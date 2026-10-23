@@ -94,7 +94,7 @@ export default async function DashboardPage({
           <StatCard
             title="Outstanding"
             value={formatMoney(report.outstanding)}
-            caption="All-time balance across tenants"
+            caption="Rent unpaid to the end of last month"
             badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
           />
         </Grid>

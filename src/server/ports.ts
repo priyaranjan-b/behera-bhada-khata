@@ -18,6 +18,7 @@ import type {
   Property,
   RentPeriod,
   Tenant,
+  TenantDocument,
   TenantRentRate,
   TenantStatus,
   Unit,
@@ -126,6 +127,15 @@ export interface OwnerRepositories {
   /** Who occupies (occupied) which house, when - oldest tenancy first. */
   occupancy: {
     list(filter?: { tenantIds?: string[]; propertyCode?: string }): Promise<UnitOccupancy[]>;
+  };
+  /** Files kept on a tenant (0011): added and deleted, never edited. */
+  tenantDocuments: {
+    /** Oldest first. */
+    list(tenantId: string): Promise<TenantDocument[]>;
+    get(id: string): Promise<TenantDocument | null>;
+    create(rows: Insert<"tenant_documents">[]): Promise<void>;
+    /** False if no such document. */
+    remove(id: string): Promise<boolean>;
   };
   rentRates: {
     /** Ordered by effective_month ascending. */

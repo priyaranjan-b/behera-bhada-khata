@@ -18,6 +18,7 @@ import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
 import { notFound, parseInput, type OwnerContext } from "./context";
 import { ensureRentPeriodsFor } from "./periods";
+import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
 
 const MAX_BULK_ROWS = 500;
@@ -138,7 +139,8 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
           contentType: f.content_type,
         })),
       })),
-      adjustments
+      adjustments,
+      currentMonthKey()
     ),
   };
 }
@@ -189,7 +191,11 @@ export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Pr
   const db = await ownerDb();
   const tenant = await db.tenants.get(tenantId);
   if (!tenant) notFound("Tenant");
-  const [placements, available] = await Promise.all([loadPlacements(db, [tenantId]), availableUnits(db, tenantId)]);
+  const [placements, available, documents] = await Promise.all([
+    loadPlacements(db, [tenantId]),
+    availableUnits(db, tenantId),
+    listTenantDocuments(db, tenantId),
+  ]);
   const placement = placementOf(placements, tenantId);
   // A moved-out tenant's last houses may already be let again; a draft keeps its houses.
   const own = new Set(tenant.status !== "inactive" ? placement.unitCodes : []);
@@ -209,6 +215,7 @@ export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Pr
       unitCodes: [...own],
     },
     availableUnits: [...available.filter((u) => own.has(u.unitCode)), ...available.filter((u) => !own.has(u.unitCode))],
+    documents,
   };
 }
 

@@ -9,6 +9,7 @@ import type {
   Payment,
   PaymentAllocation,
   PaymentProof,
+  TenantDocument,
   Property,
   RentPeriod,
   Tenant,
@@ -125,6 +126,7 @@ function build() {
     adjustments: new Map<string, Adjustment>(),
     files: new Map<string, Uint8Array>(),
     proofs: new Map<string, PaymentProof>(),
+    documents: new Map<string, TenantDocument>(),
     rateLimitAllows: true,
   };
 
@@ -137,6 +139,17 @@ function build() {
     properties: { list: vi.fn(async () => [property]), get: vi.fn(async () => property), create: vi.fn() },
     units: { list: vi.fn(async () => units), create: vi.fn() },
     occupancy: { list: vi.fn(async () => occupancy) },
+    tenantDocuments: {
+      list: vi.fn(async (tenantId: string) => [...state.documents.values()].filter((d) => d.tenant_id === tenantId)),
+      get: vi.fn(async (id: string) => state.documents.get(id) ?? null),
+      create: vi.fn(async (rows: Omit<TenantDocument, "id" | "created_at">[]) => {
+        for (const row of rows) {
+          const id = `00000000-0000-4000-8000-${String(state.documents.size + 1).padStart(12, "0")}`;
+          state.documents.set(id, { ...row, id, created_at: "2026-10-24T00:00:00Z" });
+        }
+      }),
+      remove: vi.fn(async (id: string) => state.documents.delete(id)),
+    },
     rentRates: { listForTenants: vi.fn(async () => [rate]) },
     tenants: {
       list: vi.fn(async () => [...state.tenants.values()]),

@@ -91,6 +91,11 @@ both together.
   `src/server/services/periods.ts`, plus the daily cron — so arrears show up
   even for months no one logged a payment for). **Billing is per tenant:**
   one combined monthly rent covers all of a tenant's houses.
+- **Outstanding counts only months that have ended** (up to the end of last
+  month): `summarizeBalance` in `src/lib/domain/allocation.ts`, used by every
+  screen. Rent rows for the current month and later exist (created ahead so
+  rent can be paid in advance) but are "not due yet" (`notYetDue`), shown as
+  such in the Months table and ledger and left out of balances.
 - **Which houses, at what rent, and when are dated history, never
   overwritten.**
   - `tenant_units` (start/end dates; `end_date` inclusive, null = current) is
@@ -121,6 +126,11 @@ both together.
   browser (`src/lib/proofImages.ts`) and sends multipart
   (`readJsonWithFiles` in `src/server/http.ts`); the service checks the
   bytes and the limits in `PROOF_LIMITS` (`src/lib/validation.ts`).
+- **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
+  agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,
+  `src/server/services/tenantDocuments.ts`), one `tenant_documents` row per
+  file with a free-text `document_type`. Unlike the ledger, the owner may
+  delete them.
 - **Recorded = counted** (`0010_instant_confirmation.sql`, D20): both
   ledger tables are written as `status = 'confirmed'` and applied to
   `rent_periods.amount_allocated` in the same transaction. The tenant's

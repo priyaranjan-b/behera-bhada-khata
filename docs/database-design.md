@@ -22,6 +22,7 @@ locations            AC          Arnapal Chakk Complex          (site)
 tenants              uuid        a person or business
   ├ tenant_units     which houses, from - to     (occupancy history)
   ├ tenant_rent_rates combined monthly rent, from month M  (rent history)
+  ├ tenant_documents ID proof, photo, agreement... (files, D21)
   ├ rent_periods     one row per tenant per month owed
   ├ payments  ─ payment_allocations    ─┐  append-only ledger,
   │            payment_proofs          │  (files attached to a payment)
@@ -40,6 +41,7 @@ tenants              uuid        a person or business
 | `0008_billing_start.sql` | `tenants.billing_start` separate from `lease_start`; "rent paid up to"; security deposit |
 | `0009_payment_proofs.sql` | `payment_proofs` (photo/PDF attachments of a payment, written by `create_payment`); bucket takes photos, 4 MB |
 | `0010_instant_confirmation.sql` | payments/adjustments count when recorded; tenant sign + OTP becomes an optional acknowledgement (`acknowledged_at`); ledger writable only through `create_*` |
+| `0011_tenant_documents.sql` | `tenant_documents`: ID proof, photo, agreement... on a tenant, with a free-text type |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -404,6 +406,30 @@ dropped, since they would apply allocations a second time.
 back until the tenant signed made arrears and "paid" months wrong for as
 long as the tenant didn't respond. The signature stays valuable as the
 tenant's own record, so it's kept, but optional.
+
+### D21 — Tenant documents are deletable files with a free-text type
+
+**Decision (0011).** `tenant_documents (tenant_id, document_type,
+storage_path, file_name, content_type, size_bytes)`: one row per file, kept
+in the private bucket under `tenants/<tenant>/documents/` (a CHECK keeps the
+path in the tenant's own folder). `document_type` is free text (1-60
+characters): the form suggests common types (`TENANT_DOCUMENT_TYPES` in
+`src/lib/validation.ts`) but the owner can type any other.
+
+**Rules.**
+- **Owner only:** RLS with `is_app_owner()` for select, insert and delete;
+  `UPDATE` is revoked (re-upload instead of editing), `anon` gets nothing.
+- **Deletable, unlike the ledger.** These aren't money facts, and a replaced
+  ID proof or a wrong upload should go; deleting removes the row, then the
+  file (best effort). A single-row write needs no SQL function (D5).
+- **Same file rules as payment proofs (D19):** photos or PDFs identified by
+  their bytes, up to 5 files / 4 MB per upload, photos compressed in the
+  browser; viewing redirects to a 5-minute signed URL.
+
+**Why a free-text type and not an enum or lookup table.** The list of
+documents people keep varies (shop licences, electricity bills, police
+verification); a fixed list would force "Other" and lose the meaning, and a
+lookup table is more machinery than suggestions in the form.
 
 ---
 

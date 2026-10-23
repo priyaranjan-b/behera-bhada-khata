@@ -28,6 +28,8 @@ import type {
   RecordCreated,
   RecordType,
   SearchIndex,
+  TenantDocumentsSaved,
+  UploadTenantDocumentsInput,
   Session,
   SessionTokens,
   TenantDetail,
@@ -89,6 +91,9 @@ export interface ApiCommands {
       moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
       /** `proofs`: photos/PDFs of the payment, sent as multipart (see PROOF_LIMITS). */
       createPayment(tenantId: string, input: CreatePaymentInput, proofs?: File[]): Promise<RecordCreated>;
+      /** ID proof, photo, agreement... as multipart; `documentTypes[i]` is the type of `files[i]`. */
+      uploadDocuments(tenantId: string, input: UploadTenantDocumentsInput, files: File[]): Promise<TenantDocumentsSaved>;
+      deleteDocument(tenantId: string, documentId: string): Promise<void>;
     };
     payments: {
       createAdjustment(paymentId: string, input: CreateAdjustmentInput): Promise<CreatedAdjustment>;

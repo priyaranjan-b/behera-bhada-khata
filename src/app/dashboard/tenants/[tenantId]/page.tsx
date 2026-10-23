@@ -7,7 +7,7 @@ import Alert from "@mui/material/Alert";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { addMonthsToKey, formatMonth, monthKeyOf } from "@/lib/dates";
+import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import FlashAlert from "@/components/ui/FlashAlert";
 import StatCard from "@/components/ui/StatCard";
@@ -36,8 +36,15 @@ export default async function TenantPage({
   const flash = await searchParams;
   const { tenant, balance: summary, periods, ledger: ledgerRows } = await serverApi.dashboard.tenants.detail(tenantId);
 
-  const periodRows: TenantPeriodRow[] = periods.map((p) => ({ ...p, monthLabel: formatMonth(p.periodMonth) }));
-  const paidMonths = periodRows.filter((p) => p.status === "paid").length;
+  const thisMonth = currentMonthKey();
+  const periodRows: TenantPeriodRow[] = periods.map((p) => ({
+    ...p,
+    monthLabel: formatMonth(p.periodMonth),
+    notYetDue: p.periodMonth >= thisMonth,
+  }));
+  // Only months that have ended are owed (summarizeBalance); later ones are billed ahead.
+  const endedRows = periodRows.filter((p) => !p.notYetDue);
+  const paidMonths = endedRows.filter((p) => p.status === "paid").length;
   const active = tenant.status === "active";
   const draft = tenant.status === "draft";
   const houseHistory = [...tenant.unitHistory].reverse();
@@ -171,7 +178,11 @@ export default async function TenantPage({
           <StatCard
             title="Outstanding"
             value={formatMoney(summary.totalOutstanding)}
-            caption="All-time balance"
+            caption={
+              summary.notYetDue > 0
+                ? `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))} · ${formatMoney(summary.notYetDue)} not due yet`
+                : `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))}`
+            }
             badge={
               summary.totalOutstanding > 0
                 ? { label: "To collect", tone: "warning" }
@@ -183,7 +194,7 @@ export default async function TenantPage({
           <StatCard
             title="Months overdue"
             value={String(summary.overdueMonths)}
-            caption={`${paidMonths} of ${periodRows.length} month${periodRows.length === 1 ? "" : "s"} paid`}
+            caption={`${paidMonths} of ${endedRows.length} ended month${endedRows.length === 1 ? "" : "s"} paid`}
             badge={
               summary.overdueMonths > 0
                 ? { label: "Follow up", tone: "danger" }

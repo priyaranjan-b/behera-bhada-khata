@@ -9,6 +9,7 @@ import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
 import type { PeriodStatus, PreferredChannel, TenantStatus, UnitType } from "@/lib/types";
 import type {
+  uploadTenantDocumentsSchema,
   confirmSchema,
   createAdjustmentSchema,
   createPaymentSchema,
@@ -276,7 +277,26 @@ export interface EditTenantForm {
   };
   /** The tenant's own current houses first, then every vacant one. */
   availableUnits: AvailableUnit[];
+  /** ID proof, photo, agreement... oldest first (0011). */
+  documents: TenantDocumentView[];
 }
+
+/** A file kept on a tenant; opened via apiPaths.dashboard.tenants.document. */
+export interface TenantDocumentView {
+  id: string;
+  documentType: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+export interface TenantDocumentsSaved {
+  /** All of the tenant's documents after the upload. */
+  documents: TenantDocumentView[];
+}
+
+export type UploadTenantDocumentsInput = z.infer<typeof uploadTenantDocumentsSchema>;
 
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type MoveOutInput = z.infer<typeof moveOutSchema>;

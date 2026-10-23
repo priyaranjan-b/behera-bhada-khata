@@ -121,25 +121,26 @@ export const appCustomizations: Components<Theme> = {
     ],
   },
   // The template draws the field border on OutlinedInput's root and hides
-  // the notched outline (inputs.tsx), so a floating `TextField label` has no
-  // gap cut for it and the border strikes through the text. Show outlined
-  // labels the template's way instead: static, above the field, like
-  // FormLabel.
+  // the notched outline (inputs.tsx), so a floating `TextField label` gets no
+  // gap cut in the border and the line strikes through the text. Instead the
+  // floated label carries the field's own background (same rule as
+  // MuiOutlinedInput above: paper in light, background.default in dark),
+  // masking the border behind it. The resting position is retuned for the
+  // template's 2.5rem / 2.25rem fields (MUI's default assumes 56px / 40px).
   MuiInputLabel: {
     variants: [
       {
         props: { variant: "outlined" },
         style: ({ theme }) => ({
-          ...theme.typography.caption,
-          position: "static",
-          transform: "none",
-          maxWidth: "100%",
-          marginBottom: 6,
-          color: (theme.vars || theme).palette.text.secondary,
-          pointerEvents: "auto",
-          "&.Mui-focused": { color: (theme.vars || theme).palette.primary.main },
-          "&.Mui-error": { color: (theme.vars || theme).palette.error.main },
-          "&.Mui-disabled": { color: (theme.vars || theme).palette.text.disabled },
+          transform: "translate(13px, 9px) scale(1)",
+          "&.MuiInputLabel-sizeSmall": { transform: "translate(13px, 7px) scale(1)" },
+          "&.MuiInputLabel-shrink": {
+            transform: "translate(10px, -9px) scale(0.75)",
+            padding: "0 4px",
+            borderRadius: 2,
+            backgroundColor: (theme.vars || theme).palette.background.default,
+            ...theme.applyStyles("light", { backgroundColor: lightSurfaces.paper }),
+          },
         }),
       },
     ],

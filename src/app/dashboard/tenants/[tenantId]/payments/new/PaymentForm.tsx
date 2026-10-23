@@ -20,8 +20,8 @@ import {
   SignatureField,
   SummaryLine,
 } from "@/components/ui";
-import { suggestAllocations, type PeriodLike } from "@/lib/domain/allocation";
-import { formatMonth, todayKey } from "@/lib/dates";
+import { suggestAllocations, summarizeBalance, type PeriodLike } from "@/lib/domain/allocation";
+import { currentMonthKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 import { prepareProofFile } from "@/lib/proofImages";
@@ -58,9 +58,8 @@ export default function PaymentForm({
     : suggested;
   const allocatedTotal = round2(allocations.reduce((sum, a) => sum + a.amountAllocated, 0));
   const unallocated = round2(amountNumber - allocatedTotal);
-  const totalOutstanding = round2(
-    periods.reduce((sum, p) => sum + Number(p.amount_due) - Number(p.amount_allocated), 0),
-  );
+  // Owed = months that have ended; this month and later can be paid in advance but aren't due yet.
+  const { totalOutstanding, notYetDue } = summarizeBalance(periods, currentMonthKey());
 
   function updateAllocation(rentPeriodId: string, value: number) {
     const base: Record<string, number> = manualAllocations
@@ -201,7 +200,8 @@ export default function PaymentForm({
 
             <Divider />
             <Stack spacing={1}>
-              <SummaryLine label="Total outstanding" value={formatMoney(totalOutstanding)} />
+              <SummaryLine label="Due (to end of last month)" value={formatMoney(totalOutstanding)} />
+              {notYetDue > 0 ? <SummaryLine label="Not due yet (advance)" value={formatMoney(notYetDue)} /> : null}
               <SummaryLine label="Amount received" value={formatMoney(amountNumber)} />
               <SummaryLine label="Allocated" value={formatMoney(allocatedTotal)} emphasis="strong" />
               {unallocated !== 0 && amountNumber > 0 ? (

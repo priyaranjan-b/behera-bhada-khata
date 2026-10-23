@@ -37,7 +37,7 @@ export function sniffProofType(bytes: Uint8Array): ProofContentType | null {
 }
 
 /** A readable, storage-safe name: `3-upi-screenshot.jpg`. */
-function storageName(index: number, fileName: string, type: ProofContentType): string {
+export function storageName(index: number, fileName: string, type: ProofContentType): string {
   const stem =
     fileName
       .replace(/\.[^.]*$/, "")
@@ -49,14 +49,20 @@ function storageName(index: number, fileName: string, type: ProofContentType): s
   return `${index + 1}-${stem}.${EXTENSION[type]}`;
 }
 
-/** 400 unless the files fit the limits and each really is an accepted type. */
-export function checkProofFiles(files: UploadedFile[]): (UploadedFile & { type: ProofContentType })[] {
+/**
+ * 400 unless the files fit the limits and each really is an accepted type.
+ * Shared by payment proofs and tenant documents (`what` names them in errors).
+ */
+export function checkProofFiles(
+  files: UploadedFile[],
+  what = "proof files"
+): (UploadedFile & { type: ProofContentType })[] {
   if (files.length > PROOF_LIMITS.maxFiles) {
-    throw new ApiError(400, `Attach at most ${PROOF_LIMITS.maxFiles} proof files`);
+    throw new ApiError(400, `Attach at most ${PROOF_LIMITS.maxFiles} ${what} at a time`);
   }
   const total = files.reduce((sum, f) => sum + f.bytes.length, 0);
   if (total > PROOF_LIMITS.maxTotalBytes) {
-    throw new ApiError(400, `Proof files can be at most ${PROOF_LIMITS.maxTotalBytes / 1024 / 1024} MB in total`);
+    throw new ApiError(400, `${what[0].toUpperCase()}${what.slice(1)} can be at most ${PROOF_LIMITS.maxTotalBytes / 1024 / 1024} MB in total`);
   }
   return files.map((f) => {
     const type = f.bytes.length > 0 ? sniffProofType(f.bytes) : null;

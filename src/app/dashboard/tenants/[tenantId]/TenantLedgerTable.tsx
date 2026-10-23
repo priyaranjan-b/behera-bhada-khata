@@ -132,6 +132,8 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
             <Typography variant="caption" color="textSecondary">
               —
             </Typography>
+          ) : row.status === "upcoming" ? (
+            <StatusChip status="not_due_yet" />
           ) : (
             <StatusChip status={row.status} />
           ),

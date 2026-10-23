@@ -179,6 +179,31 @@ export interface Database {
           },
         ];
       };
+      tenant_documents: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          document_type: string;
+          storage_path: string;
+          file_name: string;
+          content_type: ProofContentType;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          document_type: string;
+          storage_path: string;
+          file_name: string;
+          content_type: ProofContentType;
+          size_bytes: number;
+          created_at?: string;
+        };
+        // Never edited (UPDATE revoked, 0011); delete and re-upload instead.
+        Update: never;
+        Relationships: [];
+      };
       tenant_rent_rates: {
         Row: {
           id: number;
@@ -462,6 +487,7 @@ export type Unit = Database["public"]["Tables"]["units"]["Row"];
 export type Tenant = Database["public"]["Tables"]["tenants"]["Row"];
 export type TenantUnit = Database["public"]["Tables"]["tenant_units"]["Row"];
 export type TenantRentRate = Database["public"]["Tables"]["tenant_rent_rates"]["Row"];
+export type TenantDocument = Database["public"]["Tables"]["tenant_documents"]["Row"];
 export type UnitOccupancy = Database["public"]["Views"]["unit_occupancy"]["Row"];
 export type RentPeriod = Database["public"]["Tables"]["rent_periods"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];

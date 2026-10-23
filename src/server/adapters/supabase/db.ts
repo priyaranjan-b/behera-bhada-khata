@@ -95,6 +95,29 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
       },
     },
 
+    tenantDocuments: {
+      async list(tenantId) {
+        return must(
+          await db.from("tenant_documents").select("*").eq("tenant_id", tenantId).order("created_at").order("storage_path"),
+          "list tenant documents"
+        );
+      },
+      async get(id) {
+        return must(await db.from("tenant_documents").select("*").eq("id", id).maybeSingle(), "get tenant document");
+      },
+      async create(rows) {
+        if (rows.length === 0) return;
+        mustWrite(await db.from("tenant_documents").insert(rows), "add tenant documents");
+      },
+      async remove(id) {
+        const deleted = mustWrite(
+          await db.from("tenant_documents").delete().eq("id", id).select("id"),
+          "delete tenant document"
+        );
+        return deleted.length > 0;
+      },
+    },
+
     rentRates: {
       async listForTenants(tenantIds) {
         const batches = await Promise.all(

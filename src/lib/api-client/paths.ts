@@ -32,6 +32,9 @@ export const apiPaths = {
       moveOut: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out`,
       payments: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments`,
       newPayment: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments/new`,
+      documents: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/documents`,
+      document: (tenantId: string, documentId: string) =>
+        `/api/dashboard/tenants/${e(tenantId)}/documents/${e(documentId)}`,
     },
     payments: {
       adjust: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/adjust`,

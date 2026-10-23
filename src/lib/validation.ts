@@ -35,6 +35,29 @@ export const signaturePngSchema = z
 
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 
+/** Suggested tenant document types (0011); the owner may type any other. */
+export const TENANT_DOCUMENT_TYPES = [
+  "ID proof (Aadhaar)",
+  "ID proof (PAN)",
+  "ID proof (Voter ID)",
+  "ID proof (Driving licence)",
+  "Passport photo",
+  "Rent agreement",
+  "Police verification",
+  "Business licence / GST",
+] as const;
+
+export const tenantDocumentTypeSchema = z
+  .string()
+  .trim()
+  .min(1, "Choose or type what each document is")
+  .max(60, "Keep a document type under 60 characters");
+
+/** One type per uploaded file, in the order the files are sent. */
+export const uploadTenantDocumentsSchema = z.object({
+  documentTypes: z.array(tenantDocumentTypeSchema).min(1, "Choose at least one file").max(10),
+});
+
 /**
  * Payment proof attachments (0009_payment_proofs.sql). One request carries
  * them all, so the total stays under Vercel's 4.5 MB request body limit; the

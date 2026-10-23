@@ -5,6 +5,8 @@ const TONE_BY_STATUS: Record<string, BadgeTone> = {
   partially_paid: "warning",
   paid: "success",
   confirmed: "success",
+  // A month that hasn't ended yet: billed ahead, not owed (summarizeBalance).
+  not_due_yet: "neutral",
 };
 
 export function StatusChip({ status }: { status: string }) {

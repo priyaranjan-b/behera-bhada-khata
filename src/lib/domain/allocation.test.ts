@@ -25,7 +25,15 @@ describe("suggestAllocations", () => {
 });
 
 describe("summarizeBalance", () => {
-  it("counts only past months as overdue", () => {
-    expect(summarizeBalance(periods, "2026-03-01")).toEqual({ totalOutstanding: 11000, overdueMonths: 2 });
+  it("counts only months that have ended; this month and later aren't due yet", () => {
+    expect(summarizeBalance(periods, "2026-03-01")).toEqual({ totalOutstanding: 6000, overdueMonths: 2, notYetDue: 5000 });
+  });
+
+  it("owes nothing yet when only the current and future months are unpaid", () => {
+    expect(summarizeBalance(periods, "2026-01-01")).toEqual({ totalOutstanding: 0, overdueMonths: 0, notYetDue: 11000 });
+  });
+
+  it("counts every unpaid month once they've all ended", () => {
+    expect(summarizeBalance(periods, "2026-04-01")).toEqual({ totalOutstanding: 11000, overdueMonths: 3, notYetDue: 0 });
   });
 });

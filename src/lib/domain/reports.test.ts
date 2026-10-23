@@ -26,7 +26,8 @@ describe("buildMonthlyReport", () => {
       "2026-03-01",
       "2026-03-01"
     );
-    expect(report).toMatchObject({ expected: 10000, collected: 2000, outstanding: 13000, overdueTenantCount: 1 });
+    // Outstanding stops at the end of last month: only Bimal's unpaid February counts, not March.
+    expect(report).toMatchObject({ expected: 10000, collected: 2000, outstanding: 5000, overdueTenantCount: 1 });
   });
 });
 

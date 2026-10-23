@@ -2,7 +2,8 @@ import { dateKeyOf, formatMonth } from "@/lib/dates";
 import { round2 } from "@/lib/money";
 
 export type LedgerEntryType = "charge" | "payment" | "adjustment";
-export type LedgerRowStatus = "billed" | "confirmed" | "pending";
+/** "upcoming": a rent charge for this month or later - shown, but not owed (or counted) until the month ends. */
+export type LedgerRowStatus = "billed" | "upcoming" | "confirmed" | "pending";
 
 /** A file attached to a payment as proof (payment_proofs, 0009). */
 export interface LedgerProof {
@@ -60,10 +61,14 @@ interface AdjustmentInput {
 // the balance at once (the tenant's acknowledgement is optional and changes
 // nothing). A "pending" row could only be left from before 0010; it's shown
 // but, like rent_periods.amount_allocated, not counted.
+//
+// Rent for the current month and later is shown as "upcoming" and left out
+// of the balance, matching summarizeBalance: a month counts once it's over.
 export function buildTenantLedger(
   periods: PeriodInput[],
   payments: PaymentInput[],
-  adjustments: AdjustmentInput[]
+  adjustments: AdjustmentInput[],
+  todayMonthKey: string
 ): LedgerRow[] {
   type Draft = Omit<LedgerRow, "balance">;
   const draft: Draft[] = [];
@@ -76,7 +81,7 @@ export function buildTenantLedger(
       description: `Rent due — ${formatMonth(period.period_month)}`,
       debit: round2(Number(period.amount_due)),
       credit: 0,
-      status: "billed",
+      status: period.period_month < todayMonthKey ? "billed" : "upcoming",
     });
   }
 
@@ -114,7 +119,7 @@ export function buildTenantLedger(
 
   let balance = 0;
   return draft.map((row) => {
-    if (row.status !== "pending") {
+    if (row.status !== "pending" && row.status !== "upcoming") {
       balance = round2(balance + row.debit - row.credit);
     }
     return { ...row, balance };

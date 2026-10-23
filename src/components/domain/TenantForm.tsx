@@ -6,13 +6,15 @@ import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
+import Grid from "@mui/material/Grid";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { FormActions, SectionCard } from "@/components/ui";
+import TenantDocumentsCard, { type PendingDocument } from "@/components/domain/TenantDocumentsCard";
 import { api, errorMessage } from "@/lib/api-client";
-import type { AvailableUnit, EditTenantForm } from "@/lib/contracts";
+import type { AvailableUnit, EditTenantForm, TenantDocumentView } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf, todayKey } from "@/lib/dates";
 import { formatFloor } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
@@ -36,7 +38,16 @@ function sameSet(a: string[], b: string[]): boolean {
  * Onboards a tenant onto one or more houses at one combined monthly rent, or
  * edits one. Billing is per tenant, so the rent covers every chosen house.
  */
-export default function TenantForm({ mode, availableUnits }: { mode: Mode; availableUnits: AvailableUnit[] }) {
+export default function TenantForm({
+  mode,
+  availableUnits,
+  documents,
+}: {
+  mode: Mode;
+  availableUnits: AvailableUnit[];
+  /** Edit mode: the tenant's saved documents; new ones added here upload on Save (0011). */
+  documents?: TenantDocumentView[];
+}) {
   const router = useRouter();
   const editing = mode.kind === "edit" ? mode.tenant : null;
   const movedOut = editing?.status === "inactive";
@@ -73,6 +84,7 @@ export default function TenantForm({ mode, availableUnits }: { mode: Mode; avail
   const [unitsEffective, setUnitsEffective] = useState(todayKey());
   const [rentEffectiveMonth, setRentEffectiveMonth] = useState(addMonthsToKey(currentMonthKey(), 1).slice(0, 7));
   const [submitting, setSubmitting] = useState(false);
+  const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const unitCodes = units.map((u) => u.unitCode);
@@ -108,6 +120,11 @@ export default function TenantForm({ mode, availableUnits }: { mode: Mode; avail
       setError("Choose at least one house");
       return;
     }
+    // Every new document needs its own type (one to one), checked before anything is saved.
+    if (pendingDocuments.some((d) => !d.documentType.trim())) {
+      setError("Choose or type a document type for each new document");
+      return;
+    }
     setSubmitting(true);
     if (draft && Boolean(monthlyRent) !== Boolean(leaseStart)) {
       setError("Enter the monthly rent and lease start together (with the phone) to start billing");
@@ -135,6 +152,21 @@ export default function TenantForm({ mode, availableUnits }: { mode: Mode; avail
           // Only a draft's deposit can change; leave it out otherwise.
           depositAmount: draft && deposit ? Number(deposit) : undefined,
         });
+        if (pendingDocuments.length > 0) {
+          try {
+            await api.dashboard.tenants.uploadDocuments(
+              mode.tenant.id,
+              { documentTypes: pendingDocuments.map((d) => d.documentType.trim()) },
+              pendingDocuments.map((d) => d.file)
+            );
+          } catch (err) {
+            // The tenant's changes are saved; keep the files here so Save can retry them.
+            setError(`Tenant saved, but the documents weren't uploaded: ${errorMessage(err, "please try again")}`);
+            setSubmitting(false);
+            router.refresh();
+            return;
+          }
+        }
         router.push(`/dashboard/tenants/${mode.tenant.id}?saved=1`);
       } else {
         const { id } = await api.dashboard.properties.createTenant(mode.propertyCode, {
@@ -153,205 +185,224 @@ export default function TenantForm({ mode, availableUnits }: { mode: Mode; avail
   }
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 720 }}>
-      <Stack spacing={2}>
-        <SectionCard title="Houses & rent">
-          {draft ? (
-            <Alert severity={draftComplete ? "success" : "info"}>
-              {draftComplete
-                ? `Saving will make this tenant active and start billing from ${billingStart ? formatMonth(billingStart) : "the month after rent was paid up to"}.`
-                : "Draft from the paper register: not billed yet. Add the phone, combined monthly rent, when they moved in and how far rent is already paid, to start billing. You can save partial details now."}
-            </Alert>
-          ) : null}
-          {movedOut ? (
-            <Alert severity="info">This tenant has moved out, so their houses and rent can no longer change.</Alert>
-          ) : null}
-          <Autocomplete
-            multiple
-            options={options}
-            value={units}
-            onChange={(_, value) => setUnits(value)}
-            disabled={movedOut}
-            groupBy={(u) => `${u.propertyName} (${u.propertyCode})`}
-            getOptionLabel={(u) => u.unitCode}
-            isOptionEqualToValue={(a, b) => a.unitCode === b.unitCode}
-            filterSelectedOptions
-            renderOption={(props, u) => {
-              const { key, ...rest } = props;
-              return (
-                <li key={key} {...rest}>
-                  <Stack>
-                    <Typography variant="body2">{u.unitCode}</Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {unitCaption(u)}
-                    </Typography>
-                  </Stack>
-                </li>
-              );
-            }}
-            renderValue={(value, getItemProps) =>
-              value.map((u, index) => {
-                const { key, ...itemProps } = getItemProps({ index });
-                return <Chip key={key} label={u.unitCode} size="small" {...itemProps} />;
-              })
-            }
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Houses"
-                helperText={
-                  options.length === 0
-                    ? "No vacant houses - add a house to a tower first."
-                    : "Vacant houses only. A tenant can take several, across towers."
-                }
-              />
-            )}
-          />
-          {unitsChanged && !movedOut ? (
-            <TextField
-              label="Houses change from"
-              type="date"
-              value={unitsEffective}
-              onChange={(e) => setUnitsEffective(e.target.value)}
-              helperText="Removed houses end the day before; added houses start on this date."
-              required
-              fullWidth
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          ) : null}
-
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <TextField
-              label="Combined monthly rent"
-              type="number"
-              value={monthlyRent}
-              onChange={(e) => setMonthlyRent(e.target.value)}
+    <Box component="form" onSubmit={handleSubmit}>
+      {/* Side by side from md, equal halves; both columns stretch to the same height so the cards line up. */}
+      <Grid container spacing={2} columns={12}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+          <SectionCard title="Houses & rent" fill>
+            {draft ? (
+              <Alert severity={draftComplete ? "success" : "info"}>
+                {draftComplete
+                  ? `Saving will make this tenant active and start billing from ${billingStart ? formatMonth(billingStart) : "the month after rent was paid up to"}.`
+                  : "Draft from the paper register: not billed yet. Add the phone, combined monthly rent, when they moved in and how far rent is already paid, to start billing. You can save partial details now."}
+              </Alert>
+            ) : null}
+            {movedOut ? (
+              <Alert severity="info">This tenant has moved out, so their houses and rent can no longer change.</Alert>
+            ) : null}
+            <Autocomplete
+              multiple
+              options={options}
+              value={units}
+              onChange={(_, value) => setUnits(value)}
               disabled={movedOut}
-              helperText={
-                draft && !monthlyRent
-                  ? "Not set yet"
-                  : units.length > 1
-                  ? `One rent for all ${units.length} houses${Number(monthlyRent) > 0 ? ` (${formatMoney(Number(monthlyRent))})` : ""}`
-                  : "Billed once a month for all of this tenant's houses"
+              groupBy={(u) => `${u.propertyName} (${u.propertyCode})`}
+              getOptionLabel={(u) => u.unitCode}
+              isOptionEqualToValue={(a, b) => a.unitCode === b.unitCode}
+              filterSelectedOptions
+              renderOption={(props, u) => {
+                const { key, ...rest } = props;
+                return (
+                  <li key={key} {...rest}>
+                    <Stack>
+                      <Typography variant="body2">{u.unitCode}</Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {unitCaption(u)}
+                      </Typography>
+                    </Stack>
+                  </li>
+                );
+              }}
+              renderValue={(value, getItemProps) =>
+                value.map((u, index) => {
+                  const { key, ...itemProps } = getItemProps({ index });
+                  return <Chip key={key} label={u.unitCode} size="small" {...itemProps} />;
+                })
               }
-              slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
-              required={!draft}
-              fullWidth
-            />
-            {editing && !draft ? (
-              rentChanged && !movedOut ? (
+              renderInput={(params) => (
                 <TextField
-                  label="New rent from"
-                  type="month"
-                  value={rentEffectiveMonth}
-                  onChange={(e) => setRentEffectiveMonth(e.target.value)}
-                  helperText="Months before keep the old rent"
-                  required
-                  fullWidth
-                  slotProps={{ inputLabel: { shrink: true } }}
+                  {...params}
+                  label="Houses"
+                  helperText={
+                    options.length === 0
+                      ? "No vacant houses - add a house to a tower first."
+                      : "Vacant houses only. A tenant can take several, across towers."
+                  }
                 />
-              ) : null
-            ) : (
+              )}
+            />
+            {unitsChanged && !movedOut ? (
               <TextField
-                label="Moved in (lease start)"
+                label="Houses change from"
                 type="date"
-                value={leaseStart}
-                onChange={(e) => setLeaseStart(e.target.value)}
-                helperText="When they moved in - kept as history"
-                required={!draft}
+                value={unitsEffective}
+                onChange={(e) => setUnitsEffective(e.target.value)}
+                helperText="Removed houses end the day before; added houses start on this date."
+                required
                 fullWidth
                 slotProps={{ inputLabel: { shrink: true } }}
               />
-            )}
-          </Stack>
-          {settingUpBilling ? (
+            ) : null}
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <TextField
+                label="Combined monthly rent"
+                type="number"
+                value={monthlyRent}
+                onChange={(e) => setMonthlyRent(e.target.value)}
+                disabled={movedOut}
+                helperText={
+                  draft && !monthlyRent
+                    ? "Not set yet"
+                    : units.length > 1
+                    ? `One rent for all ${units.length} houses${Number(monthlyRent) > 0 ? ` (${formatMoney(Number(monthlyRent))})` : ""}`
+                    : "Billed once a month for all of this tenant's houses"
+                }
+                slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
+                required={!draft}
+                fullWidth
+              />
+              {editing && !draft ? (
+                rentChanged && !movedOut ? (
+                  <TextField
+                    label="New rent from"
+                    type="month"
+                    value={rentEffectiveMonth}
+                    onChange={(e) => setRentEffectiveMonth(e.target.value)}
+                    helperText="Months before keep the old rent"
+                    required
+                    fullWidth
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                ) : null
+              ) : (
+                <TextField
+                  label="Moved in (lease start)"
+                  type="date"
+                  value={leaseStart}
+                  onChange={(e) => setLeaseStart(e.target.value)}
+                  helperText="When they moved in - kept as history"
+                  required={!draft}
+                  fullWidth
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              )}
+            </Stack>
+            {settingUpBilling ? (
+              <TextField
+                label="Rent paid up to"
+                type="month"
+                value={paidThrough}
+                onChange={(e) => setPaidThrough(e.target.value)}
+                helperText={
+                  billingStart
+                    ? `Billing starts ${formatMonth(billingStart)}. Months before that were settled outside the app.`
+                    : draft
+                      ? "Last month already paid on paper; billing starts the month after"
+                      : "Leave blank for a new tenant: billing starts from the lease start"
+                }
+                fullWidth
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            ) : null}
             <TextField
-              label="Rent paid up to"
-              type="month"
-              value={paidThrough}
-              onChange={(e) => setPaidThrough(e.target.value)}
+              label="Security deposit (optional)"
+              type="number"
+              value={deposit}
+              onChange={(e) => setDeposit(e.target.value)}
+              disabled={!depositEditable}
               helperText={
-                billingStart
-                  ? `Billing starts ${formatMonth(billingStart)}. Months before that were settled outside the app.`
-                  : draft
-                    ? "Last month already paid on paper; billing starts the month after"
-                    : "Leave blank for a new tenant: billing starts from the lease start"
+                depositEditable
+                  ? "Can't be changed after the tenant is active"
+                  : deposit
+                    ? "Locked: the deposit can't be changed once the tenant is active"
+                    : "No deposit recorded - it can't be added once the tenant is active"
               }
-              fullWidth
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          ) : null}
-          <TextField
-            label="Security deposit (optional)"
-            type="number"
-            value={deposit}
-            onChange={(e) => setDeposit(e.target.value)}
-            disabled={!depositEditable}
-            helperText={
-              depositEditable
-                ? "Can't be changed after the tenant is active"
-                : deposit
-                  ? "Locked: the deposit can't be changed once the tenant is active"
-                  : "No deposit recorded - it can't be added once the tenant is active"
-            }
-            slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
-            fullWidth
-          />
-          {monthsDueNow > 3 ? (
-            <Alert severity="warning">
-              Saving creates {monthsDueNow} months of rent due
-              {Number(monthlyRent) > 0 ? ` (${formatMoney(monthsDueNow * Number(monthlyRent))})` : ""}. If those months
-              were already paid on paper, set &quot;Rent paid up to&quot; to the last paid month.
-            </Alert>
-          ) : null}
-        </SectionCard>
-
-        <SectionCard title="Tenant details">
-          {hasCommercial ? (
-            <TextField
-              label="Business name"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              helperText="Shown instead of the contact name"
+              slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
               fullWidth
             />
-          ) : null}
-          <TextField
-            label={hasCommercial ? "Contact name" : "Name"}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            fullWidth
-          />
-          <TextField
-            label="Phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            helperText={draft && !phone ? "Not known yet - needed before billing starts" : "With country code, e.g. +919876543210"}
-            required={!draft}
-            fullWidth
-          />
-          <TextField
-            label="Preferred contact channel"
-            select
-            value={preferredChannel}
-            onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
-            fullWidth
-          >
-            <MenuItem value="both">WhatsApp + SMS</MenuItem>
-            <MenuItem value="whatsapp">WhatsApp only</MenuItem>
-            <MenuItem value="sms">SMS only</MenuItem>
-          </TextField>
-        </SectionCard>
+            {monthsDueNow > 3 ? (
+              <Alert severity="warning">
+                Saving creates {monthsDueNow} months of rent due
+                {Number(monthlyRent) > 0 ? ` (${formatMoney(monthsDueNow * Number(monthlyRent))})` : ""}. If those months
+                were already paid on paper, set &quot;Rent paid up to&quot; to the last paid month.
+              </Alert>
+            ) : null}
+          </SectionCard>
+        </Grid>
 
-        <FormActions
-          error={error}
-          cancelHref={cancelHref}
-          submitLabel="Save"
-          pendingLabel="Saving…"
-          pending={submitting}
-        />
-      </Stack>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+          {/* The last card grows to fill the column, matching the left card's bottom edge. */}
+          <Stack spacing={2} sx={{ height: "100%", "& > :last-child": { flexGrow: 1 } }}>
+            <SectionCard title="Tenant details">
+              {hasCommercial ? (
+                <TextField
+                  label="Business name"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  helperText="Shown instead of the contact name"
+                  fullWidth
+                />
+              ) : null}
+              <TextField
+                label={hasCommercial ? "Contact name" : "Name"}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                fullWidth
+              />
+              <TextField
+                label="Phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                helperText={draft && !phone ? "Not known yet - needed before billing starts" : "With country code, e.g. +919876543210"}
+                required={!draft}
+                fullWidth
+              />
+              <TextField
+                label="Preferred contact channel"
+                select
+                value={preferredChannel}
+                onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
+                fullWidth
+              >
+                <MenuItem value="both">WhatsApp + SMS</MenuItem>
+                <MenuItem value="whatsapp">WhatsApp only</MenuItem>
+                <MenuItem value="sms">SMS only</MenuItem>
+              </TextField>
+            </SectionCard>
+            {mode.kind === "edit" && documents ? (
+              <TenantDocumentsCard
+                tenantId={mode.tenant.id}
+                documents={documents}
+                pending={pendingDocuments}
+                onPendingChange={setPendingDocuments}
+                disabled={submitting}
+              />
+            ) : null}
+          </Stack>
+        </Grid>
+
+        <Grid size={12}>
+          <FormActions
+            error={error}
+            cancelHref={cancelHref}
+            submitLabel="Save"
+            pendingLabel="Saving…"
+            pending={submitting}
+          />
+        </Grid>
+      </Grid>
     </Box>
   );
 }

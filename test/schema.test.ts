@@ -926,3 +926,47 @@ describe("security deposit (0008)", () => {
     ).toBe("23514");
   });
 });
+
+describe("tenant documents (0011)", () => {
+  const doc = (overrides: Record<string, unknown> = {}) => ({
+    type: "ID proof (Aadhaar)",
+    path: `tenants/${fx.tenantA}/documents/ab12cd34-1-aadhaar.jpg`,
+    ...overrides,
+  });
+  const add = (who: Role, d: { type: unknown; path: unknown; tenant?: string }) =>
+    as(
+      who,
+      `insert into tenant_documents (tenant_id, document_type, storage_path, file_name, content_type, size_bytes)
+       values ($1, $2, $3, 'aadhaar.jpg', 'image/jpeg', 2048) returning id`,
+      [d.tenant ?? fx.tenantA, d.type, d.path]
+    );
+
+  it("lets the owner add, list and delete a document, but never edit one", async () => {
+    const [{ id }] = await add(owner(OWNER_A), doc());
+    expect(await as(owner(OWNER_A), `select document_type from tenant_documents`)).toEqual([
+      { document_type: "ID proof (Aadhaar)" },
+    ]);
+    expect(await errorCode(as(owner(OWNER_A), `update tenant_documents set document_type = 'x'`))).toBe("42501");
+    expect(await as(owner(OWNER_A), `delete from tenant_documents where id = $1 returning id`, [id])).toHaveLength(1);
+  });
+
+  it("keeps the file inside the tenant's own folder", async () => {
+    expect(await errorCode(add(owner(OWNER_A), doc({ path: `tenants/${fx.tenantA2}/documents/x.jpg` })))).toBe("23514");
+    expect(await errorCode(add(owner(OWNER_A), doc({ path: `tenants/${fx.tenantA}/documents/` })))).toBe("23514");
+    expect(await errorCode(add(owner(OWNER_A), doc({ path: `payments/${fx.tenantA}/documents/x.jpg` })))).toBe("23514");
+  });
+
+  it("requires a document type of 1-60 characters (free text)", async () => {
+    expect(await errorCode(add(owner(OWNER_A), doc({ type: "   " })))).toBe("23514");
+    expect(await errorCode(add(owner(OWNER_A), doc({ type: "x".repeat(61) })))).toBe("23514");
+    expect(await errorCode(add(owner(OWNER_A), doc({ type: "Electricity bill" })))).toBe("ok");
+  });
+
+  it("shows another account nothing and lets it add or delete nothing", async () => {
+    await add(owner(OWNER_A), doc());
+    expect(await as(owner(OWNER_B), `select * from tenant_documents`)).toEqual([]);
+    expect(await errorCode(add(owner(OWNER_B), doc({ path: `tenants/${fx.tenantA}/documents/b.jpg` })))).toBe("42501");
+    expect(await as(owner(OWNER_B), `delete from tenant_documents returning id`)).toEqual([]);
+    expect((await db.query(`select 1 from tenant_documents`)).rows).toHaveLength(1);
+  });
+});

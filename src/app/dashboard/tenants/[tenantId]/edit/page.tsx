@@ -5,7 +5,7 @@ import TenantForm from "@/components/domain/TenantForm";
 
 export default async function EditTenantPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
-  const { tenant, availableUnits } = await serverApi.dashboard.tenants.edit(tenantId);
+  const { tenant, availableUnits, documents } = await serverApi.dashboard.tenants.edit(tenantId);
 
   return (
     <Stack spacing={2}>
@@ -13,7 +13,8 @@ export default async function EditTenantPage({ params }: { params: Promise<{ ten
         title={`Edit ${tenant.businessName || tenant.name}`}
         subtitle="Changes to houses and rent take effect from the dates you choose; earlier months stay as they were."
       />
-      <TenantForm mode={{ kind: "edit", tenant }} availableUnits={availableUnits} />
+      {/* Documents show in the form's right column; new ones upload with Save. */}
+      <TenantForm mode={{ kind: "edit", tenant }} availableUnits={availableUnits} documents={documents} />
     </Stack>
   );
 }

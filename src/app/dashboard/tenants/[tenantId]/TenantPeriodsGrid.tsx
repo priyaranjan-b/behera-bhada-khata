@@ -7,6 +7,8 @@ import type { TenantPeriod } from "@/lib/contracts";
 
 export interface TenantPeriodRow extends TenantPeriod {
   monthLabel: string;
+  /** This month or later: billed ahead, not owed until the month ends (set on the server). */
+  notYetDue: boolean;
 }
 
 const columns: GridColDef<TenantPeriodRow>[] = [
@@ -26,7 +28,7 @@ const columns: GridColDef<TenantPeriodRow>[] = [
     minWidth: 140,
     headerAlign: "right",
     align: "right",
-    renderCell: ({ row }) => <StatusChip status={row.status} />,
+    renderCell: ({ row }) => <StatusChip status={row.notYetDue && row.status !== "paid" ? "not_due_yet" : row.status} />,
   },
 ];
 

@@ -11,7 +11,7 @@ export interface HttpApiOptions {
 
 /** The API over fetch. Same shape as the in-process server API, so callers can't tell them apart. */
 export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
-  async function request<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
     // FormData sets its own multipart Content-Type (with the boundary).
     const isForm = body instanceof FormData;
     const res = await fetch(`${baseUrl}${path}`, {
@@ -76,6 +76,10 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
         newPayment: (id) => get(p.dashboard.tenants.newPayment(id)),
         createPayment: (id, input, proofs) => postWithFiles(p.dashboard.tenants.payments(id), input, "proofs", proofs),
+        uploadDocuments: (id, input, files) => postWithFiles(p.dashboard.tenants.documents(id), input, "files", files),
+        deleteDocument: async (id, documentId) => {
+          await request("DELETE", p.dashboard.tenants.document(id, documentId));
+        },
       },
       payments: {
         adjust: (id) => get(p.dashboard.payments.adjust(id)),

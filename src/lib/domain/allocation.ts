@@ -45,21 +45,36 @@ export function suggestAllocations(
 }
 
 export interface TenantBalanceSummary {
+  /** Unpaid rent for months that have ended - up to the end of last month. */
   totalOutstanding: number;
+  /** How many ended months still have something unpaid. */
   overdueMonths: number;
+  /**
+   * Unpaid rent for this month and later. Those months are created ahead of
+   * time (so rent can be paid in advance) but aren't owed until they end.
+   */
+  notYetDue: number;
 }
 
+/**
+ * Outstanding = what's unpaid on months before `todayMonthKey` (the current
+ * month, yyyy-MM-01): a month's rent counts once the month is over.
+ */
 export function summarizeBalance(periods: PeriodLike[], todayMonthKey: string): TenantBalanceSummary {
   let totalOutstanding = 0;
   let overdueMonths = 0;
+  let notYetDue = 0;
 
   for (const period of periods) {
     const outstanding = round2(Number(period.amount_due) - Number(period.amount_allocated));
-    if (outstanding > 0) {
+    if (outstanding <= 0) continue;
+    if (period.period_month < todayMonthKey) {
       totalOutstanding = round2(totalOutstanding + outstanding);
-      if (period.period_month < todayMonthKey) overdueMonths += 1;
+      overdueMonths += 1;
+    } else {
+      notYetDue = round2(notYetDue + outstanding);
     }
   }
 
-  return { totalOutstanding, overdueMonths };
+  return { totalOutstanding, overdueMonths, notYetDue };
 }
