@@ -1,4 +1,4 @@
-import Link from "@/components/Link";
+import Link from "@/components/ui/Link";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -9,88 +9,105 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { EmptyState, PageHeader, StatusBadge, TagPill } from "@/components/DataComponents";
+import { EmptyState, PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { BadgeRow, IconTile } from "@/components/ui";
 
 export default async function PropertiesPage() {
-  const properties = await serverApi.dashboard.properties.list();
+  const groups = await serverApi.dashboard.properties.list();
+  const towerCount = groups.reduce((n, g) => n + g.properties.length, 0);
 
   const addButton = (
     <Button component={Link} href="/dashboard/properties/new" variant="contained" startIcon={<AddRoundedIcon />}>
-      Add property
+      Add tower
     </Button>
   );
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={3}>
       <PageHeader
         title="Properties"
-        subtitle="Every property you manage - each can hold both residential and commercial units."
-        action={addButton}
+        subtitle="Your sites, the towers in each, and how many houses are let."
+        action={groups.length > 0 ? addButton : undefined}
       />
 
-      {properties.length === 0 ? (
+      {towerCount === 0 ? (
         <Card variant="outlined">
           <EmptyState
             icon={<ApartmentRoundedIcon />}
-            title="No properties yet"
-            description="Add your first property to start tracking rent."
-            action={addButton}
+            title="No towers yet"
+            description="Load the master data (supabase/seed) or add a tower to a site to start tracking rent."
+            action={groups.length > 0 ? addButton : undefined}
           />
         </Card>
-      ) : (
-        <Grid container spacing={2} columns={12}>
-          {properties.map((property) => {
-            const total = property.residentialTenants + property.commercialTenants;
-            return (
-              <Grid key={property.id} size={{ xs: 12, sm: 6, lg: 4 }}>
-                <Card variant="outlined" sx={{ height: "100%" }}>
-                  <Stack spacing={2} useFlexGap sx={{ height: "100%" }}>
-                    <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
-                      <IconTile icon={<ApartmentRoundedIcon fontSize="small" />} size="sm" />
-                      <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-                        <Typography component="h2" variant="subtitle2" noWrap>
-                          {property.name}
-                        </Typography>
-                        {property.address ? (
-                          <Typography variant="caption" color="textSecondary" component="p" noWrap>
-                            {property.address}
+      ) : null}
+
+      {groups.map(({ location, properties }) => (
+        <Stack key={location.code} spacing={1.5} component="section" aria-labelledby={`site-${location.code}`}>
+          <Box>
+            <Typography id={`site-${location.code}`} component="h2" variant="h6">
+              {location.name} · {location.code}
+            </Typography>
+            {location.address ? (
+              <Typography variant="body2" color="textSecondary">
+                {location.address}
+              </Typography>
+            ) : null}
+          </Box>
+
+          <Grid container spacing={2} columns={12}>
+            {properties.map((property) => {
+              const vacant = property.totalUnits - property.occupiedUnits;
+              return (
+                <Grid key={property.code} size={{ xs: 12, sm: 6, lg: 4 }}>
+                  <Card variant="outlined" sx={{ height: "100%" }}>
+                    <Stack spacing={2} useFlexGap sx={{ height: "100%" }}>
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+                        <IconTile icon={<ApartmentRoundedIcon fontSize="small" />} size="sm" />
+                        <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                          <Typography component="h3" variant="subtitle2" noWrap>
+                            {property.name}
                           </Typography>
-                        ) : null}
+                          <Typography variant="caption" color="textSecondary" component="p" noWrap>
+                            {property.code}
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      <BadgeRow>
+                        {property.totalUnits === 0 ? (
+                          <StatusBadge tone="neutral" label="No houses yet" />
+                        ) : (
+                          <>
+                            <StatusBadge
+                              tone={vacant === 0 ? "success" : "info"}
+                              label={`${property.occupiedUnits} of ${property.totalUnits} let`}
+                            />
+                            {property.residentialUnits > 0 ? <TagPill label={`${property.residentialUnits} residential`} /> : null}
+                            {property.commercialUnits > 0 ? <TagPill label={`${property.commercialUnits} commercial`} /> : null}
+                          </>
+                        )}
+                      </BadgeRow>
+
+                      <Box sx={{ mt: "auto" }}>
+                        <Button
+                          component={Link}
+                          href={`/dashboard/properties/${property.code}`}
+                          variant="outlined"
+                          size="small"
+                          endIcon={<ArrowForwardRoundedIcon />}
+                          aria-label={`View ${property.name}`}
+                        >
+                          View
+                        </Button>
                       </Box>
                     </Stack>
-
-                    <BadgeRow>
-                      {total === 0 ? (
-                        <StatusBadge tone="neutral" label="No tenants yet" />
-                      ) : (
-                        <>
-                          <StatusBadge tone="success" label={`${total} active tenant${total === 1 ? "" : "s"}`} />
-                          {property.residentialTenants > 0 ? <TagPill label={`${property.residentialTenants} residential`} /> : null}
-                          {property.commercialTenants > 0 ? <TagPill label={`${property.commercialTenants} commercial`} /> : null}
-                        </>
-                      )}
-                    </BadgeRow>
-
-                    <Box sx={{ mt: "auto" }}>
-                      <Button
-                        component={Link}
-                        href={`/dashboard/properties/${property.id}`}
-                        variant="outlined"
-                        size="small"
-                        endIcon={<ArrowForwardRoundedIcon />}
-                        aria-label={`View ${property.name}`}
-                      >
-                        View
-                      </Button>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Stack>
+      ))}
     </Stack>
   );
 }

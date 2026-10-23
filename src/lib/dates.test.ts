@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest";
+import { addMonthsToKey, currentMonthKey, dateKeyOf, formatMonth, isDateKey, monthKeyOf, todayKey } from "./dates";
+
+describe("dates (Asia/Kolkata)", () => {
+  it("puts an early-morning IST instant on the IST day, not the UTC one", () => {
+    // 2026-03-01 01:00 IST = 2026-02-28 19:30 UTC
+    const instant = new Date("2026-02-28T19:30:00Z");
+    expect(todayKey(instant)).toBe("2026-03-01");
+    expect(currentMonthKey(instant)).toBe("2026-03-01");
+    expect(dateKeyOf("2026-02-28T19:30:00Z")).toBe("2026-03-01");
+  });
+
+  it("does month arithmetic on keys across year boundaries", () => {
+    expect(addMonthsToKey("2026-11-01", 2)).toBe("2027-01-01");
+    expect(addMonthsToKey("2026-01-01", -1)).toBe("2025-12-01");
+    expect(addMonthsToKey("2026-03-01", -15)).toBe("2024-12-01");
+    expect(monthKeyOf("2026-07-19")).toBe("2026-07-01");
+  });
+
+  it("validates real calendar dates", () => {
+    expect(isDateKey("2026-02-28")).toBe(true);
+    expect(isDateKey("2028-02-29")).toBe(true);
+    expect(isDateKey("2026-02-30")).toBe(false);
+    expect(isDateKey("2026-13-01")).toBe(false);
+    expect(isDateKey("26-01-01")).toBe(false);
+  });
+
+  it("labels months the same whatever the runtime's own zone", () => {
+    expect(formatMonth("2026-03-01")).toBe("March 2026");
+    expect(formatMonth("2026-03-01", "short")).toBe("Mar 2026");
+  });
+});

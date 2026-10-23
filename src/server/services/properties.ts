@@ -1,62 +1,172 @@
 import "server-only";
-import type { Created, PropertyCard, PropertyDetail, PropertyHeader } from "@/lib/contracts";
-import { formatUnitLabel, tenantDisplayName } from "@/lib/tenant";
-import type { Property } from "@/lib/types";
-import { createPropertySchema } from "@/lib/validation";
+import type {
+  LocationGroup,
+  NewPropertyForm,
+  NewTenantForm,
+  PropertyDetail,
+  PropertyHeader,
+  UnitRow,
+} from "@/lib/contracts";
+import { todayKey } from "@/lib/dates";
+import { tenantDisplayName } from "@/lib/domain/tenant";
+import type { Location, Property } from "@/lib/types";
+import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
-import { notFound, parseInput, type OwnerContext } from "./context";
+import { notFound, parseInput, withParams, type OwnerContext } from "./context";
+import { availableUnits, holdsUnit, loadPlacements, placementOf } from "./placements";
 
-function toHeader(property: Property): PropertyHeader {
-  return { id: property.id, name: property.name, address: property.address };
-}
-
-export async function listProperties(ctx: OwnerContext): Promise<PropertyCard[]> {
-  const db = await ownerDb(ctx.ownerId);
-  const [properties, tenants] = await Promise.all([db.properties.list(), db.tenants.list({ status: "active" })]);
-
-  const counts = new Map<string, { residential: number; commercial: number }>();
-  for (const t of tenants) {
-    const c = counts.get(t.property_id) ?? { residential: 0, commercial: 0 };
-    c[t.unit_type] += 1;
-    counts.set(t.property_id, c);
-  }
-
-  return properties.map((p) => ({
-    ...toHeader(p),
-    residentialTenants: counts.get(p.id)?.residential ?? 0,
-    commercialTenants: counts.get(p.id)?.commercial ?? 0,
-  }));
-}
-
-export async function getPropertyHeader(ctx: OwnerContext, propertyId: string): Promise<PropertyHeader> {
-  const db = await ownerDb(ctx.ownerId);
-  const property = await db.properties.get(propertyId);
-  if (!property) notFound("Property");
-  return toHeader(property);
-}
-
-export async function getPropertyDetail(ctx: OwnerContext, propertyId: string): Promise<PropertyDetail> {
-  const db = await ownerDb(ctx.ownerId);
-  const [property, tenants] = await Promise.all([db.properties.get(propertyId), db.tenants.list({ propertyId })]);
-  if (!property) notFound("Property");
-
+function toHeader(property: Property, locations: Location[]): PropertyHeader {
   return {
-    property: toHeader(property),
-    tenants: tenants.map((tenant) => ({
-      id: tenant.id,
-      displayName: tenantDisplayName(tenant),
-      contactName: tenant.business_name ? tenant.name : null,
-      unitType: tenant.unit_type,
-      unitLabel: formatUnitLabel(tenant),
-      phone: tenant.phone,
-      monthlyRent: Number(tenant.monthly_rent_amount),
-      status: tenant.status,
-    })),
+    code: property.property_code,
+    name: property.name,
+    locationCode: property.location_code,
+    locationName: locations.find((l) => l.location_code === property.location_code)?.name ?? property.location_code,
   };
 }
 
-export async function createProperty(ctx: OwnerContext, body: unknown): Promise<Created> {
+/** Normalises a code from the URL; anything malformed is simply "not found". */
+function parsePropertyCode(raw: string): string {
+  const parsed = propertyCodeSchema.safeParse(decodeURIComponent(raw));
+  if (!parsed.success) notFound("Property");
+  return parsed.data;
+}
+
+async function loadHeader(ctx: OwnerContext, rawCode: string): Promise<PropertyHeader> {
+  const db = await ownerDb();
+  const [property, locations] = await Promise.all([db.properties.get(parsePropertyCode(rawCode)), db.locations.list()]);
+  if (!property) notFound("Property");
+  return toHeader(property, locations);
+}
+
+/** Every site with its towers and how full each one is. */
+export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[]> {
+  const db = await ownerDb();
+  const [locations, properties, units, occupancy] = await Promise.all([
+    db.locations.list(),
+    db.properties.list(),
+    db.units.list(),
+    db.occupancy.list(),
+  ]);
+  const today = todayKey();
+  const held = new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.unit_code));
+
+  return locations.map((location) => ({
+    location: { code: location.location_code, name: location.name, address: location.address },
+    properties: properties
+      .filter((p) => p.location_code === location.location_code)
+      .map((p) => {
+        const inTower = units.filter((u) => u.property_code === p.property_code && u.is_active);
+        return {
+          ...toHeader(p, locations),
+          totalUnits: inTower.length,
+          occupiedUnits: inTower.filter((u) => held.has(u.unit_code)).length,
+          residentialUnits: inTower.filter((u) => u.unit_type === "residential").length,
+          commercialUnits: inTower.filter((u) => u.unit_type === "commercial").length,
+        };
+      }),
+  }));
+}
+
+export async function getPropertyHeader(ctx: OwnerContext, propertyCode: string): Promise<PropertyHeader> {
+  return loadHeader(ctx, propertyCode);
+}
+
+/** A tower: its houses (with who is in each, and who was) and its current tenants. */
+export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Promise<PropertyDetail> {
+  const code = parsePropertyCode(rawCode);
+  const db = await ownerDb();
+  const [property, locations, units, occupancy] = await Promise.all([
+    db.properties.get(code),
+    db.locations.list(),
+    db.units.list({ propertyCode: code }),
+    db.occupancy.list({ propertyCode: code }),
+  ]);
+  if (!property) notFound("Property");
+
+  const today = todayKey();
+  const unitRows: UnitRow[] = units.map((unit) => {
+    const history = occupancy.filter((o) => o.unit_code === unit.unit_code);
+    const holder = history.find((o) => holdsUnit(o, today));
+    return {
+      unitCode: unit.unit_code,
+      houseNumber: unit.house_number,
+      floor: unit.floor,
+      unitType: unit.unit_type,
+      label: unit.label,
+      isActive: unit.is_active,
+      currentTenant: holder
+        ? {
+            id: holder.tenant_id,
+            displayName: tenantDisplayName({ name: holder.tenant_name, business_name: holder.tenant_business_name }),
+            since: holder.start_date,
+          }
+        : null,
+      history: history.map((o) => ({
+        tenantId: o.tenant_id,
+        tenantName: tenantDisplayName({ name: o.tenant_name, business_name: o.tenant_business_name }),
+        startDate: o.start_date,
+        endDate: o.end_date,
+      })),
+    };
+  });
+
+  // Tenants currently holding a house in this tower.
+  const tenantIds = [...new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.tenant_id))];
+  const [tenants, placements] = await Promise.all([db.tenants.list(), loadPlacements(db, tenantIds)]);
+  const tenantRows = tenants
+    .filter((t) => tenantIds.includes(t.id))
+    .map((tenant) => {
+      const placement = placementOf(placements, tenant.id);
+      return {
+        id: tenant.id,
+        displayName: tenantDisplayName(tenant),
+        contactName: tenant.business_name ? tenant.name : null,
+        unitMix: placement.unitMix,
+        unitCodes: placement.unitCodes.filter((c) => c.startsWith(`${code}-`)),
+        phone: tenant.phone,
+        monthlyRent: placement.monthlyRent,
+        status: tenant.status,
+      };
+    });
+
+  return { property: toHeader(property, locations), units: unitRows, tenants: tenantRows };
+}
+
+export async function getNewPropertyForm(_ctx: OwnerContext): Promise<NewPropertyForm> {
+  const db = await ownerDb();
+  const locations = await db.locations.list();
+  return { locations: locations.map((l) => ({ code: l.location_code, name: l.name, address: l.address })) };
+}
+
+/** Adds a tower to a site; its code is `<site>-<tower>`, e.g. AC-T3, and never changes. */
+export async function createProperty(ctx: OwnerContext, body: unknown): Promise<{ code: string }> {
   const input = parseInput(createPropertySchema, body);
-  const db = await ownerDb(ctx.ownerId);
-  return db.properties.create({ name: input.name, address: input.address ?? null });
+  const db = await ownerDb();
+  const code = `${input.locationCode}-${input.towerCode}`;
+  await db.properties.create({ property_code: code, location_code: input.locationCode, name: input.name });
+  return { code };
+}
+
+/** Adds a house to a tower; its code is `<tower>-<house number>`, e.g. AC-T1-G13. */
+export async function createUnit(ctx: OwnerContext, rawCode: string, body: unknown): Promise<{ code: string }> {
+  const propertyCode = parsePropertyCode(rawCode);
+  const input = parseInput(createUnitSchema, withParams(body, { propertyCode }));
+  const db = await ownerDb();
+  if (!(await db.properties.get(propertyCode))) notFound("Property");
+  const code = `${propertyCode}-${input.houseNumber}`;
+  await db.units.create({
+    unit_code: code,
+    property_code: propertyCode,
+    floor: input.floor || null,
+    unit_type: input.unitType,
+    label: input.label || null,
+  });
+  return { code };
+}
+
+/** The "add tenant" form opened from a tower: that tower, plus every vacant house. */
+export async function getNewTenantForm(ctx: OwnerContext, rawCode: string): Promise<NewTenantForm> {
+  const property = await loadHeader(ctx, rawCode);
+  const db = await ownerDb();
+  return { property, availableUnits: await availableUnits(db) };
 }

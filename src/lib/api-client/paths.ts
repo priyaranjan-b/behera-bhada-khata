@@ -1,6 +1,8 @@
 // Every API endpoint path, in one place. The tree mirrors the page tree:
 // the page at src/app/dashboard/tenants/[tenantId]/page.tsx reads from
 // src/app/api/dashboard/tenants/[tenantId]/route.ts, and so on.
+import { PUBLIC_API_BASE_URL } from "@/lib/publicEnv";
+
 const e = encodeURIComponent;
 
 export const apiPaths = {
@@ -12,16 +14,22 @@ export const apiPaths = {
   },
   dashboard: {
     summary: "/api/dashboard",
+    search: "/api/dashboard/search",
     properties: {
       list: "/api/dashboard/properties",
-      detail: (propertyId: string) => `/api/dashboard/properties/${e(propertyId)}`,
-      tenants: (propertyId: string) => `/api/dashboard/properties/${e(propertyId)}/tenants`,
-      newTenant: (propertyId: string) => `/api/dashboard/properties/${e(propertyId)}/tenants/new`,
-      bulkTenants: (propertyId: string) => `/api/dashboard/properties/${e(propertyId)}/tenants/bulk`,
+      new: "/api/dashboard/properties/new",
+      detail: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}`,
+      tenants: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/tenants`,
+      newTenant: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/tenants/new`,
+      bulkTenants: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/tenants/bulk`,
+      units: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/units`,
+      newUnit: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/units/new`,
     },
     tenants: {
       list: "/api/dashboard/tenants",
       detail: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}`,
+      edit: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/edit`,
+      moveOut: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out`,
       payments: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments`,
       newPayment: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments/new`,
     },
@@ -30,6 +38,7 @@ export const apiPaths = {
       adjustments: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/adjustments`,
       resend: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/resend`,
       receipt: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/receipt`,
+      proof: (paymentId: string, proofId: string) => `/api/dashboard/payments/${e(paymentId)}/proofs/${e(proofId)}`,
     },
     adjustments: {
       resend: (adjustmentId: string) => `/api/dashboard/adjustments/${e(adjustmentId)}/resend`,
@@ -44,10 +53,8 @@ export const apiPaths = {
   },
 } as const;
 
-// Empty = same origin. Point it at a standalone backend to move the API out
-// of this Next.js app without touching any page or component.
-const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-
+// PUBLIC_API_BASE_URL empty = same origin. Point it at a standalone backend
+// to move the API out of this Next.js app without touching any page or component.
 /** Absolute-or-relative URL for a browser link to the API (e.g. a receipt download). */
 export function apiHref(path: string): string {
   return `${PUBLIC_API_BASE_URL}${path}`;

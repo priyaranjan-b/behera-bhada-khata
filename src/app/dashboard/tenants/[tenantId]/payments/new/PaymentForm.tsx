@@ -9,20 +9,43 @@ import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import { type SignaturePadHandle } from "@/components/SignaturePad";
-import { StatusBadge } from "@/components/DataComponents";
-import { AmountRow, BadgeRow, FormActions, SectionCard, SignatureField, SummaryLine } from "@/components/ui";
-import { suggestAllocations, type PeriodLike } from "@/lib/allocation";
+import { type SignaturePadHandle } from "@/components/ui/SignaturePad";
+import { StatusBadge } from "@/components/ui/DataDisplay";
+import {
+  AmountRow,
+  BadgeRow,
+  FileAttachmentsField,
+  FormActions,
+  SectionCard,
+  SignatureField,
+  SummaryLine,
+} from "@/components/ui";
+import { suggestAllocations, type PeriodLike } from "@/lib/domain/allocation";
+import { formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
+import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
+import { prepareProofFile } from "@/lib/proofImages";
+import { PROOF_LIMITS } from "@/lib/validation";
 import { api, errorMessage } from "@/lib/api-client";
 import type { CreatePaymentInput } from "@/lib/contracts";
 
-export default function PaymentForm({ tenantId, periods }: { tenantId: string; periods: PeriodLike[] }) {
+export default function PaymentForm({
+  tenantId,
+  periods,
+  inDialog = false,
+}: {
+  tenantId: string;
+  periods: PeriodLike[];
+  /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
+  inDialog?: boolean;
+}) {
   const router = useRouter();
   const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(() => todayKey());
   const [mode, setMode] = useState("bank_transfer");
   const [note, setNote] = useState("");
+  const [proofs, setProofs] = useState<File[]>([]);
+  const [notify, setNotify] = useState(true);
   const [manualAllocations, setManualAllocations] = useState<Record<string, number> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,15 +85,23 @@ export default function PaymentForm({ tenantId, periods }: { tenantId: string; p
 
     setSubmitting(true);
     try {
-      await api.dashboard.tenants.createPayment(tenantId, {
-        amount: amountNumber,
-        paymentDate,
-        mode: mode as CreatePaymentInput["mode"],
-        note: note || undefined,
-        allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
-        ownerSignaturePng: padHandle.current.toPngDataUrl(),
-      });
-      router.push(`/dashboard/tenants/${tenantId}?paymentCreated=1`);
+      const { notified } = await api.dashboard.tenants.createPayment(
+        tenantId,
+        {
+          amount: amountNumber,
+          paymentDate,
+          mode: mode as CreatePaymentInput["mode"],
+          note: note || undefined,
+          allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
+          ownerSignaturePng: padHandle.current.toPngDataUrl(),
+          notifyTenant: notify,
+        },
+        proofs
+      );
+      const href = `/dashboard/tenants/${tenantId}?${recordedFlash(notified)}`;
+      // In the dialog, replace the form's history entry so Back doesn't reopen it.
+      if (inDialog) router.replace(href);
+      else router.push(href);
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save that payment."));
@@ -126,6 +157,18 @@ export default function PaymentForm({ tenantId, periods }: { tenantId: string; p
               />
             </SectionCard>
 
+            <FileAttachmentsField
+              title="Payment proof (optional)"
+              caption="UPI or bank screenshot, cheque photo, deposit slip - kept with this payment."
+              files={proofs}
+              onChange={setProofs}
+              accept={PROOF_LIMITS.accept}
+              maxFiles={PROOF_LIMITS.maxFiles}
+              maxTotalBytes={PROOF_LIMITS.maxTotalBytes}
+              prepare={prepareProofFile}
+              disabled={submitting}
+            />
+
             <SignatureField title="Owner signature" onReady={(handle) => (padHandle.current = handle)} />
           </Stack>
         </Grid>
@@ -133,7 +176,7 @@ export default function PaymentForm({ tenantId, periods }: { tenantId: string; p
         <Grid size={{ xs: 12, md: 5 }}>
           <SectionCard
             title="Covers"
-            sticky
+            sticky={!inDialog}
             action={manualAllocations ? <StatusBadge tone="info" label="Edited" /> : undefined}
           >
             {allocations.length === 0 ? (
@@ -145,10 +188,7 @@ export default function PaymentForm({ tenantId, periods }: { tenantId: string; p
                 {allocations.map((a) => (
                   <AmountRow
                     key={a.rentPeriodId}
-                    label={new Date(`${a.periodMonth}T00:00:00Z`).toLocaleDateString(undefined, {
-                      month: "long",
-                      year: "numeric",
-                    })}
+                    label={formatMonth(a.periodMonth)}
                     caption={`outstanding ${formatMoney(a.amountOutstanding)}`}
                     value={a.amountAllocated}
                     onChange={(value) => updateAllocation(a.rentPeriodId, value)}
@@ -177,10 +217,15 @@ export default function PaymentForm({ tenantId, periods }: { tenantId: string; p
         </Grid>
 
         <Grid size={12}>
+          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} />
+        </Grid>
+
+        <Grid size={12}>
           <FormActions
             error={error}
             cancelHref={`/dashboard/tenants/${tenantId}`}
-            submitLabel="Save & send for confirmation"
+            onCancel={inDialog ? () => router.back() : undefined}
+            submitLabel="Save payment"
             pendingLabel="Saving…"
             pending={submitting}
           />

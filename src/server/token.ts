@@ -16,9 +16,10 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function tokensEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, "hex");
-  const bufB = Buffer.from(b, "hex");
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+/** Constant-time comparison of two secrets (e.g. a bearer token against the configured one). */
+export function secretsEqual(provided: string, expected: string): boolean {
+  // Hash both so the comparison is fixed-length and leaks nothing about length.
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
 }

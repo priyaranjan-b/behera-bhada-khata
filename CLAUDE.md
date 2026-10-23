@@ -7,9 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project overview
 
 Behera Bhada Khata (ବେହେରା ଭଡ଼ା ଖାତା) — a digital version of a landlord's rent
-book. An owner records a rent payment, the tenant gets a link over
-WhatsApp/SMS, draws a signature and verifies an SMS OTP, and a signed PDF
-receipt is generated for both sides. Payments and corrections are
+book. An owner records a rent payment, which counts immediately and has a
+downloadable PDF receipt. Optionally the tenant gets a link over
+WhatsApp/SMS, draws a signature and verifies an SMS OTP to acknowledge it,
+which produces a tenant-signed receipt. Payments and corrections are
 append-only — see `supabase/migrations/0001_init.sql`.
 
 Stack: Next.js 16 (App Router) on Vercel, Postgres/Auth/Storage on Supabase,
@@ -19,48 +20,136 @@ receipts, `zod` for validation.
 ## Commands
 
 ```bash
-npm run dev      # start dev server (http://localhost:3000)
-npm run build    # production build
-npm run start    # run a production build
-npm run lint     # eslint (flat config, eslint-config-next)
+npm run dev       # start dev server (http://localhost:3000)
+npm run build     # production build
+npm run start     # run a production build
+npm run lint      # eslint (flat config, eslint-config-next)
+npm run typecheck # tsc --noEmit
+npm test          # vitest: unit, service (fake ports) and migration tests
+npx vitest run test/schema.test.ts   # one file
 ```
 
-There is no test suite in this repo currently.
+Tests: pure modules have a colocated `*.test.ts`; service tests live in
+`test/services/` and swap the ports for in-memory fakes (`test/fakes.ts`,
+`vi.mock("@/server/infra", …)`); `test/schema.test.ts` applies every
+migration to an in-process Postgres (PGlite) with stubs for Supabase's
+`auth`/`storage` schemas and roles, then exercises the ledger functions under
+RLS. Any migration change needs a case there. CI (`.github/workflows/ci.yml`)
+runs lint, typecheck, test and build.
 
-Local setup requires a Supabase project (schema + storage bucket) and Twilio
-credentials — see `README.md` and `.env.local.example` for the full list of
-env vars and setup steps.
+Local setup requires a Supabase project (run `supabase/migrations/*` in
+order) — see `README.md` and `.env.local.example`. Twilio and `CRON_SECRET`
+are optional in development, required in production.
 
 ## Architecture
 
 ### Ledger design (the core domain model)
 
-The schema (`supabase/migrations/0001_init.sql`, `0002_units_and_search.sql`)
-and the types in `src/lib/types.ts` are the source of truth for the data
-model — `types.ts` is hand-maintained to match the SQL and says so at the top
-of the file; update both together (or regenerate with
-`npx supabase gen types typescript`).
+**Read `docs/database-design.md` before changing anything in the database.**
+It records every schema decision and why, with checklists for adding tables
+and functions. The schema (`supabase/migrations/*.sql`) and the types in
+`src/lib/types.ts` are the source of truth for the data model. `types.ts` is
+hand-maintained to match the SQL and says so at the top of the file; update
+both together.
 
-- `properties` → `tenants` → `rent_periods` (one row per tenant per calendar
-  month owed, created ahead of time by `ensureRentPeriods` in
-  `src/server/services/periods.ts` so arrears show up even for months no one
-  logged a payment for).
+- **Single owner.** The rent book has exactly one owner, recorded once in
+  `app_owner` (`0003_single_owner.sql`). No table has an `owner_id` column.
+  Every RLS policy and owner-facing SQL function checks `is_app_owner()`,
+  and with no owner row nothing is readable (it fails closed). The app turns
+  a signed-in non-owner into a 403 / `/login?error=owner`
+  (`getOwnerContext()` in `src/server/services/auth.ts`).
+
+- **Places** (`0006_property_master_data.sql`): `locations` (site, `AC`) →
+  `properties` (tower, `AC-T1`) → `units` (house, `AC-T1-G01`). The codes
+  are the primary keys and child tables reference them directly. They are
+  **permanent**: a trigger rejects any code change, so rename via `name` and
+  retire a house with `is_active = false`, never delete. `tower_code` and
+  `house_number` are generated from the code. Master data from the paper
+  register is in `supabase/seed/arnapal_master_data.sql` (2 sites, 7 towers,
+  40 houses), which also claims ownership for the email you put in it. Houses
+  are pure master data: who occupies them is a tenant, never a column on
+  `units`.
+- **Draft tenants** (`0007_draft_tenants.sql`): `tenants.status` is `draft |
+  active | inactive`. The register's 26 occupants
+  (`supabase/seed/arnapal_tenants.sql`, gitignored: real names stay local)
+  are drafts. A draft holds its houses
+  but has no phone, rent or lease start yet and is never billed. Saving all
+  three through Edit tenant (`update_tenant`) makes it active. The UI hides
+  "Record payment" for drafts and lists them under "Drafts - details
+  missing".
+- **Billing start ≠ lease start** (`0008_billing_start.sql`): rent months
+  start at `tenants.billing_start`, which is the month after the "rent paid up
+  to" entered when onboarding or completing a draft (never before the lease
+  month). `lease_start` is history only, so an old lease start doesn't
+  create years of fake arrears.
+- **Security deposit** (`tenants.deposit_amount`, optional): set when
+  onboarding or while a draft, then frozen by a trigger once the tenant is
+  active (D18).
+- **People and money keep uuids.** `tenants` → `rent_periods` (one row per
+  tenant per calendar month owed, created ahead of time by the
+  `ensure_rent_periods` SQL function — `ensureRentPeriodsFor` in
+  `src/server/services/periods.ts`, plus the daily cron — so arrears show up
+  even for months no one logged a payment for). **Billing is per tenant:**
+  one combined monthly rent covers all of a tenant's houses.
+- **Which houses, at what rent, and when are dated history, never
+  overwritten.**
+  - `tenant_units` (start/end dates; `end_date` inclusive, null = current) is
+    protected by a `btree_gist` exclusion constraint: no two tenancies of a
+    house overlap. Back-to-back tenancies are fine, which is how a house is
+    re-let.
+  - `tenant_rent_rates` (`effective_month`, `monthly_amount`) prices each
+    month: `rent_for_month()`.
+  - Both change only through the `SECURITY DEFINER` functions
+    `create_tenant`, `update_tenant` (diffs the house set as of a date;
+    changes rent from a month, re-pricing only months with no payment
+    against them) and `move_out_tenant` (ends the houses, stops billing after
+    the move-out month, keeps the dues). The owner role has
+    `INSERT`/`UPDATE`/`DELETE` revoked on `tenants`, `tenant_units` and
+    `tenant_rent_rates`.
+  - "Who lived where, when" is the `unit_occupancy` view;
+    `src/server/services/placements.ts` derives a tenant's current houses and
+    rent from it.
 - `payments` and `adjustments` are **append-only ledger events**, each with
   its own `*_allocations` table mapping the event onto one or more
   `rent_periods`. A mistake is never edited on the original `payments` row —
   it's corrected with a new `adjustments` row referencing it
-  (`original_payment_id`), going through the same sign+OTP flow.
-- Both ledger tables have a `status`: `pending` → `confirmed`. Only
-  `confirmed` rows move `rent_periods.amount_allocated` (see
-  `confirmRecord` in `src/server/services/confirm.ts`; the adapter's
-  `confirm()` is an `.eq("status", "pending")` compare-and-swap, so
-  confirmation is idempotent under a race).
+  (`original_payment_id`), which also counts at once.
+- **Payment proofs** (`0009_payment_proofs.sql`, D19): photos/PDFs attached
+  when recording a payment, one `payment_proofs` row each, written by
+  `create_payment` (`p_proofs`) in the same transaction and stored under
+  `payments/<tenant>/<payment>/proofs/`. The form compresses photos in the
+  browser (`src/lib/proofImages.ts`) and sends multipart
+  (`readJsonWithFiles` in `src/server/http.ts`); the service checks the
+  bytes and the limits in `PROOF_LIMITS` (`src/lib/validation.ts`).
+- **Recorded = counted** (`0010_instant_confirmation.sql`, D20): both
+  ledger tables are written as `status = 'confirmed'` and applied to
+  `rent_periods.amount_allocated` in the same transaction. The tenant's
+  signature + OTP is an optional acknowledgement (`acknowledged_at`) that
+  never moves money. `pending` survives only in the type, for old rows.
+- **Every money-moving write is one Postgres function**
+  (`supabase/migrations/0004_ledger_integrity.sql`), never a sequence of
+  client calls: `create_payment` / `create_adjustment` (`SECURITY DEFINER`,
+  owner check first) lock the months, check the invariants (allocations sum
+  to the amount, belong to that tenant / the original payment's months, stay
+  within `[0, amount_due]`), insert the record and its allocations and do
+  `amount_allocated = amount_allocated + delta`, all in one transaction;
+  `acknowledge_payment` / `acknowledge_adjustment` record the tenant's
+  signature (compare-and-swap on `acknowledged_at`). Never compute a balance
+  in JS and write it back.
+- Errors meant for the user are raised with SQLSTATE `BBK00` (→ 400),
+  `BBK04` (→ 404) or `BBK09` (→ 409); `mustWrite`/`writeError` in
+  `src/server/adapters/supabase/clients.ts` map those and log-and-hide every
+  other database error.
 - RLS enforces this at the DB level too: `authenticated` (the owner) can
-  `INSERT`/`SELECT` on ledger tables but has `UPDATE`/`DELETE` revoked
-  outright, with a narrow re-grant of just `token_hash`/`token_expires_at`
-  (for resending an expired link). The pending→confirmed transition is only
-  ever performed by server code using the service-role admin client, which
-  bypasses RLS.
+  only `SELECT` ledger tables (`INSERT` revoked in 0010, so writes go through
+  `create_*`; `UPDATE`/`DELETE` revoked outright), with a narrow re-grant of
+  just `token_hash`/`token_expires_at` (for sending a link until the tenant
+  acknowledges). The acknowledge functions,
+  `ensure_rent_periods` and the rate-limit functions are executable by
+  `service_role` only; `create_*` and the tenant lifecycle functions by
+  `authenticated` (each starts with `if not is_app_owner()`). Supabase grants
+  EXECUTE on new functions to everyone by default, so every new function's
+  migration must revoke and re-grant explicitly.
 
 ### Data access — layers (the UI never touches the database)
 
@@ -74,11 +163,12 @@ API        src/app/api/**/route.ts — thin: auth + JSON via src/server/http.ts,
                ↔ app/api/dashboard/tenants/[tenantId]/route.ts
              Writes POST to the collection (…/tenants/[id]/payments); a form
              page's data is a GET at its own path (…/payments/new).
-Services   src/server/services/* — business logic, no Next.js/Supabase imports
+Services   src/server/services/* — business logic, no Next.js/Supabase/Twilio imports
 Ports      src/server/ports.ts — OwnerRepositories, SystemRepositories,
-             AuthGateway, FileStorage interfaces
-Infra      src/server/infra/index.ts — binds ports to an adapter
+             AuthGateway, FileStorage, Messaging interfaces
+Infra      src/server/infra/index.ts — binds ports to adapters
 Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
+           src/server/adapters/twilio/*   — the ONLY code importing twilio
 ```
 
 - Shapes crossing the API are in `src/lib/contracts.ts`; the client surface
@@ -93,65 +183,108 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
   standalone backend instead — that's the migration path to a separate
   Node.js server (move `src/server/**` there behind the same routes).
 - Swapping the database (e.g. MySQL) = a new adapter implementing
-  `src/server/ports.ts`, bound in `src/server/infra/index.ts`.
-  `ownerDb(ownerId)` must scope every query to that owner (the Supabase
-  adapter uses the RLS session client *and* explicit `owner_id` filters);
+  `src/server/ports.ts`, bound in `src/server/infra/index.ts`. `ownerDb()`
+  must refuse anyone but the single app owner; the Supabase adapter relies on
+  RLS (`is_app_owner()`) via the session client, so another database must
+  enforce the same check itself. Services take an `OwnerContext` (from
+  `getOwnerContext()`) as proof the check ran; name it `_ctx` where unused.
+  Tower routes take the property code (`/dashboard/properties/AC-T1`);
+  services parse it with `propertyCodeSchema`, and a malformed code is a
+  404.
   `systemDb()` is unscoped (service role) and only for flows that authorize
-  some other way: the confirm token, rent-period upkeep, cron.
+  some other way: the confirm token, rent-period upkeep, rate limits, cron.
 - Services throw `ApiError(status, message)` (`src/lib/errors.ts`); the route
   helpers turn it into `{ error }` JSON and the API client rethrows it.
 - ESLint enforces the layering (`no-restricted-imports` in
   `eslint.config.mjs`).
-- Step-by-step recipes: the `add-api-endpoint` and `build-dashboard-page`
-  skills in `.claude/skills/`.
+- Step-by-step recipes: the `add-api-endpoint` (anything touching the API
+  or database; it starts from `docs/database-design.md`) and
+  `build-dashboard-page` skills in `.claude/skills/`.
 
 ### Auth & routing
 
 - Route protection is a `src/proxy.ts` file, not `middleware.ts` — **Next.js
   16 renamed Middleware to Proxy** (same mechanics, see
   `node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md`). It
-  redirects unauthenticated requests to `/dashboard/**` to `/login`.
-  `src/app/dashboard/layout.tsx` does the same check again server-side
-  (`serverApi.auth.session()`) as the authoritative guard. The proxy also
+  redirects unauthenticated requests to `/dashboard/**` to `/login`, and
   refreshes the session cookie (`src/server/adapters/supabase/proxy.ts`).
+- **Authorization happens in the data call, not the layout.**
+  `src/app/dashboard/layout.tsx` checks the session for the shell, but
+  layouts don't re-render on client navigation, so it is not a guard. What
+  protects data is that every owner read/write goes through `serverApi` (its
+  `owner()` → `getOwnerContext()`) or `ownerRoute`, which return 401 without
+  a session and 403 for a signed-in account that isn't the owner, backed by
+  RLS in the database. Never add a page or route that reads owner data any
+  other way.
 - Login is Supabase email magic link. It lands on the `/auth/callback` page,
   which forwards `?code=` to `GET /api/auth/callback` (only a route handler
   can set cookies) or posts `#access_token` to `POST /api/auth/session`. The
-  tenant-facing
-  `/confirm/[token]` flow has no login at all — auth is the token itself.
+  tenant-facing `/confirm/[token]` flow has no login at all — auth is the
+  token itself.
+- Who may sign in: `OWNER_EMAILS` (listed emails may also sign up); unset =
+  existing accounts only. `ALLOW_DEV_LOGIN=1` returns the magic link to the
+  browser instead of emailing it, and is ignored in production.
 
-### The confirm flow
+### The confirm (acknowledge) flow
 
-`/confirm/[token]` (tenant-facing, unauthenticated) is served by
+Optional since 0010: the payment already counts. `/confirm/[token]`
+(tenant-facing, unauthenticated) is served by
 `src/server/services/confirm.ts`: the token is hashed (`src/server/token.ts`)
-and looked up via `systemDb()`; the tenant requests an OTP
-(`src/server/messaging/twilio.ts`) and posts it with their signature to
-`POST /api/confirm/[token]`, which verifies the OTP, stores the signature in
-private storage, renders the PDF (`src/server/pdf/receipt.ts`), then flips the
-record to confirmed and applies its allocations. Resending a link
-(`.../resend` routes) only rotates the token columns, never ledger facts.
+and looked up via `systemDb()`; the tenant requests an OTP (the `Messaging`
+port, `src/server/adapters/twilio/messaging.ts`) and posts it with their
+signature to `POST /api/confirm/[token]`, which verifies the OTP, renders the
+PDF (`src/server/pdf/receipt.ts`) **before writing anything**, uploads the
+signature and PDF under a fresh per-attempt folder, then calls
+`acknowledge_payment`/`acknowledge_adjustment`; if that doesn't win, the
+files are deleted. Any failure leaves it unacknowledged and retryable.
+Receipt data for both sides comes from `src/server/services/receipts.ts`;
+the owner's download (`.../payments/[id]/receipt`) renders it on demand
+until the tenant-signed copy exists.
+
+- The receipt embeds Noto Sans + Noto Sans Oriya (`src/server/pdf/fonts/`,
+  OFL) because the standard PDF fonts can't encode `₹` or Odia; they're
+  traced into the route via `outputFileTracingIncludes` in `next.config.ts`
+  — a new route that renders PDFs must be added there.
+- Public endpoints that cost money or send email (OTP send, confirm, magic
+  link) call `enforceRateLimits` (`src/server/services/context.ts`, backed by
+  the `rate_limits` table); their routes pass `requestMeta(request)` for the
+  client IP.
+- Resending a link (`.../resend` routes) takes no body: the tenant and amount
+  come from the record itself, and only the token columns rotate.
+- Services report whether the tenant was actually messaged (`notified`); the
+  UI shows a warning flash when not.
 
 ### Money & dates
 
 - All money is `numeric(12,2)` columns, handled as plain JS numbers rounded
   through `round2()` in `src/lib/money.ts`; display via `formatMoney()`
   (`CURRENCY_SYMBOL` is the one thing to edit for a different currency).
-- `src/lib/allocation.ts` (oldest-first payment allocation, balance
-  summaries) is deliberately pure with no `server-only` import — it's shared
-  between server code and the client-side `PaymentForm` so the UI can
-  recompute the same suggestion as the owner types an amount.
-- Month keys are `yyyy-MM-dd` strings (first of month);
-  `src/server/services/periods.ts` / `src/lib/reports.ts` build reporting
-  views on top of `rent_periods`.
+- `src/lib/domain/` (`allocation.ts` oldest-first allocation and balances,
+  `reports.ts`, `tenantLedger.ts`, `tenant.ts`) is pure and framework-free
+  with no `server-only` import — shared between services and client
+  components such as `PaymentForm` — and unit-tested next to the code.
+- **Dates go through `src/lib/dates.ts`**: "today", "this month" and the day
+  a timestamp falls on are in `APP_TIME_ZONE` (Asia/Kolkata), never UTC or
+  the runtime's zone. Date keys are `yyyy-MM-dd`, month keys the first of the
+  month (`yyyy-MM-01`, matching `rent_periods.period_month`); use
+  `todayKey` / `currentMonthKey` / `addMonthsToKey` / `dateKeyOf`, and
+  `formatMonth` (fixed locale, so server and browser render the same text).
+  Don't use `toISOString().slice(0, 10)` or bare `toLocaleDateString`.
 
 ### Conventions
 
 - Server-only modules start with `import "server-only"`; if a `src/lib/*`
   file lacks that import, assume it's meant to run on the client too.
+- Configuration: server code reads `env()` from `src/server/env.ts` (zod
+  schema, validated at startup by `src/instrumentation.ts`, never during
+  `next build`); browser code reads `src/lib/publicEnv.ts`. ESLint bans
+  `process.env` anywhere else. A new variable goes in the schema and in
+  `.env.local.example`.
 - API routes are one line per method: `ownerRoute` / `publicRoute` /
-  `ownerLinkRoute` from `src/server/http.ts` around a service call. Services
-  validate their own input with `zod` schemas from `src/lib/validation.ts`
-  (`parseInput`), so validation holds whichever transport calls them.
+  `ownerLinkRoute` / `cronRoute` from `src/server/http.ts` around a service
+  call. Services validate their own input with `zod` schemas from
+  `src/lib/validation.ts` (`parseInput`), so validation holds whichever
+  transport calls them.
 
 ### UI & styling
 
@@ -164,10 +297,27 @@ record to confirmed and applies its allocations. Resending a link
   menu, `#E2E8F0` dividers, `#F8FAFC` grid-row hover). Light + dark schemes
   via CSS variables, so never read `theme.palette.*` in JS for colours — use
   `sx` palette keys or `theme.vars`.
-- Shared UI kit: `src/components/ui/` (`SectionCard`, `FormActions`,
-  `SignatureField`, `SummaryLine`, `DetailRow`, `PublicLayout`, …) and
-  `src/components/DataComponents.tsx` (`PageHeader`, `DashboardCardPanel`,
-  `StatusBadge`, …). Tables use `src/components/AppDataGrid.tsx`.
+- Components: `src/components/ui/` = presentational primitives
+  (`SectionCard`, `FormActions`, `SignatureField`, `PublicLayout`, …;
+  `DataDisplay.tsx` for `PageHeader`, `DashboardCardPanel`, `StatusBadge`,
+  `EmptyState`; `Skeletons.tsx` for per-card `loading.tsx` placeholders
+  sized like the real cards; `AppDataGrid.tsx` for tables; `Link`,
+  `FlashAlert`, …), `src/components/shell/` = dashboard chrome,
+  `src/components/domain/` = data-aware widgets (`ResendButton`,
+  `StatusChip`, `BillingCollectionChart`). One component per file,
+  `PascalCase.tsx`. Keep server-safe files free of `"use client"`; put
+  interactive pieces (callbacks, state) in their own client file, as with
+  `PanelFilterSelect`.
+- The top-bar search (`src/components/shell/Search.tsx`, also behind the
+  search icon in the mobile `AppNavbar`) loads `GET /api/dashboard/search`
+  once per page and matches tenants (name, business) and houses (label,
+  code) in the browser with `src/lib/domain/search.ts`.
+- Every segment with its own data has `error.tsx` (props `error` + `retry` —
+  Next 16 renamed `reset`), `loading.tsx` and, where `notFound()` is likely,
+  `not-found.tsx`; the root has `global-error.tsx` (renders its own `<html>`
+  and theme).
+- One-time messages after a redirect use a query param plus `FlashAlert`,
+  which removes the param so reloads and Back don't repeat it.
 - Pages (`src/app/**`) set **layout only** (Stack/Grid props, `alignItems`,
   `minWidth: 0`, `maxWidth`). No colour, typography, border, radius or shadow
   `sx`, no `@/theme` imports. Text colour via the Typography/Link prop

@@ -1,103 +1,230 @@
 import "server-only";
+import type { RentPeriod } from "@/lib/types";
 import type { OwnerRepositories, SystemRepositories } from "@/server/ports";
-import { createAdminClient, createSessionClient, must, mustWrite, type Supabase } from "./clients";
+import { chunk, createAdminClient, createSessionClient, must, mustWrite, type Supabase } from "./clients";
 
-const PENDING = "pending" as const;
+/** One day before a yyyy-MM-dd key, as an ISO timestamp - a safe lower bound for an app-time-zone day. */
+function dayBefore(dateKey: string): string {
+  return new Date(Date.parse(`${dateKey}T00:00:00Z`) - 24 * 60 * 60 * 1000).toISOString();
+}
+
+function byPeriodMonth(a: RentPeriod, b: RentPeriod): number {
+  return a.period_month.localeCompare(b.period_month);
+}
 
 /**
- * Owner-scoped repositories. Uses the owner's session client, so RLS applies;
- * the explicit owner_id filters say the same thing in a form any other
- * database adapter has to reproduce.
+ * The owner's repositories, on the signed-in session client. There is one
+ * owner and no owner_id column: RLS (is_app_owner(), 0003_single_owner.sql)
+ * returns nothing and refuses every write for anyone else. Another database
+ * adapter must enforce the same single-owner check.
  */
-export async function supabaseOwnerRepositories(ownerId: string): Promise<OwnerRepositories> {
+export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
   const db = await createSessionClient();
 
+  async function ownerPeriods(
+    build: (q: ReturnType<typeof periodsQuery>) => ReturnType<typeof periodsQuery>
+  ): Promise<RentPeriod[]> {
+    return must(await build(periodsQuery()), "list rent periods");
+  }
+
+  function periodsQuery() {
+    return db.from("rent_periods").select("*");
+  }
+
   return {
+    locations: {
+      async list() {
+        return must(
+          await db.from("locations").select("*").order("location_code"),
+          "list locations"
+        );
+      },
+    },
+
     properties: {
       async list() {
         return must(
-          await db.from("properties").select("*").eq("owner_id", ownerId).order("created_at", { ascending: true }),
+          await db.from("properties").select("*").order("property_code"),
           "list properties"
         );
       },
-      async get(id) {
+      async get(propertyCode) {
         return must(
-          await db.from("properties").select("*").eq("owner_id", ownerId).eq("id", id).maybeSingle(),
+          await db.from("properties").select("*").eq("property_code", propertyCode).maybeSingle(),
           "get property"
         );
       },
       async create(input) {
-        return mustWrite(
-          await db
-            .from("properties")
-            .insert({ ...input, owner_id: ownerId })
-            .select("id")
-            .single()
+        mustWrite(await db.from("properties").insert(input), "create property");
+      },
+    },
+
+    units: {
+      async list(filter = {}) {
+        if (filter.unitCodes) {
+          const batches = await Promise.all(
+            chunk(filter.unitCodes).map(async (codes) =>
+              must(await db.from("units").select("*").in("unit_code", codes), "list units")
+            )
+          );
+          return batches.flat().sort((a, b) => a.unit_code.localeCompare(b.unit_code));
+        }
+        let query = db.from("units").select("*");
+        if (filter.propertyCode) query = query.eq("property_code", filter.propertyCode);
+        return must(await query.order("unit_code"), "list units");
+      },
+      async create(input) {
+        mustWrite(await db.from("units").insert(input), "create unit");
+      },
+    },
+
+    occupancy: {
+      async list(filter = {}) {
+        const base = () => db.from("unit_occupancy").select("*");
+        if (filter.tenantIds) {
+          const batches = await Promise.all(
+            chunk(filter.tenantIds).map(async (ids) =>
+              must(await base().in("tenant_id", ids).order("start_date"), "list occupancy")
+            )
+          );
+          return batches.flat().sort((a, b) => a.start_date.localeCompare(b.start_date));
+        }
+        let query = base();
+        if (filter.propertyCode) query = query.eq("property_code", filter.propertyCode);
+        return must(await query.order("start_date"), "list occupancy");
+      },
+    },
+
+    rentRates: {
+      async listForTenants(tenantIds) {
+        const batches = await Promise.all(
+          chunk(tenantIds).map(async (ids) =>
+            must(
+              await db
+                .from("tenant_rent_rates")
+                .select("*")
+                .in("tenant_id", ids)
+                .order("effective_month"),
+              "list rent rates"
+            )
+          )
         );
+        return batches.flat().sort((a, b) => a.effective_month.localeCompare(b.effective_month));
       },
     },
 
     tenants: {
       async list(filter = {}) {
-        let query = db.from("tenants").select("*").eq("owner_id", ownerId);
+        let query = db.from("tenants").select("*");
         if (filter.status) query = query.eq("status", filter.status);
-        if (filter.propertyId) query = query.eq("property_id", filter.propertyId);
         return must(await query.order("created_at", { ascending: true }), "list tenants");
       },
       async get(id) {
         return must(
-          await db.from("tenants").select("*").eq("owner_id", ownerId).eq("id", id).maybeSingle(),
+          await db.from("tenants").select("*").eq("id", id).maybeSingle(),
           "get tenant"
         );
       },
       async create(input) {
-        return mustWrite(
-          await db
-            .from("tenants")
-            .insert({ ...input, owner_id: ownerId })
-            .select("id")
-            .single()
+        // One transaction that also checks every house (0006_property_master_data.sql).
+        const id = mustWrite(
+          await db.rpc("create_tenant", {
+            p_name: input.name,
+            p_business_name: input.business_name,
+            p_phone: input.phone,
+            p_preferred_channel: input.preferred_channel,
+            p_monthly_rent: input.monthly_rent,
+            p_lease_start: input.lease_start,
+            p_unit_codes: input.unit_codes,
+            p_paid_through: input.paid_through,
+            p_deposit_amount: input.deposit_amount,
+          }),
+          "create tenant"
+        );
+        return { id };
+      },
+      async update(id, changes) {
+        mustWrite(
+          await db.rpc("update_tenant", {
+            p_tenant_id: id,
+            p_name: changes.name,
+            p_business_name: changes.business_name,
+            p_phone: changes.phone,
+            p_preferred_channel: changes.preferred_channel,
+            p_unit_codes: changes.unit_codes,
+            p_units_effective: changes.units_effective,
+            p_monthly_rent: changes.monthly_rent,
+            p_rent_effective_month: changes.rent_effective_month,
+            p_lease_start: changes.lease_start,
+            p_paid_through: changes.paid_through,
+            p_deposit_amount: changes.deposit_amount,
+          }),
+          "update tenant"
+        );
+      },
+      async moveOut(id, date) {
+        mustWrite(
+          await db.rpc("move_out_tenant", { p_tenant_id: id, p_move_out_date: date }),
+          "move out tenant"
         );
       },
     },
 
     rentPeriods: {
-      async listForTenants(tenantIds) {
-        if (tenantIds.length === 0) return [];
-        return must(
-          await db
-            .from("rent_periods")
-            .select("*")
-            .in("tenant_id", tenantIds)
-            .order("period_month", { ascending: true }),
-          "list rent periods"
+      async listForTenants(tenantIds, filter = {}) {
+        const batches = await Promise.all(
+          chunk(tenantIds).map((ids) =>
+            ownerPeriods((q) => {
+              let query = q.in("tenant_id", ids);
+              if (filter.openOnly) query = query.neq("status", "paid");
+              else if (filter.openOrFrom) query = query.or(`status.neq.paid,period_month.gte.${filter.openOrFrom}`);
+              return query;
+            })
+          )
         );
+        return batches.flat().sort(byPeriodMonth);
       },
       async listByIds(ids) {
-        if (ids.length === 0) return [];
-        return must(await db.from("rent_periods").select("*").in("id", ids), "list rent periods");
+        const batches = await Promise.all(chunk(ids).map((part) => ownerPeriods((q) => q.in("id", part))));
+        return batches.flat();
       },
     },
 
     payments: {
       async listForTenants(tenantIds, filter = {}) {
-        if (tenantIds.length === 0) return [];
-        let query = db.from("payments").select("*").eq("owner_id", ownerId).in("tenant_id", tenantIds);
-        if (filter.status) query = query.eq("status", filter.status);
-        return must(await query, "list payments");
+        const batches = await Promise.all(
+          chunk(tenantIds).map(async (ids) => {
+            let query = db.from("payments").select("*").in("tenant_id", ids);
+            if (filter.status) query = query.eq("status", filter.status);
+            if (filter.fromDate) query = query.gte("payment_date", filter.fromDate);
+            return must(await query, "list payments");
+          })
+        );
+        return batches.flat();
       },
       async get(id) {
         return must(
-          await db.from("payments").select("*").eq("owner_id", ownerId).eq("id", id).maybeSingle(),
+          await db.from("payments").select("*").eq("id", id).maybeSingle(),
           "get payment"
         );
       },
-      async create(payment, allocations) {
-        mustWrite(await db.from("payments").insert({ ...payment, owner_id: ownerId }));
+      async create(payment, allocations, proofs = []) {
+        // One transaction that also checks the allocations and proofs (0004, 0009).
         mustWrite(
-          await db
-            .from("payment_allocations")
-            .insert(allocations.map((a) => ({ ...a, payment_id: payment.id })))
+          await db.rpc("create_payment", {
+            p_id: payment.id,
+            p_tenant_id: payment.tenant_id,
+            p_amount: payment.amount,
+            p_payment_date: payment.payment_date,
+            p_mode: payment.mode,
+            p_note: payment.note ?? null,
+            p_owner_signature_path: payment.owner_signature_path,
+            p_token_hash: payment.token_hash,
+            p_token_expires_at: payment.token_expires_at,
+            p_allocations: allocations,
+            p_proofs: proofs,
+          }),
+          "create payment"
         );
       },
       async listAllocations(paymentId) {
@@ -106,49 +233,90 @@ export async function supabaseOwnerRepositories(ownerId: string): Promise<OwnerR
           "list payment allocations"
         );
       },
+      async listProofs(paymentIds) {
+        const batches = await Promise.all(
+          chunk(paymentIds).map(async (ids) =>
+            must(
+              await db.from("payment_proofs").select("*").in("payment_id", ids).order("storage_path"),
+              "list payment proofs"
+            )
+          )
+        );
+        return batches.flat();
+      },
+      async getProof(proofId) {
+        return must(
+          await db.from("payment_proofs").select("*").eq("id", proofId).maybeSingle(),
+          "get payment proof"
+        );
+      },
       async rotateToken(id, tokenHash, expiresAt) {
         // The owner's UPDATE grant covers only these two columns (0001_init.sql).
-        mustWrite(
+        const rows = mustWrite(
           await db
             .from("payments")
             .update({ token_hash: tokenHash, token_expires_at: expiresAt })
-            .eq("owner_id", ownerId)
+            
             .eq("id", id)
-            .eq("status", PENDING)
+            .is("acknowledged_at", null)
+            .select("id"),
+          "rotate payment link"
         );
+        return rows.length > 0;
       },
     },
 
     adjustments: {
       async listForTenants(tenantIds, filter = {}) {
-        if (tenantIds.length === 0) return [];
-        let query = db.from("adjustments").select("*").eq("owner_id", ownerId).in("tenant_id", tenantIds);
-        if (filter.status) query = query.eq("status", filter.status);
-        return must(await query, "list adjustments");
+        const batches = await Promise.all(
+          chunk(tenantIds).map(async (ids) => {
+            let query = db.from("adjustments").select("*").in("tenant_id", ids);
+            if (filter.status) query = query.eq("status", filter.status);
+            if (filter.fromDate) query = query.gte("confirmed_at", dayBefore(filter.fromDate));
+            return must(await query, "list adjustments");
+          })
+        );
+        return batches.flat();
       },
       async get(id) {
         return must(
-          await db.from("adjustments").select("*").eq("owner_id", ownerId).eq("id", id).maybeSingle(),
+          await db.from("adjustments").select("*").eq("id", id).maybeSingle(),
           "get adjustment"
         );
       },
       async create(adjustment, allocations) {
-        mustWrite(await db.from("adjustments").insert({ ...adjustment, owner_id: ownerId }));
         mustWrite(
-          await db
-            .from("adjustment_allocations")
-            .insert(allocations.map((a) => ({ ...a, adjustment_id: adjustment.id })))
+          await db.rpc("create_adjustment", {
+            p_id: adjustment.id,
+            p_original_payment_id: adjustment.original_payment_id,
+            p_delta_amount: adjustment.delta_amount,
+            p_reason: adjustment.reason,
+            p_owner_signature_path: adjustment.owner_signature_path,
+            p_token_hash: adjustment.token_hash,
+            p_token_expires_at: adjustment.token_expires_at,
+            p_allocations: allocations,
+          }),
+          "create adjustment"
+        );
+      },
+      async listAllocations(adjustmentId) {
+        return must(
+          await db.from("adjustment_allocations").select("*").eq("adjustment_id", adjustmentId),
+          "list adjustment allocations"
         );
       },
       async rotateToken(id, tokenHash, expiresAt) {
-        mustWrite(
+        const rows = mustWrite(
           await db
             .from("adjustments")
             .update({ token_hash: tokenHash, token_expires_at: expiresAt })
-            .eq("owner_id", ownerId)
+            
             .eq("id", id)
-            .eq("status", PENDING)
+            .is("acknowledged_at", null)
+            .select("id"),
+          "rotate adjustment link"
         );
+        return rows.length > 0;
       },
     },
   };
@@ -160,8 +328,11 @@ export function supabaseSystemRepositories(): SystemRepositories {
 
   return {
     properties: {
-      async get(id) {
-        return must(await db.from("properties").select("*").eq("id", id).maybeSingle(), "get property");
+      async get(propertyCode) {
+        return must(
+          await db.from("properties").select("*").eq("property_code", propertyCode).maybeSingle(),
+          "get property"
+        );
       },
     },
 
@@ -169,44 +340,32 @@ export function supabaseSystemRepositories(): SystemRepositories {
       async get(id) {
         return must(await db.from("tenants").select("*").eq("id", id).maybeSingle(), "get tenant");
       },
-      async listActiveIds() {
-        const rows = must(await db.from("tenants").select("id").eq("status", "active"), "list tenants");
-        return rows.map((r) => r.id);
+    },
+
+    occupancy: {
+      async listForTenant(tenantId) {
+        return must(
+          await db.from("unit_occupancy").select("*").eq("tenant_id", tenantId).order("start_date"),
+          "list occupancy"
+        );
       },
     },
 
     rentPeriods: {
-      async listForTenant(tenantId) {
-        return must(
-          await db
-            .from("rent_periods")
-            .select("*")
-            .eq("tenant_id", tenantId)
-            .order("period_month", { ascending: true }),
-          "list rent periods"
-        );
-      },
       async listByIds(ids) {
-        if (ids.length === 0) return [];
-        return must(await db.from("rent_periods").select("*").in("id", ids), "list rent periods");
-      },
-      async insertMany(rows) {
-        if (rows.length === 0) return;
-        // unique (tenant_id, period_month): a concurrent request creating the
-        // same month is fine, so skip duplicates instead of failing.
-        must(
-          await db.from("rent_periods").upsert(rows, { onConflict: "tenant_id,period_month", ignoreDuplicates: true }),
-          "insert rent periods"
+        const batches = await Promise.all(
+          chunk(ids).map(async (part) =>
+            must(await db.from("rent_periods").select("*").in("id", part), "list rent periods")
+          )
         );
+        return batches.flat();
       },
-      async addToAllocated(id, delta) {
-        const period = must<{ amount_allocated: string } | null>(
-          await db.from("rent_periods").select("amount_allocated").eq("id", id).maybeSingle(),
-          "get rent period"
+      async ensure(tenantIds, throughMonth) {
+        if (tenantIds && tenantIds.length === 0) return 0;
+        return must(
+          await db.rpc("ensure_rent_periods", { p_tenant_ids: tenantIds, p_through: throughMonth }),
+          "ensure rent periods"
         );
-        if (!period) return;
-        const amount = Math.max(0, Number(period.amount_allocated) + delta);
-        must(await db.from("rent_periods").update({ amount_allocated: amount }).eq("id", id), "update rent period");
       },
     },
 
@@ -220,19 +379,17 @@ export function supabaseSystemRepositories(): SystemRepositories {
           "list payment allocations"
         );
       },
-      async confirm(id, patch) {
-        // `.eq("status", "pending")` makes this a compare-and-swap: of two
-        // racing confirmations only the first updates a row.
-        const rows = must(
-          await db
-            .from("payments")
-            .update({ ...patch, status: "confirmed" })
-            .eq("id", id)
-            .eq("status", PENDING)
-            .select("id"),
-          "confirm payment"
-        );
-        return rows.length > 0;
+      async acknowledge(id, patch) {
+        // Compare-and-swap on acknowledged_at; moves no money (0010).
+        return mustWrite(
+          await db.rpc("acknowledge_payment", {
+            p_id: id,
+            p_tenant_signature_path: patch.tenant_signature_path,
+            p_pdf_path: patch.pdf_path,
+            p_otp_verified_at: patch.otp_verified_at,
+          }),
+          "acknowledge payment"
+        ) as boolean;
       },
     },
 
@@ -249,17 +406,28 @@ export function supabaseSystemRepositories(): SystemRepositories {
           "list adjustment allocations"
         );
       },
-      async confirm(id, patch) {
-        const rows = must(
-          await db
-            .from("adjustments")
-            .update({ ...patch, status: "confirmed" })
-            .eq("id", id)
-            .eq("status", PENDING)
-            .select("id"),
-          "confirm adjustment"
+      async acknowledge(id, patch) {
+        return mustWrite(
+          await db.rpc("acknowledge_adjustment", {
+            p_id: id,
+            p_tenant_signature_path: patch.tenant_signature_path,
+            p_pdf_path: patch.pdf_path,
+            p_otp_verified_at: patch.otp_verified_at,
+          }),
+          "acknowledge adjustment"
+        ) as boolean;
+      },
+    },
+
+    rateLimits: {
+      async hit(key, limit, windowSeconds) {
+        return must(
+          await db.rpc("hit_rate_limit", { p_key: key, p_limit: limit, p_window_seconds: windowSeconds }),
+          "rate limit"
         );
-        return rows.length > 0;
+      },
+      async prune() {
+        return must(await db.rpc("prune_rate_limits"), "prune rate limits");
       },
     },
   };

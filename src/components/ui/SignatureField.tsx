@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import Button from "@mui/material/Button";
-import SignaturePad, { type SignaturePadHandle } from "@/components/SignaturePad";
+import SignaturePad, { type SignaturePadHandle } from "@/components/ui/SignaturePad";
 import { SectionCard } from "./Surfaces";
 
 /** Signature section: heading, Clear action, and the pad. Hands the pad handle to the parent. */

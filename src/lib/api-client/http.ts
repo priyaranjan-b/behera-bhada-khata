@@ -11,15 +11,17 @@ export interface HttpApiOptions {
 
 /** The API over fetch. Same shape as the in-process server API, so callers can't tell them apart. */
 export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
-  async function request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
+    // FormData sets its own multipart Content-Type (with the boundary).
+    const isForm = body instanceof FormData;
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: {
         Accept: "application/json",
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(body === undefined || isForm ? {} : { "Content-Type": "application/json" }),
         ...(headers ? await headers() : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       credentials: "include",
       cache: "no-store",
     });
@@ -33,38 +35,55 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
 
   const get = <T>(path: string) => request<T>("GET", path);
   const post = <T>(path: string, body?: unknown) => request<T>("POST", path, body ?? {});
+  const put = <T>(path: string, body: unknown) => request<T>("PUT", path, body);
+  /** JSON as-is, or with files: a multipart form of `payload` (the JSON) + each file under `fileField`. */
+  const postWithFiles = <T>(path: string, body: unknown, fileField: string, files: Blob[] = []) => {
+    if (files.length === 0) return post<T>(path, body);
+    const form = new FormData();
+    form.append("payload", JSON.stringify(body));
+    for (const f of files) form.append(fileField, f);
+    return request<T>("POST", path, form);
+  };
 
   return {
     auth: {
       session: () => get(p.auth.session),
+      loginOptions: () => get(p.auth.magicLink),
       requestMagicLink: (input) => post(p.auth.magicLink, input),
       setSession: (tokens) => post(p.auth.session, tokens),
       signOut: () => post(p.auth.signOut),
     },
     dashboard: {
       summary: (month) => get(month ? `${p.dashboard.summary}?month=${encodeURIComponent(month)}` : p.dashboard.summary),
+      search: () => get(p.dashboard.search),
       properties: {
         list: () => get(p.dashboard.properties.list),
-        detail: (id) => get(p.dashboard.properties.detail(id)),
-        newTenant: (id) => get(p.dashboard.properties.newTenant(id)),
-        bulkTenants: (id) => get(p.dashboard.properties.bulkTenants(id)),
+        newForm: () => get(p.dashboard.properties.new),
+        detail: (code) => get(p.dashboard.properties.detail(code)),
+        newTenant: (code) => get(p.dashboard.properties.newTenant(code)),
+        bulkTenants: (code) => get(p.dashboard.properties.bulkTenants(code)),
+        newUnit: (code) => get(p.dashboard.properties.newUnit(code)),
         create: (input) => post(p.dashboard.properties.list, input),
+        createUnit: (code, input) => post(p.dashboard.properties.units(code), input),
         createTenant: (id, input) => post(p.dashboard.properties.tenants(id), input),
         bulkCreateTenants: (id, tenants) => post(p.dashboard.properties.bulkTenants(id), { tenants }),
       },
       tenants: {
         list: () => get(p.dashboard.tenants.list),
         detail: (id) => get(p.dashboard.tenants.detail(id)),
+        edit: (id) => get(p.dashboard.tenants.edit(id)),
+        update: (id, input) => put(p.dashboard.tenants.detail(id), input),
+        moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
         newPayment: (id) => get(p.dashboard.tenants.newPayment(id)),
-        createPayment: (id, input) => post(p.dashboard.tenants.payments(id), input),
+        createPayment: (id, input, proofs) => postWithFiles(p.dashboard.tenants.payments(id), input, "proofs", proofs),
       },
       payments: {
         adjust: (id) => get(p.dashboard.payments.adjust(id)),
         createAdjustment: (id, input) => post(p.dashboard.payments.adjustments(id), input),
-        resend: (id, input) => post(p.dashboard.payments.resend(id), input),
+        resend: (id) => post(p.dashboard.payments.resend(id)),
       },
       adjustments: {
-        resend: (id, input) => post(p.dashboard.adjustments.resend(id), input),
+        resend: (id) => post(p.dashboard.adjustments.resend(id)),
       },
     },
     confirm: {

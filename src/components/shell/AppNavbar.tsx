@@ -9,21 +9,28 @@ import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
 import { BrandMark } from "./BrandMark";
 import { MenuContent } from "./MenuContent";
 import { OwnerAvatar } from "./OwnerMenu";
+import { Search } from "./Search";
 import { useSignOut } from "./useSignOut";
 import { shellSurfaceSx } from "./surface";
 import type { AppTab } from "./nav";
 
 export const MOBILE_NAVBAR_HEIGHT = 64;
 
-/** Phone/tablet top bar with a right-hand slide-out menu (template AppNavbar + SideMenuMobile). */
+/**
+ * Phone/tablet top bar with a right-hand slide-out menu (template AppNavbar +
+ * SideMenuMobile). The search icon swaps the bar for the top-bar search.
+ */
 export function AppNavbar({ currentTab, ownerEmail }: { currentTab?: AppTab; ownerEmail?: string }) {
   const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
   const { signOut, signingOut } = useSignOut();
 
   return (
@@ -35,13 +42,29 @@ export function AppNavbar({ currentTab, ownerEmail }: { currentTab?: AppTab; own
       ]}
     >
       <Toolbar sx={{ minHeight: MOBILE_NAVBAR_HEIGHT, gap: 1, px: "12px !important" }}>
-        <Stack direction="row" sx={{ mr: "auto", minWidth: 0 }}>
-          <BrandMark showOdia={false} iconSize={28} />
-        </Stack>
-        <ColorModeIconDropdown aria-label="Change color mode" />
-        <IconButton size="small" aria-label="Open menu" onClick={() => setOpen(true)}>
-          <MenuRoundedIcon />
-        </IconButton>
+        {searching ? (
+          <>
+            <Stack sx={{ flex: 1, minWidth: 0 }}>
+              <Search autoFocus onNavigate={() => setSearching(false)} />
+            </Stack>
+            <IconButton size="small" aria-label="Close search" onClick={() => setSearching(false)}>
+              <CloseRoundedIcon />
+            </IconButton>
+          </>
+        ) : (
+          <>
+            <Stack direction="row" sx={{ mr: "auto", minWidth: 0 }}>
+              <BrandMark showOdia={false} iconSize={28} />
+            </Stack>
+            <IconButton size="small" aria-label="Search" onClick={() => setSearching(true)}>
+              <SearchRoundedIcon />
+            </IconButton>
+            <ColorModeIconDropdown aria-label="Change color mode" />
+            <IconButton size="small" aria-label="Open menu" onClick={() => setOpen(true)}>
+              <MenuRoundedIcon />
+            </IconButton>
+          </>
+        )}
       </Toolbar>
 
       <Drawer

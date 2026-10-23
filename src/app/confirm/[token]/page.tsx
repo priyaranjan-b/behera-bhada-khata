@@ -9,8 +9,7 @@ import { apiHref, apiPaths } from "@/lib/api-client";
 import { serverApi } from "@/lib/api-client/server";
 import { formatMoney } from "@/lib/money";
 import { BrandMark } from "@/components/shell/BrandMark";
-import { StatusBadge } from "@/components/DataComponents";
-import { StatusChip } from "@/components/StatusChip";
+import { StatusBadge } from "@/components/ui/DataDisplay";
 import {
   DetailList,
   DetailRow,
@@ -25,7 +24,6 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
   const { token } = await params;
   const record = await serverApi.confirm.detail(token);
   const { isExpired } = record;
-  const isConfirmed = record.status === "confirmed";
   const recordLabel = record.recordType === "payment" ? "Payment" : "Adjustment";
 
   return (
@@ -34,19 +32,28 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
         <BrandMark />
 
         <PublicHeading
-          title={`Confirm ${recordLabel.toLowerCase()}`}
-          subtitle="Check the details below, then sign and verify with the code sent to your phone."
+          title={`Acknowledge ${recordLabel.toLowerCase()}`}
+          subtitle="This has been recorded by the owner. Check the details, then sign and verify with the code sent to your phone to get your signed receipt."
         />
 
         <SectionCard
           title={`${recordLabel} details`}
           icon={<ReceiptLongRoundedIcon />}
           action={
-            isExpired ? <StatusBadge tone="warning" label="Link expired" /> : <StatusChip status={record.status} />
+            record.acknowledged ? (
+              <StatusBadge tone="success" label="Acknowledged" />
+            ) : isExpired ? (
+              <StatusBadge tone="warning" label="Link expired" />
+            ) : (
+              <StatusBadge tone="info" label="Recorded" />
+            )
           }
         >
           <DetailList>
             <DetailRow label="Property">{record.propertyName}</DetailRow>
+            {record.unitCodes.length > 0 ? (
+              <DetailRow label={record.unitCodes.length === 1 ? "House" : "Houses"}>{record.unitCodes.join(", ")}</DetailRow>
+            ) : null}
             <DetailRow label="Tenant">{record.tenantName}</DetailRow>
           </DetailList>
 
@@ -76,11 +83,11 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
           ) : null}
         </SectionCard>
 
-        {isConfirmed ? (
+        {record.acknowledged ? (
           <Stack spacing={2}>
             <Alert severity="success">
-              <AlertTitle>Already confirmed</AlertTitle>
-              This {recordLabel.toLowerCase()} has been signed and verified.
+              <AlertTitle>Already acknowledged</AlertTitle>
+              You have signed and verified this {recordLabel.toLowerCase()}.
             </Alert>
             <Button
               variant="contained"
@@ -94,7 +101,8 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
         ) : isExpired ? (
           <Alert severity="warning">
             <AlertTitle>Link expired</AlertTitle>
-            This link has expired. Please contact the owner for a new one.
+            This link has expired. The {recordLabel.toLowerCase()} is still recorded; ask the owner for a new link if you
+            want to sign the receipt.
           </Alert>
         ) : (
           <ConfirmForm token={token} recordType={record.recordType} maskedPhone={record.maskedPhone} />

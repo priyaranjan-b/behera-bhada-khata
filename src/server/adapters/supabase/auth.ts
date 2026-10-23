@@ -10,13 +10,24 @@ export const supabaseAuth: AuthGateway = {
     const { data } = await supabase.auth.getClaims();
     if (!data?.claims) return null;
     const { sub, email } = data.claims;
-    return { userId: sub, email: typeof email === "string" ? email : undefined };
+    const { data: isOwner, error } = await supabase.rpc("is_app_owner");
+    if (error) throw new Error(`is_app_owner: ${error.message}`);
+    return { userId: sub, email: typeof email === "string" ? email : undefined, isOwner: isOwner === true };
   },
 
-  async sendMagicLink(email, redirectTo) {
+  async sendMagicLink(email, redirectTo, { allowSignUp }) {
     const supabase = await createSessionClient();
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-    if (error) throw new ApiError(500, "Could not send the link");
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo, shouldCreateUser: allowSignUp },
+    });
+    if (!error) return;
+    // With sign-ups off, an unknown email is rejected - answer the same way
+    // as for a known one so the form can't be used to discover accounts.
+    if (!allowSignUp && ["otp_disabled", "signup_disabled", "user_not_found"].includes(error.code ?? "")) return;
+    console.error(`sendMagicLink: [${error.code ?? "?"}] ${error.message}`);
+    if (error.status === 429) throw new ApiError(429, "Too many sign-in emails. Try again in a few minutes.");
+    throw new ApiError(500, "Could not send the link");
   },
 
   async generateMagicLink(email, redirectTo) {
@@ -29,16 +40,29 @@ export const supabaseAuth: AuthGateway = {
     return data.properties.action_link;
   },
 
+  async ownerDisplayName() {
+    const admin = createAdminClient();
+    const { data: owner } = await admin.from("app_owner").select("user_id").maybeSingle();
+    if (!owner) return null;
+    const { data, error } = await admin.auth.admin.getUserById(owner.user_id);
+    if (error || !data.user) return null;
+    const meta = data.user.user_metadata ?? {};
+    const name = [meta.full_name, meta.name, meta.display_name].find(
+      (v): v is string => typeof v === "string" && v.trim() !== ""
+    );
+    return name?.trim() ?? data.user.email ?? null;
+  },
+
   async exchangeCode(code) {
     const supabase = await createSessionClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw new ApiError(400, error.message);
+    if (error) throw new ApiError(400, "That sign-in link didn't work");
   },
 
   async setSession(accessToken, refreshToken) {
     const supabase = await createSessionClient();
     const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-    if (error) throw new ApiError(400, error.message);
+    if (error) throw new ApiError(400, "That sign-in link didn't work");
   },
 
   async signOut() {

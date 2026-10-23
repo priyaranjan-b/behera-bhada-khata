@@ -1,9 +1,10 @@
-import { ownerLinkRoute, redirectTo } from "@/server/http";
-import { paymentReceiptUrl } from "@/server/services/payments";
+import { fileResponse, ownerLinkRoute } from "@/server/http";
+import { paymentReceipt } from "@/server/services/payments";
 
 type Params = { paymentId: string };
 
-// Opened as a link: redirects to a short-lived signed PDF URL.
+// Opened as a link: downloads the PDF receipt (owner-signed, or the
+// tenant-signed copy once acknowledged), e.g. to send on over WhatsApp.
 export const GET = ownerLinkRoute<Params>(async (ctx, _request, { paymentId }) =>
-  redirectTo(await paymentReceiptUrl(ctx, paymentId))
+  fileResponse(await paymentReceipt(ctx, paymentId), "application/pdf")
 );

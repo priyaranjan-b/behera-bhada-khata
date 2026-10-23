@@ -1,64 +1,200 @@
 import * as z from "zod";
+import { isDateKey } from "@/lib/dates";
+
+// Every request body the API accepts, validated by the service that receives
+// it (parseInput in src/server/services/context.ts). Client-safe, so forms
+// can reuse the same rules.
 
 export const phoneE164Schema = z
   .string()
   .regex(/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format, e.g. +919876543210");
 
-export const createPropertySchema = z.object({
-  name: z.string().min(1, "Required"),
-  address: z.string().optional(),
+/** A real yyyy-MM-dd calendar date. */
+export const dateKeySchema = z.string().refine(isDateKey, "Use a valid date (yyyy-MM-dd)");
+
+// numeric(12,2): at most 10 digits before the point, and whole paise.
+const MAX_AMOUNT = 9_999_999_999.99;
+const hasPaiseOnly = (n: number) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6;
+
+const moneySchema = z.coerce
+  .number()
+  .refine(Number.isFinite, "Enter an amount")
+  .refine(hasPaiseOnly, "Use at most 2 decimal places")
+  .refine((n) => Math.abs(n) <= MAX_AMOUNT, "Amount is too large");
+
+const positiveMoneySchema = moneySchema.refine((n) => n > 0, "Must be more than zero");
+const nonZeroMoneySchema = moneySchema.refine((n) => n !== 0, "Must not be zero");
+
+/** ~150 KB of PNG - far more than a drawn signature needs, small enough to bound uploads. */
+export const MAX_SIGNATURE_DATA_URL_LENGTH = 200_000;
+
+export const signaturePngSchema = z
+  .string()
+  .startsWith("data:image/png;base64,", "Signature must be a PNG")
+  .max(MAX_SIGNATURE_DATA_URL_LENGTH, "Signature image is too large");
+
+const optionalText = (max: number) => z.string().trim().max(max).optional();
+
+/**
+ * Payment proof attachments (0009_payment_proofs.sql). One request carries
+ * them all, so the total stays under Vercel's 4.5 MB request body limit; the
+ * form downscales photos to fit.
+ */
+export const PROOF_LIMITS = {
+  maxFiles: 5,
+  maxTotalBytes: 4 * 1024 * 1024,
+  /** For the file picker; the server checks the bytes, not the name or type. */
+  accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf",
+} as const;
+
+// ---- Auth --------------------------------------------------------------------
+
+export const magicLinkSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email")),
+  next: z.string().max(2048).optional(),
 });
 
-export const createTenantSchema = z.object({
-  propertyId: z.string().uuid(),
-  name: z.string().min(1, "Required"),
-  businessName: z.string().optional(),
+export const sessionTokensSchema = z.object({
+  accessToken: z.string().min(1).max(8192),
+  refreshToken: z.string().min(1).max(8192),
+});
+
+// ---- Sites, towers, houses & tenants ----------------------------------------
+// Codes match the CHECK constraints in 0006_property_master_data.sql and are
+// upper-cased on the way in, so "ac-t1-g01" works too.
+
+const upperCode = (pattern: RegExp, message: string) =>
+  z.string().trim().toUpperCase().regex(pattern, message);
+
+export const locationCodeSchema = upperCode(/^[A-Z]{2,4}$/, "Site code: 2-4 letters, e.g. AC");
+export const towerCodeSchema = upperCode(/^T[A-Z0-9]{1,3}$/, "Tower code: T followed by 1-3 letters/digits, e.g. T1");
+export const propertyCodeSchema = upperCode(/^[A-Z]{2,4}-T[A-Z0-9]{1,3}$/, "Tower code looks like AC-T1");
+export const houseNumberSchema = upperCode(/^[A-Z0-9]{1,4}$/, "House number: 1-4 letters/digits, e.g. G01 or 101");
+export const unitCodeSchema = upperCode(/^[A-Z]{2,4}-T[A-Z0-9]{1,3}-[A-Z0-9]{1,4}$/, "House code looks like AC-T1-G01");
+
+export const unitCodesSchema = z
+  .array(unitCodeSchema)
+  .min(1, "Choose at least one house")
+  .max(20, "At most 20 houses per tenant")
+  .refine((codes) => new Set(codes).size === codes.length, "Each house can only be chosen once");
+
+const floorSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^(G|B[0-9]?|[0-9]{1,2})$/, "Floor: G, B, or a number")
+  .optional();
+
+/** A first-of-month key; "2026-07" is accepted and normalised to "2026-07-01". */
+export const monthKeySchema = z
+  .string()
+  .trim()
+  .transform((v) => (/^\d{4}-\d{2}$/.test(v) ? `${v}-01` : v))
+  .pipe(dateKeySchema)
+  .refine((v) => v.endsWith("-01"), "Use the first of the month");
+
+export const createPropertySchema = z.object({
+  locationCode: locationCodeSchema,
+  towerCode: towerCodeSchema,
+  name: z.string().trim().min(1, "Required").max(200),
+});
+
+export const createUnitSchema = z.object({
+  propertyCode: propertyCodeSchema,
+  houseNumber: houseNumberSchema,
+  floor: floorSchema,
   unitType: z.enum(["residential", "commercial"]),
-  tower: z.string().optional(),
-  floor: z.string().optional(),
-  houseNumber: z.string().optional(),
+  label: optionalText(100),
+});
+
+const tenantContact = {
+  name: z.string().trim().min(1, "Required").max(200),
+  businessName: optionalText(200),
   phone: phoneE164Schema,
   preferredChannel: z.enum(["whatsapp", "sms", "both"]),
-  monthlyRentAmount: z.coerce.number().positive(),
-  leaseStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+};
+
+/** One tenant, the houses they take on `leaseStart`, and their combined monthly rent. */
+export const createTenantSchema = z.object({
+  ...tenantContact,
+  monthlyRentAmount: positiveMoneySchema,
+  leaseStart: dateKeySchema,
+  unitCodes: unitCodesSchema,
+  /** Rent already settled outside the app up to this month; billing starts the month after. */
+  paidThrough: monthKeySchema.optional(),
+  /** Security deposit (optional); can't be changed once the tenant is active. */
+  depositAmount: positiveMoneySchema.optional(),
 });
 
+/**
+ * The full new state of a tenant. The database works out what changed:
+ * houses added/removed take effect on `unitsEffective`, a different rent
+ * from `rentEffectiveMonth` - each required only when that part changed.
+ * A draft (from the paper register) may be saved with details still missing;
+ * phone + rent + `leaseStart` together make it active.
+ */
+export const updateTenantSchema = z.object({
+  ...tenantContact,
+  phone: phoneE164Schema.optional(),
+  unitCodes: unitCodesSchema,
+  unitsEffective: dateKeySchema.optional(),
+  monthlyRentAmount: positiveMoneySchema.optional(),
+  rentEffectiveMonth: monthKeySchema.optional(),
+  leaseStart: dateKeySchema.optional(),
+  /** Drafts: rent settled on paper up to this month (default: last month). */
+  paidThrough: monthKeySchema.optional(),
+  /** Drafts only - frozen once active (sending the stored value is fine). */
+  depositAmount: positiveMoneySchema.optional(),
+});
+
+export const moveOutSchema = z.object({
+  moveOutDate: dateKeySchema,
+});
+
+// ---- Payments & adjustments -------------------------------------------------
+
 export const paymentAllocationInputSchema = z.object({
-  rentPeriodId: z.string().uuid(),
-  amountAllocated: z.coerce.number().positive(),
+  rentPeriodId: z.uuid(),
+  amountAllocated: positiveMoneySchema,
 });
 
 export const createPaymentSchema = z.object({
-  tenantId: z.string().uuid(),
-  amount: z.coerce.number().positive(),
-  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  tenantId: z.uuid(),
+  amount: positiveMoneySchema,
+  paymentDate: dateKeySchema,
   mode: z.enum(["cash", "bank_transfer", "upi", "cheque", "other"]),
-  note: z.string().optional(),
-  allocations: z.array(paymentAllocationInputSchema).min(1, "Select at least one period"),
-  ownerSignaturePng: z.string().startsWith("data:image/png;base64,"),
+  note: optionalText(500),
+  allocations: z.array(paymentAllocationInputSchema).min(1, "Select at least one period").max(240),
+  ownerSignaturePng: signaturePngSchema,
+  /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */
+  notifyTenant: z.boolean().optional(),
 });
 
 export const adjustmentAllocationInputSchema = z.object({
-  rentPeriodId: z.string().uuid(),
-  amountDelta: z.coerce.number().refine((n) => n !== 0, "Must not be zero"),
+  rentPeriodId: z.uuid(),
+  amountDelta: nonZeroMoneySchema,
 });
 
 export const createAdjustmentSchema = z.object({
-  originalPaymentId: z.string().uuid(),
-  deltaAmount: z.coerce.number().refine((n) => n !== 0, "Must not be zero"),
-  reason: z.string().min(3, "Explain what's being corrected"),
-  allocations: z.array(adjustmentAllocationInputSchema).min(1, "Select at least one period"),
-  ownerSignaturePng: z.string().startsWith("data:image/png;base64,"),
+  originalPaymentId: z.uuid(),
+  deltaAmount: nonZeroMoneySchema,
+  reason: z.string().trim().min(3, "Explain what's being corrected").max(500),
+  allocations: z.array(adjustmentAllocationInputSchema).min(1, "Select at least one period").max(240),
+  ownerSignaturePng: signaturePngSchema,
+  /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */
+  notifyTenant: z.boolean().optional(),
 });
 
+// ---- Tenant confirm flow ----------------------------------------------------
+
 export const otpSendSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).max(200),
   recordType: z.enum(["payment", "adjustment"]),
 });
 
 export const confirmSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).max(200),
   recordType: z.enum(["payment", "adjustment"]),
-  otpCode: z.string().min(4).max(10),
-  tenantSignaturePng: z.string().startsWith("data:image/png;base64,"),
+  otpCode: z.string().trim().regex(/^\d{4,10}$/, "Enter the code from the SMS"),
+  tenantSignaturePng: signaturePngSchema,
 });

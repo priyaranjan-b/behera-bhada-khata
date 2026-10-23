@@ -3,26 +3,29 @@
 import { useMemo, useState } from "react";
 import type { GridColDef } from "@mui/x-data-grid";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlineOutlined";
-import AppDataGrid from "@/components/AppDataGrid";
+import AppDataGrid from "@/components/ui/AppDataGrid";
 import {
   DashboardCardPanel,
   EmptyState,
   IdentityCell,
-  PanelFilterSelect,
   StatusBadge,
   TagPill,
-} from "@/components/DataComponents";
+} from "@/components/ui/DataDisplay";
+import PanelFilterSelect from "@/components/ui/PanelFilterSelect";
 import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
 import type { TenantSearchRow } from "@/lib/contracts";
 
-type StatusFilter = "all" | "overdue" | "outstanding" | "settled";
+type StatusFilter = "current" | "drafts" | "overdue" | "outstanding" | "settled" | "movedOut" | "all";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All tenants" },
+  { value: "current", label: "Current tenants" },
+  { value: "drafts", label: "Drafts - details missing" },
   { value: "overdue", label: "Overdue" },
   { value: "outstanding", label: "Has balance" },
   { value: "settled", label: "Settled" },
+  { value: "movedOut", label: "Moved out" },
+  { value: "all", label: "Everyone" },
 ];
 
 const columns: GridColDef<TenantSearchRow>[] = [
@@ -36,7 +39,13 @@ const columns: GridColDef<TenantSearchRow>[] = [
     renderCell: ({ row }) => (
       <IdentityCell
         name={row.displayName}
-        caption={row.contactName ?? undefined}
+        caption={
+          row.status === "active"
+            ? (row.contactName ?? undefined)
+            : row.status === "draft"
+              ? "Draft - add phone, rent, lease start"
+              : `Moved out ${row.movedOutOn ?? ""}`
+        }
         href={`/dashboard/tenants/${row.tenantId}`}
       />
     ),
@@ -49,19 +58,20 @@ const columns: GridColDef<TenantSearchRow>[] = [
     renderCell: ({ row }) => <TagPill label={row.propertyName} />,
   },
   {
-    field: "propertyAddress",
-    headerName: "Location",
+    field: "locationName",
+    headerName: "Site",
     flex: 1,
     minWidth: 160,
     valueFormatter: (value: string) => value || "—",
   },
   {
-    field: "unitLabel",
-    headerName: "Unit",
+    field: "unitCodes",
+    headerName: "Houses",
     flex: 1,
-    minWidth: 180,
-    valueGetter: (_value, row) => `${row.unitType} ${row.unitLabel}`,
-    renderCell: ({ row }) => <UnitCell unitType={row.unitType} unitLabel={row.unitLabel} />,
+    minWidth: 200,
+    // Codes in the value so the quick filter finds a tenant by house number.
+    valueGetter: (_value, row) => `${row.unitMix ?? ""} ${row.unitCodes.join(" ")}`,
+    renderCell: ({ row }) => <UnitCell unitMix={row.unitMix} unitCodes={row.unitCodes} />,
   },
   {
     field: "totalOutstanding",
@@ -91,20 +101,27 @@ const columns: GridColDef<TenantSearchRow>[] = [
 ];
 
 function matchesStatus(row: TenantSearchRow, status: StatusFilter): boolean {
+  const current = row.status !== "inactive";
   switch (status) {
+    case "current":
+      return current;
+    case "drafts":
+      return row.status === "draft";
     case "overdue":
       return row.overdueMonths > 0;
     case "outstanding":
       return row.totalOutstanding > 0;
     case "settled":
-      return row.totalOutstanding <= 0;
+      return current && row.totalOutstanding <= 0;
+    case "movedOut":
+      return !current;
     default:
       return true;
   }
 }
 
 export default function TenantSearchList({ rows }: { rows: TenantSearchRow[] }) {
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [status, setStatus] = useState<StatusFilter>("current");
   const filtered = useMemo(() => rows.filter((row) => matchesStatus(row, status)), [rows, status]);
 
   const statusFilter = (
@@ -118,7 +135,7 @@ export default function TenantSearchList({ rows }: { rows: TenantSearchRow[] }) 
 
   return (
     <DashboardCardPanel
-      title="Active tenants"
+      title="Tenants"
       subtitle={`${filtered.length} of ${rows.length}`}
       action={rows.length > 0 ? statusFilter : undefined}
       flush
@@ -126,8 +143,8 @@ export default function TenantSearchList({ rows }: { rows: TenantSearchRow[] }) 
       {rows.length === 0 ? (
         <EmptyState
           icon={<PeopleOutlineIcon />}
-          title="No active tenants yet"
-          description="Add a property and a tenant to start tracking rent."
+          title="No tenants yet"
+          description="Open a tower under Properties and add a tenant to one or more of its houses."
         />
       ) : (
         <AppDataGrid<TenantSearchRow>

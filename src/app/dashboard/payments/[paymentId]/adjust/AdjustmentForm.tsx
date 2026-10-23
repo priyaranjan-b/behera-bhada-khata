@@ -7,19 +7,14 @@ import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
 import Divider from "@mui/material/Divider";
 import TextField from "@mui/material/TextField";
-import { type SignaturePadHandle } from "@/components/SignaturePad";
-import { StatusBadge } from "@/components/DataComponents";
+import { type SignaturePadHandle } from "@/components/ui/SignaturePad";
+import { StatusBadge } from "@/components/ui/DataDisplay";
 import { AmountRow, FormActions, SectionCard, SignatureField, SummaryLine } from "@/components/ui";
+import { formatMonth } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AdjustablePeriod } from "@/lib/contracts";
-
-function monthLabel(periodMonth: string) {
-  return new Date(`${periodMonth}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
-}
+import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 
 export default function AdjustmentForm({
   paymentId,
@@ -35,6 +30,7 @@ export default function AdjustmentForm({
   const router = useRouter();
   const [deltas, setDeltas] = useState<Record<string, number>>({});
   const [reason, setReason] = useState("");
+  const [notify, setNotify] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const padHandle = useRef<SignaturePadHandle | null>(null);
@@ -72,8 +68,9 @@ export default function AdjustmentForm({
         reason: reason.trim(),
         allocations,
         ownerSignaturePng: padHandle.current.toPngDataUrl(),
+        notifyTenant: notify,
       });
-      router.push(`/dashboard/tenants/${created.tenantId}?paymentCreated=1`);
+      router.push(`/dashboard/tenants/${created.tenantId}?${recordedFlash(created.notified)}`);
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save that adjustment."));
@@ -91,8 +88,8 @@ export default function AdjustmentForm({
                 {periods.map((p) => (
                   <AmountRow
                     key={p.rentPeriodId}
-                    label={monthLabel(p.periodMonth)}
-                    ariaLabel={`Adjustment for ${monthLabel(p.periodMonth)}`}
+                    label={formatMonth(p.periodMonth)}
+                    ariaLabel={`Adjustment for ${formatMonth(p.periodMonth)}`}
                     caption={`originally ${formatMoney(p.originallyAllocated)}`}
                     value={deltas[p.rentPeriodId] ?? 0}
                     onChange={(value) => setDeltas((prev) => ({ ...prev, [p.rentPeriodId]: value }))}
@@ -140,10 +137,14 @@ export default function AdjustmentForm({
         </Grid>
 
         <Grid size={12}>
+          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} />
+        </Grid>
+
+        <Grid size={12}>
           <FormActions
             error={error}
             cancelHref={`/dashboard/tenants/${tenantId}`}
-            submitLabel="Save & send for confirmation"
+            submitLabel="Save correction"
             pendingLabel="Saving…"
             pending={submitting}
           />

@@ -3,12 +3,20 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/errors";
-import { getSession } from "@/server/services/auth";
+import { apiBaseUrl } from "@/server/env";
+import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { getConfirmView } from "@/server/services/confirm";
 import { getDashboardSummary } from "@/server/services/dashboard";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
-import { getPropertyDetail, getPropertyHeader, listProperties } from "@/server/services/properties";
-import { getTenantDetail, listTenants } from "@/server/services/tenants";
+import {
+  getNewPropertyForm,
+  getNewTenantForm,
+  getPropertyDetail,
+  getPropertyHeader,
+  listProperties,
+} from "@/server/services/properties";
+import { getSearchIndex } from "@/server/services/search";
+import { getEditTenantForm, getTenantDetail, listTenants } from "@/server/services/tenants";
 import type { OwnerContext } from "@/server/services/context";
 import { createHttpApi } from "./http";
 import type { ApiQueries } from "./types";
@@ -19,26 +27,28 @@ import type { ApiQueries } from "./types";
 // and nothing is listening at build time). Set API_BASE_URL to send these
 // reads over HTTP to a standalone backend instead; pages don't change.
 
-const owner = cache(async (): Promise<OwnerContext> => {
-  const session = await getSession();
-  return { ownerId: session.userId, email: session.email };
-});
+const owner = cache((): Promise<OwnerContext> => getOwnerContext());
 
 const inProcessApi: ApiQueries = {
   auth: {
     session: () => getSession(),
+    loginOptions: async () => getLoginOptions(),
   },
   dashboard: {
     summary: async (month) => getDashboardSummary(await owner(), month),
+    search: async () => getSearchIndex(await owner()),
     properties: {
       list: async () => listProperties(await owner()),
-      detail: async (id) => getPropertyDetail(await owner(), id),
-      newTenant: async (id) => getPropertyHeader(await owner(), id),
-      bulkTenants: async (id) => getPropertyHeader(await owner(), id),
+      newForm: async () => getNewPropertyForm(await owner()),
+      detail: async (code) => getPropertyDetail(await owner(), code),
+      newTenant: async (code) => getNewTenantForm(await owner(), code),
+      bulkTenants: async (code) => getNewTenantForm(await owner(), code),
+      newUnit: async (code) => getPropertyHeader(await owner(), code),
     },
     tenants: {
       list: async () => listTenants(await owner()),
       detail: async (id) => getTenantDetail(await owner(), id),
+      edit: async (id) => getEditTenantForm(await owner(), id),
       newPayment: async (id) => getNewPaymentForm(await owner(), id),
     },
     payments: {
@@ -58,28 +68,38 @@ function httpApi(baseUrl: string): ApiQueries {
   });
 }
 
+// Picked on first call rather than at import, so loading a page module
+// (e.g. during `next build`) doesn't need the environment.
+let selected: ApiQueries | undefined;
+function selectApi(): ApiQueries {
+  const baseUrl = apiBaseUrl();
+  selected ??= baseUrl ? httpApi(baseUrl) : inProcessApi;
+  return selected;
+}
+
 // Pages render whatever the API returns; the two failures every page treats
-// the same way are handled once here: no session -> /login, missing -> 404.
-function withPageErrors<T extends object>(api: T): T {
+// the same way are handled once here: no session -> /login, signed in but not
+// the owner -> /login?error=owner, missing -> 404.
+function withPageErrors<T extends object>(shape: T, resolve: () => T): T {
   return Object.fromEntries(
-    Object.entries(api).map(([key, value]) => [
+    Object.entries(shape).map(([key, value]) => [
       key,
       typeof value === "function"
         ? async (...args: unknown[]) => {
             try {
-              return await value(...args);
+              const fn = (resolve() as Record<string, (...a: unknown[]) => Promise<unknown>>)[key];
+              return await fn(...args);
             } catch (err) {
               if (err instanceof ApiError && err.status === 401) redirect("/login");
+              if (err instanceof ApiError && err.status === 403) redirect("/login?error=owner");
               if (err instanceof ApiError && err.status === 404) notFound();
               throw err;
             }
           }
-        : withPageErrors(value as object),
+        : withPageErrors(value as object, () => (resolve() as Record<string, object>)[key]),
     ])
   ) as T;
 }
 
 /** Data access for Server Components (pages, layouts). */
-export const serverApi: ApiQueries = withPageErrors(
-  process.env.API_BASE_URL ? httpApi(process.env.API_BASE_URL) : inProcessApi
-);
+export const serverApi: ApiQueries = withPageErrors(inProcessApi, selectApi);

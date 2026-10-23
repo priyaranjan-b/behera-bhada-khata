@@ -1,8 +1,8 @@
 "use client";
 
 import type { GridColDef } from "@mui/x-data-grid";
-import AppDataGrid, { moneyColumn } from "@/components/AppDataGrid";
-import { StatusChip } from "@/components/StatusChip";
+import AppDataGrid, { moneyColumn } from "@/components/ui/AppDataGrid";
+import { StatusChip } from "@/components/domain/StatusChip";
 import type { TenantPeriod } from "@/lib/contracts";
 
 export interface TenantPeriodRow extends TenantPeriod {

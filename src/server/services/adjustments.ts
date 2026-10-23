@@ -1,22 +1,25 @@
 import "server-only";
-import type { CreatedAdjustment, ResendInput } from "@/lib/contracts";
+import type { CreatedAdjustment, LinkResent } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
 import { formatMoney } from "@/lib/money";
 import { createAdjustmentSchema } from "@/lib/validation";
-import { ownerDb, storage } from "@/server/infra";
+import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
-import { confirmUrl, generateConfirmToken, notifyTenant, storeOwnerSignature } from "./confirmLinks";
-import { resendSchema } from "./payments";
+import { confirmUrl, generateConfirmToken, notifyTenant, storeOwnerSignature, withUploadedFile } from "./confirmLinks";
+import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
 
-// A mistake on a confirmed payment is never edited in place - it's corrected
-// with a new adjustment that goes through the same sign + OTP flow.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// A mistake on a payment is never edited in place - it's corrected with a new
+// adjustment, which (like a payment, since 0010) counts as soon as it's
+// recorded; the tenant may acknowledge it with a signature + OTP.
 export async function createAdjustment(
   ctx: OwnerContext,
   paymentId: string,
   body: unknown
 ): Promise<CreatedAdjustment> {
   const input = parseInput(createAdjustmentSchema, withParams(body, { originalPaymentId: paymentId }));
-  const db = await ownerDb(ctx.ownerId);
+  const db = await ownerDb();
 
   const payment = await db.payments.get(paymentId);
   if (!payment || payment.status !== "confirmed") notFound("Payment");
@@ -26,44 +29,67 @@ export async function createAdjustment(
   const { id, ownerSignaturePath } = await storeOwnerSignature("adjustments", tenant, input.ownerSignaturePng);
   const { token, tokenHash, expiresAt } = generateConfirmToken();
 
-  await db.adjustments.create(
-    {
-      id,
-      tenant_id: tenant.id,
-      original_payment_id: paymentId,
-      delta_amount: input.deltaAmount,
-      reason: input.reason,
-      owner_signature_path: ownerSignaturePath,
-      token_hash: tokenHash,
-      token_expires_at: expiresAt,
-    },
-    input.allocations.map((a) => ({ rent_period_id: a.rentPeriodId, amount_delta: a.amountDelta }))
+  // The database checks the allocations against the original payment,
+  // inserts everything and applies it to the months in one transaction.
+  await withUploadedFile(ownerSignaturePath, () =>
+    db.adjustments.create(
+      {
+        id,
+        original_payment_id: paymentId,
+        delta_amount: input.deltaAmount,
+        reason: input.reason,
+        owner_signature_path: ownerSignaturePath,
+        token_hash: tokenHash,
+        token_expires_at: expiresAt,
+      },
+      input.allocations.map((a) => ({ rent_period_id: a.rentPeriodId, amount: a.amountDelta }))
+    )
   );
 
-  await notifyTenant(
-    tenant,
-    `Hi ${tenant.name}, a correction of ${formatMoney(input.deltaAmount)} was recorded on a past payment. Please confirm: ${confirmUrl(token)}`
-  );
-  return { id, tenantId: tenant.id };
+  const notified =
+    input.notifyTenant === false
+      ? null
+      : await notifyTenant(
+          tenant,
+          `Hi ${tenant.name}, a correction of ${formatMoney(input.deltaAmount)} was recorded on a past rent payment. View and acknowledge it: ${confirmUrl(token)}`
+        );
+  return { id, tenantId: tenant.id, notified };
 }
 
-export async function resendAdjustmentLink(ctx: OwnerContext, adjustmentId: string, body: unknown): Promise<void> {
-  const input: ResendInput = parseInput(resendSchema, body);
-  const db = await ownerDb(ctx.ownerId);
-  const tenant = await db.tenants.get(input.tenantId);
-  if (!tenant) throw new ApiError(400, "Tenant not found");
+/** Like resendPaymentLink: tenant and amount come from the adjustment itself. */
+export async function resendAdjustmentLink(ctx: OwnerContext, adjustmentId: string): Promise<LinkResent> {
+  const db = await ownerDb();
+  const adjustment = await db.adjustments.get(adjustmentId);
+  if (!adjustment) notFound("Adjustment");
+  if (adjustment.acknowledged_at) throw new ApiError(409, "The tenant has already acknowledged this adjustment");
+  const tenant = await db.tenants.get(adjustment.tenant_id);
+  if (!tenant) notFound("Tenant");
 
   const { token, tokenHash, expiresAt } = generateConfirmToken();
-  await db.adjustments.rotateToken(adjustmentId, tokenHash, expiresAt);
-  await notifyTenant(
+  if (!(await db.adjustments.rotateToken(adjustmentId, tokenHash, expiresAt))) {
+    throw new ApiError(409, "The tenant has already acknowledged this adjustment");
+  }
+  const notified = await notifyTenant(
     tenant,
-    `Hi ${tenant.name}, reminder to confirm the adjustment of ${formatMoney(input.amount)}: ${confirmUrl(token)}`
+    `Hi ${tenant.name}, a correction of ${formatMoney(adjustment.delta_amount)} was recorded on your rent. View and acknowledge it: ${confirmUrl(token)}`
   );
+  return { notified };
 }
 
-export async function adjustmentReceiptUrl(ctx: OwnerContext, adjustmentId: string): Promise<string> {
-  const db = await ownerDb(ctx.ownerId);
+/** The adjustment's PDF, available from the moment it's recorded (see paymentReceipt). */
+export async function adjustmentReceipt(
+  ctx: OwnerContext,
+  adjustmentId: string
+): Promise<{ bytes: Uint8Array; fileName: string }> {
+  if (!UUID.test(adjustmentId)) notFound("Adjustment");
+  const db = await ownerDb();
   const adjustment = await db.adjustments.get(adjustmentId);
-  if (!adjustment?.pdf_path) throw new ApiError(404, "Not available");
-  return storage.signedUrl(adjustment.pdf_path, 300);
+  if (!adjustment) notFound("Adjustment");
+  const details = await describeRecord(ownerReceiptReads(db), {
+    recordType: "adjustment",
+    row: adjustment,
+    allocations: await db.adjustments.listAllocations(adjustmentId),
+  });
+  if (!details) notFound("Tenant");
+  return receiptFile(details);
 }

@@ -6,7 +6,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
-import Link from "@/components/Link";
+import Link from "@/components/ui/Link";
 import { NAV_ITEMS, type AppTab } from "./nav";
 
 export function MenuContent({ currentTab, onNavigate }: { currentTab?: AppTab; onNavigate?: () => void }) {

@@ -1,0 +1,134 @@
+"use client";
+
+import { useState } from "react";
+import type { GridColDef } from "@mui/x-data-grid";
+import Button from "@mui/material/Button";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import MuiLink from "@mui/material/Link";
+import Typography from "@mui/material/Typography";
+import Link from "@/components/ui/Link";
+import AppDataGrid from "@/components/ui/AppDataGrid";
+import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
+import { DetailList, DetailRow, GridCell } from "@/components/ui";
+import { formatFloor } from "@/lib/domain/tenant";
+import type { UnitRow } from "@/lib/contracts";
+
+function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
+  return (
+    <Dialog open={unit !== null} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>{unit ? `History of ${unit.unitCode}` : ""}</DialogTitle>
+      <DialogContent>
+        {unit && unit.history.length > 0 ? (
+          <DetailList dividers>
+            {[...unit.history].reverse().map((h) => (
+              <DetailRow key={`${h.tenantId}-${h.startDate}`} label={`${h.startDate} → ${h.endDate ?? "now"}`}>
+                <MuiLink component={Link} href={`/dashboard/tenants/${h.tenantId}`}>
+                  {h.tenantName}
+                </MuiLink>
+              </DetailRow>
+            ))}
+          </DetailList>
+        ) : (
+          <EmptyState title="No tenants yet" description="Nobody has been placed in this house." />
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+export default function UnitsGrid({ units, propertyName }: { units: UnitRow[]; propertyName: string }) {
+  const [historyOf, setHistoryOf] = useState<UnitRow | null>(null);
+
+  const columns: GridColDef<UnitRow>[] = [
+    {
+      field: "unitCode",
+      headerName: "House",
+      flex: 1,
+      minWidth: 170,
+      valueGetter: (_v, row) => `${row.unitCode} ${row.label ?? ""}`,
+      renderCell: ({ row }) => (
+        <GridCell direction="column" spacing={0}>
+          <Typography variant="body2" noWrap>
+            {row.unitCode}
+            {row.label ? ` · ${row.label}` : ""}
+          </Typography>
+        </GridCell>
+      ),
+    },
+    {
+      field: "floor",
+      headerName: "Floor",
+      minWidth: 110,
+      valueFormatter: (value: string | null) => formatFloor(value) || "—",
+    },
+    {
+      field: "unitType",
+      headerName: "Type",
+      minWidth: 120,
+      renderCell: ({ row }) => (
+        <GridCell>
+          <TagPill label={row.unitType === "commercial" ? "Commercial" : "Residential"} />
+        </GridCell>
+      ),
+    },
+    {
+      field: "currentTenant",
+      headerName: "Occupant",
+      flex: 1,
+      minWidth: 180,
+      valueGetter: (_v, row) => row.currentTenant?.displayName ?? (row.isActive ? "Vacant" : "Retired"),
+      renderCell: ({ row }) => (
+        <GridCell>
+          {row.currentTenant ? (
+            <MuiLink component={Link} href={`/dashboard/tenants/${row.currentTenant.id}`} noWrap>
+              {row.currentTenant.displayName}
+            </MuiLink>
+          ) : row.isActive ? (
+            <StatusBadge tone="info" label="Vacant" />
+          ) : (
+            <StatusBadge tone="neutral" label="Retired" />
+          )}
+        </GridCell>
+      ),
+    },
+    {
+      field: "since",
+      headerName: "Since",
+      minWidth: 110,
+      valueGetter: (_v, row) => row.currentTenant?.since ?? "",
+    },
+    {
+      field: "history",
+      headerName: "",
+      minWidth: 110,
+      sortable: false,
+      filterable: false,
+      renderCell: ({ row }) => (
+        <GridCell align="end">
+          <Button size="small" onClick={() => setHistoryOf(row)}>
+            History
+          </Button>
+        </GridCell>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <AppDataGrid<UnitRow>
+        rows={units}
+        columns={columns}
+        getRowId={(row) => row.unitCode}
+        quickFilter={units.length > 8}
+        label={`Houses at ${propertyName}`}
+      />
+      <HistoryDialog unit={historyOf} onClose={() => setHistoryOf(null)} />
+    </>
+  );
+}

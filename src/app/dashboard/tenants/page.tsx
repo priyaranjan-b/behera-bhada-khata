@@ -1,6 +1,6 @@
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
-import { PageHeader } from "@/components/DataComponents";
+import { PageHeader } from "@/components/ui/DataDisplay";
 import TenantSearchList from "./TenantSearchList";
 
 export default async function TenantsIndexPage() {

@@ -10,15 +10,24 @@ import type {
   CreatePaymentInput,
   CreatePropertyInput,
   CreateTenantInput,
+  CreateUnitInput,
   DashboardSummary,
+  EditTenantForm,
+  LocationGroup,
+  MoveOutInput,
+  NewPropertyForm,
+  NewTenantForm,
+  UpdateTenantInput,
   MagicLinkResult,
   NewPaymentForm,
   OtpSent,
-  PropertyCard,
   PropertyDetail,
   PropertyHeader,
+  LinkResent,
+  LoginOptions,
+  RecordCreated,
   RecordType,
-  ResendInput,
+  SearchIndex,
   Session,
   SessionTokens,
   TenantDetail,
@@ -32,18 +41,24 @@ import type {
 export interface ApiQueries {
   auth: {
     session(): Promise<Session>;
+    loginOptions(): Promise<LoginOptions>;
   };
   dashboard: {
     summary(month?: string): Promise<DashboardSummary>;
+    /** Top-bar search index (tenants and houses). */
+    search(): Promise<SearchIndex>;
     properties: {
-      list(): Promise<PropertyCard[]>;
-      detail(propertyId: string): Promise<PropertyDetail>;
-      newTenant(propertyId: string): Promise<PropertyHeader>;
-      bulkTenants(propertyId: string): Promise<PropertyHeader>;
+      list(): Promise<LocationGroup[]>;
+      newForm(): Promise<NewPropertyForm>;
+      detail(propertyCode: string): Promise<PropertyDetail>;
+      newTenant(propertyCode: string): Promise<NewTenantForm>;
+      bulkTenants(propertyCode: string): Promise<NewTenantForm>;
+      newUnit(propertyCode: string): Promise<PropertyHeader>;
     };
     tenants: {
       list(): Promise<TenantSearchRow[]>;
       detail(tenantId: string): Promise<TenantDetail>;
+      edit(tenantId: string): Promise<EditTenantForm>;
       newPayment(tenantId: string): Promise<NewPaymentForm>;
     };
     payments: {
@@ -64,19 +79,23 @@ export interface ApiCommands {
   };
   dashboard: {
     properties: {
-      create(input: CreatePropertyInput): Promise<Created>;
-      createTenant(propertyId: string, input: CreateTenantInput): Promise<Created>;
-      bulkCreateTenants(propertyId: string, tenants: unknown[]): Promise<BulkCreateResult>;
+      create(input: CreatePropertyInput): Promise<{ code: string }>;
+      createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;
+      createTenant(propertyCode: string, input: CreateTenantInput): Promise<Created>;
+      bulkCreateTenants(propertyCode: string, tenants: unknown[]): Promise<BulkCreateResult>;
     };
     tenants: {
-      createPayment(tenantId: string, input: CreatePaymentInput): Promise<Created>;
+      update(tenantId: string, input: UpdateTenantInput): Promise<void>;
+      moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
+      /** `proofs`: photos/PDFs of the payment, sent as multipart (see PROOF_LIMITS). */
+      createPayment(tenantId: string, input: CreatePaymentInput, proofs?: File[]): Promise<RecordCreated>;
     };
     payments: {
       createAdjustment(paymentId: string, input: CreateAdjustmentInput): Promise<CreatedAdjustment>;
-      resend(paymentId: string, input: ResendInput): Promise<void>;
+      resend(paymentId: string): Promise<LinkResent>;
     };
     adjustments: {
-      resend(adjustmentId: string, input: ResendInput): Promise<void>;
+      resend(adjustmentId: string): Promise<LinkResent>;
     };
   };
   confirm: {

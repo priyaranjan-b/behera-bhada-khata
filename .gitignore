@@ -50,3 +50,10 @@ supabase/sb-info.txt
 # Python bytecode (from skill scripts)
 __pycache__/
 *.pyc
+
+# generated Supabase types, for diffing against src/lib/types.ts
+src/lib/database.generated.ts
+
+# real occupant names from the paper register - keep local, never publish
+supabase/seed/arnapal_tenants.sql
+*.xlsx

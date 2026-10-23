@@ -48,9 +48,35 @@ const eslintConfig = defineConfig([
         "error",
         {
           patterns: [
-            { group: ["@supabase/*", "@/server/adapters/*"], message: "Services use the ports via @/server/infra." },
+            {
+              group: ["@supabase/*", "twilio", "@/server/adapters/*"],
+              message: "Services use the ports via @/server/infra.",
+            },
             { group: ["next", "next/*"], message: "Keep services framework-free so they can move to a standalone server." },
           ],
+        },
+      ],
+    },
+  },
+  // Services take an OwnerContext as proof the single-owner check ran, even
+  // when they don't read it; name such parameters _ctx.
+  {
+    files: ["src/**/*.{ts,tsx}", "test/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
+  },
+  // Configuration is read in exactly two places, so a missing variable fails
+  // validation at startup instead of turning up as `undefined` in a request.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/server/env.ts", "src/lib/publicEnv.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: "Read configuration via env() from @/server/env (server) or @/lib/publicEnv (browser).",
         },
       ],
     },

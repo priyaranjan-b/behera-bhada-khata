@@ -1,7 +1,7 @@
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { formatMoney } from "@/lib/money";
-import { PageHeader } from "@/components/DataComponents";
+import { PageHeader } from "@/components/ui/DataDisplay";
 import AdjustmentForm from "./AdjustmentForm";
 
 export default async function AdjustPaymentPage({

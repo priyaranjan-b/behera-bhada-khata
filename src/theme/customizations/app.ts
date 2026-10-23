@@ -120,6 +120,30 @@ export const appCustomizations: Components<Theme> = {
       },
     ],
   },
+  // The template draws the field border on OutlinedInput's root and hides
+  // the notched outline (inputs.tsx), so a floating `TextField label` has no
+  // gap cut for it and the border strikes through the text. Show outlined
+  // labels the template's way instead: static, above the field, like
+  // FormLabel.
+  MuiInputLabel: {
+    variants: [
+      {
+        props: { variant: "outlined" },
+        style: ({ theme }) => ({
+          ...theme.typography.caption,
+          position: "static",
+          transform: "none",
+          maxWidth: "100%",
+          marginBottom: 6,
+          color: (theme.vars || theme).palette.text.secondary,
+          pointerEvents: "auto",
+          "&.Mui-focused": { color: (theme.vars || theme).palette.primary.main },
+          "&.Mui-error": { color: (theme.vars || theme).palette.error.main },
+          "&.Mui-disabled": { color: (theme.vars || theme).palette.text.disabled },
+        }),
+      },
+    ],
+  },
   MuiButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
   MuiToggleButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
   MuiIconButton: {

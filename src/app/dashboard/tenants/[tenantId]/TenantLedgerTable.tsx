@@ -6,14 +6,17 @@ import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import type { GridColDef } from "@mui/x-data-grid";
-import type { LedgerRow } from "@/lib/tenantLedger";
-import AppDataGrid, { moneyColumn } from "@/components/AppDataGrid";
-import { DashboardCardPanel, PanelFilterSelect } from "@/components/DataComponents";
+import type { LedgerRow } from "@/lib/domain/tenantLedger";
+import AppDataGrid, { moneyColumn } from "@/components/ui/AppDataGrid";
+import { DashboardCardPanel } from "@/components/ui/DataDisplay";
+import PanelFilterSelect from "@/components/ui/PanelFilterSelect";
 import { GridCell } from "@/components/ui";
-import { StatusChip } from "@/components/StatusChip";
-import ResendButton from "@/components/ResendButton";
-import Link from "@/components/Link";
+import { StatusChip } from "@/components/domain/StatusChip";
+import ResendButton from "@/components/domain/ResendButton";
+import ProofsButton from "@/components/domain/ProofsButton";
+import Link from "@/components/ui/Link";
 import { apiHref, apiPaths } from "@/lib/api-client";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 
 type FilterMode = "all" | "range" | "month";
 
@@ -29,39 +32,41 @@ const TYPE_LABEL: Record<LedgerRow["type"], string> = {
   adjustment: "Adjustment",
 };
 
+// Every payment/adjustment counts once recorded (0010): its receipt can be
+// downloaded straight away (e.g. to send on WhatsApp), and the tenant can be
+// sent a link to acknowledge it until they have.
 function ActionsCell({ row, tenantId }: { row: LedgerRow; tenantId: string }) {
   if (row.type === "charge" || !row.refId) return null;
-  if (row.status === "confirmed") {
-    return (
-      <GridCell align="end">
-        <Button
-          size="small"
-          href={apiHref(
-            row.type === "payment"
-              ? apiPaths.dashboard.payments.receipt(row.refId)
-              : apiPaths.dashboard.adjustments.receipt(row.refId)
-          )}
-        >
-          Receipt
-        </Button>
-        {row.type === "payment" ? (
-          <Button size="small" component={Link} href={`/dashboard/payments/${row.refId}/adjust`}>
-            Adjust
-          </Button>
-        ) : null}
-      </GridCell>
-    );
-  }
   return (
     <GridCell align="end">
-      <ResendButton
-        kind={row.type === "payment" ? "payment" : "adjustment"}
-        recordId={row.refId}
-        tenantId={tenantId}
-        amount={row.rawAmount ?? 0}
-      />
+      {row.type === "payment" ? <ProofsButton paymentId={row.refId} proofs={row.proofs ?? []} /> : null}
+      <Button
+        size="small"
+        startIcon={<DownloadRoundedIcon />}
+        href={apiHref(
+          row.type === "payment"
+            ? apiPaths.dashboard.payments.receipt(row.refId)
+            : apiPaths.dashboard.adjustments.receipt(row.refId)
+        )}
+        download
+      >
+        Receipt
+      </Button>
+      {row.type === "payment" && row.status === "confirmed" ? (
+        <Button size="small" component={Link} href={`/dashboard/payments/${row.refId}/adjust`}>
+          Adjust
+        </Button>
+      ) : null}
+      {row.acknowledged ? null : (
+        <ResendButton kind={row.type === "payment" ? "payment" : "adjustment"} recordId={row.refId} tenantId={tenantId} />
+      )}
     </GridCell>
   );
+}
+
+function captionOf(row: LedgerRow): string {
+  if (row.type === "charge") return TYPE_LABEL.charge;
+  return `${TYPE_LABEL[row.type]} · ${row.acknowledged ? "signed by tenant" : "not signed by tenant"}`;
 }
 
 function blankZero(value: number | null | undefined) {
@@ -113,7 +118,7 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
               {row.description}
             </Typography>
             <Typography variant="caption" color="textSecondary" noWrap>
-              {TYPE_LABEL[row.type]}
+              {captionOf(row)}
             </Typography>
           </GridCell>
         ),
@@ -140,7 +145,7 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
         sortable: false,
         filterable: false,
         disableColumnMenu: true,
-        minWidth: 180,
+        minWidth: 320,
         headerAlign: "right",
         align: "right",
         renderCell: ({ row }) => <ActionsCell row={row} tenantId={tenantId} />,

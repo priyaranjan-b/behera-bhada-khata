@@ -1,64 +1,76 @@
 import "server-only";
 import * as z from "zod";
-import { summarizeBalance } from "@/lib/allocation";
-import type { BulkCreateResult, Created, TenantDetail, TenantSearchRow } from "@/lib/contracts";
+import type {
+  BulkCreateResult,
+  Created,
+  EditTenantForm,
+  TenantDetail,
+  TenantSearchRow,
+} from "@/lib/contracts";
+import { currentMonthKey } from "@/lib/dates";
+import { summarizeBalance } from "@/lib/domain/allocation";
+import { tenantDisplayName } from "@/lib/domain/tenant";
+import { buildTenantLedger } from "@/lib/domain/tenantLedger";
 import { errorMessage } from "@/lib/errors";
-import { formatUnitLabel, tenantDisplayName } from "@/lib/tenant";
-import { buildTenantLedger } from "@/lib/tenantLedger";
 import type { RentPeriod } from "@/lib/types";
-import { createTenantSchema } from "@/lib/validation";
+import { createTenantSchema, moveOutSchema, updateTenantSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
-import { notFound, parseInput, withParams, type OwnerContext } from "./context";
-import { currentMonthKey, ensureRentPeriods, ensureRentPeriodsFor } from "./periods";
+import { notFound, parseInput, type OwnerContext } from "./context";
+import { ensureRentPeriodsFor } from "./periods";
+import { availableUnits, loadPlacements, placementOf } from "./placements";
 
 const MAX_BULK_ROWS = 500;
 
 function toNewTenant(input: z.infer<typeof createTenantSchema>): NewTenant {
   return {
-    property_id: input.propertyId,
     name: input.name,
-    business_name: input.businessName ?? null,
-    unit_type: input.unitType,
-    tower: input.tower ?? null,
-    floor: input.floor ?? null,
-    house_number: input.houseNumber ?? null,
+    business_name: input.businessName || null,
     phone: input.phone,
     preferred_channel: input.preferredChannel,
-    monthly_rent_amount: input.monthlyRentAmount,
+    monthly_rent: input.monthlyRentAmount,
     lease_start: input.leaseStart,
+    unit_codes: input.unitCodes,
+    paid_through: input.paidThrough ?? null,
+    deposit_amount: input.depositAmount ?? null,
   };
 }
 
-export async function listTenants(ctx: OwnerContext): Promise<TenantSearchRow[]> {
-  const db = await ownerDb(ctx.ownerId);
-  const [properties, tenants] = await Promise.all([db.properties.list(), db.tenants.list({ status: "active" })]);
+/** Every tenant, current and former - former ones mostly matter while they still owe. */
+export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]> {
+  const db = await ownerDb();
+  const [tenants, locations] = await Promise.all([db.tenants.list(), db.locations.list()]);
   const tenantIds = tenants.map((t) => t.id);
-  await ensureRentPeriodsFor(tenantIds);
-  const periods = await db.rentPeriods.listForTenants(tenantIds);
+  await ensureRentPeriodsFor(tenants.filter((t) => t.status === "active").map((t) => t.id));
+  const [periods, placements] = await Promise.all([
+    // Balances only need what's still owed.
+    db.rentPeriods.listForTenants(tenantIds, { openOnly: true }),
+    loadPlacements(db, tenantIds),
+  ]);
 
-  const propertyById = new Map(properties.map((p) => [p.id, p]));
   const periodsByTenant = new Map<string, RentPeriod[]>();
   for (const period of periods) {
-    const list = periodsByTenant.get(period.tenant_id) ?? [];
-    list.push(period);
-    periodsByTenant.set(period.tenant_id, list);
+    periodsByTenant.set(period.tenant_id, [...(periodsByTenant.get(period.tenant_id) ?? []), period]);
   }
+  const locationName = new Map(locations.map((l) => [l.location_code, l.name]));
 
   const todayMonthKey = currentMonthKey();
   return tenants.map((tenant) => {
-    const property = propertyById.get(tenant.property_id);
+    const placement = placementOf(placements, tenant.id);
     const balance = summarizeBalance(periodsByTenant.get(tenant.id) ?? [], todayMonthKey);
+    const locationCodes = [...new Set(placement.houses.map((h) => h.propertyCode.split("-")[0]))];
     return {
       tenantId: tenant.id,
       displayName: tenantDisplayName(tenant),
       contactName: tenant.business_name ? tenant.name : null,
       businessName: tenant.business_name,
-      unitType: tenant.unit_type,
-      unitLabel: formatUnitLabel(tenant),
+      unitMix: placement.unitMix,
+      unitCodes: placement.unitCodes,
       phone: tenant.phone,
-      propertyName: property?.name ?? "Property",
-      propertyAddress: property?.address ?? "",
+      propertyName: placement.propertyName,
+      locationName: locationCodes.map((c) => locationName.get(c) ?? c).join(", "),
+      status: tenant.status,
+      movedOutOn: tenant.moved_out_on,
       totalOutstanding: balance.totalOutstanding,
       overdueMonths: balance.overdueMonths,
     };
@@ -66,17 +78,21 @@ export async function listTenants(ctx: OwnerContext): Promise<TenantSearchRow[]>
 }
 
 export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Promise<TenantDetail> {
-  const db = await ownerDb(ctx.ownerId);
+  const db = await ownerDb();
   const tenant = await db.tenants.get(tenantId);
   if (!tenant) notFound("Tenant");
 
-  await ensureRentPeriods(tenantId);
-  const [property, periods, payments, adjustments] = await Promise.all([
-    db.properties.get(tenant.property_id),
+  if (tenant.status === "active") await ensureRentPeriodsFor([tenantId]);
+  const [periods, payments, adjustments, placements] = await Promise.all([
     db.rentPeriods.listForTenants([tenantId]),
     db.payments.listForTenants([tenantId]),
     db.adjustments.listForTenants([tenantId]),
+    loadPlacements(db, [tenantId]),
   ]);
+  const placement = placementOf(placements, tenantId);
+  const proofs = await db.payments.listProofs(payments.map((p) => p.id));
+  const proofsByPayment = new Map<string, typeof proofs>();
+  for (const proof of proofs) proofsByPayment.set(proof.payment_id, [...(proofsByPayment.get(proof.payment_id) ?? []), proof]);
 
   return {
     tenant: {
@@ -84,12 +100,25 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       name: tenant.name,
       businessName: tenant.business_name,
       displayName: tenantDisplayName(tenant),
-      unitType: tenant.unit_type,
-      unitLabel: formatUnitLabel(tenant),
       phone: tenant.phone,
-      monthlyRent: Number(tenant.monthly_rent_amount),
-      propertyId: tenant.property_id,
-      propertyName: property?.name ?? "Property",
+      preferredChannel: tenant.preferred_channel,
+      status: tenant.status,
+      leaseStart: tenant.lease_start,
+      billingStart: tenant.billing_start,
+      depositAmount: tenant.deposit_amount === null ? null : Number(tenant.deposit_amount),
+      movedOutOn: tenant.moved_out_on,
+      monthlyRent: placement.monthlyRent,
+      unitMix: placement.unitMix,
+      currentUnits: placement.houses,
+      unitHistory: (placements.historyByTenant.get(tenantId) ?? []).map((o) => ({
+        unitCode: o.unit_code,
+        startDate: o.start_date,
+        endDate: o.end_date,
+      })),
+      rentHistory: (placements.ratesByTenant.get(tenantId) ?? []).map((r) => ({
+        effectiveMonth: r.effective_month,
+        monthlyAmount: Number(r.monthly_amount),
+      })),
     },
     balance: summarizeBalance(periods, currentMonthKey()),
     periods: periods.map((p) => ({
@@ -99,46 +128,119 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       amountAllocated: Number(p.amount_allocated),
       status: p.status,
     })),
-    ledger: buildTenantLedger(periods, payments, adjustments),
+    ledger: buildTenantLedger(
+      periods,
+      payments.map((p) => ({
+        ...p,
+        proofs: (proofsByPayment.get(p.id) ?? []).map((f) => ({
+          id: f.id,
+          fileName: f.file_name,
+          contentType: f.content_type,
+        })),
+      })),
+      adjustments
+    ),
   };
 }
 
-export async function createTenant(ctx: OwnerContext, propertyId: string, body: unknown): Promise<Created> {
-  const input = parseInput(createTenantSchema, withParams(body, { propertyId }));
-  const db = await ownerDb(ctx.ownerId);
-  return db.tenants.create(toNewTenant(input));
+/** Onboards a tenant onto one or more vacant houses at one combined rent. */
+export async function createTenant(ctx: OwnerContext, body: unknown): Promise<Created> {
+  const input = parseInput(createTenantSchema, body);
+  const db = await ownerDb();
+  const created = await db.tenants.create(toNewTenant(input));
+  await ensureRentPeriodsFor([created.id]);
+  return created;
 }
 
-export async function bulkCreateTenants(
-  ctx: OwnerContext,
-  propertyId: string,
-  rows: unknown
-): Promise<BulkCreateResult> {
+export async function bulkCreateTenants(ctx: OwnerContext, rows: unknown): Promise<BulkCreateResult> {
   const tenants = parseInput(
     z.array(z.unknown()).min(1, "No tenants provided").max(MAX_BULK_ROWS, `Too many rows (max ${MAX_BULK_ROWS})`),
     rows
   );
-  const db = await ownerDb(ctx.ownerId);
+  const db = await ownerDb();
 
   let created = 0;
+  const createdIds: string[] = [];
   const failed: BulkCreateResult["failed"] = [];
 
   // Small-scale by design (a landlord's initial load, not a data pipeline) -
-  // a plain loop keeps per-row error attribution simple and is plenty fast
-  // at this volume.
+  // a plain loop keeps per-row error attribution simple, and each row is its
+  // own transaction (a house taken by an earlier row fails just that row).
   for (let i = 0; i < tenants.length; i++) {
-    const parsed = createTenantSchema.safeParse(withParams(tenants[i], { propertyId }));
+    const parsed = createTenantSchema.safeParse(tenants[i]);
     if (!parsed.success) {
       failed.push({ rowNumber: i + 1, error: parsed.error.issues[0]?.message ?? "Invalid input" });
       continue;
     }
     try {
-      await db.tenants.create(toNewTenant(parsed.data));
+      const { id } = await db.tenants.create(toNewTenant(parsed.data));
+      createdIds.push(id);
       created += 1;
     } catch (err) {
       failed.push({ rowNumber: i + 1, error: errorMessage(err, "Could not save") });
     }
   }
 
+  await ensureRentPeriodsFor(createdIds);
   return { created, failed };
+}
+
+export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Promise<EditTenantForm> {
+  const db = await ownerDb();
+  const tenant = await db.tenants.get(tenantId);
+  if (!tenant) notFound("Tenant");
+  const [placements, available] = await Promise.all([loadPlacements(db, [tenantId]), availableUnits(db, tenantId)]);
+  const placement = placementOf(placements, tenantId);
+  // A moved-out tenant's last houses may already be let again; a draft keeps its houses.
+  const own = new Set(tenant.status !== "inactive" ? placement.unitCodes : []);
+
+  return {
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      businessName: tenant.business_name,
+      phone: tenant.phone,
+      preferredChannel: tenant.preferred_channel,
+      status: tenant.status,
+      leaseStart: tenant.lease_start,
+      billingStart: tenant.billing_start,
+      depositAmount: tenant.deposit_amount === null ? null : Number(tenant.deposit_amount),
+      monthlyRent: placement.monthlyRent,
+      unitCodes: [...own],
+    },
+    availableUnits: [...available.filter((u) => own.has(u.unitCode)), ...available.filter((u) => !own.has(u.unitCode))],
+  };
+}
+
+/**
+ * Saves the tenant's full new state. The database diffs it: houses added or
+ * removed change on `unitsEffective`, a new rent applies from
+ * `rentEffectiveMonth`, and already-paid months are never re-priced.
+ */
+export async function updateTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const input = parseInput(updateTenantSchema, body);
+  const db = await ownerDb();
+  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await db.tenants.update(tenantId, {
+    name: input.name,
+    business_name: input.businessName || null,
+    phone: input.phone ?? null,
+    preferred_channel: input.preferredChannel,
+    unit_codes: input.unitCodes,
+    units_effective: input.unitsEffective ?? null,
+    monthly_rent: input.monthlyRentAmount ?? null,
+    rent_effective_month: input.rentEffectiveMonth ?? null,
+    lease_start: input.leaseStart ?? null,
+    paid_through: input.paidThrough ?? null,
+    deposit_amount: input.depositAmount ?? null,
+  });
+  await ensureRentPeriodsFor([tenantId]);
+}
+
+/** Ends every tenancy on the move-out date; dues up to then stay on the ledger. */
+export async function moveOutTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const { moveOutDate } = parseInput(moveOutSchema, body);
+  const db = await ownerDb();
+  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await db.tenants.moveOut(tenantId, moveOutDate);
 }

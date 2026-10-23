@@ -1,9 +1,9 @@
-import { ownerLinkRoute, redirectTo } from "@/server/http";
-import { adjustmentReceiptUrl } from "@/server/services/adjustments";
+import { fileResponse, ownerLinkRoute } from "@/server/http";
+import { adjustmentReceipt } from "@/server/services/adjustments";
 
 type Params = { adjustmentId: string };
 
-// Opened as a link: redirects to a short-lived signed PDF URL.
+// Opened as a link: downloads the adjustment's PDF (see the payment receipt route).
 export const GET = ownerLinkRoute<Params>(async (ctx, _request, { adjustmentId }) =>
-  redirectTo(await adjustmentReceiptUrl(ctx, adjustmentId))
+  fileResponse(await adjustmentReceipt(ctx, adjustmentId), "application/pdf")
 );

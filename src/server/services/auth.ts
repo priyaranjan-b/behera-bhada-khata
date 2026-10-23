@@ -1,25 +1,15 @@
 import "server-only";
-import * as z from "zod";
-import type { MagicLinkResult, Session } from "@/lib/contracts";
+import type { LoginOptions, MagicLinkResult, Session } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
+import { magicLinkSchema, sessionTokensSchema } from "@/lib/validation";
+import { devLoginEnabled, env, ownerEmailAllowlist } from "@/server/env";
+import { hashToken } from "@/server/token";
 import { auth } from "@/server/infra";
-import { parseInput } from "./context";
-
-const isDev = process.env.NODE_ENV !== "production";
-
-const magicLinkSchema = z.object({
-  email: z.string().trim().min(1, "Email is required"),
-  next: z.string().optional(),
-});
-
-const sessionTokensSchema = z.object({
-  accessToken: z.string().min(1),
-  refreshToken: z.string().min(1),
-});
+import { enforceRateLimits, HOUR, parseInput, type OwnerContext, type RequestMeta } from "./context";
 
 /** Only same-site paths, so a crafted `next` can't bounce the owner to another site after sign-in. */
 export function safeNext(next: string | null | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/dashboard";
 }
 
 export async function getSession(): Promise<Session> {
@@ -28,21 +18,60 @@ export async function getSession(): Promise<Session> {
   return session;
 }
 
-export async function requestMagicLink(body: unknown): Promise<MagicLinkResult> {
+export const NOT_OWNER_MESSAGE = "This account isn't the owner of this rent book";
+
+/**
+ * The signed-in owner, for every owner-only read and write: 401 without a
+ * session, 403 for a signed-in account that isn't the single app owner. The
+ * database enforces the same rule (is_app_owner()); this turns it into a
+ * clear answer instead of empty pages.
+ */
+export async function getOwnerContext(): Promise<OwnerContext> {
+  const session = await getSession();
+  if (!session.isOwner) throw new ApiError(403, NOT_OWNER_MESSAGE);
+  return { ownerId: session.userId, email: session.email };
+}
+
+/**
+ * Who may sign in: with OWNER_EMAILS set, only those emails (and they may
+ * create their account); without it, only accounts that already exist -
+ * nobody can sign up as a new owner by just typing an email.
+ */
+function signInPolicy(email: string): { allowed: boolean; allowSignUp: boolean } {
+  const allowlist = ownerEmailAllowlist();
+  if (!allowlist) return { allowed: true, allowSignUp: false };
+  const listed = allowlist.has(email);
+  return { allowed: listed, allowSignUp: listed };
+}
+
+export function getLoginOptions(): LoginOptions {
+  return { devLogin: devLoginEnabled() };
+}
+
+export async function requestMagicLink(body: unknown, meta: RequestMeta): Promise<MagicLinkResult> {
   const { email, next } = parseInput(magicLinkSchema, body);
+  await enforceRateLimits([
+    { key: `magic-link:email:${hashToken(email)}`, limit: 5, windowSeconds: HOUR },
+    { key: `magic-link:ip:${meta.ip}`, limit: 20, windowSeconds: HOUR },
+  ]);
+
   // Lands on the /auth/callback page, which finishes sign-in for both the
   // PKCE (?code=) and the implicit (#access_token=) flows.
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext(next))}`;
+  const redirectTo = `${env().NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(safeNext(next))}`;
+  const policy = signInPolicy(email);
 
-  if (isDev) {
+  if (devLoginEnabled()) {
     // No email provider locally - create the link and hand it back instead
-    // of sending it. Never reachable when NODE_ENV=production.
+    // of sending it. Needs ALLOW_DEV_LOGIN=1 and is never honoured in a
+    // production build.
+    if (!policy.allowed) throw new ApiError(403, "That email isn't in OWNER_EMAILS");
     const link = await auth.generateMagicLink(email, redirectTo);
-    console.log(`\n[dev] Sign-in link for ${email}:\n${link}\n`);
     return { dev: true, link };
   }
 
-  await auth.sendMagicLink(email, redirectTo);
+  // Same answer whether or not the email may sign in, so the form doesn't
+  // reveal who the owners are.
+  if (policy.allowed) await auth.sendMagicLink(email, redirectTo, { allowSignUp: policy.allowSignUp });
   return { dev: false };
 }
 

@@ -27,7 +27,7 @@ needs new data, run the `add-api-endpoint` skill first.
 ```tsx
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
-import { PageHeader } from "@/components/DataComponents";
+import { PageHeader } from "@/components/ui/DataDisplay";
 
 export default async function ThingPage({ params }: { params: Promise<{ thingId: string }> }) {
   const { thingId } = await params;              // Next 16: params/searchParams are Promises
@@ -42,8 +42,16 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
 }
 ```
 
-- Use flash messages via query params (`?paymentCreated=1`), rendered as an
-  `<Alert>` under the header.
+- Use flash messages via query params (`?paymentCreated=1`), rendered with
+  `FlashAlert` (`@/components/ui/FlashAlert`) under the header - it removes
+  the param after showing, so a reload doesn't repeat it.
+- Format months with `formatMonth` and default dates with `todayKey` from
+  `@/lib/dates` (app time zone, same text on server and browser).
+- A new route segment with its own data gets `loading.tsx`: a
+  `PageSkeleton` holding one skeleton per card the page renders
+  (`PageHeaderSkeleton`, `StatCardSkeleton`, `ChartCardSkeleton`,
+  `PanelSkeleton` from `@/components/ui/Skeletons`), not a page-wide spinner,
+  and, if it can fail independently, `error.tsx` (`EmptyState` + `retry`).
 - Client mutations follow `try { await api.… ; router.push(…); router.refresh(); }`,
   with `catch` calling `setError(errorMessage(err, "…"))` and passing it to
   `FormActions error={…}`.
@@ -73,13 +81,15 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
 ## Kit to reach for first
 
 - **Page structure:** `PageHeader` and `DashboardCardPanel` (with the `flush`
-  prop for grids) from `DataComponents`, plus `EmptyState`.
+  prop for grids) from `@/components/ui/DataDisplay`, plus `EmptyState`;
+  loading skeletons from `@/components/ui/Skeletons`. `PanelFilterSelect` is its own client file.
 - **Forms:** `SectionCard`, `FormActions`, `SignatureField`, `AmountRow`,
   `SummaryLine`.
 - **Detail rows:** `DetailList`/`DetailRow`, `BadgeRow`, `ActionStack`,
   `IconTile`, `InsetBox`, `GridCell`, `UnitCell`, `DropzoneCard`.
-- **Badges:** `StatusBadge` and `TagPill` from `DataComponents`, `StatusChip`.
-- **Tables:** `AppDataGrid` plus `moneyColumn`. Row types come from
+- **Badges:** `StatusBadge` and `TagPill` from `@/components/ui/DataDisplay`,
+  `StatusChip` from `@/components/domain/StatusChip`.
+- **Tables:** `AppDataGrid` (`@/components/ui/AppDataGrid`) plus `moneyColumn`. Row types come from
   `src/lib/contracts.ts`.
 - **Public pages** (login, confirm): `PublicLayout`, `PublicCard`, `PublicHeading`.
 

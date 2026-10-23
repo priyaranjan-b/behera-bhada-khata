@@ -5,7 +5,7 @@ import Breadcrumbs, { breadcrumbsClasses } from "@mui/material/Breadcrumbs";
 import MuiLink from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import NavigateNextRoundedIcon from "@mui/icons-material/NavigateNextRounded";
-import Link from "@/components/Link";
+import Link from "@/components/ui/Link";
 
 export interface Crumb {
   label: string;

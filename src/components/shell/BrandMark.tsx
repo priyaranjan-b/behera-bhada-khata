@@ -2,7 +2,8 @@ import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
-import { OdiaText } from "@/components/OdiaText";
+import Link from "@/components/ui/Link";
+import { OdiaText } from "@/components/ui/OdiaText";
 import { brand } from "@/theme/themePrimitives";
 
 // Glossy indigo tile, same treatment as the template's CustomIcon.
@@ -31,7 +32,13 @@ export function BrandIcon({ size = 36 }: { size?: number }) {
 
 export function BrandMark({ showOdia = true, iconSize = 36 }: { showOdia?: boolean; iconSize?: number }) {
   return (
-    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", minWidth: 0 }}>
+    <Stack
+      component={Link}
+      href="/dashboard"
+      direction="row"
+      spacing={1.25}
+      sx={{ alignItems: "center", minWidth: 0, textDecoration: "none", color: "inherit" }}
+    >
       <BrandIcon size={iconSize} />
       <Box sx={{ minWidth: 0 }}>
         <Typography component="p" variant="subtitle2" noWrap color="textPrimary">

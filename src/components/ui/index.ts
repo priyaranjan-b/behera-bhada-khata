@@ -4,5 +4,6 @@ export { SectionCard, InsetBox, IconTile, DropzoneCard } from "./Surfaces";
 export { DetailList, DetailRow, SummaryLine, AmountRow, BadgeRow } from "./Rows";
 export { ActionStack, FormActions } from "./Actions";
 export { SignatureField } from "./SignatureField";
+export { FileAttachmentsField } from "./FileAttachmentsField";
 export { PublicLayout, PublicCard, PublicHeading } from "./PublicLayout";
 export { GridCell, UnitCell } from "./GridCells";

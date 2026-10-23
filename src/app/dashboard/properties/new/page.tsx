@@ -1,12 +1,14 @@
 import Stack from "@mui/material/Stack";
-import { PageHeader } from "@/components/DataComponents";
+import { serverApi } from "@/lib/api-client/server";
+import { PageHeader } from "@/components/ui/DataDisplay";
 import PropertyForm from "./PropertyForm";
 
-export default function NewPropertyPage() {
+export default async function NewPropertyPage() {
+  const { locations } = await serverApi.dashboard.properties.newForm();
   return (
     <Stack spacing={2}>
-      <PageHeader title="Add property" subtitle="A building or plot you rent out units in." />
-      <PropertyForm />
+      <PageHeader title="Add tower" subtitle="A building at one of your sites. Its code can't be changed later." />
+      <PropertyForm locations={locations} />
     </Stack>
   );
 }

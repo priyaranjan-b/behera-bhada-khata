@@ -9,7 +9,7 @@ import AlertTitle from "@mui/material/AlertTitle";
 import Stepper from "@mui/material/Stepper";
 import Step from "@mui/material/Step";
 import StepLabel from "@mui/material/StepLabel";
-import { type SignaturePadHandle } from "@/components/SignaturePad";
+import { type SignaturePadHandle } from "@/components/ui/SignaturePad";
 import { SectionCard, SignatureField } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
 
@@ -49,7 +49,7 @@ export default function ConfirmForm({
   async function submitConfirmation() {
     setError(null);
     if (!padHandle.current || padHandle.current.isEmpty()) {
-      setError("Please sign before confirming");
+      setError("Please sign before submitting");
       return;
     }
     if (otpCode.trim().length < 4) {
@@ -67,7 +67,7 @@ export default function ConfirmForm({
       setReceiptUrl(confirmed.receiptUrl);
       setStep("success");
     } catch (e) {
-      setError(errorMessage(e, "Could not confirm"));
+      setError(errorMessage(e, "Could not save your acknowledgement"));
       setStep("otpSent");
     }
   }
@@ -89,8 +89,8 @@ export default function ConfirmForm({
       <Stack spacing={2}>
         {stepper}
         <Alert severity="success">
-          <AlertTitle>Confirmed</AlertTitle>
-          Confirmed. Thank you.
+          <AlertTitle>Acknowledged</AlertTitle>
+          Thank you. Your signed receipt is ready.
         </Alert>
         {receiptUrl ? (
           <Button variant="contained" size="large" fullWidth href={receiptUrl} target="_blank" rel="noreferrer">
@@ -127,7 +127,7 @@ export default function ConfirmForm({
           </SectionCard>
 
           <Button variant="contained" size="large" fullWidth onClick={submitConfirmation} disabled={step === "submitting"}>
-            {step === "submitting" ? "Confirming…" : "Sign & confirm"}
+            {step === "submitting" ? "Saving…" : "Sign & acknowledge"}
           </Button>
         </>
       )}

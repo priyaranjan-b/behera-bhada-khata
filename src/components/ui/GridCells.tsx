@@ -2,7 +2,8 @@
 
 import Stack, { type StackProps } from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { TagPill } from "@/components/DataComponents";
+import { TagPill } from "@/components/ui/DataDisplay";
+import { formatUnits, unitMixLabel, type UnitMix } from "@/lib/domain/tenant";
 
 /** Fills a Data Grid cell and centres its content vertically. */
 export function GridCell({
@@ -34,14 +35,15 @@ export function GridCell({
   );
 }
 
-/** "Commercial · Floor 2 #A-01" unit cell shared by the tenant grids. */
-export function UnitCell({ unitType, unitLabel }: { unitType: string; unitLabel?: string | null }) {
+/** "Commercial · AC-T1-G01, G02" houses cell shared by the tenant grids. */
+export function UnitCell({ unitMix, unitCodes }: { unitMix: UnitMix | null; unitCodes: string[] }) {
+  const houses = formatUnits(unitCodes);
   return (
     <GridCell>
-      <TagPill label={unitType === "commercial" ? "Commercial" : "Residential"} />
-      {unitLabel ? (
-        <Typography variant="caption" color="textSecondary" noWrap>
-          {unitLabel}
+      <TagPill label={unitMixLabel(unitMix)} />
+      {houses ? (
+        <Typography variant="caption" color="textSecondary" noWrap title={houses}>
+          {houses}
         </Typography>
       ) : null}
     </GridCell>

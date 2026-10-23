@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import type { RentPeriod } from "@/lib/types";
+import { buildBillingCollectionTrend, buildMonthlyReport } from "./reports";
+
+const period = (tenant_id: string, period_month: string, amount_allocated: string): RentPeriod => ({
+  id: `${tenant_id}-${period_month}`,
+  tenant_id,
+  period_month,
+  amount_due: "5000.00",
+  amount_allocated,
+  status: amount_allocated === "5000.00" ? "paid" : amount_allocated === "0.00" ? "pending" : "partially_paid",
+  created_at: "2026-01-01T00:00:00Z",
+});
+
+describe("buildMonthlyReport", () => {
+  it("sums the month and flags tenants with overdue months", () => {
+    const report = buildMonthlyReport(
+      [
+        { id: "a", name: "Asha", propertyName: "P" },
+        { id: "b", name: "Bimal", propertyName: "P" },
+      ],
+      new Map([
+        ["a", [period("a", "2026-02-01", "5000.00"), period("a", "2026-03-01", "2000.00")]],
+        ["b", [period("b", "2026-02-01", "0.00"), period("b", "2026-03-01", "0.00")]],
+      ]),
+      "2026-03-01",
+      "2026-03-01"
+    );
+    expect(report).toMatchObject({ expected: 10000, collected: 2000, outstanding: 13000, overdueTenantCount: 1 });
+  });
+});
+
+describe("buildBillingCollectionTrend", () => {
+  it("counts adjustments in the IST month they were confirmed", () => {
+    const trend = buildBillingCollectionTrend(
+      [period("a", "2026-03-01", "0.00")],
+      [{ amount: "1000.00", payment_date: "2026-02-28" }],
+      // 01:00 IST on 1 March
+      [{ delta_amount: "-200.00", confirmed_at: "2026-02-28T19:30:00Z" }],
+      ["2026-02", "2026-03"]
+    );
+    expect(trend).toEqual([
+      { monthKey: "2026-02", label: "Feb 2026", billed: 0, collected: 1000 },
+      { monthKey: "2026-03", label: "Mar 2026", billed: 5000, collected: -200 },
+    ]);
+  });
+});
