@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Alert from "@mui/material/Alert";
+import { FormActions, SectionCard } from "@/components/ui";
+import { api, errorMessage } from "@/lib/api-client";
 
 export default function PropertyForm() {
   const router = useRouter();
@@ -20,36 +20,35 @@ export default function PropertyForm() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch("/api/properties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, address: address || undefined }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't save that property.");
+      await api.dashboard.properties.create({ name, address: address || undefined });
       router.push("/dashboard/properties");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorMessage(err, "Couldn't save that property."));
       setSubmitting(false);
     }
   }
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 480 }}>
+    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 720 }}>
       <Stack spacing={2}>
-        <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required fullWidth />
-        <TextField
-          label="Address"
-          helperText="Can hold both residential and commercial units"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          fullWidth
+        <SectionCard title="Property details">
+          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required fullWidth />
+          <TextField
+            label="Address"
+            helperText="Can hold both residential and commercial units"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            fullWidth
+          />
+        </SectionCard>
+        <FormActions
+          error={error}
+          cancelHref="/dashboard/properties"
+          submitLabel="Save"
+          pendingLabel="Saving…"
+          pending={submitting}
         />
-        {error ? <Alert severity="error">{error}</Alert> : null}
-        <Button type="submit" variant="contained" size="large" disabled={submitting}>
-          {submitting ? "Saving…" : "Save"}
-        </Button>
       </Stack>
     </Box>
   );

@@ -1,0 +1,93 @@
+---
+name: build-dashboard-page
+description: Build or restyle a page or UI component in Behera Bhada Khata (Next.js 16 App Router + MUI v9 Dashboard template theme). Covers where the page file goes, how it gets data (serverApi / api), breadcrumbs, the shared UI kit, and the "pages are layout-only" styling rules incl. MUI v9 gotchas. Use when adding a screen under src/app, a form, a data grid, or changing visuals.
+---
+
+# Build a dashboard page
+
+Read `CLAUDE.md` → "UI & styling" and "Data access — layers". If the page
+needs new data, run the `add-api-endpoint` skill first.
+
+## File layout
+
+- **Page:** `src/app/dashboard/<route>/page.tsx` is an async Server Component.
+- **Interactive parts:** forms, grids with state and buttons that mutate go
+  in a sibling `"use client"` file, for example `PaymentForm.tsx` or
+  `TenantLedgerTable.tsx`.
+- **Data:** the matching GET lives at `src/app/api/dashboard/<route>/route.ts`.
+- **Breadcrumbs:** add one line to `ROUTE_LABELS` in
+  `src/components/shell/AppBreadcrumbs.tsx`. The layout renders breadcrumbs
+  from the URL, so pages never pass crumbs.
+- **Nav tab:** a top-level section also needs a `NAV_ITEMS` entry in
+  `src/components/shell/nav.tsx`, plus a case in
+  `tabForPath` in `DashboardShell.tsx`.
+
+## Page skeleton
+
+```tsx
+import Stack from "@mui/material/Stack";
+import { serverApi } from "@/lib/api-client/server";
+import { PageHeader } from "@/components/DataComponents";
+
+export default async function ThingPage({ params }: { params: Promise<{ thingId: string }> }) {
+  const { thingId } = await params;              // Next 16: params/searchParams are Promises
+  const thing = await serverApi.dashboard.things.detail(thingId); // 401/404 handled for you
+
+  return (
+    <Stack spacing={2}>
+      <PageHeader title={thing.name} subtitle="…" action={/* buttons */} />
+      {/* SectionCard / DashboardCardPanel / grids */}
+    </Stack>
+  );
+}
+```
+
+- Use flash messages via query params (`?paymentCreated=1`), rendered as an
+  `<Alert>` under the header.
+- Client mutations follow `try { await api.… ; router.push(…); router.refresh(); }`,
+  with `catch` calling `setError(errorMessage(err, "…"))` and passing it to
+  `FormActions error={…}`.
+
+## Styling rules (pages under `src/app/**`)
+
+- **Layout only:** Stack and Grid props, `alignItems`, `minWidth: 0` and
+  `maxWidth`.
+  - No colour, typography, border, radius or shadow `sx`.
+  - No `@/theme` imports.
+  - No hex values.
+- **Text colour:** use the prop `color="textSecondary"`, `"textPrimary"` or
+  `"textDisabled"`. MUI v9 silently ignores the dotted `color="text.secondary"`
+  form on Typography and Link. Dotted keys still work inside `sx`.
+- **`MuiLink`:** the template pins links to `text.primary`. A secondary link
+  needs `sx={{ color: "text.secondary" }}` in a kit component, not on a page.
+- **Colours in JS:** never read `theme.palette.*`. Use `sx` palette keys or
+  `(theme.vars || theme).palette…`. The theme is CSS variables with light and
+  dark schemes.
+- **Light-only styles:** `theme.applyStyles("light", {...})`. Put a
+  specificity hack (`&&`) *outside* `applyStyles`, never inside it.
+- **Anything needed twice:** a component in `src/components/ui/` or a theme
+  override in `src/theme/customizations/app.ts`. Light-mode surface tokens
+  are in `src/theme/appTokens.ts`. Leave the copied template files in
+  `src/theme/` close to upstream.
+
+## Kit to reach for first
+
+- **Page structure:** `PageHeader` and `DashboardCardPanel` (with the `flush`
+  prop for grids) from `DataComponents`, plus `EmptyState`.
+- **Forms:** `SectionCard`, `FormActions`, `SignatureField`, `AmountRow`,
+  `SummaryLine`.
+- **Detail rows:** `DetailList`/`DetailRow`, `BadgeRow`, `ActionStack`,
+  `IconTile`, `InsetBox`, `GridCell`, `UnitCell`, `DropzoneCard`.
+- **Badges:** `StatusBadge` and `TagPill` from `DataComponents`, `StatusChip`.
+- **Tables:** `AppDataGrid` plus `moneyColumn`. Row types come from
+  `src/lib/contracts.ts`.
+- **Public pages** (login, confirm): `PublicLayout`, `PublicCard`, `PublicHeading`.
+
+## Verify
+
+1. Run `npx tsc --noEmit -p .` and `npm run lint`.
+2. Check the page in Chrome against the running dev server (`localhost:3000`).
+   The owner signs in themselves; never enter credentials.
+   - Light and dark mode.
+   - 375px width with no horizontal scroll.
+   - No console errors.

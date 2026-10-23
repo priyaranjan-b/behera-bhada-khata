@@ -3,22 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
+import type { GridColDef } from "@mui/x-data-grid";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
-import Paper from "@mui/material/Paper";
-import Table from "@mui/material/Table";
-import TableHead from "@mui/material/TableHead";
-import TableBody from "@mui/material/TableBody";
-import TableRow from "@mui/material/TableRow";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import Chip from "@mui/material/Chip";
 import Tooltip from "@mui/material/Tooltip";
-import DownloadIcon from "@mui/icons-material/Download";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import AppDataGrid from "@/components/AppDataGrid";
+import { DashboardCardPanel, StatusBadge } from "@/components/DataComponents";
+import { ActionStack, BadgeRow, DropzoneCard, FormActions, GridCell } from "@/components/ui";
 import { createTenantSchema } from "@/lib/validation";
+import { api, errorMessage } from "@/lib/api-client";
 import type { z } from "zod";
 
 const SAMPLE_CSV =
@@ -61,6 +58,44 @@ interface ParsedRow {
   error?: string;
 }
 
+const previewColumns: GridColDef<ParsedRow>[] = [
+  { field: "rowNumber", headerName: "Row", type: "number", width: 80, headerAlign: "left", align: "left" },
+  { field: "name", headerName: "Name", flex: 1, minWidth: 180 },
+  {
+    field: "status",
+    headerName: "Status",
+    minWidth: 140,
+    sortable: true,
+    valueGetter: (_value, row) => (row.data ? "Ready" : "Fix required"),
+    renderCell: ({ row }) => (
+      <GridCell>
+        {row.data ? (
+          <StatusBadge tone="success" label="Ready" />
+        ) : (
+          <Tooltip title={row.error}>
+            <span>
+              <StatusBadge tone="danger" label="Fix required" />
+            </span>
+          </Tooltip>
+        )}
+      </GridCell>
+    ),
+  },
+  {
+    field: "error",
+    headerName: "Issue",
+    flex: 1.4,
+    minWidth: 220,
+    renderCell: ({ row }) => (
+      <GridCell>
+        <Typography variant="body2" color="textSecondary" noWrap title={row.error}>
+          {row.error ?? "-"}
+        </Typography>
+      </GridCell>
+    ),
+  },
+];
+
 function downloadSampleCsv() {
   const blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -79,7 +114,7 @@ export default function BulkTenantUpload({ propertyId }: { propertyId: string })
   const [parseError, setParseError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ created: number; failed: { rowNumber: number; error: string }[] } | null>(
-    null
+    null,
   );
 
   function handleFile(file: File) {
@@ -131,108 +166,91 @@ export default function BulkTenantUpload({ propertyId }: { propertyId: string })
     setUploading(true);
     setResult(null);
     try {
-      const res = await fetch(`/api/properties/${propertyId}/tenants/bulk`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenants: validRows.map((r) => r.data) }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Upload failed");
+      const body = await api.dashboard.properties.bulkCreateTenants(
+        propertyId,
+        validRows.map((r) => r.data)
+      );
 
       // Server reports failures by index into what we sent - map back to the
       // original CSV row numbers for a message the owner can act on.
-      const failed = (body.failed as { rowNumber: number; error: string }[]).map((f) => ({
+      const failed = body.failed.map((f) => ({
         rowNumber: validRows[f.rowNumber - 1]?.rowNumber ?? f.rowNumber,
         error: f.error,
       }));
       setResult({ created: body.created, failed });
       router.refresh();
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Upload failed");
+      setParseError(errorMessage(err, "Upload failed"));
     } finally {
       setUploading(false);
     }
   }
 
   return (
-    <Stack spacing={3}>
-      <Alert severity="info">
-        Download the template, fill in one row per tenant, then upload it here. Unit type defaults to
-        &quot;residential&quot; and preferred channel to &quot;both&quot; if left blank.
-      </Alert>
-
-      <Stack direction="row" spacing={2}>
-        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={downloadSampleCsv}>
-          Download sample CSV
-        </Button>
-        <Button
-          variant="contained"
-          component="label"
-          startIcon={<UploadFileIcon />}
-        >
-          Choose CSV file
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-              e.target.value = "";
-            }}
-          />
-        </Button>
-      </Stack>
+    <Stack spacing={2}>
+      <DropzoneCard
+        icon={<UploadFileRoundedIcon />}
+        title="Upload a CSV of tenants"
+        description={
+          <>
+            Download the template, fill in one row per tenant, then upload it here. Unit type defaults to
+            &quot;residential&quot; and preferred channel to &quot;both&quot; if left blank.
+          </>
+        }
+        actions={
+          <ActionStack>
+            <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={downloadSampleCsv}>
+              Download sample CSV
+            </Button>
+            <Button variant="contained" component="label" startIcon={<UploadFileRoundedIcon />}>
+              Choose CSV file
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFile(file);
+                  e.target.value = "";
+                }}
+              />
+            </Button>
+          </ActionStack>
+        }
+      />
 
       {parseError ? <Alert severity="error">{parseError}</Alert> : null}
 
       {rows.length > 0 ? (
         <>
-          <Stack direction="row" spacing={1}>
-            <Chip size="small" color="success" label={`${validRows.length} ready to upload`} />
-            {invalidRows.length > 0 ? (
-              <Chip size="small" color="error" label={`${invalidRows.length} need fixing`} />
-            ) : null}
-          </Stack>
-
-          <TableContainer component={Paper}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Row</TableCell>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Status</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.rowNumber}>
-                    <TableCell>{row.rowNumber}</TableCell>
-                    <TableCell>{row.name}</TableCell>
-                    <TableCell>
-                      {row.data ? (
-                        <Chip size="small" color="success" label="Ready" />
-                      ) : (
-                        <Tooltip title={row.error}>
-                          <Chip size="small" color="error" label="Fix required" />
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          <Button
-            variant="contained"
-            size="large"
-            disabled={validRows.length === 0 || uploading}
-            onClick={handleUpload}
-            sx={{ alignSelf: "flex-start" }}
+          <DashboardCardPanel
+            title="Preview"
+            subtitle="Rows that need fixing show the reason in the Issue column."
+            action={
+              <BadgeRow align="end">
+                <StatusBadge tone="success" label={`${validRows.length} ready to upload`} />
+                {invalidRows.length > 0 ? (
+                  <StatusBadge tone="danger" label={`${invalidRows.length} need fixing`} />
+                ) : null}
+              </BadgeRow>
+            }
+            flush
           >
-            {uploading ? "Uploading…" : `Upload ${validRows.length} tenant${validRows.length === 1 ? "" : "s"}`}
-          </Button>
+            <AppDataGrid<ParsedRow>
+              rows={rows}
+              columns={previewColumns}
+              getRowId={(row) => row.rowNumber}
+              label="CSV preview"
+            />
+          </DashboardCardPanel>
+
+          <FormActions
+            submitLabel={`Upload ${validRows.length} tenant${validRows.length === 1 ? "" : "s"}`}
+            pendingLabel="Uploading…"
+            pending={uploading}
+            disabled={validRows.length === 0}
+            onAction={handleUpload}
+          />
         </>
       ) : null}
 

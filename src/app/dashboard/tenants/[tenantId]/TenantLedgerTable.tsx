@@ -1,29 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
-import MenuItem from "@mui/material/MenuItem";
 import Button from "@mui/material/Button";
-import Table from "@mui/material/Table";
-import TableHead from "@mui/material/TableHead";
-import TableBody from "@mui/material/TableBody";
-import TableRow from "@mui/material/TableRow";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableSortLabel from "@mui/material/TableSortLabel";
-import TablePagination from "@mui/material/TablePagination";
-import Chip from "@mui/material/Chip";
+import type { GridColDef } from "@mui/x-data-grid";
 import type { LedgerRow } from "@/lib/tenantLedger";
-import { formatMoney } from "@/lib/money";
+import AppDataGrid, { moneyColumn } from "@/components/AppDataGrid";
+import { DashboardCardPanel, PanelFilterSelect } from "@/components/DataComponents";
+import { GridCell } from "@/components/ui";
+import { StatusChip } from "@/components/StatusChip";
 import ResendButton from "@/components/ResendButton";
 import Link from "@/components/Link";
+import { apiHref, apiPaths } from "@/lib/api-client";
 
 type FilterMode = "all" | "range" | "month";
-type SortKey = "date" | "debit" | "credit" | "balance";
+
+const FILTER_OPTIONS: { value: FilterMode; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "range", label: "Date range" },
+  { value: "month", label: "Month" },
+];
 
 const TYPE_LABEL: Record<LedgerRow["type"], string> = {
   charge: "Charge",
@@ -31,15 +29,43 @@ const TYPE_LABEL: Record<LedgerRow["type"], string> = {
   adjustment: "Adjustment",
 };
 
-function StatusCell({ status }: { status: LedgerRow["status"] }) {
-  if (status === "billed") {
+function ActionsCell({ row, tenantId }: { row: LedgerRow; tenantId: string }) {
+  if (row.type === "charge" || !row.refId) return null;
+  if (row.status === "confirmed") {
     return (
-      <Typography variant="caption" color="textSecondary">
-        —
-      </Typography>
+      <GridCell align="end">
+        <Button
+          size="small"
+          href={apiHref(
+            row.type === "payment"
+              ? apiPaths.dashboard.payments.receipt(row.refId)
+              : apiPaths.dashboard.adjustments.receipt(row.refId)
+          )}
+        >
+          Receipt
+        </Button>
+        {row.type === "payment" ? (
+          <Button size="small" component={Link} href={`/dashboard/payments/${row.refId}/adjust`}>
+            Adjust
+          </Button>
+        ) : null}
+      </GridCell>
     );
   }
-  return <Chip size="small" color={status === "confirmed" ? "success" : "warning"} label={status} />;
+  return (
+    <GridCell align="end">
+      <ResendButton
+        kind={row.type === "payment" ? "payment" : "adjustment"}
+        recordId={row.refId}
+        tenantId={tenantId}
+        amount={row.rawAmount ?? 0}
+      />
+    </GridCell>
+  );
+}
+
+function blankZero(value: number | null | undefined) {
+  return value ? value : null;
 }
 
 export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[]; tenantId: string }) {
@@ -47,10 +73,6 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [month, setMonth] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -66,51 +88,86 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
     });
   }, [rows, filterMode, fromDate, toDate, month]);
 
-  const sorted = useMemo(() => {
-    const copy = [...filtered];
-    copy.sort((a, b) => {
-      const cmp = sortKey === "date" ? a.date.localeCompare(b.date) : a[sortKey] - b[sortKey];
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
-  }, [filtered, sortKey, sortDir]);
+  // Rows arrive in ledger order (the order the running balance was built in);
+  // same-day entries keep that order instead of whatever the grid's sort yields.
+  const ledgerOrder = useMemo(() => new Map(rows.map((row, i) => [row.id, i])), [rows]);
 
-  const paged = sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "date" ? "desc" : "desc");
-    }
-    setPage(0);
-  }
+  const columns = useMemo<GridColDef<LedgerRow>[]>(
+    () => [
+      {
+        field: "date",
+        headerName: "Date",
+        minWidth: 110,
+        flex: 0.6,
+        sortComparator: (a: string, b: string, p1, p2) =>
+          a.localeCompare(b) || (ledgerOrder.get(String(p1.id)) ?? 0) - (ledgerOrder.get(String(p2.id)) ?? 0),
+      },
+      {
+        field: "description",
+        headerName: "Description",
+        flex: 1.4,
+        minWidth: 200,
+        renderCell: ({ row }) => (
+          <GridCell direction="column" spacing={0}>
+            <Typography variant="body2" noWrap>
+              {row.description}
+            </Typography>
+            <Typography variant="caption" color="textSecondary" noWrap>
+              {TYPE_LABEL[row.type]}
+            </Typography>
+          </GridCell>
+        ),
+      },
+      {
+        field: "status",
+        headerName: "Status",
+        minWidth: 120,
+        renderCell: ({ row }) =>
+          row.status === "billed" ? (
+            <Typography variant="caption" color="textSecondary">
+              —
+            </Typography>
+          ) : (
+            <StatusChip status={row.status} />
+          ),
+      },
+      moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero }),
+      moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero }),
+      moneyColumn<LedgerRow>("balance", "Balance"),
+      {
+        field: "actions",
+        headerName: "Actions",
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        minWidth: 180,
+        headerAlign: "right",
+        align: "right",
+        renderCell: ({ row }) => <ActionsCell row={row} tenantId={tenantId} />,
+      },
+    ],
+    [tenantId, ledgerOrder]
+  );
 
   function resetFilters(mode: FilterMode) {
     setFilterMode(mode);
     setFromDate("");
     setToDate("");
     setMonth("");
-    setPage(0);
   }
 
-  return (
-    <Stack spacing={2}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "flex-end" } }}>
-        <TextField
-          select
-          label="Filter"
-          size="small"
-          value={filterMode}
-          onChange={(e) => resetFilters(e.target.value as FilterMode)}
-          sx={{ minWidth: 160 }}
-        >
-          <MenuItem value="all">All time</MenuItem>
-          <MenuItem value="range">Date range</MenuItem>
-          <MenuItem value="month">Month</MenuItem>
-        </TextField>
+  const filterSelect = (
+    <PanelFilterSelect<FilterMode>
+      label="Filter"
+      value={filterMode}
+      options={FILTER_OPTIONS}
+      onChange={resetFilters}
+    />
+  );
 
+  const dateInputs =
+    filterMode !== "all" ? (
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
         {filterMode === "range" ? (
           <>
             <TextField
@@ -118,10 +175,7 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
               type="date"
               size="small"
               value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setPage(0);
-              }}
+              onChange={(e) => setFromDate(e.target.value)}
               slotProps={{ inputLabel: { shrink: true } }}
             />
             <TextField
@@ -129,134 +183,39 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
               type="date"
               size="small"
               value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setPage(0);
-              }}
+              onChange={(e) => setToDate(e.target.value)}
               slotProps={{ inputLabel: { shrink: true } }}
             />
           </>
-        ) : null}
-
-        {filterMode === "month" ? (
+        ) : (
           <TextField
             label="Month"
             type="month"
             size="small"
             value={month}
-            onChange={(e) => {
-              setMonth(e.target.value);
-              setPage(0);
-            }}
+            onChange={(e) => setMonth(e.target.value)}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-        ) : null}
+        )}
       </Stack>
+    ) : undefined;
 
-      <TableContainer component={Paper}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell sortDirection={sortKey === "date" ? sortDir : false}>
-                <TableSortLabel active={sortKey === "date"} direction={sortDir} onClick={() => toggleSort("date")}>
-                  Date
-                </TableSortLabel>
-              </TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right" sortDirection={sortKey === "debit" ? sortDir : false}>
-                <TableSortLabel active={sortKey === "debit"} direction={sortDir} onClick={() => toggleSort("debit")}>
-                  Debit
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right" sortDirection={sortKey === "credit" ? sortDir : false}>
-                <TableSortLabel active={sortKey === "credit"} direction={sortDir} onClick={() => toggleSort("credit")}>
-                  Credit
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right" sortDirection={sortKey === "balance" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortKey === "balance"}
-                  direction={sortDir}
-                  onClick={() => toggleSort("balance")}
-                >
-                  Balance
-                </TableSortLabel>
-              </TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paged.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7}>
-                  <Typography variant="body2" color="textSecondary" sx={{ py: 2, textAlign: "center" }}>
-                    No entries match this filter.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              paged.map((row) => (
-                <TableRow key={row.id} hover>
-                  <TableCell>{row.date}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{row.description}</Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {TYPE_LABEL[row.type]}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <StatusCell status={row.status} />
-                  </TableCell>
-                  <TableCell align="right">{row.debit > 0 ? formatMoney(row.debit) : ""}</TableCell>
-                  <TableCell align="right">{row.credit > 0 ? formatMoney(row.credit) : ""}</TableCell>
-                  <TableCell align="right">{formatMoney(row.balance)}</TableCell>
-                  <TableCell align="right">
-                    {row.type !== "charge" && row.refId ? (
-                      row.status === "confirmed" ? (
-                        <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
-                          <Button
-                            size="small"
-                            href={`/api/owner/receipt/${row.type === "payment" ? "payment" : "adjustment"}/${row.refId}`}
-                          >
-                            Receipt
-                          </Button>
-                          {row.type === "payment" ? (
-                            <Button size="small" component={Link} href={`/dashboard/payments/${row.refId}/adjust`}>
-                              Adjust
-                            </Button>
-                          ) : null}
-                        </Stack>
-                      ) : (
-                        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                          <ResendButton
-                            kind={row.type === "payment" ? "payment" : "adjustment"}
-                            recordId={row.refId}
-                            tenantId={tenantId}
-                            amount={row.rawAmount ?? 0}
-                          />
-                        </Box>
-                      )
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-        <TablePagination
-          component="div"
-          count={sorted.length}
-          page={page}
-          onPageChange={(_, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(Number(e.target.value));
-            setPage(0);
-          }}
-          rowsPerPageOptions={[10, 25, 50]}
-        />
-      </TableContainer>
-    </Stack>
+  return (
+    <DashboardCardPanel
+      title="Ledger"
+      subtitle="Charges, payments and corrections"
+      action={filterSelect}
+      toolbar={dateInputs}
+      flush
+    >
+      <AppDataGrid<LedgerRow>
+        rows={filtered}
+        columns={columns}
+        pageSize={10}
+        label="Tenant ledger"
+        localeText={{ noRowsLabel: "No entries match this filter." }}
+        initialState={{ sorting: { sortModel: [{ field: "date", sort: "desc" }] } }}
+      />
+    </DashboardCardPanel>
   );
 }

@@ -4,23 +4,20 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
+import Grid from "@mui/material/Grid";
+import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import Button from "@mui/material/Button";
-import Alert from "@mui/material/Alert";
-import Paper from "@mui/material/Paper";
-import SignaturePad, { type SignaturePadHandle } from "@/components/SignaturePad";
+import { type SignaturePadHandle } from "@/components/SignaturePad";
+import { StatusBadge } from "@/components/DataComponents";
+import { AmountRow, BadgeRow, FormActions, SectionCard, SignatureField, SummaryLine } from "@/components/ui";
 import { suggestAllocations, type PeriodLike } from "@/lib/allocation";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, round2 } from "@/lib/money";
+import { api, errorMessage } from "@/lib/api-client";
+import type { CreatePaymentInput } from "@/lib/contracts";
 
-export default function PaymentForm({
-  tenantId,
-  periods,
-}: {
-  tenantId: string;
-  periods: PeriodLike[];
-}) {
+export default function PaymentForm({ tenantId, periods }: { tenantId: string; periods: PeriodLike[] }) {
   const router = useRouter();
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -36,6 +33,11 @@ export default function PaymentForm({
   const allocations = manualAllocations
     ? suggested.map((s) => ({ ...s, amountAllocated: manualAllocations[s.rentPeriodId] ?? s.amountAllocated }))
     : suggested;
+  const allocatedTotal = round2(allocations.reduce((sum, a) => sum + a.amountAllocated, 0));
+  const unallocated = round2(amountNumber - allocatedTotal);
+  const totalOutstanding = round2(
+    periods.reduce((sum, p) => sum + Number(p.amount_due) - Number(p.amount_allocated), 0),
+  );
 
   function updateAllocation(rentPeriodId: string, value: number) {
     const base: Record<string, number> = manualAllocations
@@ -60,130 +62,130 @@ export default function PaymentForm({
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/tenants/${tenantId}/payments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: amountNumber,
-          paymentDate,
-          mode,
-          note: note || undefined,
-          allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
-          ownerSignaturePng: padHandle.current.toPngDataUrl(),
-        }),
+      await api.dashboard.tenants.createPayment(tenantId, {
+        amount: amountNumber,
+        paymentDate,
+        mode: mode as CreatePaymentInput["mode"],
+        note: note || undefined,
+        allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
+        ownerSignaturePng: padHandle.current.toPngDataUrl(),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't save that payment.");
       router.push(`/dashboard/tenants/${tenantId}?paymentCreated=1`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(errorMessage(err, "Couldn't save that payment."));
       setSubmitting(false);
     }
   }
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 520 }}>
-      <Stack spacing={2.5}>
-        <TextField
-          id="amount"
-          label="Amount received"
-          type="number"
-          required
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setManualAllocations(null);
-          }}
-          slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
-          fullWidth
-        />
+    <Box component="form" onSubmit={handleSubmit}>
+      <Grid container spacing={2} columns={12}>
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Stack spacing={2}>
+            <SectionCard title="Payment details">
+              <TextField
+                id="amount"
+                label="Amount received"
+                type="number"
+                required
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setManualAllocations(null);
+                }}
+                slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
+                fullWidth
+              />
 
-        <TextField
-          id="paymentDate"
-          label="Date received"
-          type="date"
-          required
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-          fullWidth
-        />
+              <TextField
+                id="paymentDate"
+                label="Date received"
+                type="date"
+                required
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                fullWidth
+              />
 
-        <TextField id="mode" label="Mode" select value={mode} onChange={(e) => setMode(e.target.value)} fullWidth>
-          <MenuItem value="cash">Cash</MenuItem>
-          <MenuItem value="bank_transfer">Bank transfer</MenuItem>
-          <MenuItem value="upi">UPI</MenuItem>
-          <MenuItem value="cheque">Cheque</MenuItem>
-          <MenuItem value="other">Other</MenuItem>
-        </TextField>
+              <TextField id="mode" label="Mode" select value={mode} onChange={(e) => setMode(e.target.value)} fullWidth>
+                <MenuItem value="cash">Cash</MenuItem>
+                <MenuItem value="bank_transfer">Bank transfer</MenuItem>
+                <MenuItem value="upi">UPI</MenuItem>
+                <MenuItem value="cheque">Cheque</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </TextField>
 
-        <TextField
-          id="note"
-          label="Note (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          fullWidth
-        />
+              <TextField
+                id="note"
+                label="Note (optional)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                fullWidth
+              />
+            </SectionCard>
 
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Covers
-          </Typography>
-          {allocations.length === 0 ? (
-            <Typography variant="body2" color="textSecondary">
-              Enter an amount to see which months this covers.
-            </Typography>
-          ) : (
-            <Stack spacing={1.5}>
-              {allocations.map((a) => (
-                <Stack
-                  key={a.rentPeriodId}
-                  direction="row"
-                  spacing={2}
-                  sx={{ alignItems: "center", justifyContent: "space-between" }}
-                >
-                  <Typography variant="body2">
-                    {new Date(`${a.periodMonth}T00:00:00Z`).toLocaleDateString(undefined, {
+            <SignatureField title="Owner signature" onReady={(handle) => (padHandle.current = handle)} />
+          </Stack>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 5 }}>
+          <SectionCard
+            title="Covers"
+            sticky
+            action={manualAllocations ? <StatusBadge tone="info" label="Edited" /> : undefined}
+          >
+            {allocations.length === 0 ? (
+              <Typography variant="body2" color="textSecondary">
+                Enter an amount to see which months this covers.
+              </Typography>
+            ) : (
+              <Stack spacing={1.5} divider={<Divider flexItem />}>
+                {allocations.map((a) => (
+                  <AmountRow
+                    key={a.rentPeriodId}
+                    label={new Date(`${a.periodMonth}T00:00:00Z`).toLocaleDateString(undefined, {
                       month: "long",
                       year: "numeric",
-                    })}{" "}
-                    <Typography component="span" variant="body2" color="textSecondary">
-                      (outstanding {formatMoney(a.amountOutstanding)})
-                    </Typography>
-                  </Typography>
-                  <TextField
-                    type="number"
-                    size="small"
+                    })}
+                    caption={`outstanding ${formatMoney(a.amountOutstanding)}`}
                     value={a.amountAllocated}
-                    onChange={(e) => updateAllocation(a.rentPeriodId, Number(e.target.value) || 0)}
-                    slotProps={{ htmlInput: { step: "0.01", min: 0, max: a.amountOutstanding, style: { textAlign: "right" } } }}
-                    sx={{ width: 130 }}
+                    onChange={(value) => updateAllocation(a.rentPeriodId, value)}
+                    min={0}
+                    max={a.amountOutstanding}
                   />
-                </Stack>
-              ))}
+                ))}
+              </Stack>
+            )}
+
+            <Divider />
+            <Stack spacing={1}>
+              <SummaryLine label="Total outstanding" value={formatMoney(totalOutstanding)} />
+              <SummaryLine label="Amount received" value={formatMoney(amountNumber)} />
+              <SummaryLine label="Allocated" value={formatMoney(allocatedTotal)} emphasis="strong" />
+              {unallocated !== 0 && amountNumber > 0 ? (
+                <BadgeRow>
+                  <StatusBadge
+                    tone="warning"
+                    label={`${formatMoney(Math.abs(unallocated))} ${unallocated > 0 ? "not allocated" : "over-allocated"}`}
+                  />
+                </BadgeRow>
+              ) : null}
             </Stack>
-          )}
-        </Box>
+          </SectionCard>
+        </Grid>
 
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Owner signature
-          </Typography>
-          <Paper variant="outlined" sx={{ p: 0.5 }}>
-            <SignaturePad onReady={(handle) => (padHandle.current = handle)} />
-          </Paper>
-          <Button size="small" onClick={() => padHandle.current?.clear()} sx={{ mt: 0.5 }}>
-            Clear
-          </Button>
-        </Box>
-
-        {error ? <Alert severity="error">{error}</Alert> : null}
-
-        <Button type="submit" variant="contained" size="large" disabled={submitting}>
-          {submitting ? "Saving…" : "Save & send for confirmation"}
-        </Button>
-      </Stack>
+        <Grid size={12}>
+          <FormActions
+            error={error}
+            cancelHref={`/dashboard/tenants/${tenantId}`}
+            submitLabel="Save & send for confirmation"
+            pendingLabel="Saving…"
+            pending={submitting}
+          />
+        </Grid>
+      </Grid>
     </Box>
   );
 }

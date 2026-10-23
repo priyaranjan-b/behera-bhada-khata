@@ -43,8 +43,8 @@ of the file; update both together (or regenerate with
 
 - `properties` → `tenants` → `rent_periods` (one row per tenant per calendar
   month owed, created ahead of time by `ensureRentPeriods` in
-  `src/lib/periods.ts` so arrears show up even for months no one logged a
-  payment for).
+  `src/server/services/periods.ts` so arrears show up even for months no one
+  logged a payment for).
 - `payments` and `adjustments` are **append-only ledger events**, each with
   its own `*_allocations` table mapping the event onto one or more
   `rent_periods`. A mistake is never edited on the original `payments` row —
@@ -52,9 +52,9 @@ of the file; update both together (or regenerate with
   (`original_payment_id`), going through the same sign+OTP flow.
 - Both ledger tables have a `status`: `pending` → `confirmed`. Only
   `confirmed` rows move `rent_periods.amount_allocated` (see
-  `confirmRecordAndApplyAllocations` in `src/lib/ledger.ts`, which uses an
-  `.eq("status", "pending")` compare-and-swap to make confirmation
-  idempotent under a race).
+  `confirmRecord` in `src/server/services/confirm.ts`; the adapter's
+  `confirm()` is an `.eq("status", "pending")` compare-and-swap, so
+  confirmation is idempotent under a race).
 - RLS enforces this at the DB level too: `authenticated` (the owner) can
   `INSERT`/`SELECT` on ledger tables but has `UPDATE`/`DELETE` revoked
   outright, with a narrow re-grant of just `token_hash`/`token_expires_at`
@@ -62,18 +62,48 @@ of the file; update both together (or regenerate with
   ever performed by server code using the service-role admin client, which
   bypasses RLS.
 
-### Three Supabase clients — pick the right one
+### Data access — layers (the UI never touches the database)
 
-- `src/lib/supabase/client.ts` — browser client (anon key), RLS-scoped.
-- `src/lib/supabase/server.ts` — server client (cookie-based session), also
-  RLS-scoped to the logged-in owner. Used from Server Components, layouts,
-  and API routes that act "as" the owner (via `requireAuthedClient()` in
-  `src/lib/api.ts`).
-- `src/lib/supabase/admin.ts` — service-role client, **bypasses RLS**. Only
-  import from server-only code that itself enforces authorization —
-  primarily the tenant-facing confirm-token flow (`src/lib/ledger.ts`,
-  `src/app/api/confirm/**`), where possession of the unguessable token is
-  the auth check instead of a Supabase Auth session.
+```
+UI         src/app/** pages, src/components/**
+             Server Components: serverApi  (src/lib/api-client/server.ts)
+             Client Components: api        (src/lib/api-client/index.ts, fetch)
+API        src/app/api/**/route.ts — thin: auth + JSON via src/server/http.ts,
+             then one service call. The tree mirrors the pages:
+             app/dashboard/tenants/[tenantId]/page.tsx
+               ↔ app/api/dashboard/tenants/[tenantId]/route.ts
+             Writes POST to the collection (…/tenants/[id]/payments); a form
+             page's data is a GET at its own path (…/payments/new).
+Services   src/server/services/* — business logic, no Next.js/Supabase imports
+Ports      src/server/ports.ts — OwnerRepositories, SystemRepositories,
+             AuthGateway, FileStorage interfaces
+Infra      src/server/infra/index.ts — binds ports to an adapter
+Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
+```
+
+- Shapes crossing the API are in `src/lib/contracts.ts`; the client surface
+  is typed by `ApiQueries`/`ApiCommands` (`src/lib/api-client/types.ts`) and
+  every path is in `src/lib/api-client/paths.ts`. Adding an endpoint = service
+  function + `route.ts` + path + a line in `http.ts` (and in `server.ts` if
+  pages read it).
+- Server Components call services **in-process** through `serverApi` (Next
+  docs: don't fetch your own route handlers from Server Components). It maps
+  401 → `/login` and 404 → `notFound()`, so pages don't check either. Setting
+  `API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL` sends all calls over HTTP to a
+  standalone backend instead — that's the migration path to a separate
+  Node.js server (move `src/server/**` there behind the same routes).
+- Swapping the database (e.g. MySQL) = a new adapter implementing
+  `src/server/ports.ts`, bound in `src/server/infra/index.ts`.
+  `ownerDb(ownerId)` must scope every query to that owner (the Supabase
+  adapter uses the RLS session client *and* explicit `owner_id` filters);
+  `systemDb()` is unscoped (service role) and only for flows that authorize
+  some other way: the confirm token, rent-period upkeep, cron.
+- Services throw `ApiError(status, message)` (`src/lib/errors.ts`); the route
+  helpers turn it into `{ error }` JSON and the API client rethrows it.
+- ESLint enforces the layering (`no-restricted-imports` in
+  `eslint.config.mjs`).
+- Step-by-step recipes: the `add-api-endpoint` and `build-dashboard-page`
+  skills in `.claude/skills/`.
 
 ### Auth & routing
 
@@ -82,21 +112,24 @@ of the file; update both together (or regenerate with
   `node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md`). It
   redirects unauthenticated requests to `/dashboard/**` to `/login`.
   `src/app/dashboard/layout.tsx` does the same check again server-side
-  (`supabase.auth.getClaims()`) as the authoritative guard.
-- Login is Supabase email magic link (`/auth/callback`); the tenant-facing
+  (`serverApi.auth.session()`) as the authoritative guard. The proxy also
+  refreshes the session cookie (`src/server/adapters/supabase/proxy.ts`).
+- Login is Supabase email magic link. It lands on the `/auth/callback` page,
+  which forwards `?code=` to `GET /api/auth/callback` (only a route handler
+  can set cookies) or posts `#access_token` to `POST /api/auth/session`. The
+  tenant-facing
   `/confirm/[token]` flow has no login at all — auth is the token itself.
 
 ### The confirm flow
 
-`/confirm/[token]` (tenant-facing, unauthenticated) ties most of `src/lib/`
-together: `loadPendingRecordByToken` (`ledger.ts`) resolves the token
-(`token.ts` hashes it, `hashToken`/`generateConfirmToken`), the tenant draws
-a signature and requests an OTP (`messaging/twilio.ts`), submits it plus the
-signature to `POST /api/confirm/[token]`, which verifies the OTP, uploads
-signatures to private Supabase Storage (`storage.ts`), renders a PDF
-(`pdf/receipt.ts`), then atomically confirms the record and applies its
-allocations (`confirmRecordAndApplyAllocations`). `resend.ts` rotates the
-token to reissue an expired/lost link without touching ledger facts.
+`/confirm/[token]` (tenant-facing, unauthenticated) is served by
+`src/server/services/confirm.ts`: the token is hashed (`src/server/token.ts`)
+and looked up via `systemDb()`; the tenant requests an OTP
+(`src/server/messaging/twilio.ts`) and posts it with their signature to
+`POST /api/confirm/[token]`, which verifies the OTP, stores the signature in
+private storage, renders the PDF (`src/server/pdf/receipt.ts`), then flips the
+record to confirmed and applies its allocations. Resending a link
+(`.../resend` routes) only rotates the token columns, never ledger facts.
 
 ### Money & dates
 
@@ -107,13 +140,38 @@ token to reissue an expired/lost link without touching ledger facts.
   summaries) is deliberately pure with no `server-only` import — it's shared
   between server code and the client-side `PaymentForm` so the UI can
   recompute the same suggestion as the owner types an amount.
-- Month keys are `yyyy-MM-dd` strings (first of month); `periods.ts` /
-  `reports.ts` build reporting views on top of `rent_periods`.
+- Month keys are `yyyy-MM-dd` strings (first of month);
+  `src/server/services/periods.ts` / `src/lib/reports.ts` build reporting
+  views on top of `rent_periods`.
 
 ### Conventions
 
 - Server-only modules start with `import "server-only"`; if a `src/lib/*`
   file lacks that import, assume it's meant to run on the client too.
-- API routes follow one pattern: parse/validate with a `zod` schema from
-  `src/lib/validation.ts`, get an authed client via `requireAuthedClient()`,
-  return `NextResponse.json({ error }, { status })` on failure.
+- API routes are one line per method: `ownerRoute` / `publicRoute` /
+  `ownerLinkRoute` from `src/server/http.ts` around a service call. Services
+  validate their own input with `zod` schemas from `src/lib/validation.ts`
+  (`parseInput`), so validation holds whichever transport calls them.
+
+### UI & styling
+
+- Theme: `src/theme/` is the MUI Dashboard template (MIT, copied from
+  mui/material-ui v9.5.0 — keep those files close to upstream) plus app
+  additions in `src/theme/customizations/app.ts` (Chip `warning`/`info`/`tag`,
+  Avatar `soft`, touch targets, global tabular numbers) and
+  `src/theme/appTokens.ts` (slate ramp; light-mode depth layers: slate
+  `background.default` canvas, white `background.paper` for cards/header/side
+  menu, `#E2E8F0` dividers, `#F8FAFC` grid-row hover). Light + dark schemes
+  via CSS variables, so never read `theme.palette.*` in JS for colours — use
+  `sx` palette keys or `theme.vars`.
+- Shared UI kit: `src/components/ui/` (`SectionCard`, `FormActions`,
+  `SignatureField`, `SummaryLine`, `DetailRow`, `PublicLayout`, …) and
+  `src/components/DataComponents.tsx` (`PageHeader`, `DashboardCardPanel`,
+  `StatusBadge`, …). Tables use `src/components/AppDataGrid.tsx`.
+- Pages (`src/app/**`) set **layout only** (Stack/Grid props, `alignItems`,
+  `minWidth: 0`, `maxWidth`). No colour, typography, border, radius or shadow
+  `sx`, no `@/theme` imports. Text colour via the Typography/Link prop
+  `color="textSecondary"` — MUI v9 dropped the dotted `"text.secondary"` form
+  for that prop and silently renders it as the default colour (dotted paths
+  still work inside `sx`). If a
+  page needs something visual twice, add it to the kit or the theme instead.

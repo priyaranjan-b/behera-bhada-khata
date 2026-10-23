@@ -1,13 +1,11 @@
 import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import { PageHeader } from "@/components/DataComponents";
 import PropertyForm from "./PropertyForm";
 
 export default function NewPropertyPage() {
   return (
-    <Stack spacing={3}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>
-        Add property
-      </Typography>
+    <Stack spacing={2}>
+      <PageHeader title="Add property" subtitle="A building or plot you rent out units in." />
       <PropertyForm />
     </Stack>
   );

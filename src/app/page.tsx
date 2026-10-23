@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { serverApi } from "@/lib/api-client/server";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  redirect(data?.claims ? "/dashboard" : "/login");
+  // No session -> serverApi sends the visitor to /login.
+  await serverApi.auth.session();
+  redirect("/dashboard");
 }

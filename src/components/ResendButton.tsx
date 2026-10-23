@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@mui/material/Button";
+import { api } from "@/lib/api-client";
 
 export default function ResendButton({
   kind,
@@ -20,14 +21,13 @@ export default function ResendButton({
 
   async function handleClick() {
     setBusy(true);
-    const endpoint = kind === "payment" ? `/api/payments/${recordId}/resend` : `/api/adjustments/${recordId}/resend`;
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tenantId, amount }),
-    });
+    const resend = kind === "payment" ? api.dashboard.payments.resend : api.dashboard.adjustments.resend;
+    const ok = await resend(recordId, { tenantId, amount }).then(
+      () => true,
+      () => false
+    );
     setBusy(false);
-    router.push(`/dashboard/tenants/${tenantId}?${res.ok ? "resent=1" : "error=1"}`);
+    router.push(`/dashboard/tenants/${tenantId}?${ok ? "resent=1" : "error=1"}`);
     router.refresh();
   }
 

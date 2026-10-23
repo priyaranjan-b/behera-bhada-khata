@@ -1,11 +1,9 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { serverApi } from "@/lib/api-client/server";
 import DashboardShell from "@/components/DashboardShell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  if (!data?.claims) redirect("/login");
-
-  return <DashboardShell>{children}</DashboardShell>;
+  // The proxy already redirects signed-out visitors; this is the authoritative
+  // check (no session -> serverApi redirects to /login).
+  const session = await serverApi.auth.session();
+  return <DashboardShell ownerEmail={session.email}>{children}</DashboardShell>;
 }

@@ -46,3 +46,7 @@ next-env.d.ts
 
 # local credentials notes
 supabase/sb-info.txt
+
+# Python bytecode (from skill scripts)
+__pycache__/
+*.pyc

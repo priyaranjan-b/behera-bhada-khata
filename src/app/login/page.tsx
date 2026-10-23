@@ -8,8 +8,38 @@ import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import DrawRoundedIcon from "@mui/icons-material/DrawRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
+import EventRepeatRoundedIcon from "@mui/icons-material/EventRepeatRounded";
+import { BrandMark } from "@/components/shell/BrandMark";
+import { PublicCard, PublicHeading, PublicLayout } from "@/components/ui";
+import { api, errorMessage } from "@/lib/api-client";
 
 const isDev = process.env.NODE_ENV !== "production";
+
+const valuePoints = [
+  {
+    icon: ReceiptLongRoundedIcon,
+    title: "Record rent in seconds",
+    description: "Log a payment against one or more months and send the tenant a link over WhatsApp or SMS.",
+  },
+  {
+    icon: DrawRoundedIcon,
+    title: "Tenant signs and verifies",
+    description: "Tenants draw a signature and confirm with a one-time SMS code - no app or login needed.",
+  },
+  {
+    icon: PictureAsPdfRoundedIcon,
+    title: "Signed PDF receipts",
+    description: "Every confirmed payment produces a signed receipt for both owner and tenant.",
+  },
+  {
+    icon: EventRepeatRoundedIcon,
+    title: "Arrears at a glance",
+    description: "Months owed are tracked automatically, so unpaid rent shows up even if nothing was logged.",
+  },
+];
 
 type State =
   | { step: "idle" | "sending" }
@@ -25,6 +55,27 @@ export default function LoginPage() {
   );
 }
 
+function ValuePoints() {
+  return (
+    <Stack spacing={4} sx={{ display: { xs: "none", md: "flex" }, maxWidth: 450 }}>
+      <BrandMark iconSize={40} />
+      {valuePoints.map(({ icon: Icon, title, description }) => (
+        <Stack key={title} direction="row" spacing={2}>
+          <Typography component="span" color="textSecondary" aria-hidden>
+            <Icon />
+          </Typography>
+          <Stack spacing={0.5}>
+            <Typography variant="subtitle2">{title}</Typography>
+            <Typography variant="body2" color="textSecondary">
+              {description}
+            </Typography>
+          </Stack>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
@@ -37,84 +88,75 @@ function LoginForm() {
     e.preventDefault();
     setState({ step: "sending" });
     try {
-      const res = await fetch("/api/auth/magic-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, next }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Couldn't send the link. Try again.");
-      setState(body.dev ? { step: "sent", dev: true, link: body.link } : { step: "sent", dev: false });
+      const result = await api.auth.requestMagicLink({ email, next });
+      setState(result.dev ? { step: "sent", dev: true, link: result.link } : { step: "sent", dev: false });
     } catch (err) {
-      setState({ step: "error", message: err instanceof Error ? err.message : "Something went wrong" });
+      setState({ step: "error", message: errorMessage(err, "Couldn't send the link. Try again.") });
     }
   }
 
   return (
-    <Box
-      sx={{
-        maxWidth: 400,
-        mx: "auto",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        px: 2,
-      }}
-    >
-      <Stack spacing={3}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Behera Bhada Khata
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            ବେହେରା ଭଡ଼ା ଖାତା
-          </Typography>
-        </Box>
+    <PublicLayout width="lg">
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={{ xs: 4, md: 12 }}
+        useFlexGap
+        sx={{ justifyContent: "center", alignItems: "center" }}
+      >
+        <ValuePoints />
 
-        {state.step === "sent" ? (
-          <Stack spacing={2}>
-            {state.dev ? (
-              <>
-                <Alert severity="success">
-                  No email sent (dev mode). This link is single-use - if it fails, come back and
-                  request a new one rather than reusing it.
-                </Alert>
-                <Button href={state.link} variant="contained" size="large">
-                  Sign in
-                </Button>
-              </>
-            ) : (
-              <Alert severity="success">Check your email for a sign-in link.</Alert>
-            )}
-          </Stack>
-        ) : (
-          <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={2}>
-              <TextField
-                id="email"
-                type="email"
-                label="Owner email"
-                required
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                fullWidth
-              />
-              {state.step === "error" ? <Alert severity="error">{state.message}</Alert> : null}
-              <Button type="submit" variant="contained" size="large" disabled={state.step === "sending"}>
-                {state.step === "sending" ? "Sending…" : "Send sign-in link"}
-              </Button>
-              {isDev ? (
-                <Typography variant="caption" color="textSecondary">
-                  Dev mode: no email will actually be sent - you&apos;ll get a clickable sign-in
-                  button on the next screen.
-                </Typography>
-              ) : null}
-            </Stack>
+        <PublicCard>
+          <Box sx={{ display: { xs: "flex", md: "none" } }}>
+            <BrandMark />
           </Box>
-        )}
+          <PublicHeading title="Sign in" subtitle={<>We&apos;ll email you a one-time sign-in link.</>} />
+
+          {state.step === "sent" ? (
+            <Stack spacing={2}>
+              {state.dev ? (
+                <>
+                  <Alert severity="success">
+                    No email sent (dev mode). This link is single-use - if it fails, come back and
+                    request a new one rather than reusing it.
+                  </Alert>
+                  <Button href={state.link} variant="contained" size="large" fullWidth>
+                    Sign in
+                  </Button>
+                </>
+              ) : (
+                <Alert severity="success">Check your email for a sign-in link.</Alert>
+              )}
+            </Stack>
+          ) : (
+            <Box component="form" onSubmit={handleSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  id="email"
+                  type="email"
+                  label="Owner email"
+                  required
+                  autoComplete="email"
+                  autoFocus
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  fullWidth
+                />
+                {state.step === "error" ? <Alert severity="error">{state.message}</Alert> : null}
+                <Button type="submit" variant="contained" size="large" fullWidth disabled={state.step === "sending"}>
+                  {state.step === "sending" ? "Sending…" : "Send sign-in link"}
+                </Button>
+                {isDev ? (
+                  <Typography variant="caption" color="textSecondary">
+                    Dev mode: no email will actually be sent - you&apos;ll get a clickable sign-in
+                    button on the next screen.
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Box>
+          )}
+        </PublicCard>
       </Stack>
-    </Box>
+    </PublicLayout>
   );
 }

@@ -77,7 +77,7 @@ link), then add a property, a tenant, and record a payment.
 
 - **Currency**: edit `CURRENCY_SYMBOL` in `src/lib/money.ts`.
 - **Link lifetime**: confirmation links expire after 14 days
-  (`CONFIRM_LINK_TTL_DAYS` in `src/lib/token.ts`); the owner can resend a
+  (`CONFIRM_LINK_TTL_DAYS` in `src/server/token.ts`); the owner can resend a
   fresh link from the tenant's page.
 - **Corrections**: a confirmed payment is never edited - use "Adjust" on the
   tenant's page to record a correction, which goes through the same

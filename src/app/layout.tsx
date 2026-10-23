@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Noto_Sans_Oriya } from "next/font/google";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import ThemeRegistry from "@/components/ThemeRegistry";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Only used for the Odia brand line (see OdiaText), so don't block first paint on it.
+const notoOriya = Noto_Sans_Oriya({
+  variable: "--font-oriya",
+  subsets: ["oriya"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -20,8 +23,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    // suppressHydrationWarning: InitColorSchemeScript sets the color-scheme
+    // attribute on <html> before React hydrates.
+    <html lang="en" className={`${inter.variable} ${notoOriya.variable}`} suppressHydrationWarning>
       <body>
+        <InitColorSchemeScript attribute="data-mui-color-scheme" />
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>

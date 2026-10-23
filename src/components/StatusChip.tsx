@@ -1,6 +1,6 @@
-import Chip, { type ChipProps } from "@mui/material/Chip";
+import { StatusBadge, type BadgeTone } from "@/components/DataComponents";
 
-const COLOR_BY_STATUS: Record<string, ChipProps["color"]> = {
+const TONE_BY_STATUS: Record<string, BadgeTone> = {
   pending: "warning",
   partially_paid: "warning",
   paid: "success",
@@ -8,7 +8,6 @@ const COLOR_BY_STATUS: Record<string, ChipProps["color"]> = {
 };
 
 export function StatusChip({ status }: { status: string }) {
-  return (
-    <Chip size="small" color={COLOR_BY_STATUS[status] ?? "default"} label={status.replace(/_/g, " ")} />
-  );
+  const label = status.replace(/_/g, " ");
+  return <StatusBadge tone={TONE_BY_STATUS[status] ?? "neutral"} label={label.charAt(0).toUpperCase() + label.slice(1)} />;
 }

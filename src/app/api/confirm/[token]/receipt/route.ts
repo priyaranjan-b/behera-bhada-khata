@@ -1,27 +1,9 @@
-import { NextResponse } from "next/server";
-import { hashToken } from "@/lib/token";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getSignedUrl } from "@/lib/storage";
+import { publicRoute, redirectTo } from "@/server/http";
+import { confirmReceiptUrl } from "@/server/services/confirm";
 
-export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const recordType = new URL(request.url).searchParams.get("recordType");
-  if (recordType !== "payment" && recordType !== "adjustment") {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+type Params = { token: string };
 
-  const admin = createAdminClient();
-  const table = recordType === "payment" ? "payments" : "adjustments";
-  const { data: record } = await admin
-    .from(table)
-    .select("pdf_path, status")
-    .eq("token_hash", hashToken(token))
-    .maybeSingle();
-
-  if (!record || record.status !== "confirmed" || !record.pdf_path) {
-    return NextResponse.json({ error: "Not available" }, { status: 404 });
-  }
-
-  const signedUrl = await getSignedUrl(record.pdf_path, 300);
-  return NextResponse.redirect(signedUrl);
-}
+// Opened as a link: redirects to a short-lived signed PDF URL.
+export const GET = publicRoute<Params>(async (request, { token }) =>
+  redirectTo(await confirmReceiptUrl(token, new URL(request.url).searchParams.get("recordType")))
+);

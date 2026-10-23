@@ -1,7 +1,6 @@
-import { notFound } from "next/navigation";
 import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
-import { createClient } from "@/lib/supabase/server";
+import { serverApi } from "@/lib/api-client/server";
+import { PageHeader } from "@/components/DataComponents";
 import BulkTenantUpload from "./BulkTenantUpload";
 
 export default async function BulkTenantUploadPage({
@@ -10,15 +9,11 @@ export default async function BulkTenantUploadPage({
   params: Promise<{ propertyId: string }>;
 }) {
   const { propertyId } = await params;
-  const supabase = await createClient();
-  const { data: property } = await supabase.from("properties").select("id, name").eq("id", propertyId).single();
-  if (!property) notFound();
+  const property = await serverApi.dashboard.properties.bulkTenants(propertyId);
 
   return (
-    <Stack spacing={3}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>
-        Bulk upload tenants · {property.name}
-      </Typography>
+    <Stack spacing={2}>
+      <PageHeader title="Bulk upload tenants" subtitle={property.name} />
       <BulkTenantUpload propertyId={propertyId} />
     </Stack>
   );

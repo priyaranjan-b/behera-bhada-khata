@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiPaths } from "@/lib/api-client";
 import HashSessionHandler from "./HashSessionHandler";
 
 export default async function AuthCallbackPage({
@@ -10,10 +10,10 @@ export default async function AuthCallbackPage({
   const { code, next } = await searchParams;
   const target = next ?? "/dashboard";
 
+  // PKCE flow: the API exchanges the code and sets the session cookies (a
+  // page render can't set cookies), then redirects on to `next`.
   if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    redirect(error ? "/login?error=1" : target);
+    redirect(`${apiPaths.auth.callback}?${new URLSearchParams({ code, next: target })}`);
   }
 
   // No `code` - this may be an implicit-flow redirect carrying the session in
