@@ -1,7 +1,7 @@
 import "server-only";
 import { ApiError } from "@/lib/errors";
 import type { ProofArg, ProofContentType } from "@/lib/types";
-import { PROOF_LIMITS } from "@/lib/validation";
+import { PROOF_LIMITS, type FileLimits } from "@/lib/validation";
 import { storage } from "@/server/infra";
 import type { UploadedFile } from "./context";
 
@@ -55,14 +55,15 @@ export function storageName(index: number, fileName: string, type: ProofContentT
  */
 export function checkProofFiles(
   files: UploadedFile[],
-  what = "proof files"
+  what = "proof files",
+  limits: FileLimits = PROOF_LIMITS
 ): (UploadedFile & { type: ProofContentType })[] {
-  if (files.length > PROOF_LIMITS.maxFiles) {
-    throw new ApiError(400, `Attach at most ${PROOF_LIMITS.maxFiles} ${what} at a time`);
+  if (files.length > limits.maxFiles) {
+    throw new ApiError(400, `Attach at most ${limits.maxFiles} ${what} at a time`);
   }
   const total = files.reduce((sum, f) => sum + f.bytes.length, 0);
-  if (total > PROOF_LIMITS.maxTotalBytes) {
-    throw new ApiError(400, `${what[0].toUpperCase()}${what.slice(1)} can be at most ${PROOF_LIMITS.maxTotalBytes / 1024 / 1024} MB in total`);
+  if (total > limits.maxTotalBytes) {
+    throw new ApiError(400, `${what[0].toUpperCase()}${what.slice(1)} can be at most ${limits.maxTotalBytes / 1024 / 1024} MB in total`);
   }
   return files.map((f) => {
     const type = f.bytes.length > 0 ? sniffProofType(f.bytes) : null;

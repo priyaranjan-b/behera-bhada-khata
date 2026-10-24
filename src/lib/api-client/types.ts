@@ -2,6 +2,7 @@ import type {
   AdjustPaymentForm,
   AnyTowerTenantForm,
   BulkCreateResult,
+  ChangePasswordInput,
   ConfirmInput,
   ConfirmView,
   Confirmed,
@@ -25,6 +26,7 @@ import type {
   UpdateOwnerProfileInput,
   UpdateTenantInput,
   MagicLinkResult,
+  PasswordSignInResult,
   NewPaymentForm,
   OtpSent,
   PropertyDetail,
@@ -95,11 +97,13 @@ export interface ApiQueries {
 export interface ApiCommands {
   auth: {
     requestMagicLink(input: { email: string; next: string }): Promise<MagicLinkResult>;
+    signInWithPassword(input: { email: string; password: string; next: string }): Promise<PasswordSignInResult>;
     setSession(tokens: SessionTokens): Promise<void>;
     signOut(): Promise<void>;
   };
   dashboard: {
     updateProfile(input: UpdateOwnerProfileInput): Promise<void>;
+    changePassword(input: ChangePasswordInput): Promise<void>;
     properties: {
       create(input: CreatePropertyInput): Promise<{ code: string }>;
       createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;

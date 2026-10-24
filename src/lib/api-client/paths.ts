@@ -9,6 +9,7 @@ export const apiPaths = {
   auth: {
     session: "/api/auth/session",
     magicLink: "/api/auth/magic-link",
+    password: "/api/auth/password",
     signOut: "/api/auth/signout",
     callback: "/api/auth/callback",
   },
@@ -17,6 +18,7 @@ export const apiPaths = {
     defaulters: "/api/dashboard/defaulters",
     search: "/api/dashboard/search",
     profile: "/api/dashboard/profile",
+    profilePassword: "/api/dashboard/profile/password",
     properties: {
       list: "/api/dashboard/properties",
       new: "/api/dashboard/properties/new",

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsToKey, currentMonthKey, dateKeyOf, formatDateKey, formatMonth, isDateKey, monthKeyOf, todayKey } from "./dates";
+import {
+  addMonthsToKey,
+  currentMonthKey,
+  dateKeyOf,
+  formatDateKey,
+  formatMonth,
+  isDateKey,
+  monthKeyOf,
+  monthsBetween,
+  todayKey,
+  yearMonthOf,
+} from "./dates";
 
 describe("dates (Asia/Kolkata)", () => {
   it("puts an early-morning IST instant on the IST day, not the UTC one", () => {
@@ -29,5 +40,19 @@ describe("dates (Asia/Kolkata)", () => {
     expect(formatMonth("2026-03-01")).toBe("March 2026");
     expect(formatMonth("2026-03-01", "short")).toBe("Mar 2026");
     expect(formatDateKey("2026-10-04")).toBe("4 Oct 2026");
+  });
+});
+
+describe("month helpers", () => {
+  it("converts between month keys and yyyy-MM", () => {
+    expect(yearMonthOf("2026-10-01")).toBe("2026-10");
+    expect(yearMonthOf("2026-10-24")).toBe("2026-10");
+    expect(monthKeyOf(yearMonthOf("2026-10-24"))).toBe("2026-10-01");
+  });
+
+  it("counts whole months between month keys", () => {
+    expect(monthsBetween("2026-10-01", "2026-10-01")).toBe(0);
+    expect(monthsBetween("2025-11-01", "2026-02-01")).toBe(3);
+    expect(monthsBetween("2026-02-01", "2025-11-01")).toBe(0);
   });
 });

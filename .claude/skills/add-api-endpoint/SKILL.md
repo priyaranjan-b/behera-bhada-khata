@@ -101,9 +101,9 @@ In `src/server/services/<domain>.ts` (start the file with `import "server-only"`
   cover it in `test/schema.test.ts`.
 - A public endpoint that sends SMS/email or is worth brute-forcing calls
   `enforceRateLimits([...])`; its route passes `requestMeta(request)`.
-- Validate path ids first: a malformed uuid is a 404 before any DB call.
-  Reuse the shared tenant lookup / record-kind helpers in `./context` (or
-  add them there) rather than repeating `get` + `notFound` per function.
+- Validate path ids first with `requireId` / `requireTenant` (`./context`):
+  a malformed uuid is a 404 before any DB call. Reuse the helpers in
+  `./context` rather than repeating `get` + `notFound` per function.
 - No magic numbers: signed-URL lifetimes and rate limits are named
   constants in `./context`; input limits are exported from `validation.ts`
   and the schema and the service check read the same constant.

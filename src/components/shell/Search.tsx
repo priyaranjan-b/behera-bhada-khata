@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { useAppRouter } from "@/components/ui/Loading";
+import { Loader, useAppRouter } from "@/components/ui/Loading";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
-import CircularProgress from "@mui/material/CircularProgress";
 import InputAdornment from "@mui/material/InputAdornment";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -222,7 +221,7 @@ export function Search({
                 </InputAdornment>
               ),
               endAdornment: loading ? (
-                <CircularProgress color="inherit" size={16} />
+                <Loader size="sm" />
               ) : showShortcut && !focused && !query ? (
                 <InputAdornment position="end">
                   <ShortcutHint mac={mac} />

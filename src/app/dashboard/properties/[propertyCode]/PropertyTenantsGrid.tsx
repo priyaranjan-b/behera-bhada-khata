@@ -2,9 +2,11 @@
 
 import type { GridColDef } from "@mui/x-data-grid";
 import DataTable, { moneyColumn } from "@/components/ui/DataTable";
-import { IdentityCell, StatusBadge } from "@/components/ui/DataDisplay";
+import { IdentityCell } from "@/components/ui/DataDisplay";
+import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { UnitCell } from "@/components/ui";
 import type { PropertyTenantRow } from "@/lib/contracts";
+import { routes } from "@/lib/routes";
 
 const columns: GridColDef<PropertyTenantRow>[] = [
   {
@@ -16,7 +18,7 @@ const columns: GridColDef<PropertyTenantRow>[] = [
       <IdentityCell
         name={row.displayName}
         caption={row.contactName ?? undefined}
-        href={`/dashboard/tenants/${row.id}`}
+        href={routes.tenants.detail(row.id)}
       />
     ),
   },
@@ -36,14 +38,7 @@ const columns: GridColDef<PropertyTenantRow>[] = [
     minWidth: 110,
     headerAlign: "right",
     align: "right",
-    renderCell: ({ row }) =>
-      row.status === "active" ? (
-        <StatusBadge tone="success" label="Active" />
-      ) : row.status === "draft" ? (
-        <StatusBadge tone="warning" label="Draft" />
-      ) : (
-        <StatusBadge tone="neutral" label="Inactive" />
-      ),
+    renderCell: ({ row }) => <TenantStatusBadge status={row.status} />,
   },
 ];
 

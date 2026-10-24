@@ -25,29 +25,35 @@ import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 import { prepareProofFile } from "@/lib/proofImages";
 import { PROOF_LIMITS } from "@/lib/validation";
+import { PAYMENT_MODE_OPTIONS } from "@/lib/domain/payments";
+import type { PaymentMode } from "@/lib/types";
 import { api, errorMessage } from "@/lib/api-client";
-import type { CreatePaymentInput, SavedSignature } from "@/lib/contracts";
+import type { SavedSignature } from "@/lib/contracts";
+import { routes } from "@/lib/routes";
 
 export default function PaymentForm({
   tenantId,
   periods,
   savedSignature,
+  tenantMessaging,
   inDialog = false,
 }: {
   tenantId: string;
   periods: PeriodLike[];
   /** From the Profile page; used unless the owner signs by hand. */
   savedSignature: SavedSignature | null;
+  /** Twilio is set up, so the tenant can be sent a link. */
+  tenantMessaging: boolean;
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;
 }) {
   const router = useAppRouter();
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => todayKey());
-  const [mode, setMode] = useState("bank_transfer");
+  const [mode, setMode] = useState<PaymentMode>("bank_transfer");
   const [note, setNote] = useState("");
   const [proofs, setProofs] = useState<File[]>([]);
-  const [notify, setNotify] = useState(true);
+  const [notify, setNotify] = useState(tenantMessaging);
   const [manualAllocations, setManualAllocations] = useState<Record<string, number> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +98,7 @@ export default function PaymentForm({
         {
           amount: amountNumber,
           paymentDate,
-          mode: mode as CreatePaymentInput["mode"],
+          mode,
           note: note || undefined,
           allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
           ownerSignaturePng: signature,
@@ -100,7 +106,7 @@ export default function PaymentForm({
         },
         proofs
       );
-      const href = `/dashboard/tenants/${tenantId}?${recordedFlash(notified)}`;
+      const href = routes.tenants.detail(tenantId, recordedFlash(notified));
       // In the dialog, replace the form's history entry so Back doesn't reopen it.
       if (inDialog) router.replace(href);
       else router.push(href);
@@ -142,12 +148,12 @@ export default function PaymentForm({
                 fullWidth
               />
 
-              <TextField id="mode" label="Mode" select value={mode} onChange={(e) => setMode(e.target.value)} fullWidth>
-                <MenuItem value="cash">Cash</MenuItem>
-                <MenuItem value="bank_transfer">Bank transfer</MenuItem>
-                <MenuItem value="upi">UPI</MenuItem>
-                <MenuItem value="cheque">Cheque</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
+              <TextField id="mode" label="Mode" select value={mode} onChange={(e) => setMode(e.target.value as PaymentMode)} fullWidth>
+                {PAYMENT_MODE_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
               </TextField>
 
               <TextField
@@ -220,13 +226,13 @@ export default function PaymentForm({
         </Grid>
 
         <Grid size={12}>
-          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} />
+          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} available={tenantMessaging} />
         </Grid>
 
         <Grid size={12}>
           <FormActions
             error={error}
-            cancelHref={`/dashboard/tenants/${tenantId}`}
+            cancelHref={routes.tenants.detail(tenantId)}
             onCancel={inDialog ? () => router.back() : undefined}
             submitLabel="Save payment"
             pendingLabel="Saving…"

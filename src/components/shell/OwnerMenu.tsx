@@ -16,6 +16,7 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import Link from "@/components/ui/Link";
 import { ownerInitials } from "@/lib/domain/owner";
+import { routes } from "@/lib/routes";
 import { useSignOut } from "./useSignOut";
 import Loader from "@/components/ui/Loading/Loader";
 
@@ -71,7 +72,7 @@ export function OwnerCard({ email, name }: { email?: string; name?: string }) {
           <ListItemText primary="Signed in as" secondary={email} />
         </MenuItem>
         <Divider sx={{ my: "4px !important" }} />
-        <MenuItem component={Link} href="/dashboard/profile" onClick={() => setAnchorEl(null)}>
+        <MenuItem component={Link} href={routes.profile()} onClick={() => setAnchorEl(null)}>
           <ListItemText>Profile</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: "0 !important" }}>
             <PersonRoundedIcon fontSize="small" />

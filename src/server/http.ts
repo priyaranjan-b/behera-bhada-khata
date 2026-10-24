@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { ApiError } from "@/lib/errors";
+import { routes } from "@/lib/routes";
 import { env } from "@/server/env";
 import { auth } from "@/server/infra";
 import { getOwnerContext } from "@/server/services/auth";
@@ -95,8 +96,8 @@ export function ownerLinkRoute<P = Record<string, never>>(
 ) {
   return publicRoute<P>(async (request, params) => {
     const session = await auth.getSession();
-    if (!session) return NextResponse.redirect(new URL("/login", request.url));
-    if (!session.isOwner) return NextResponse.redirect(new URL("/login?error=owner", request.url));
+    if (!session) return NextResponse.redirect(new URL(routes.login(), request.url));
+    if (!session.isOwner) return NextResponse.redirect(new URL(routes.login({ error: "owner" }), request.url));
     return handler({ ownerId: session.userId, email: session.email }, request, params);
   });
 }

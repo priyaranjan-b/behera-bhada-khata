@@ -1,16 +1,12 @@
 import "server-only";
-import type { LoginOptions, MagicLinkResult, Session } from "@/lib/contracts";
+import type { LoginOptions, MagicLinkResult, PasswordSignInResult, Session } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
-import { magicLinkSchema, sessionTokensSchema } from "@/lib/validation";
+import { magicLinkSchema, passwordSignInSchema, sessionTokensSchema } from "@/lib/validation";
 import { devLoginEnabled, env, ownerEmailAllowlist } from "@/server/env";
 import { hashToken } from "@/server/token";
 import { auth } from "@/server/infra";
-import { enforceRateLimits, HOUR, parseInput, type OwnerContext, type RequestMeta } from "./context";
-
-/** Only same-site paths, so a crafted `next` can't bounce the owner to another site after sign-in. */
-export function safeNext(next: string | null | undefined): string {
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/dashboard";
-}
+import { safeNext } from "@/lib/redirects";
+import { enforceRateLimits, parseInput, RATE_LIMITS, type OwnerContext, type RequestMeta } from "./context";
 
 export async function getSession(): Promise<Session> {
   const session = await auth.getSession();
@@ -51,8 +47,8 @@ export function getLoginOptions(): LoginOptions {
 export async function requestMagicLink(body: unknown, meta: RequestMeta): Promise<MagicLinkResult> {
   const { email, next } = parseInput(magicLinkSchema, body);
   await enforceRateLimits([
-    { key: `magic-link:email:${hashToken(email)}`, limit: 5, windowSeconds: HOUR },
-    { key: `magic-link:ip:${meta.ip}`, limit: 20, windowSeconds: HOUR },
+    { key: `magic-link:email:${hashToken(email)}`, ...RATE_LIMITS.magicLinkPerEmail },
+    { key: `magic-link:ip:${meta.ip}`, ...RATE_LIMITS.magicLinkPerIp },
   ]);
 
   // Lands on the /auth/callback page, which finishes sign-in for both the
@@ -73,6 +69,31 @@ export async function requestMagicLink(body: unknown, meta: RequestMeta): Promis
   // reveal who the owners are.
   if (policy.allowed) await auth.sendMagicLink(email, redirectTo, { allowSignUp: policy.allowSignUp });
   return { dev: false };
+}
+
+const WRONG_PASSWORD = "Wrong email or password";
+
+/**
+ * Owner sign-in with email + password (Supabase Auth). An email outside
+ * OWNER_EMAILS gets the same answer as a wrong password, and an account that
+ * isn't the app owner is signed straight back out.
+ */
+export async function signInWithPassword(body: unknown, meta: RequestMeta): Promise<PasswordSignInResult> {
+  const { email, password, next } = parseInput(passwordSignInSchema, body);
+  await enforceRateLimits([
+    { key: `password:email:${hashToken(email)}`, ...RATE_LIMITS.passwordPerEmail },
+    { key: `password:ip:${meta.ip}`, ...RATE_LIMITS.passwordPerIp },
+  ]);
+
+  if (!signInPolicy(email).allowed) throw new ApiError(400, WRONG_PASSWORD);
+  if (!(await auth.signInWithPassword(email, password))) throw new ApiError(400, WRONG_PASSWORD);
+
+  const session = await auth.getSession();
+  if (!session?.isOwner) {
+    await auth.signOut();
+    throw new ApiError(403, NOT_OWNER_MESSAGE);
+  }
+  return { next: safeNext(next) };
 }
 
 export async function setSessionFromTokens(body: unknown): Promise<void> {

@@ -280,6 +280,10 @@ export interface AuthGateway {
   sendMagicLink(email: string, redirectTo: string, options: { allowSignUp: boolean }): Promise<void>;
   /** Dev only: creates the sign-in link without sending email. */
   generateMagicLink(email: string, redirectTo: string): Promise<string>;
+  /** Signs in and sets the session cookies; false for a wrong email or password. */
+  signInWithPassword(email: string, password: string): Promise<boolean>;
+  /** Sets the signed-in account's password. */
+  updatePassword(password: string): Promise<void>;
   /**
    * For receipts, which the tenant's confirm flow renders without a session:
    * the owner's name (owner_profile, else the account's name or email) and
@@ -306,7 +310,7 @@ export interface FileStorage {
 
 // ---- Messaging (tenant OTP + confirm links) ----
 
-export type NotifyChannel = "whatsapp" | "sms" | "both";
+export type NotifyChannel = PreferredChannel;
 
 export interface Messaging {
   /** Starts an SMS one-time-code verification. */

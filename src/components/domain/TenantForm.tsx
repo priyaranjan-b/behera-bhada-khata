@@ -15,8 +15,8 @@ import { FormActions, SectionCard } from "@/components/ui";
 import TenantDocumentsCard, { type PendingDocument } from "@/components/domain/TenantDocumentsCard";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AvailableUnit, EditTenantForm, TenantDocumentView } from "@/lib/contracts";
-import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf, todayKey } from "@/lib/dates";
-import { formatFloor } from "@/lib/domain/tenant";
+import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf, monthsBetween, todayKey, yearMonthOf } from "@/lib/dates";
+import { PREFERRED_CHANNEL_OPTIONS, billingStartFor, formatFloor } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import type { PreferredChannel } from "@/lib/types";
 
@@ -78,12 +78,12 @@ export default function TenantForm({
   // Rent settled outside the app (paper register) up to this month, yyyy-MM.
   // Drafts default to last month so billing starts this month; new tenants to
   // blank (billed from the lease month).
-  const [paidThrough, setPaidThrough] = useState(draft ? addMonthsToKey(currentMonthKey(), -1).slice(0, 7) : "");
+  const [paidThrough, setPaidThrough] = useState(draft ? yearMonthOf(addMonthsToKey(currentMonthKey(), -1)) : "");
   const [deposit, setDeposit] = useState(editing?.depositAmount ? String(editing.depositAmount) : "");
   // Set when onboarding or while a draft; frozen once the tenant is active.
   const depositEditable = mode.kind === "create" || draft;
   const [unitsEffective, setUnitsEffective] = useState(todayKey());
-  const [rentEffectiveMonth, setRentEffectiveMonth] = useState(addMonthsToKey(currentMonthKey(), 1).slice(0, 7));
+  const [rentEffectiveMonth, setRentEffectiveMonth] = useState(yearMonthOf(addMonthsToKey(currentMonthKey(), 1)));
   const [submitting, setSubmitting] = useState(false);
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -96,22 +96,11 @@ export default function TenantForm({
   const draftComplete = draft && Boolean(phone.trim() && monthlyRent && leaseStart);
   const settingUpBilling = mode.kind === "create" || draft;
 
-  // Same rule as billing_start_for() in 0008: the month after "paid up to",
-  // never before the lease month.
-  const billingStart = (() => {
-    if (!settingUpBilling || !leaseStart) return null;
-    const leaseMonth = monthKeyOf(leaseStart);
-    if (!paidThrough) return leaseMonth;
-    const afterPaid = addMonthsToKey(`${paidThrough}-01`, 1);
-    return afterPaid > leaseMonth ? afterPaid : leaseMonth;
-  })();
+  // billing_start_for() in 0008, shared with the server via src/lib/domain.
+  const billingStart =
+    settingUpBilling && leaseStart ? billingStartFor(leaseStart, paidThrough ? monthKeyOf(paidThrough) : null) : null;
   // Months already due the moment this is saved (billing start .. this month).
-  const monthsDueNow = (() => {
-    if (!billingStart) return 0;
-    let n = 0;
-    for (let m = billingStart; m <= currentMonthKey() && n < 1200; m = addMonthsToKey(m, 1)) n++;
-    return n;
-  })();
+  const monthsDueNow = billingStart ? monthsBetween(billingStart, addMonthsToKey(currentMonthKey(), 1)) : 0;
   const cancelHref = editing
     ? `/dashboard/tenants/${editing.id}`
     : homeTower
@@ -151,7 +140,7 @@ export default function TenantForm({
           phone: contact.phone || undefined,
           monthlyRentAmount: monthlyRent ? Number(monthlyRent) : undefined,
           unitsEffective: unitsChanged ? unitsEffective : undefined,
-          rentEffectiveMonth: rentChanged ? `${rentEffectiveMonth}-01` : undefined,
+          rentEffectiveMonth: rentChanged ? monthKeyOf(rentEffectiveMonth) : undefined,
           leaseStart: draft && leaseStart ? leaseStart : undefined,
           // Blank = nothing paid yet: send the month before the lease month so
           // billing starts at move-in, as the preview says (update_tenant would
@@ -159,7 +148,7 @@ export default function TenantForm({
           paidThrough: !draft
             ? undefined
             : paidThrough
-              ? `${paidThrough}-01`
+              ? monthKeyOf(paidThrough)
               : leaseStart
                 ? addMonthsToKey(monthKeyOf(leaseStart), -1)
                 : undefined,
@@ -186,7 +175,7 @@ export default function TenantForm({
         const { id } = await api.dashboard.tenants.create({
           ...contact,
           leaseStart,
-          paidThrough: paidThrough ? `${paidThrough}-01` : undefined,
+          paidThrough: paidThrough ? monthKeyOf(paidThrough) : undefined,
           depositAmount: deposit ? Number(deposit) : undefined,
         });
         router.push(`/dashboard/tenants/${id}?saved=1`);
@@ -390,9 +379,11 @@ export default function TenantForm({
                 onChange={(e) => setPreferredChannel(e.target.value as PreferredChannel)}
                 fullWidth
               >
-                <MenuItem value="both">WhatsApp + SMS</MenuItem>
-                <MenuItem value="whatsapp">WhatsApp only</MenuItem>
-                <MenuItem value="sms">SMS only</MenuItem>
+                {PREFERRED_CHANNEL_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
               </TextField>
             </SectionCard>
             {mode.kind === "edit" && documents ? (

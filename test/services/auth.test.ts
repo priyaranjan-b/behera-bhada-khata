@@ -3,7 +3,7 @@ import { fakes, resetFakes } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { requestMagicLink, safeNext } = await import("@/server/services/auth");
+const { requestMagicLink, signInWithPassword } = await import("@/server/services/auth");
 
 const meta = { ip: "203.0.113.7" };
 
@@ -52,12 +52,45 @@ describe("requestMagicLink", () => {
   });
 });
 
-describe("safeNext", () => {
-  it("only allows same-site paths", () => {
-    expect(safeNext("/dashboard/tenants")).toBe("/dashboard/tenants");
-    expect(safeNext("//evil.test")).toBe("/dashboard");
-    expect(safeNext("/\\evil.test")).toBe("/dashboard");
-    expect(safeNext("https://evil.test")).toBe("/dashboard");
+describe("signInWithPassword", () => {
+  const owner = { email: "Owner@Example.com", password: "correct-horse", next: "/dashboard/tenants" };
+
+  it("signs the owner in and returns where to go", async () => {
+    expect(await signInWithPassword(owner, meta)).toEqual({ next: "/dashboard/tenants" });
+    expect(fakes.auth.signInWithPassword).toHaveBeenCalledWith("owner@example.com", "correct-horse");
+  });
+
+  it("never sends the owner to another site", async () => {
+    expect(await signInWithPassword({ ...owner, next: "https://evil.test" }, meta)).toEqual({ next: "/dashboard" });
+  });
+
+  it("answers a wrong password and an email outside OWNER_EMAILS the same way", async () => {
+    await expect(signInWithPassword({ ...owner, password: "nope" }, meta)).rejects.toMatchObject({
+      status: 400,
+      message: "Wrong email or password",
+    });
+
+    vi.stubEnv("OWNER_EMAILS", "owner@example.com");
+    const { resetEnvCacheForTests } = await import("@/server/env");
+    resetEnvCacheForTests();
+    fakes.auth.signInWithPassword.mockClear();
+    await expect(signInWithPassword({ ...owner, email: "stranger@example.com" }, meta)).rejects.toMatchObject({
+      status: 400,
+      message: "Wrong email or password",
+    });
+    expect(fakes.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("signs a non-owner account straight back out", async () => {
+    fakes.auth.getSession.mockResolvedValueOnce({ userId: "someone-else", isOwner: false } as never);
+    await expect(signInWithPassword(owner, meta)).rejects.toMatchObject({ status: 403 });
+    expect(fakes.auth.signOut).toHaveBeenCalled();
+  });
+
+  it("is rate limited", async () => {
+    fakes.state.rateLimitAllows = false;
+    await expect(signInWithPassword(owner, meta)).rejects.toMatchObject({ status: 429 });
+    expect(fakes.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });
 

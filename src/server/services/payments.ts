@@ -5,7 +5,16 @@ import { formatMoney } from "@/lib/money";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { createPaymentSchema } from "@/lib/validation";
 import { ownerDb, storage } from "@/server/infra";
-import { notFound, parseInput, withParams, type OwnerContext, type UploadedFile } from "./context";
+import {
+  notFound,
+  parseInput,
+  requireId,
+  requireTenant,
+  SIGNED_URL_SECONDS,
+  withParams,
+  type OwnerContext,
+  type UploadedFile,
+} from "./context";
 import {
   confirmUrl,
   generateConfirmToken,
@@ -18,11 +27,11 @@ import { checkProofFiles, storeProofs } from "./proofs";
 import { ownerSignatureBytes, savedSignatureFor } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
 import { ensureRentPeriodsFor } from "./periods";
+import { tenantMessagingEnabled } from "@/server/env";
 
 export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Promise<NewPaymentForm> {
   const db = await ownerDb();
-  const tenant = await db.tenants.get(tenantId);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, tenantId);
 
   await ensureRentPeriodsFor([tenantId]);
   const [periods, savedSignature] = await Promise.all([
@@ -40,6 +49,7 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
       amount_allocated: p.amount_allocated,
     })),
     savedSignature,
+    tenantMessaging: tenantMessagingEnabled(),
   };
 }
 
@@ -53,8 +63,7 @@ export async function createPayment(
   const input = parseInput(createPaymentSchema, withParams(body, { tenantId }));
   const proofFiles = checkProofFiles(proofs);
   const db = await ownerDb();
-  const tenant = await db.tenants.get(tenantId);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, tenantId);
 
   const signature = await ownerSignatureBytes(db, input.ownerSignaturePng);
   const { id, ownerSignaturePath } = await storeOwnerSignature("payments", tenant, signature);
@@ -95,6 +104,7 @@ export async function createPayment(
 }
 
 export async function getAdjustPaymentForm(ctx: OwnerContext, paymentId: string): Promise<AdjustPaymentForm> {
+  requireId(paymentId, "Payment");
   const db = await ownerDb();
   const payment = await db.payments.get(paymentId);
   // Only a confirmed payment can be corrected; a pending one is still awaiting the tenant.
@@ -120,6 +130,7 @@ export async function getAdjustPaymentForm(ctx: OwnerContext, paymentId: string)
       originallyAllocated: Number(a.amount_allocated),
     })),
     savedSignature,
+    tenantMessaging: tenantMessagingEnabled(),
   };
 }
 
@@ -129,12 +140,12 @@ export async function getAdjustPaymentForm(ctx: OwnerContext, paymentId: string)
 // the token columns (0001_init.sql), so this can never touch the ledger's
 // financial facts.
 export async function resendPaymentLink(ctx: OwnerContext, paymentId: string): Promise<LinkResent> {
+  requireId(paymentId, "Payment");
   const db = await ownerDb();
   const payment = await db.payments.get(paymentId);
   if (!payment) notFound("Payment");
   if (payment.acknowledged_at) throw new ApiError(409, "The tenant has already acknowledged this payment");
-  const tenant = await db.tenants.get(payment.tenant_id);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, payment.tenant_id);
 
   const { token, tokenHash, expiresAt } = generateConfirmToken();
   if (!(await db.payments.rotateToken(paymentId, tokenHash, expiresAt))) {
@@ -147,15 +158,14 @@ export async function resendPaymentLink(ctx: OwnerContext, paymentId: string): P
   return { notified };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Short-lived URL for one of a payment's proof files (any status: proofs are attached when recording). */
 export async function paymentProofUrl(ctx: OwnerContext, paymentId: string, proofId: string): Promise<string> {
-  if (!UUID.test(proofId)) notFound("Proof");
+  requireId(paymentId, "Payment");
+  requireId(proofId, "Proof");
   const db = await ownerDb();
   const proof = await db.payments.getProof(proofId);
   if (!proof || proof.payment_id !== paymentId) notFound("Proof");
-  return storage.signedUrl(proof.storage_path, 300);
+  return storage.signedUrl(proof.storage_path, SIGNED_URL_SECONDS);
 }
 
 /**
@@ -164,7 +174,7 @@ export async function paymentProofUrl(ctx: OwnerContext, paymentId: string, proo
  * For downloading and sending on (e.g. over WhatsApp).
  */
 export async function paymentReceipt(ctx: OwnerContext, paymentId: string): Promise<{ bytes: Uint8Array; fileName: string }> {
-  if (!UUID.test(paymentId)) notFound("Payment");
+  requireId(paymentId, "Payment");
   const db = await ownerDb();
   const payment = await db.payments.get(paymentId);
   if (!payment) notFound("Payment");

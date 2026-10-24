@@ -14,6 +14,7 @@ import { formatMonth } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AdjustablePeriod, SavedSignature } from "@/lib/contracts";
+import { routes } from "@/lib/routes";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 
 export default function AdjustmentForm({
@@ -22,6 +23,7 @@ export default function AdjustmentForm({
   tenantId,
   originalAmount,
   savedSignature,
+  tenantMessaging,
 }: {
   paymentId: string;
   periods: AdjustablePeriod[];
@@ -29,11 +31,13 @@ export default function AdjustmentForm({
   originalAmount: number;
   /** From the Profile page; used unless the owner signs by hand. */
   savedSignature: SavedSignature | null;
+  /** Twilio is set up, so the tenant can be sent a link. */
+  tenantMessaging: boolean;
 }) {
   const router = useAppRouter();
   const [deltas, setDeltas] = useState<Record<string, number>>({});
   const [reason, setReason] = useState("");
-  const [notify, setNotify] = useState(true);
+  const [notify, setNotify] = useState(tenantMessaging);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signatureHandle = useRef<OwnerSignatureHandle | null>(null);
@@ -74,7 +78,7 @@ export default function AdjustmentForm({
         ownerSignaturePng: signature,
         notifyTenant: notify,
       });
-      router.push(`/dashboard/tenants/${created.tenantId}?${recordedFlash(created.notified)}`);
+      router.push(routes.tenants.detail(created.tenantId, recordedFlash(created.notified)));
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save that adjustment."));
@@ -141,13 +145,13 @@ export default function AdjustmentForm({
         </Grid>
 
         <Grid size={12}>
-          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} />
+          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} available={tenantMessaging} />
         </Grid>
 
         <Grid size={12}>
           <FormActions
             error={error}
-            cancelHref={`/dashboard/tenants/${tenantId}`}
+            cancelHref={routes.tenants.detail(tenantId)}
             submitLabel="Save correction"
             pendingLabel="Saving…"
             pending={submitting}

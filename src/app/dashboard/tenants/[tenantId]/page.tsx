@@ -10,11 +10,13 @@ import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf } from "@/lib/
 import { formatMoney } from "@/lib/money";
 import FlashAlert from "@/components/ui/FlashAlert";
 import StatCard from "@/components/ui/StatCard";
-import { PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
+import { PageHeader, TagPill } from "@/components/ui/DataDisplay";
+import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { ActionStack, BadgeRow, DetailList, DetailRow, SectionCard } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import { unitMixLabel } from "@/lib/domain/tenant";
+import { FLASH, routes, type Flash } from "@/lib/routes";
 import TenantLedgerTable from "./TenantLedgerTable";
 import TenantPeriodsGrid, { type TenantPeriodRow } from "./TenantPeriodsGrid";
 import LinkButton from "@/components/ui/Loading/LinkButton";
@@ -24,18 +26,11 @@ export default async function TenantPage({
   searchParams,
 }: {
   params: Promise<{ tenantId: string }>;
-  searchParams: Promise<{
-    paymentCreated?: string;
-    resent?: string;
-    notifyFailed?: string;
-    error?: string;
-    saved?: string;
-    movedOut?: string;
-  }>;
+  searchParams: Promise<Flash>;
 }) {
   const { tenantId } = await params;
   const flash = await searchParams;
-  const { tenant, balance: summary, periods, ledger: ledgerRows } = await serverApi.dashboard.tenants.detail(tenantId);
+  const { tenant, balance: summary, periods, ledger: ledgerRows, tenantMessaging } = await serverApi.dashboard.tenants.detail(tenantId);
 
   const thisMonth = currentMonthKey();
   const periodRows: TenantPeriodRow[] = periods.map((p) => ({
@@ -64,7 +59,7 @@ export default async function TenantPage({
         }
         action={
           <ActionStack>
-            <LinkButton href={`/dashboard/tenants/${tenantId}/edit`} variant="outlined" startIcon={<EditRoundedIcon />}>
+            <LinkButton href={routes.tenants.edit(tenantId)} variant="outlined" startIcon={<EditRoundedIcon />}>
               Edit
             </LinkButton>
             {active || draft ? (
@@ -77,7 +72,7 @@ export default async function TenantPage({
             ) : null}
             {draft ? null : (
               <LinkButton
-                href={`/dashboard/tenants/${tenantId}/payments/new`}
+                href={routes.tenants.newPayment(tenantId)}
                 variant="contained"
                 startIcon={<AddRoundedIcon />}
               >
@@ -95,36 +90,36 @@ export default async function TenantPage({
         </Alert>
       ) : null}
       {flash.saved ? (
-        <FlashAlert param="saved" severity="success">
+        <FlashAlert param={FLASH.saved} severity="success">
           Tenant saved.
         </FlashAlert>
       ) : null}
       {flash.movedOut ? (
-        <FlashAlert param="movedOut" severity="success">
+        <FlashAlert param={FLASH.movedOut} severity="success">
           Moved out. Their houses are free for a new tenant; any dues stay on this ledger.
         </FlashAlert>
       ) : null}
 
       {flash.paymentCreated ? (
-        <FlashAlert param="paymentCreated" severity="success">
+        <FlashAlert param={FLASH.paymentCreated} severity="success">
           {flash.paymentCreated === "sent"
             ? "Recorded and counted. The tenant was sent a link to acknowledge it."
             : "Recorded and counted. Download the receipt from the ledger to send it yourself."}
         </FlashAlert>
       ) : null}
       {flash.notifyFailed ? (
-        <FlashAlert param="notifyFailed" severity="warning">
+        <FlashAlert param={FLASH.notifyFailed} severity="warning">
           Recorded and counted, but the WhatsApp/SMS message couldn&apos;t be delivered. Check the tenant&apos;s
           number, then use Send link in the ledger below - or download the receipt and send it yourself.
         </FlashAlert>
       ) : null}
       {flash.resent ? (
-        <FlashAlert param="resent" severity="success">
+        <FlashAlert param={FLASH.resent} severity="success">
           Link sent to the tenant to acknowledge.
         </FlashAlert>
       ) : null}
       {flash.error ? (
-        <FlashAlert param="error" severity="error">
+        <FlashAlert param={FLASH.error} severity="error">
           Something went wrong. Please try again.
         </FlashAlert>
       ) : null}
@@ -134,19 +129,13 @@ export default async function TenantPage({
           <SectionCard title="Details" fill>
             <DetailList dividers>
               <DetailRow label="Status">
-                {active ? (
-                  <StatusBadge tone="success" label="Active" />
-                ) : draft ? (
-                  <StatusBadge tone="warning" label="Draft - details missing" />
-                ) : (
-                  <StatusBadge tone="neutral" label={`Moved out ${tenant.movedOutOn ?? ""}`} />
-                )}
+                <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
               </DetailRow>
               <DetailRow label={active || draft ? "Houses" : "Last houses"}>
                 <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
                   <TagPill label={unitMixLabel(tenant.unitMix)} />
                   {tenant.currentUnits.map((u) => (
-                    <MuiLink key={u.unitCode} component={Link} href={`/dashboard/properties/${u.propertyCode}`}>
+                    <MuiLink key={u.unitCode} component={Link} href={routes.properties.detail(u.propertyCode)}>
                       {u.unitCode}
                       {u.label ? ` · ${u.label}` : ""}
                     </MuiLink>
@@ -240,7 +229,7 @@ export default async function TenantPage({
 
       <TenantPeriodsGrid rows={periodRows} />
 
-      <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} />
+      <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} tenantMessaging={tenantMessaging} />
     </Stack>
   );
 }

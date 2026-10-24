@@ -1,6 +1,6 @@
 import "server-only";
 import type { DashboardSummary, DefaulterRow, DefaultersReport } from "@/lib/contracts";
-import { addMonthsToKey, currentMonthKey } from "@/lib/dates";
+import { addMonthsToKey, currentMonthKey, yearMonthOf } from "@/lib/dates";
 import {
   agingGroups,
   agingOf,
@@ -80,7 +80,7 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
     periods,
     payments,
     adjustments,
-    trendMonthKeys.map((k) => k.slice(0, 7))
+    trendMonthKeys.map(yearMonthOf)
   );
 
   // Same rule as the Houses page's "Vacant" filter: in use, nobody holding it today.

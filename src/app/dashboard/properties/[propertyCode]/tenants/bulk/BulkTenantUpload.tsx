@@ -17,6 +17,7 @@ import { ActionStack, BadgeRow, DropzoneCard, FormActions, GridCell } from "@/co
 import { createTenantSchema } from "@/lib/validation";
 import { api, errorMessage } from "@/lib/api-client";
 import type { z } from "zod";
+import type { PreferredChannel } from "@/lib/types";
 
 const CSV_HEADER = "Business Name,Tenant Name,Phone,Houses,Preferred Channel,Monthly Rent,Lease Start,Paid Up To,Deposit";
 
@@ -170,7 +171,7 @@ export default function BulkTenantUpload({
             businessName: raw.businessName?.trim() || undefined,
             unitCodes,
             phone: raw.phone?.trim(),
-            preferredChannel: (raw.preferredChannel?.trim().toLowerCase() || "both") as "whatsapp" | "sms" | "both",
+            preferredChannel: (raw.preferredChannel?.trim().toLowerCase() || "both") as PreferredChannel,
             monthlyRentAmount: raw.monthlyRentAmount?.trim(),
             leaseStart: raw.leaseStart?.trim(),
             paidThrough: raw.paidThrough?.trim() || undefined,

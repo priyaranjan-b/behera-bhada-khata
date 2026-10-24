@@ -8,6 +8,7 @@ import { IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay"
 import { StatusChip } from "@/components/domain/StatusChip";
 import { formatMoney } from "@/lib/money";
 import type { TenantMonthRow } from "@/lib/domain/reports";
+import { routes } from "@/lib/routes";
 
 const columns: GridColDef<TenantMonthRow>[] = [
   {
@@ -19,7 +20,7 @@ const columns: GridColDef<TenantMonthRow>[] = [
       <IdentityCell
         name={row.tenantName}
         caption={row.movedOut ? "Moved out - still owes" : undefined}
-        href={`/dashboard/tenants/${row.tenantId}`}
+        href={routes.tenants.detail(row.tenantId)}
       />
     ),
   },

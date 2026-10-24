@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { exchangeCode, safeNext } from "@/server/services/auth";
+import { safeNext } from "@/lib/redirects";
+import { routes } from "@/lib/routes";
+import { exchangeCode } from "@/server/services/auth";
 
 // PKCE sign-in: the /auth/callback page forwards ?code= here, because only a
 // route handler can set the session cookies on its response.
@@ -13,6 +15,6 @@ export async function GET(request: Request) {
     await exchangeCode(code);
     return NextResponse.redirect(new URL(next, url.origin));
   } catch {
-    return NextResponse.redirect(new URL("/login?error=1", url.origin));
+    return NextResponse.redirect(new URL(routes.login({ error: "link" }), url.origin));
   }
 }

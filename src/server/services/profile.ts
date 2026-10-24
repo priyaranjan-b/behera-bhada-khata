@@ -3,17 +3,15 @@ import { randomUUID } from "node:crypto";
 import type { OwnerProfileView, SavedSignature } from "@/lib/contracts";
 import { ownerFullName } from "@/lib/domain/owner";
 import { ApiError } from "@/lib/errors";
-import { ownerProfileSchema } from "@/lib/validation";
-import { ownerDb, storage } from "@/server/infra";
+import { changePasswordSchema, ownerProfileSchema } from "@/lib/validation";
+import { auth, ownerDb, storage } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
 import { pngDataUrlToBytes } from "./confirmLinks";
-import { parseInput, type OwnerContext } from "./context";
+import { parseInput, SIGNED_URL_SECONDS, type OwnerContext } from "./context";
 
 // The owner's name and the signer's saved signature (owner_profile, 0013).
 // The owner (e.g. a parent) can be someone other than the person who uses
 // the login and signs receipts on their behalf; receipts print both.
-
-const SIGNATURE_URL_SECONDS = 300;
 
 export async function getOwnerProfile(ctx: OwnerContext): Promise<OwnerProfileView> {
   const db = await ownerDb();
@@ -24,7 +22,7 @@ export async function getOwnerProfile(ctx: OwnerContext): Promise<OwnerProfileVi
     signatureName: profile?.signature_name ?? null,
     email: ctx.email ?? null,
     displayName: ownerFullName(profile?.first_name, profile?.last_name),
-    signatureUrl: profile?.signature_path ? await storage.signedUrl(profile.signature_path, SIGNATURE_URL_SECONDS) : null,
+    signatureUrl: profile?.signature_path ? await storage.signedUrl(profile.signature_path, SIGNED_URL_SECONDS) : null,
   };
 }
 
@@ -64,12 +62,18 @@ export async function updateOwnerProfile(ctx: OwnerContext, body: unknown): Prom
   if (oldPath && oldPath !== signaturePath) await storage.remove([oldPath]);
 }
 
+/** Sets the signed-in owner's password, for signing in without an email link. */
+export async function changePassword(_ctx: OwnerContext, body: unknown): Promise<void> {
+  const { password } = parseInput(changePasswordSchema, body);
+  await auth.updatePassword(password);
+}
+
 /** For the payment/adjustment forms: the saved signature to offer instead of drawing. */
 export async function savedSignatureFor(db: OwnerRepositories, ctx: OwnerContext): Promise<SavedSignature | null> {
   const profile = await db.ownerProfile.get();
   if (!profile?.signature_path) return null;
   return {
-    url: await storage.signedUrl(profile.signature_path, SIGNATURE_URL_SECONDS),
+    url: await storage.signedUrl(profile.signature_path, SIGNED_URL_SECONDS),
     signerName: profile.signature_name ?? ownerFullName(profile.first_name, profile.last_name) ?? ctx.email ?? "Owner",
   };
 }

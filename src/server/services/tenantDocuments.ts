@@ -3,17 +3,23 @@ import { randomUUID } from "node:crypto";
 import type { TenantDocumentsSaved, TenantDocumentView } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
 import type { TenantDocument } from "@/lib/types";
-import { uploadTenantDocumentsSchema } from "@/lib/validation";
+import { DOCUMENT_LIMITS, uploadTenantDocumentsSchema } from "@/lib/validation";
 import { ownerDb, storage } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
-import { notFound, parseInput, type OwnerContext, type UploadedFile } from "./context";
+import {
+  notFound,
+  parseInput,
+  requireId,
+  requireTenant,
+  SIGNED_URL_SECONDS,
+  type OwnerContext,
+  type UploadedFile,
+} from "./context";
 import { checkProofFiles, storageName } from "./proofs";
 
 // Files kept on a tenant (0011_tenant_documents.sql): ID proof, passport
 // photo, rent agreement... Stored in the private bucket under
 // tenants/<tenant>/documents/; not money facts, so they can be deleted.
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function toView(row: TenantDocument): TenantDocumentView {
   return {
@@ -37,13 +43,13 @@ export async function uploadTenantDocuments(
   body: unknown,
   files: UploadedFile[]
 ): Promise<TenantDocumentsSaved> {
-  if (!UUID.test(tenantId)) notFound("Tenant");
+  requireId(tenantId, "Tenant");
   const { documentTypes } = parseInput(uploadTenantDocumentsSchema, body);
   if (files.length === 0) throw new ApiError(400, "Choose at least one file");
   if (documentTypes.length !== files.length) throw new ApiError(400, "Give each file a document type");
-  const checked = checkProofFiles(files, "documents");
+  const checked = checkProofFiles(files, "documents", DOCUMENT_LIMITS);
   const db = await ownerDb();
-  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await requireTenant(db, tenantId);
 
   // A fresh batch prefix keeps names unique across uploads.
   const batch = randomUUID().slice(0, 8);
@@ -74,7 +80,7 @@ export async function uploadTenantDocuments(
 }
 
 async function documentOf(db: OwnerRepositories, tenantId: string, documentId: string): Promise<TenantDocument> {
-  if (!UUID.test(documentId)) notFound("Document");
+  requireId(documentId, "Document");
   const doc = await db.tenantDocuments.get(documentId);
   if (!doc || doc.tenant_id !== tenantId) notFound("Document");
   return doc;
@@ -84,7 +90,7 @@ async function documentOf(db: OwnerRepositories, tenantId: string, documentId: s
 export async function tenantDocumentUrl(ctx: OwnerContext, tenantId: string, documentId: string): Promise<string> {
   const db = await ownerDb();
   const doc = await documentOf(db, tenantId, documentId);
-  return storage.signedUrl(doc.storage_path, 300);
+  return storage.signedUrl(doc.storage_path, SIGNED_URL_SECONDS);
 }
 
 /** Deletes the row, then (best effort) the file. */

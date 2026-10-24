@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/errors";
 import type { AuthGateway } from "@/server/ports";
 import { createAdminClient, createSessionClient } from "./clients";
 
-/** Owner login via Supabase Auth email magic links; the session lives in cookies. */
+/** Owner login via Supabase Auth (email magic link or password); the session lives in cookies. */
 export const supabaseAuth: AuthGateway = {
   async getSession() {
     const supabase = await createSessionClient();
@@ -39,6 +39,26 @@ export const supabaseAuth: AuthGateway = {
     });
     if (error) throw new ApiError(500, "Could not create a sign-in link");
     return data.properties.action_link;
+  },
+
+  async signInWithPassword(email, password) {
+    const supabase = await createSessionClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) return true;
+    if (error.code === "invalid_credentials") return false;
+    console.error(`signInWithPassword: [${error.code ?? "?"}] ${error.message}`);
+    if (error.status === 429) throw new ApiError(429, "Too many sign-in attempts. Try again in a few minutes.");
+    throw new ApiError(500, "Could not sign in");
+  },
+
+  async updatePassword(password) {
+    const supabase = await createSessionClient();
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) return;
+    if (error.code === "same_password") throw new ApiError(400, "That's already your password");
+    if (error.code === "weak_password") throw new ApiError(400, "That password is too weak. Try a longer one.");
+    console.error(`updatePassword: [${error.code ?? "?"}] ${error.message}`);
+    throw new ApiError(500, "Could not change the password");
   },
 
   async ownerNames() {

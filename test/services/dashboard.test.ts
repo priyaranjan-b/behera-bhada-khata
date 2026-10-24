@@ -29,22 +29,22 @@ describe("getDefaultersReport", () => {
   it("lists tenants behind on ended months, most months behind first", async () => {
     fakes.owner.tenants.list.mockResolvedValue([
       tenant(),
-      tenant({ id: "tenant-2", name: "Bimal", business_name: "Bimal Stores" }),
-      tenant({ id: "tenant-3", name: "Chitra" }),
-      tenant({ id: "tenant-4", name: "Dev", status: "inactive", moved_out_on: "2026-05-31" }),
+      tenant({ id: "00000000-0000-4000-8000-000000000102", name: "Bimal", business_name: "Bimal Stores" }),
+      tenant({ id: "00000000-0000-4000-8000-000000000103", name: "Chitra" }),
+      tenant({ id: "00000000-0000-4000-8000-000000000104", name: "Dev", status: "inactive", moved_out_on: "2026-05-31" }),
     ]);
     fakes.owner.rentPeriods.listForTenants.mockResolvedValue([
-      period("tenant-1", "2026-09-01"),
-      period("tenant-2", "2026-07-01", "1000.00"),
-      period("tenant-2", "2026-09-01"),
+      period("00000000-0000-4000-8000-000000000101", "2026-09-01"),
+      period("00000000-0000-4000-8000-000000000102", "2026-07-01", "1000.00"),
+      period("00000000-0000-4000-8000-000000000102", "2026-09-01"),
       // This month isn't due yet, so Chitra isn't behind.
-      period("tenant-3", "2026-10-01"),
-      period("tenant-4", "2026-04-01"),
-      period("tenant-4", "2026-05-01"),
+      period("00000000-0000-4000-8000-000000000103", "2026-10-01"),
+      period("00000000-0000-4000-8000-000000000104", "2026-04-01"),
+      period("00000000-0000-4000-8000-000000000104", "2026-05-01"),
     ]);
     fakes.owner.payments.listForTenants.mockResolvedValue([
-      payment({ tenant_id: "tenant-2", payment_date: "2026-07-03" }),
-      payment({ id: "payment-2", tenant_id: "tenant-2", payment_date: "2026-08-20" }),
+      payment({ tenant_id: "00000000-0000-4000-8000-000000000102", payment_date: "2026-07-03" }),
+      payment({ id: "00000000-0000-4000-8000-000000000202", tenant_id: "00000000-0000-4000-8000-000000000102", payment_date: "2026-08-20" }),
     ]);
 
     const report = await getDefaultersReport(ctx);
@@ -57,13 +57,13 @@ describe("getDefaultersReport", () => {
       ["Bimal Stores", 2, 9000],
       ["Asha", 1, 5000],
     ]);
-    expect(report.rows.find((r) => r.tenantId === "tenant-2")).toMatchObject({
+    expect(report.rows.find((r) => r.tenantId === "00000000-0000-4000-8000-000000000102")).toMatchObject({
       contactName: "Bimal",
       oldestUnpaidMonth: "2026-07-01",
       lastPaymentDate: "2026-08-20",
       byAge: { m1: 5000, m2to3: 4000, m4to6: 0, m7plus: 0 },
     });
-    expect(report.rows.find((r) => r.tenantId === "tenant-4")).toMatchObject({
+    expect(report.rows.find((r) => r.tenantId === "00000000-0000-4000-8000-000000000104")).toMatchObject({
       movedOut: true,
       lastPaymentDate: null,
       byAge: { m4to6: 10000 },

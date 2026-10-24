@@ -3,11 +3,20 @@ import { randomUUID } from "node:crypto";
 import type { ConfirmView, Confirmed, OtpSent, RecordType } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
 import { confirmSchema, otpSendSchema } from "@/lib/validation";
+import { tenantMessagingEnabled } from "@/server/env";
 import { messaging, storage, systemDb } from "@/server/infra";
 import { hashToken } from "@/server/token";
 import { pngDataUrlToBytes, recordFolder } from "./confirmLinks";
 import { describeRecord, renderReceipt, systemReceiptReads, type RecordDetails } from "./receipts";
-import { enforceRateLimits, HOUR, parseInput, withParams, type RequestMeta } from "./context";
+import {
+  ACKNOWLEDGED_RECEIPT_URL_SECONDS,
+  enforceRateLimits,
+  parseInput,
+  RATE_LIMITS,
+  SIGNED_URL_SECONDS,
+  withParams,
+  type RequestMeta,
+} from "./context";
 
 // Tenant-facing and unauthenticated: possession of the unguessable token is
 // the authorization, so everything here uses the unscoped system DB.
@@ -82,16 +91,18 @@ export async function getConfirmView(token: string): Promise<ConfirmView> {
     unitCodes: ctx.unitCodes,
     maskedPhone: maskPhone(ctx.tenant.phone),
     lineItems: ctx.lineItems,
+    tenantMessaging: tenantMessagingEnabled(),
   };
 }
 
 export async function sendConfirmOtp(token: string, body: unknown, meta: RequestMeta): Promise<OtpSent> {
   const { recordType } = parseInput(otpSendSchema, withParams(body, { token }));
+  if (!tenantMessagingEnabled()) throw new ApiError(503, "Acknowledging by SMS isn't available yet");
   const ctx = await loadAcknowledgeable(token, recordType);
   // Every send is a paid SMS: cap it per link and per client.
   await enforceRateLimits([
-    { key: `otp:record:${ctx.record.id}`, limit: 5, windowSeconds: HOUR },
-    { key: `otp:ip:${meta.ip}`, limit: 20, windowSeconds: HOUR },
+    { key: `otp:record:${ctx.record.id}`, ...RATE_LIMITS.otpPerRecord },
+    { key: `otp:ip:${meta.ip}`, ...RATE_LIMITS.otpPerIp },
   ]);
 
   try {
@@ -115,8 +126,8 @@ export async function confirmRecord(token: string, body: unknown, meta: RequestM
   const input = parseInput(confirmSchema, withParams(body, { token }));
   const ctx = await loadAcknowledgeable(token, input.recordType);
   await enforceRateLimits([
-    { key: `confirm:record:${ctx.record.id}`, limit: 10, windowSeconds: HOUR },
-    { key: `confirm:ip:${meta.ip}`, limit: 30, windowSeconds: HOUR },
+    { key: `confirm:record:${ctx.record.id}`, ...RATE_LIMITS.confirmPerRecord },
+    { key: `confirm:ip:${meta.ip}`, ...RATE_LIMITS.confirmPerIp },
   ]);
 
   const tenantSignatureBytes = pngDataUrlToBytes(input.tenantSignaturePng);
@@ -151,7 +162,7 @@ export async function confirmRecord(token: string, body: unknown, meta: RequestM
     throw err;
   }
 
-  return { receiptUrl: await storage.signedUrl(pdfPath, 3600) };
+  return { receiptUrl: await storage.signedUrl(pdfPath, ACKNOWLEDGED_RECEIPT_URL_SECONDS) };
 }
 
 /** Short-lived download URL for the tenant's signed copy of the receipt. */
@@ -164,5 +175,5 @@ export async function confirmReceiptUrl(token: string, recordType: string | null
       ? await db.payments.findByTokenHash(tokenHash)
       : await db.adjustments.findByTokenHash(tokenHash);
   if (!record?.acknowledged_at || !record.pdf_path) throw new ApiError(404, "Not available");
-  return storage.signedUrl(record.pdf_path, 300);
+  return storage.signedUrl(record.pdf_path, SIGNED_URL_SECONDS);
 }

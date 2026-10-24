@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/errors";
-import { OWNER_ID, PNG_DATA_URL, fakes, payment, resetFakes, tenant } from "../fakes";
+import { OWNER_ID, PNG_DATA_URL, fakes, payment, resetFakes, tenant, withoutTwilio } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
 vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
 
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
-const { createPayment, paymentProofUrl, paymentReceipt, resendPaymentLink } = await import("@/server/services/payments");
+const { createPayment, getNewPaymentForm, paymentProofUrl, paymentReceipt, resendPaymentLink } = await import(
+  "@/server/services/payments"
+);
 const { getTenantDetail } = await import("@/server/services/tenants");
 const { adjustmentReceipt } = await import("@/server/services/adjustments");
 
@@ -19,9 +21,9 @@ beforeEach(() => {
 
 describe("resendPaymentLink", () => {
   it("texts the payment's own tenant with the recorded amount", async () => {
-    fakes.state.tenants.set("tenant-2", tenant({ id: "tenant-2", phone: "+919999999999" }));
+    fakes.state.tenants.set("00000000-0000-4000-8000-000000000102", tenant({ id: "00000000-0000-4000-8000-000000000102", phone: "+919999999999" }));
 
-    const result = await resendPaymentLink(ctx, "payment-1");
+    const result = await resendPaymentLink(ctx, "00000000-0000-4000-8000-000000000201");
 
     expect(result).toEqual({ notified: true });
     const [[sent]] = fakes.messaging.send.mock.calls as unknown as [[{ toPhoneE164: string; message: string }]];
@@ -31,20 +33,20 @@ describe("resendPaymentLink", () => {
   });
 
   it("refuses payments the tenant already acknowledged, without sending anything", async () => {
-    fakes.state.payments.set("payment-1", payment({ acknowledged_at: "2026-03-06T00:00:00Z" }));
-    await expect(resendPaymentLink(ctx, "payment-1")).rejects.toMatchObject({ status: 409 });
+    fakes.state.payments.set("00000000-0000-4000-8000-000000000201", payment({ acknowledged_at: "2026-03-06T00:00:00Z" }));
+    await expect(resendPaymentLink(ctx, "00000000-0000-4000-8000-000000000201")).rejects.toMatchObject({ status: 409 });
     expect(fakes.messaging.send).not.toHaveBeenCalled();
   });
 
   it("refuses if the token can't be rotated (confirmed in the meantime)", async () => {
     fakes.owner.payments.rotateToken.mockResolvedValueOnce(false);
-    await expect(resendPaymentLink(ctx, "payment-1")).rejects.toMatchObject({ status: 409 });
+    await expect(resendPaymentLink(ctx, "00000000-0000-4000-8000-000000000201")).rejects.toMatchObject({ status: 409 });
     expect(fakes.messaging.send).not.toHaveBeenCalled();
   });
 
   it("reports when no channel delivered the message", async () => {
     fakes.messaging.send.mockResolvedValueOnce({ delivered: false });
-    expect(await resendPaymentLink(ctx, "payment-1")).toEqual({ notified: false });
+    expect(await resendPaymentLink(ctx, "00000000-0000-4000-8000-000000000201")).toEqual({ notified: false });
   });
 });
 
@@ -144,8 +146,8 @@ describe("viewing proofs", () => {
   beforeEach(() => {
     fakes.state.proofs.set(PROOF_ID, {
       id: PROOF_ID,
-      payment_id: "payment-1",
-      storage_path: "payments/tenant-1/payment-1/proofs/1-upi.jpg",
+      payment_id: "00000000-0000-4000-8000-000000000201",
+      storage_path: "payments/00000000-0000-4000-8000-000000000101/00000000-0000-4000-8000-000000000201/proofs/1-upi.jpg",
       file_name: "UPI.jpg",
       content_type: "image/jpeg",
       size_bytes: 1234,
@@ -154,21 +156,21 @@ describe("viewing proofs", () => {
   });
 
   it("lists a payment's proofs on its ledger row", async () => {
-    const { ledger } = await getTenantDetail(ctx, "tenant-1");
-    const row = ledger.find((r) => r.refId === "payment-1");
+    const { ledger } = await getTenantDetail(ctx, "00000000-0000-4000-8000-000000000101");
+    const row = ledger.find((r) => r.refId === "00000000-0000-4000-8000-000000000201");
     expect(row?.proofs).toEqual([{ id: PROOF_ID, fileName: "UPI.jpg", contentType: "image/jpeg" }]);
   });
 
   it("signs a short-lived URL for the file", async () => {
-    const url = await paymentProofUrl(ctx, "payment-1", PROOF_ID);
-    expect(url).toBe("https://storage.test/payments/tenant-1/payment-1/proofs/1-upi.jpg?sig");
+    const url = await paymentProofUrl(ctx, "00000000-0000-4000-8000-000000000201", PROOF_ID);
+    expect(url).toBe("https://storage.test/payments/00000000-0000-4000-8000-000000000101/00000000-0000-4000-8000-000000000201/proofs/1-upi.jpg?sig");
     expect(fakes.storage.signedUrl).toHaveBeenCalledWith(expect.any(String), 300);
   });
 
   it.each([
-    ["belongs to another payment", "payment-2", PROOF_ID],
-    ["doesn't exist", "payment-1", "0b2f3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"],
-    ["is not a uuid", "payment-1", "../../receipt"],
+    ["belongs to another payment", "00000000-0000-4000-8000-000000000202", PROOF_ID],
+    ["doesn't exist", "00000000-0000-4000-8000-000000000201", "0b2f3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"],
+    ["is not a uuid", "00000000-0000-4000-8000-000000000201", "../../receipt"],
   ])("404s for a proof that %s", async (_label, paymentId, proofId) => {
     await expect(paymentProofUrl(ctx, paymentId, proofId)).rejects.toMatchObject({ status: 404 });
     expect(fakes.storage.signedUrl).not.toHaveBeenCalled();
@@ -196,6 +198,16 @@ describe("instant confirmation (0010)", () => {
     expect(sent.message).toMatch(/acknowledge/i);
   });
 
+  it("without Twilio, tells the forms and the ledger, and never tries to send", async () => {
+    expect((await getNewPaymentForm(ctx, tenantId)).tenantMessaging).toBe(true);
+    await withoutTwilio();
+    expect((await getNewPaymentForm(ctx, tenantId)).tenantMessaging).toBe(false);
+    expect((await getTenantDetail(ctx, tenantId)).tenantMessaging).toBe(false);
+    expect((await createPayment(ctx, tenantId, body)).notified).toBe(false);
+    expect(fakes.messaging.send).not.toHaveBeenCalled();
+    expect(fakes.owner.payments.create).toHaveBeenCalled();
+  });
+
   it("sends nothing when the owner unticks it (notified: null)", async () => {
     expect((await createPayment(ctx, tenantId, { ...body, notifyTenant: false })).notified).toBeNull();
     expect(fakes.messaging.send).not.toHaveBeenCalled();
@@ -220,7 +232,7 @@ describe("instant confirmation (0010)", () => {
       fakes.state.proofs.set(`proof-${n}`, {
         id: `proof-${n}`,
         payment_id: id,
-        storage_path: `payments/tenant-1/${id}/proofs/${name}`,
+        storage_path: `payments/00000000-0000-4000-8000-000000000101/${id}/proofs/${name}`,
         file_name: name,
         content_type: name.endsWith(".webp") ? "image/webp" : "image/jpeg",
         size_bytes: 10,
@@ -243,7 +255,7 @@ describe("instant confirmation (0010)", () => {
     const id = "00000000-0000-4000-8000-000000000004";
     fakes.state.adjustments.set(id, {
       ...payment({ id }),
-      original_payment_id: "payment-1",
+      original_payment_id: "00000000-0000-4000-8000-000000000201",
       delta_amount: "-500.00",
       reason: "Recorded too much",
       receipt_no: "ADJ/2026/03/001",

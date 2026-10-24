@@ -3,7 +3,7 @@ import { OWNER_ID, PNG_DATA_URL, fakes, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getOwnerProfile, updateOwnerProfile } = await import("@/server/services/profile");
+const { changePassword, getOwnerProfile, updateOwnerProfile } = await import("@/server/services/profile");
 const { createPayment, getNewPaymentForm } = await import("@/server/services/payments");
 
 const ctx = { ownerId: OWNER_ID, email: "owner@example.com" };
@@ -75,5 +75,18 @@ describe("recording with the saved signature", () => {
     await expect(createPayment(ctx, tenantId, body)).rejects.toMatchObject({ status: 400 });
     expect(fakes.owner.payments.create).not.toHaveBeenCalled();
     expect((await getNewPaymentForm(ctx, tenantId)).savedSignature).toBeNull();
+  });
+});
+
+describe("changePassword", () => {
+  it("sets the password once it is long enough and confirmed", async () => {
+    await expect(changePassword(ctx, { password: "short", confirmPassword: "short" })).rejects.toMatchObject({ status: 400 });
+    await expect(changePassword(ctx, { password: "long-enough", confirmPassword: "different!" })).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(fakes.auth.updatePassword).not.toHaveBeenCalled();
+
+    await changePassword(ctx, { password: "long-enough", confirmPassword: "long-enough" });
+    expect(fakes.auth.updatePassword).toHaveBeenCalledWith("long-enough");
   });
 });

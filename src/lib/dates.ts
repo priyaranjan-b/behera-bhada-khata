@@ -36,6 +36,21 @@ export function monthKeyOf(dateKey: string): string {
   return `${dateKey.slice(0, 7)}-01`;
 }
 
+/**
+ * `yyyy-MM` of a date or month key: the value of an `<input type="month">`,
+ * the `?month=` URL param and a per-month grouping key. The way back is
+ * `monthKeyOf`.
+ */
+export function yearMonthOf(key: string): string {
+  return key.slice(0, 7);
+}
+
+/** Whole months from `from` up to, not including, `to` (month keys); 0 if `to` isn't later. */
+export function monthsBetween(from: string, to: string): number {
+  const months = (key: string) => Number(key.slice(0, 4)) * 12 + Number(key.slice(5, 7));
+  return Math.max(0, months(to) - months(from));
+}
+
 /** First of the current month in the app time zone. */
 export function currentMonthKey(now: Date = new Date()): string {
   return monthKeyOf(todayKey(now));

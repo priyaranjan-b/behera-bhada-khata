@@ -5,6 +5,7 @@ import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import Link from "@/components/ui/Link";
 import { OdiaText } from "@/components/ui/OdiaText";
 import { brand } from "@/theme/themePrimitives";
+import { routes } from "@/lib/routes";
 
 // Glossy indigo tile, same treatment as the template's CustomIcon.
 export function BrandIcon({ size = 36 }: { size?: number }) {
@@ -34,7 +35,7 @@ export function BrandMark({ showOdia = true, iconSize = 36 }: { showOdia?: boole
   return (
     <Stack
       component={Link}
-      href="/dashboard"
+      href={routes.home}
       direction="row"
       spacing={1.25}
       sx={{ alignItems: "center", minWidth: 0, textDecoration: "none", color: "inherit" }}

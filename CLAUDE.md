@@ -38,8 +38,10 @@ RLS. Any migration change needs a case there. CI (`.github/workflows/ci.yml`)
 runs lint, typecheck, test and build.
 
 Local setup requires a Supabase project (run `supabase/migrations/*` in
-order) — see `README.md` and `.env.local.example`. Twilio and `CRON_SECRET`
-are optional in development, required in production.
+order) — see `README.md` and `.env.local.example`. Twilio is optional
+everywhere (tenant messages then show as "not delivered" and OTP sends fail;
+a production server logs a warning). `CRON_SECRET` is optional in
+development, required in production.
 
 ## Architecture
 
@@ -241,7 +243,11 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
   a session and 403 for a signed-in account that isn't the owner, backed by
   RLS in the database. Never add a page or route that reads owner data any
   other way.
-- Login is Supabase email magic link. It lands on the `/auth/callback` page,
+- Login is Supabase Auth, two ways on the `/login` tabs. **Password**:
+  `POST /api/auth/password` (`signInWithPassword` in
+  `src/server/services/auth.ts`) signs in, then signs a non-owner straight
+  back out; the owner sets the password on `/dashboard/profile`
+  (`changePassword`, `PASSWORD_LIMITS`). **Email magic link**: it lands on the `/auth/callback` page,
   which forwards `?code=` to `GET /api/auth/callback` (only a route handler
   can set cookies) or posts `#access_token` to `POST /api/auth/session`. The
   tenant-facing `/confirm/[token]` flow has no login at all — auth is the
@@ -325,16 +331,20 @@ until the tenant-signed copy exists.
 Each of these was found broken somewhere; keep them when adding code.
 
 - **Redirect targets are untrusted.** Any `next`/return URL from a query
-  param goes through `safeNext` (`src/server/services/auth.ts`) before
+  param goes through `safeNext` (`src/lib/redirects.ts`) before
   `redirect`, `router.push` or `window.location.assign`, on the server and
   the client alike.
 - **Enums are declared once.** Payment modes, tenant/ledger statuses, record
   types, unit types and channels are one `as const` array (or union) in
-  `src/lib/types.ts`; zod enums, `<MenuItem>` lists and display labels
-  derive from it. Never show a raw enum value (`bank_transfer`) to a user:
-  map it through a label record in `src/lib/domain/` (client-safe, so the
-  PDF and the UI share it). Compare statuses through helpers in
-  `src/lib/domain/tenant.ts`, not repeated string literals.
+  `src/lib/types.ts` (`PAYMENT_MODES`, `UNIT_TYPES`, `PREFERRED_CHANNELS`,
+  `TENANT_STATUSES`, `RECORD_TYPES`); zod enums (`z.enum(PAYMENT_MODES)`),
+  `<MenuItem>` lists and labels derive from it. Never show a raw enum value
+  (`bank_transfer`) to a user: use the label maps in `src/lib/domain/`
+  (`paymentModeLabel`, `PAYMENT_MODE_OPTIONS` in `payments.ts`;
+  `TENANT_STATUS_DISPLAY`, `UNIT_TYPE_LABELS`, `PREFERRED_CHANNEL_OPTIONS`
+  in `tenant.ts`), client-safe so the PDF and the UI share them. A tenant's
+  status badge is `TenantStatusBadge`. Comparing against the typed union
+  (`status === "active"`) is fine; TypeScript checks it.
 - **A limit lives in one exported constant** in `src/lib/validation.ts`
   (like `PROOF_LIMITS`). The zod schema, the service check and the form
   (`maxLength`, `accept`, "6-digit code", "at most N files") all read it.
@@ -343,16 +353,19 @@ Each of these was found broken somewhere; keep them when adding code.
 - **Domain rules exist once, in `src/lib/domain/`.** A component that needs
   e.g. billing start calls `billingStartFor`, vacancy calls `isVacant`; it
   never re-derives the rule inline. Month input ↔ month key conversions and
-  month arithmetic go through helpers in `src/lib/dates.ts`, not
-  `.slice(0, 7)` or `` `${month}-01` ``.
+  month arithmetic go through `src/lib/dates.ts` (`yearMonthOf` for the
+  `yyyy-MM` of an input/URL/grouping key, `monthKeyOf` back,
+  `monthsBetween`, `addMonthsToKey`), never `.slice(0, 7)` or
+  `` `${month}-01` ``.
 - **Every date a user sees is formatted** (`formatDateKey`, `formatMonth`,
   `formatDateTime`); never render a raw `yyyy-MM-dd`. Every number/date
   formatter passes `APP_LOCALE` (no `"en-IN"` literals, no
   `toLocaleString(undefined, …)`, which differs between server and browser).
 - **Page URLs and flash params are not ad-hoc strings.** Build page links
-  with a route helper (add it to `src/lib/routes.ts`, mirroring `apiPaths`,
-  with `encodeURIComponent`) and keep flash query keys in one constant shared
-  by the writer and the `FlashAlert` reader. A new page also gets its entry
+  with `routes` from `src/lib/routes.ts` (the page twin of `apiPaths`; a new
+  page gets an entry there), e.g. `routes.tenants.detail(id, { saved: "1" })`.
+  Flash keys are `FLASH` / `Flash` from the same file, used by the writer
+  and by the page's `<FlashAlert param={FLASH.saved}>`. A new page also gets its entry
   in `ROUTE_LABELS` (`AppBreadcrumbs.tsx`), or its crumb trail breaks.
 - **Third copy = extract.** When the same block appears in a second file,
   extract it before adding a third: grid columns go in
@@ -361,10 +374,12 @@ Each of these was found broken somewhere; keep them when adding code.
   queue, confirm dialog) in a hook or kit component. In services: the tenant
   lookup + `notFound`, uuid checks, file upload with rollback and
   payment/adjustment twins share one helper keyed by record kind.
-- **No magic numbers in services:** signed-URL lifetimes and rate limits are
-  named constants in `src/server/services/context.ts`. Ids from the URL are
-  validated (malformed uuid → 404) before any DB lookup, in every service,
-  not just some.
+- **No magic numbers in services:** signed-URL lifetimes
+  (`SIGNED_URL_SECONDS`) and rate limits (`RATE_LIMITS`) are named constants
+  in `src/server/services/context.ts`. Ids from the URL go through
+  `requireId(id, "Payment")` / `requireTenant(db, id)` from the same file
+  (malformed uuid → 404, never a 500 from Postgres) before any DB lookup.
+  Test fixtures therefore use real uuids.
 - **Imports:** the Loading kit is imported from `@/components/ui/Loading`
   (the barrel), never a deep path. Export only what another module uses.
 - **Tests:** a new service function gets a case in `test/services/`, a new

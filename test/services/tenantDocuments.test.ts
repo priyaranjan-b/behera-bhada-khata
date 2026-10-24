@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
+import { DOCUMENT_LIMITS } from "@/lib/validation";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
@@ -46,6 +47,14 @@ describe("uploadTenantDocuments", () => {
     expect(fakes.state.files.size).toBe(0);
   });
 
+  it("rejects one file over DOCUMENT_LIMITS with the schema's own message", async () => {
+    const n = DOCUMENT_LIMITS.maxFiles + 1;
+    await expect(
+      uploadTenantDocuments(ctx, tenantId, { documentTypes: Array(n).fill("ID") }, Array.from({ length: n }, () => jpeg()))
+    ).rejects.toMatchObject({ status: 400, message: expect.stringContaining(`at most ${DOCUMENT_LIMITS.maxFiles}`) });
+    expect(fakes.state.files.size).toBe(0);
+  });
+
   it("removes the uploaded files if saving the rows fails", async () => {
     fakes.owner.tenantDocuments.create.mockRejectedValueOnce(new Error("db down"));
     await expect(uploadTenantDocuments(ctx, tenantId, { documentTypes: ["ID", "ID"] }, [jpeg(), pdf])).rejects.toMatchObject({
@@ -70,7 +79,7 @@ describe("viewing and deleting", () => {
   it("signs a short-lived URL, only for that tenant's own document", async () => {
     const id = await oneDocument();
     expect(await tenantDocumentUrl(ctx, tenantId, id)).toMatch(/^https:\/\/storage\.test\/tenants\//);
-    await expect(tenantDocumentUrl(ctx, "tenant-1", id)).rejects.toMatchObject({ status: 404 });
+    await expect(tenantDocumentUrl(ctx, "00000000-0000-4000-8000-000000000101", id)).rejects.toMatchObject({ status: 404 });
     await expect(tenantDocumentUrl(ctx, tenantId, "../x")).rejects.toMatchObject({ status: 404 });
   });
 

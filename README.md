@@ -45,12 +45,17 @@ Twilio for SMS OTP + WhatsApp/SMS delivery.
    - Publishable (or "anon") key → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - Secret (or "service_role") key → `SUPABASE_SECRET_KEY` (never expose
      this to the browser)
-5. **Enable email magic links**: Authentication → Providers → Email should
-   already be on by default. Authentication → URL Configuration → add your
+5. **Enable email sign-in**: Authentication → Providers → Email should
+   already be on by default, with password sign-in allowed (the app offers
+   both a password and an email magic link). Authentication → URL Configuration → add your
    app URL (and `http://localhost:3000` for local dev) to the redirect
    allow-list, since the login flow redirects to `/auth/callback`.
 
-## 2. Twilio setup
+## 2. Twilio setup (optional - tenant messages only)
+
+The owner never needs Twilio to sign in. Without it the app still works:
+payments count, receipts download, and the "send to tenant" step shows as
+"not delivered". Add it whenever you're ready; no code change is needed.
 
 1. Create an account at [twilio.com](https://twilio.com) and grab your
    **Account SID** and **Auth Token** from the console → `TWILIO_ACCOUNT_SID`
@@ -79,13 +84,16 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`, sign in with your email, then add a property,
-a tenant, and record a payment.
+Open `http://localhost:3000`, sign in with the **Email link** tab, then go
+to Profile → Password and set a password - from then on the **Password** tab
+signs you in without email. Then add a property, a tenant, and record a
+payment.
 
 Every variable is validated when the server starts (`src/server/env.ts`).
-Twilio and `CRON_SECRET` may be left empty in development - messages then
-show as "not delivered" and the cron endpoint stays locked - but are required
-in production.
+Twilio may be left empty anywhere (messages then show as "not delivered";
+a production server logs a warning). `CRON_SECRET` may be empty in
+development - the cron endpoint then stays locked - but is required in
+production.
 
 **Who can sign in:** with `OWNER_EMAILS` set, only those emails (and they may
 create their account on first sign-in). Without it, only accounts that
@@ -103,20 +111,29 @@ npm run build
 
 CI (`.github/workflows/ci.yml`) runs the same on every push and pull request.
 
-## 4. Deploying
+## 4. Deploying (Vercel)
 
-1. Push this repo to GitHub and import it into [Vercel](https://vercel.com).
-2. Add the same environment variables from `.env.local` in the Vercel
-   project's Settings → Environment Variables, setting
-   `NEXT_PUBLIC_APP_URL` to your production URL. All Twilio variables and a
-   `CRON_SECRET` of 16+ random characters are required in production (the
-   server refuses to start without them). Don't set `ALLOW_DEV_LOGIN` -
-   it is ignored in production anyway.
-3. `vercel.json` already schedules `/api/cron/ensure-periods` to run daily -
-   Vercel automatically sends `Authorization: Bearer $CRON_SECRET` for cron
-   invocations, so no extra setup is needed once `CRON_SECRET` is set.
-4. Add the production URL to Supabase's Authentication → URL Configuration
-   redirect allow-list (same as the localhost step above).
+1. **Supabase**: migrations and seeds run (step 1), and the owner row is in
+   `app_owner`. Under Authentication → URL Configuration set the Site URL to
+   the production URL and add `https://<your-app>.vercel.app/auth/callback`
+   to the redirect allow-list.
+2. **Owner password**: sign in once with the email link and set it on
+   Profile → Password, or set it in Supabase under Authentication → Users →
+   the owner. The Password tab then works without any email.
+3. Push this repo to GitHub and import it into [Vercel](https://vercel.com).
+   Under Settings → Environment Variables (Production) set
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_APP_URL` (the production URL),
+   `OWNER_EMAILS` and a `CRON_SECRET` of 16+ random characters (the server
+   refuses to start without it). Twilio may stay unset for now. Don't set
+   `ALLOW_DEV_LOGIN` - it is ignored in production anyway.
+4. Deploy. `vercel.json` already schedules `/api/cron/ensure-periods` to run
+   daily - Vercel automatically sends `Authorization: Bearer $CRON_SECRET`
+   for cron invocations, so no extra setup is needed.
+5. **Smoke test**: sign in with the password; record a payment (it shows
+   "not delivered" without Twilio) and download its receipt PDF; check that
+   the email link still works; run the cron once from the Vercel dashboard.
+6. **Later, Twilio**: add the five `TWILIO_*` variables and redeploy.
 
 ## Notes
 

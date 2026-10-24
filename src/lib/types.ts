@@ -5,12 +5,21 @@
 // the generated types to src/lib/database.generated.ts (git-ignored) to diff
 // against. test/schema.test.ts checks the migrations themselves.
 
-export type UnitType = "residential" | "commercial";
-export type PreferredChannel = "whatsapp" | "sms" | "both";
+// Each enum is one `as const` array: zod schemas, <select> options and labels
+// (src/lib/domain/*) are built from it, so a new value is a one-line change.
+export const UNIT_TYPES = ["residential", "commercial"] as const;
+export type UnitType = (typeof UNIT_TYPES)[number];
+export const PREFERRED_CHANNELS = ["both", "whatsapp", "sms"] as const;
+export type PreferredChannel = (typeof PREFERRED_CHANNELS)[number];
 /** draft = from the paper register, details incomplete, never billed (0007). */
-export type TenantStatus = "draft" | "active" | "inactive";
+export const TENANT_STATUSES = ["draft", "active", "inactive"] as const;
+export type TenantStatus = (typeof TENANT_STATUSES)[number];
+/** The two kinds of ledger record; each has its own receipt and confirm link. */
+export const RECORD_TYPES = ["payment", "adjustment"] as const;
+export type RecordType = (typeof RECORD_TYPES)[number];
 export type PeriodStatus = "pending" | "partially_paid" | "paid";
-export type PaymentMode = "cash" | "bank_transfer" | "upi" | "cheque" | "other";
+export const PAYMENT_MODES = ["cash", "bank_transfer", "upi", "cheque", "other"] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
 export type LedgerStatus = "pending" | "confirmed";
 
 /** One row of a create_payment / create_adjustment allocation list (amount is signed for adjustments). */

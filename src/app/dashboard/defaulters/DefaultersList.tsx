@@ -12,6 +12,7 @@ import { formatDateKey, formatMonth } from "@/lib/dates";
 import { AGING_BUCKETS, type AgingBucketKey } from "@/lib/domain/reports";
 import { formatUnits } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
+import { routes } from "@/lib/routes";
 
 type BandFilter = "all" | "2" | "4" | "7";
 
@@ -45,7 +46,7 @@ const columns: GridColDef<DefaulterRow>[] = [
       <IdentityCell
         name={row.displayName}
         caption={row.movedOut ? "Moved out" : (row.contactName ?? undefined)}
-        href={`/dashboard/tenants/${row.tenantId}`}
+        href={routes.tenants.detail(row.tenantId)}
       />
     ),
   },

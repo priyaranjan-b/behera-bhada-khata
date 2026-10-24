@@ -10,6 +10,8 @@ import { FormActions, SectionCard } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
 import type { PropertyHeader } from "@/lib/contracts";
 import type { UnitType } from "@/lib/types";
+import { UNIT_TYPE_OPTIONS } from "@/lib/domain/tenant";
+import { routes } from "@/lib/routes";
 
 /**
  * Adds a house to a tower. With `propertyCode` the tower is fixed (the
@@ -28,7 +30,7 @@ export default function UnitForm({ propertyCode: fixedTower, towers }: { propert
   const [error, setError] = useState<string | null>(null);
 
   const house = houseNumber.trim().toUpperCase();
-  const back = fixedTower ? `/dashboard/properties/${fixedTower}` : "/dashboard/properties";
+  const back = fixedTower ? routes.properties.detail(fixedTower) : routes.properties.list;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +47,7 @@ export default function UnitForm({ propertyCode: fixedTower, towers }: { propert
         unitType,
         label: label.trim() || undefined,
       });
-      router.push(`/dashboard/properties/${propertyCode}`);
+      router.push(routes.properties.detail(propertyCode));
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save that house."));
@@ -92,8 +94,11 @@ export default function UnitForm({ propertyCode: fixedTower, towers }: { propert
             />
           </Stack>
           <TextField label="Type" select value={unitType} onChange={(e) => setUnitType(e.target.value as UnitType)} fullWidth>
-            <MenuItem value="residential">Residential</MenuItem>
-            <MenuItem value="commercial">Commercial</MenuItem>
+            {UNIT_TYPE_OPTIONS.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
           </TextField>
           <TextField
             label="Label"

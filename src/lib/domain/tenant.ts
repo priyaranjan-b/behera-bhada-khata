@@ -1,5 +1,34 @@
 import { addMonthsToKey, monthKeyOf } from "@/lib/dates";
-import type { UnitType } from "@/lib/types";
+import {
+  PREFERRED_CHANNELS,
+  UNIT_TYPES,
+  type PreferredChannel,
+  type TenantStatus,
+  type UnitType,
+} from "@/lib/types";
+
+/** How each tenant status reads and which badge tone it gets; the one mapping every screen uses. */
+export const TENANT_STATUS_DISPLAY: Record<TenantStatus, { label: string; tone: "success" | "warning" | "neutral" }> = {
+  active: { label: "Active", tone: "success" },
+  draft: { label: "Draft", tone: "warning" },
+  inactive: { label: "Moved out", tone: "neutral" },
+};
+
+export const UNIT_TYPE_LABELS: Record<UnitType, string> = {
+  residential: "Residential",
+  commercial: "Commercial",
+};
+export const UNIT_TYPE_OPTIONS = UNIT_TYPES.map((value) => ({ value, label: UNIT_TYPE_LABELS[value] }));
+
+export const PREFERRED_CHANNEL_LABELS: Record<PreferredChannel, string> = {
+  both: "WhatsApp + SMS",
+  whatsapp: "WhatsApp only",
+  sms: "SMS only",
+};
+export const PREFERRED_CHANNEL_OPTIONS = PREFERRED_CHANNELS.map((value) => ({
+  value,
+  label: PREFERRED_CHANNEL_LABELS[value],
+}));
 
 export interface TenantDisplayLike {
   name: string;
@@ -21,8 +50,7 @@ export function unitMix(types: UnitType[]): UnitMix | null {
 }
 
 export function unitMixLabel(mix: UnitMix | null): string {
-  if (mix === "commercial") return "Commercial";
-  if (mix === "residential") return "Residential";
+  if (mix === "commercial" || mix === "residential") return UNIT_TYPE_LABELS[mix];
   if (mix === "mixed") return "Residential + commercial";
   return "No house";
 }

@@ -8,13 +8,14 @@ import * as z from "zod";
 const optional = <T extends z.ZodType>(schema: T) =>
   z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
 
-const PRODUCTION_REQUIRED = [
+const PRODUCTION_REQUIRED = ["CRON_SECRET"] as const;
+
+const TWILIO_KEYS = [
   "TWILIO_ACCOUNT_SID",
   "TWILIO_AUTH_TOKEN",
   "TWILIO_VERIFY_SERVICE_SID",
   "TWILIO_SMS_FROM",
   "TWILIO_WHATSAPP_FROM",
-  "CRON_SECRET",
 ] as const;
 
 const schema = z.object({
@@ -26,14 +27,15 @@ const schema = z.object({
 
   NEXT_PUBLIC_APP_URL: z.url(),
 
-  // Optional in development (messages then fail as "not delivered" and the
-  // cron endpoint stays locked); required in production - see below.
+  // Optional everywhere: without them tenant messages fail as "not delivered"
+  // and the tenant can't get an OTP, but payments still count (D20).
   TWILIO_ACCOUNT_SID: optional(z.string()),
   TWILIO_AUTH_TOKEN: optional(z.string()),
   TWILIO_VERIFY_SERVICE_SID: optional(z.string()),
   TWILIO_SMS_FROM: optional(z.string()),
   TWILIO_WHATSAPP_FROM: optional(z.string()),
 
+  // Optional in development (the cron endpoint then stays locked); required in production - see below.
   CRON_SECRET: optional(z.string().min(16, "CRON_SECRET must be at least 16 characters")),
 
   /** Comma-separated owner emails allowed to sign in and create an account. */
@@ -93,10 +95,25 @@ export function ownerEmailAllowlist(): Set<string> | null {
   );
 }
 
+/** The Twilio variables that are unset; empty when tenant messaging is configured. */
+export function missingTwilioKeys(): string[] {
+  const e = env();
+  return TWILIO_KEYS.filter((k) => !e[k]);
+}
+
+/** Twilio is fully configured, so tenants can be sent links and OTP codes. */
+export function tenantMessagingEnabled(): boolean {
+  return missingTwilioKeys().length === 0;
+}
+
 /** Called from src/instrumentation.ts. Skipped while `next build` runs, which needs no secrets. */
 export function validateEnvAtStartup(): void {
   if (process.env.NEXT_PHASE === "phase-production-build") return;
-  env();
+  const e = env();
+  const missing = missingTwilioKeys();
+  if (e.NODE_ENV === "production" && missing.length) {
+    console.warn(`Twilio isn't configured (${missing.join(", ")}): tenants won't get links or OTP codes.`);
+  }
 }
 
 /** Tests only: forget the parsed environment so changed variables are re-read. */

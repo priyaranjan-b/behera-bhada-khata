@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/errors";
-import { PNG_DATA_URL, fakes, payment, resetFakes } from "../fakes";
+import { PNG_DATA_URL, fakes, payment, resetFakes, withoutTwilio } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
 
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
-const { confirmRecord, sendConfirmOtp } = await import("@/server/services/confirm");
+const { confirmRecord, getConfirmView, sendConfirmOtp } = await import("@/server/services/confirm");
 
 const meta = { ip: "203.0.113.7" };
 const body = { recordType: "payment", otpCode: "123456", tenantSignaturePng: PNG_DATA_URL };
@@ -31,7 +31,7 @@ describe("confirmRecord", () => {
     const result = await confirmRecord("token", body, meta);
 
     const [[id, patch]] = fakes.system.payments.acknowledge.mock.calls as unknown as [[string, { pdf_path: string; tenant_signature_path: string }]];
-    expect(id).toBe("payment-1");
+    expect(id).toBe("00000000-0000-4000-8000-000000000201");
     const folder = patch.pdf_path.replace(/\/receipt\.pdf$/, "");
     expect(patch.tenant_signature_path).toBe(`${folder}/tenant-signature.png`);
     expect([...fakes.state.files.keys()].sort()).toEqual([patch.pdf_path, patch.tenant_signature_path].sort());
@@ -80,9 +80,9 @@ describe("confirmRecord", () => {
   });
 
   it("refuses records that are already acknowledged or whose link expired", async () => {
-    fakes.state.payments.set("payment-1", payment({ acknowledged_at: "2026-03-06T00:00:00Z" }));
+    fakes.state.payments.set("00000000-0000-4000-8000-000000000201", payment({ acknowledged_at: "2026-03-06T00:00:00Z" }));
     expect(await status(confirmRecord("token", body, meta))).toBe(409);
-    fakes.state.payments.set("payment-1", payment({ token_expires_at: "2020-01-01T00:00:00Z" }));
+    fakes.state.payments.set("00000000-0000-4000-8000-000000000201", payment({ token_expires_at: "2020-01-01T00:00:00Z" }));
     expect(await status(confirmRecord("token", body, meta))).toBe(410);
   });
 });
@@ -91,12 +91,23 @@ describe("sendConfirmOtp", () => {
   it("rate-limits per record and per client before sending a paid SMS", async () => {
     await sendConfirmOtp("token", { recordType: "payment" }, meta);
     const keys = (fakes.system.rateLimits.hit.mock.calls as unknown as [string][]).map((c) => c[0]);
-    expect(keys).toEqual(["otp:record:payment-1", "otp:ip:203.0.113.7"]);
+    expect(keys).toEqual(["otp:record:00000000-0000-4000-8000-000000000201", "otp:ip:203.0.113.7"]);
     expect(fakes.messaging.sendOtp).toHaveBeenCalledWith("+919876543210");
 
     fakes.state.rateLimitAllows = false;
     fakes.messaging.sendOtp.mockClear();
     expect(await status(sendConfirmOtp("token", { recordType: "payment" }, meta))).toBe(429);
+    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+  });
+});
+
+describe("without Twilio", () => {
+  it("tells the confirm page, and refuses an OTP before spending a rate-limit hit", async () => {
+    expect((await getConfirmView("token")).tenantMessaging).toBe(true);
+    await withoutTwilio();
+    expect((await getConfirmView("token")).tenantMessaging).toBe(false);
+    expect(await status(sendConfirmOtp("token", { recordType: "payment" }, meta))).toBe(503);
+    expect(fakes.system.rateLimits.hit).not.toHaveBeenCalled();
     expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
   });
 });

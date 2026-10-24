@@ -15,6 +15,7 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { api, errorMessage } from "@/lib/api-client";
 import { todayKey } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { routes } from "@/lib/routes";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 /**
@@ -45,7 +46,7 @@ export default function MoveOutButton({
     try {
       await api.dashboard.tenants.moveOut(tenantId, { moveOutDate: date });
       setOpen(false);
-      router.push(`/dashboard/tenants/${tenantId}?movedOut=1`);
+      router.push(routes.tenants.detail(tenantId, { movedOut: "1" }));
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't move this tenant out."));

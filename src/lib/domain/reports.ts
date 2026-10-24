@@ -1,5 +1,5 @@
 import { summarizeBalance, type PeriodLike } from "@/lib/domain/allocation";
-import { dateKeyOf, formatMonth } from "@/lib/dates";
+import { dateKeyOf, formatMonth, yearMonthOf } from "@/lib/dates";
 import { round2 } from "@/lib/money";
 import type { RentPeriod, PeriodStatus } from "@/lib/types";
 
@@ -94,19 +94,19 @@ export function buildBillingCollectionTrend(
 ): MonthlyTrendPoint[] {
   const billedByMonth = new Map<string, number>();
   for (const period of periods) {
-    const key = period.period_month.slice(0, 7);
+    const key = yearMonthOf(period.period_month);
     billedByMonth.set(key, round2((billedByMonth.get(key) ?? 0) + Number(period.amount_due)));
   }
 
   const collectedByMonth = new Map<string, number>();
   for (const payment of payments) {
-    const key = payment.payment_date.slice(0, 7);
+    const key = yearMonthOf(payment.payment_date);
     collectedByMonth.set(key, round2((collectedByMonth.get(key) ?? 0) + Number(payment.amount)));
   }
   for (const adjustment of adjustments) {
     if (!adjustment.confirmed_at) continue;
     // A timestamp: bucket it by the app-time-zone day it happened on.
-    const key = dateKeyOf(adjustment.confirmed_at).slice(0, 7);
+    const key = yearMonthOf(dateKeyOf(adjustment.confirmed_at));
     collectedByMonth.set(key, round2((collectedByMonth.get(key) ?? 0) + Number(adjustment.delta_amount)));
   }
 

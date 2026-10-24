@@ -25,6 +25,7 @@ import { useSignOut } from "./useSignOut";
 import { shellSurfaceSx } from "./surface";
 import type { AppTab } from "./nav";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
+import { routes } from "@/lib/routes";
 
 export const MOBILE_NAVBAR_HEIGHT = 64;
 
@@ -108,7 +109,7 @@ export function AppNavbar({
           <Stack sx={{ p: 2, gap: 1 }}>
             <Button
               component={Link}
-              href="/dashboard/profile"
+              href={routes.profile()}
               variant="outlined"
               fullWidth
               startIcon={<PersonRoundedIcon />}

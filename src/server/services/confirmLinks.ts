@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/errors";
 import type { Tenant } from "@/lib/types";
 import { messaging, storage } from "@/server/infra";
-import { env } from "@/server/env";
+import { env, tenantMessagingEnabled } from "@/server/env";
 import { generateConfirmToken } from "@/server/token";
 
 // Shared by payments and adjustments: both are recorded "pending" with the
@@ -67,8 +67,8 @@ export async function notifyTenant(
   tenant: Pick<Tenant, "phone" | "preferred_channel">,
   message: string
 ): Promise<boolean> {
-  // A draft tenant may not have a phone yet.
-  if (!tenant.phone) return false;
+  // A draft tenant may not have a phone yet; without Twilio nobody can be messaged.
+  if (!tenant.phone || !tenantMessagingEnabled()) return false;
   try {
     const { delivered } = await messaging.send({ toPhoneE164: tenant.phone, channel: tenant.preferred_channel, message });
     return delivered;

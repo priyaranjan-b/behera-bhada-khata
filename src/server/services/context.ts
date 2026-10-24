@@ -1,6 +1,7 @@
 import "server-only";
-import type * as z from "zod";
+import * as z from "zod";
 import { ApiError } from "@/lib/errors";
+import type { Tenant } from "@/lib/types";
 import { systemDb } from "@/server/infra";
 
 /**
@@ -57,3 +58,45 @@ export async function enforceRateLimits(limits: RateLimit[]): Promise<void> {
 }
 
 export const HOUR = 60 * 60;
+
+/**
+ * Every rate limit in one table, per hour. A route that costs money or sends
+ * email counts one hit per record/email and one per IP:
+ * `{ key: \`otp:ip:${ip}\`, ...RATE_LIMITS.otpPerIp }`.
+ */
+export const RATE_LIMITS = {
+  magicLinkPerEmail: { limit: 5, windowSeconds: HOUR },
+  magicLinkPerIp: { limit: 20, windowSeconds: HOUR },
+  passwordPerEmail: { limit: 10, windowSeconds: HOUR },
+  passwordPerIp: { limit: 30, windowSeconds: HOUR },
+  otpPerRecord: { limit: 5, windowSeconds: HOUR },
+  otpPerIp: { limit: 20, windowSeconds: HOUR },
+  confirmPerRecord: { limit: 10, windowSeconds: HOUR },
+  confirmPerIp: { limit: 30, windowSeconds: HOUR },
+} as const;
+
+/** Lifetime of a signed storage URL handed to the browser (documents, proofs, signatures, receipts). */
+export const SIGNED_URL_SECONDS = 5 * 60;
+/** The tenant-signed receipt link shown right after acknowledging: long enough to read and save it. */
+export const ACKNOWLEDGED_RECEIPT_URL_SECONDS = HOUR;
+
+/**
+ * An id from the URL that isn't a uuid can't exist: 404 here rather than a
+ * 500 when Postgres rejects it. Every service taking a path id calls this
+ * (or requireTenant) before touching the database.
+ */
+export function requireId(id: string, what: string): string {
+  if (!z.uuid().safeParse(id).success) notFound(what);
+  return id;
+}
+
+/** The tenant, or 404 - for a malformed id too. */
+export async function requireTenant(
+  db: { tenants: { get(id: string): Promise<Tenant | null> } },
+  tenantId: string
+): Promise<Tenant> {
+  requireId(tenantId, "Tenant");
+  const tenant = await db.tenants.get(tenantId);
+  if (!tenant) notFound("Tenant");
+  return tenant;
+}

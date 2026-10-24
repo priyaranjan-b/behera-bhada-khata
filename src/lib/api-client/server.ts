@@ -3,6 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ApiError } from "@/lib/errors";
+import { routes } from "@/lib/routes";
 import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { getConfirmView } from "@/server/services/confirm";
@@ -100,8 +101,8 @@ function withPageErrors<T extends object>(shape: T, resolve: () => T): T {
               const fn = (resolve() as Record<string, (...a: unknown[]) => Promise<unknown>>)[key];
               return await fn(...args);
             } catch (err) {
-              if (err instanceof ApiError && err.status === 401) redirect("/login");
-              if (err instanceof ApiError && err.status === 403) redirect("/login?error=owner");
+              if (err instanceof ApiError && err.status === 401) redirect(routes.login());
+              if (err instanceof ApiError && err.status === 403) redirect(routes.login({ error: "owner" }));
               if (err instanceof ApiError && err.status === 404) notFound();
               throw err;
             }

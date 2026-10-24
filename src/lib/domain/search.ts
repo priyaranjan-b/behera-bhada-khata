@@ -1,5 +1,6 @@
 import type { SearchIndex } from "@/lib/contracts";
-import { formatUnits } from "./tenant";
+import { routes } from "@/lib/routes";
+import { TENANT_STATUS_DISPLAY, formatUnits } from "./tenant";
 
 // Top-bar search: matches tenants by name or business, and houses by their
 // nickname (label), code or house number. Pure, so it runs in the browser
@@ -45,7 +46,7 @@ export function searchSuggestions(index: SearchIndex, rawQuery: string, limit = 
       // The display name is the business when there is one; then show the person.
       t.businessName ? t.name : null,
       t.unitCodes.length ? formatUnits(t.unitCodes) : null,
-      t.status === "draft" ? "Draft" : t.status === "inactive" ? "Moved out" : null,
+      t.status === "active" ? null : TENANT_STATUS_DISPLAY[t.status].label,
     ].filter(Boolean);
     scored.push({
       // Moved-out tenants after everyone current with the same match quality.
@@ -55,7 +56,7 @@ export function searchSuggestions(index: SearchIndex, rawQuery: string, limit = 
         key: `tenant:${t.tenantId}`,
         primary: t.displayName,
         secondary: details.join(" · "),
-        href: `/dashboard/tenants/${t.tenantId}`,
+        href: routes.tenants.detail(t.tenantId),
       },
     });
   }
@@ -73,7 +74,7 @@ export function searchSuggestions(index: SearchIndex, rawQuery: string, limit = 
           u.label ? u.unitCode : u.propertyName,
           u.occupant ? `Occupied by ${u.occupant.displayName}` : "Vacant",
         ].join(" · "),
-        href: u.occupant ? `/dashboard/tenants/${u.occupant.tenantId}` : `/dashboard/properties/${u.propertyCode}`,
+        href: u.occupant ? routes.tenants.detail(u.occupant.tenantId) : routes.properties.detail(u.propertyCode),
       },
     });
   }

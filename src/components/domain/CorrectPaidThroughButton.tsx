@@ -12,16 +12,9 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { api, errorMessage } from "@/lib/api-client";
-import { addMonthsToKey, formatMonth } from "@/lib/dates";
+import { addMonthsToKey, formatMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
 import { billingStartFor } from "@/lib/domain/tenant";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
-
-/** Months from `from` up to (not including) `to`, both month keys. */
-function monthsBetween(from: string, to: string): number {
-  let n = 0;
-  for (let m = from; m < to; m = addMonthsToKey(m, 1)) n++;
-  return n;
-}
 
 /**
  * Fixes "rent paid up to" for an active tenant (correct_paid_through, 0014):
@@ -38,13 +31,13 @@ export default function CorrectPaidThroughButton({
   billingStart: string;
 }) {
   const router = useAppRouter();
-  const current = addMonthsToKey(billingStart, -1).slice(0, 7);
+  const current = yearMonthOf(addMonthsToKey(billingStart, -1));
   const [open, setOpen] = useState(false);
   const [paidThrough, setPaidThrough] = useState(current);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const newStart = paidThrough ? billingStartFor(leaseStart, `${paidThrough}-01`) : null;
+  const newStart = paidThrough ? billingStartFor(leaseStart, monthKeyOf(paidThrough)) : null;
   const added = newStart && newStart < billingStart ? monthsBetween(newStart, billingStart) : 0;
   const removed = newStart && newStart > billingStart ? monthsBetween(billingStart, newStart) : 0;
 

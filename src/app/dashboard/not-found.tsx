@@ -2,6 +2,7 @@ import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
 import { EmptyState } from "@/components/ui/DataDisplay";
 import { SectionCard } from "@/components/ui";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { routes } from "@/lib/routes";
 
 export default function DashboardNotFound() {
   return (
@@ -11,7 +12,7 @@ export default function DashboardNotFound() {
         title="We couldn't find that"
         description="It may have been removed, or the link is wrong."
         action={
-          <LinkButton href="/dashboard" variant="contained">
+          <LinkButton href={routes.home} variant="contained">
             Back to dashboard
           </LinkButton>
         }

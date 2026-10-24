@@ -32,7 +32,7 @@ describe("onboarding and editing", () => {
       expect.objectContaining({ monthly_rent: 12000, unit_codes: ["AC-T1-G03", "AC-T1-G04"], lease_start: "2026-02-01" })
     );
     // Rent months exist straight away.
-    expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["tenant-new"], expect.any(String));
+    expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000199"], expect.any(String));
   });
 
   it("passes 'rent paid up to' through as the first of that month", async () => {
@@ -54,7 +54,7 @@ describe("onboarding and editing", () => {
     });
     expect(fakes.owner.tenants.create).toHaveBeenLastCalledWith(expect.objectContaining({ deposit_amount: 15000.5 }));
 
-    await updateTenant(ctx, "tenant-1", {
+    await updateTenant(ctx, "00000000-0000-4000-8000-000000000101", {
       ...contact,
       unitCodes: ["AC-T1-G01"],
       monthlyRentAmount: 12000,
@@ -62,7 +62,7 @@ describe("onboarding and editing", () => {
       paidThrough: "2026-09",
     });
     expect(fakes.owner.tenants.update).toHaveBeenCalledWith(
-      "tenant-1",
+      "00000000-0000-4000-8000-000000000101",
       expect.objectContaining({ lease_start: "2019-04-01", paid_through: "2026-09-01" })
     );
   });
@@ -75,14 +75,14 @@ describe("onboarding and editing", () => {
   });
 
   it("passes the full new state and its effective dates through for the database to diff", async () => {
-    await updateTenant(ctx, "tenant-1", {
+    await updateTenant(ctx, "00000000-0000-4000-8000-000000000101", {
       ...contact,
       unitCodes: ["AC-T1-G01", "AC-T1-G05"],
       unitsEffective: "2026-03-01",
       monthlyRentAmount: 5500,
       rentEffectiveMonth: "2026-04",
     });
-    expect(fakes.owner.tenants.update).toHaveBeenCalledWith("tenant-1", {
+    expect(fakes.owner.tenants.update).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", {
       name: "Mohan Das",
       business_name: null,
       phone: "+919876543210",
@@ -98,15 +98,15 @@ describe("onboarding and editing", () => {
   });
 
   it("moves a tenant out on a date", async () => {
-    await moveOutTenant(ctx, "tenant-1", { moveOutDate: "2026-03-20" });
-    expect(fakes.owner.tenants.moveOut).toHaveBeenCalledWith("tenant-1", "2026-03-20");
-    await expect(moveOutTenant(ctx, "tenant-1", { moveOutDate: "20-03-2026" })).rejects.toMatchObject({ status: 400 });
+    await moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-03-20" });
+    expect(fakes.owner.tenants.moveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-03-20");
+    await expect(moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "20-03-2026" })).rejects.toMatchObject({ status: 400 });
   });
 });
 
 describe("reads", () => {
   it("shows a tenant's houses and combined rent from the history tables", async () => {
-    const { tenant } = await getTenantDetail(ctx, "tenant-1");
+    const { tenant } = await getTenantDetail(ctx, "00000000-0000-4000-8000-000000000101");
     expect(tenant.currentUnits.map((u) => u.unitCode)).toEqual(["AC-T1-G01", "AC-T1-G02"]);
     expect(tenant.unitMix).toBe("commercial");
     expect(tenant.monthlyRent).toBe(5000);
@@ -119,7 +119,7 @@ describe("reads", () => {
       ["AC-T1-G01", "Asha"],
       ["AC-T1-G02", "Asha"],
     ]);
-    expect(detail.tenants).toEqual([expect.objectContaining({ id: "tenant-1", unitCodes: ["AC-T1-G01", "AC-T1-G02"] })]);
+    expect(detail.tenants).toEqual([expect.objectContaining({ id: "00000000-0000-4000-8000-000000000101", unitCodes: ["AC-T1-G01", "AC-T1-G02"] })]);
     await expect(getPropertyDetail(ctx, "not a code")).rejects.toMatchObject({ status: 404 });
   });
 });
@@ -144,19 +144,27 @@ describe("receipts and storage", () => {
       unitCodes: ["AC-T1-G01", "AC-T1-G02"],
     });
     const [, patch] = fakes.system.payments.acknowledge.mock.calls[0] as unknown as [string, { pdf_path: string }];
-    expect(patch.pdf_path).toMatch(/^payments\/tenant-1\/payment-1\/[0-9a-f-]{36}\/receipt\.pdf$/);
+    expect(patch.pdf_path).toMatch(/^payments\/00000000-0000-4000-8000-000000000101\/00000000-0000-4000-8000-000000000201\/[0-9a-f-]{36}\/receipt\.pdf$/);
   });
 });
 
 describe("correctPaidThrough", () => {
   it("takes a yyyy-MM month and passes the first of it to the database", async () => {
-    await correctPaidThrough(ctx, "tenant-1", { paidThrough: "2026-07" });
-    expect(fakes.owner.tenants.correctPaidThrough).toHaveBeenCalledWith("tenant-1", "2026-07-01");
+    await correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "2026-07" });
+    expect(fakes.owner.tenants.correctPaidThrough).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-07-01");
   });
 
   it("rejects a bad month and an unknown tenant", async () => {
-    await expect(correctPaidThrough(ctx, "tenant-1", { paidThrough: "July" })).rejects.toMatchObject({ status: 400 });
+    await expect(correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "July" })).rejects.toMatchObject({ status: 400 });
     await expect(correctPaidThrough(ctx, "nobody", { paidThrough: "2026-07" })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.correctPaidThrough).not.toHaveBeenCalled();
+  });
+});
+
+describe("path ids", () => {
+  it("404s a malformed tenant id before it reaches the database", async () => {
+    await expect(getTenantDetail(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
+    await expect(moveOutTenant(ctx, "1; drop", { moveOutDate: "2026-10-01" })).rejects.toMatchObject({ status: 404 });
+    expect(fakes.owner.tenants.get).not.toHaveBeenCalled();
   });
 });

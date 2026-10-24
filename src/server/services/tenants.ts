@@ -15,9 +15,10 @@ import { buildTenantLedger } from "@/lib/domain/tenantLedger";
 import { errorMessage } from "@/lib/errors";
 import type { RentPeriod } from "@/lib/types";
 import { correctPaidThroughSchema, createTenantSchema, moveOutSchema, updateTenantSchema } from "@/lib/validation";
+import { tenantMessagingEnabled } from "@/server/env";
 import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
-import { notFound, parseInput, type OwnerContext } from "./context";
+import { parseInput, requireTenant, type OwnerContext } from "./context";
 import { ensureRentPeriodsFor } from "./periods";
 import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
@@ -81,8 +82,7 @@ export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]
 
 export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Promise<TenantDetail> {
   const db = await ownerDb();
-  const tenant = await db.tenants.get(tenantId);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, tenantId);
 
   if (tenant.status === "active") await ensureRentPeriodsFor([tenantId]);
   const [periods, payments, adjustments, placements] = await Promise.all([
@@ -143,6 +143,7 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       adjustments,
       currentMonthKey()
     ),
+    tenantMessaging: tenantMessagingEnabled(),
   };
 }
 
@@ -196,8 +197,7 @@ export async function bulkCreateTenants(ctx: OwnerContext, rows: unknown): Promi
 
 export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Promise<EditTenantForm> {
   const db = await ownerDb();
-  const tenant = await db.tenants.get(tenantId);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, tenantId);
   const [placements, available, documents] = await Promise.all([
     loadPlacements(db, [tenantId]),
     availableUnits(db, tenantId),
@@ -234,7 +234,7 @@ export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Pr
 export async function updateTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const input = parseInput(updateTenantSchema, body);
   const db = await ownerDb();
-  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await requireTenant(db, tenantId);
   await db.tenants.update(tenantId, {
     name: input.name,
     business_name: input.businessName || null,
@@ -256,13 +256,13 @@ export async function updateTenant(ctx: OwnerContext, tenantId: string, body: un
 export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const { paidThrough } = parseInput(correctPaidThroughSchema, body);
   const db = await ownerDb();
-  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await requireTenant(db, tenantId);
   await db.tenants.correctPaidThrough(tenantId, paidThrough);
 }
 
 export async function moveOutTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const { moveOutDate } = parseInput(moveOutSchema, body);
   const db = await ownerDb();
-  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await requireTenant(db, tenantId);
   await db.tenants.moveOut(tenantId, moveOutDate);
 }

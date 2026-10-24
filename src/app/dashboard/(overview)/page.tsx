@@ -8,8 +8,9 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlineOutlined";
 import { serverApi } from "@/lib/api-client/server";
 import type { MonthlyTrendPoint } from "@/lib/domain/reports";
-import { addMonthsToKey, formatMonth } from "@/lib/dates";
+import { addMonthsToKey, formatMonth, yearMonthOf } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { routes } from "@/lib/routes";
 import BillingCollectionChart from "@/components/domain/BillingCollectionChart";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
@@ -38,25 +39,25 @@ export default async function DashboardPage({
 }) {
   const { month, show } = await searchParams;
   const { monthKey, report, trend, houses } = await serverApi.dashboard.summary(month);
-  const prevMonth = addMonthsToKey(monthKey, -1).slice(0, 7);
-  const nextMonth = addMonthsToKey(monthKey, 1).slice(0, 7);
+  const prevMonth = yearMonthOf(addMonthsToKey(monthKey, -1));
+  const nextMonth = yearMonthOf(addMonthsToKey(monthKey, 1));
   const monthLabel = formatMonth(monthKey);
   // Expected / Collected open this page's Tenants table for the same month, pre-filtered.
   const monthTable = (filter: string) =>
-    `/dashboard?month=${monthKey.slice(0, 7)}&show=${filter}#${MONTH_TENANTS_ANCHOR}`;
+    routes.dashboard({ month: yearMonthOf(monthKey), show: filter }, MONTH_TENANTS_ANCHOR);
 
   const collectionRate = report.expected > 0 ? Math.round((report.collected / report.expected) * 100) : null;
   const activeTenants = report.rows.length;
 
   const monthSwitcher = (
     <InsetBox>
-      <IconButton component={Link} href={`/dashboard?month=${prevMonth}`} size="small" aria-label="Previous month">
+      <IconButton component={Link} href={routes.dashboard({ month: prevMonth })} size="small" aria-label="Previous month">
         <ChevronLeftRoundedIcon fontSize="small" />
       </IconButton>
       <Typography variant="subtitle2" align="center" sx={{ minWidth: 128 }} aria-live="polite">
         {monthLabel}
       </Typography>
-      <IconButton component={Link} href={`/dashboard?month=${nextMonth}`} size="small" aria-label="Next month">
+      <IconButton component={Link} href={routes.dashboard({ month: nextMonth })} size="small" aria-label="Next month">
         <ChevronRightRoundedIcon fontSize="small" />
       </IconButton>
     </InsetBox>
@@ -104,7 +105,7 @@ export default async function DashboardPage({
             value={formatMoney(report.outstanding)}
             caption="Rent unpaid to the end of last month"
             badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
-            href="/dashboard/defaulters"
+            href={routes.defaulters}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: "grow" }}>
@@ -112,7 +113,7 @@ export default async function DashboardPage({
             title="Tenants overdue"
             value={String(report.overdueTenantCount)}
             caption="With at least one month past due"
-            href="/dashboard/tenants?show=overdue"
+            href={routes.tenants.list({ show: "overdue" })}
             badge={
               report.overdueTenantCount > 0
                 ? { label: "Follow up", tone: "danger" }
@@ -126,7 +127,7 @@ export default async function DashboardPage({
             value={String(houses.vacant)}
             caption={`Of ${houses.total} house${houses.total === 1 ? "" : "s"} in use`}
             badge={houses.vacant > 0 ? { label: "To let", tone: "info" } : { label: "All let", tone: "success" }}
-            href="/dashboard/houses?show=vacant"
+            href={routes.houses.list({ show: "vacant" })}
           />
         </Grid>
       </Grid>

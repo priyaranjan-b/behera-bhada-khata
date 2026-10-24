@@ -8,6 +8,7 @@ import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/
 import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
 import type { TenantSearchRow } from "@/lib/contracts";
+import { routes } from "@/lib/routes";
 
 type StatusFilter = "current" | "drafts" | "overdue" | "outstanding" | "settled" | "movedOut" | "all";
 
@@ -39,7 +40,7 @@ const columns: GridColDef<TenantSearchRow>[] = [
               ? "Draft - add phone, rent, lease start"
               : `Moved out ${row.movedOutOn ?? ""}`
         }
-        href={`/dashboard/tenants/${row.tenantId}`}
+        href={routes.tenants.detail(row.tenantId)}
       />
     ),
   },

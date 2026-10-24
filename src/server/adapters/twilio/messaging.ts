@@ -1,14 +1,12 @@
 import "server-only";
 import twilioClient from "twilio";
 import type { Messaging } from "@/server/ports";
-import { env } from "@/server/env";
+import { env, missingTwilioKeys } from "@/server/env";
 
-/** Twilio settings; throws if unset (allowed in development - env.ts requires them in production). */
+/** Twilio settings; throws if unset (allowed - callers treat it as "not delivered"). */
 function config() {
   const e = env();
-  const missing = (
-    ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM"] as const
-  ).filter((k) => !e[k]);
+  const missing = missingTwilioKeys();
   if (missing.length) throw new Error(`Twilio isn't configured: set ${missing.join(", ")}`);
   return {
     accountSid: e.TWILIO_ACCOUNT_SID!,

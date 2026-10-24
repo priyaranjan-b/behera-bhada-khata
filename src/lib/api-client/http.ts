@@ -50,6 +50,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       session: () => get(p.auth.session),
       loginOptions: () => get(p.auth.magicLink),
       requestMagicLink: (input) => post(p.auth.magicLink, input),
+      signInWithPassword: (input) => post(p.auth.password, input),
       setSession: (tokens) => post(p.auth.session, tokens),
       signOut: () => post(p.auth.signOut),
     },
@@ -59,6 +60,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       search: () => get(p.dashboard.search),
       profile: () => get(p.dashboard.profile),
       updateProfile: (input) => put(p.dashboard.profile, input),
+      changePassword: (input) => post(p.dashboard.profilePassword, input),
       properties: {
         list: () => get(p.dashboard.properties.list),
         newForm: () => get(p.dashboard.properties.new),

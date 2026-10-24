@@ -7,7 +7,7 @@ import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
-import type { PeriodStatus, PreferredChannel, TenantStatus, UnitType } from "@/lib/types";
+import type { PeriodStatus, PreferredChannel, RecordType, TenantStatus, UnitType } from "@/lib/types";
 import type {
   uploadTenantDocumentsSchema,
   confirmSchema,
@@ -22,7 +22,7 @@ import type {
   updateTenantSchema,
 } from "@/lib/validation";
 
-export type RecordType = "payment" | "adjustment";
+export type { RecordType };
 
 export interface Created {
   id: string;
@@ -49,6 +49,16 @@ export interface Session {
 }
 
 export type MagicLinkResult = { dev: false } | { dev: true; link: string };
+
+/** Signed in: where to go next (already checked by safeNext). */
+export interface PasswordSignInResult {
+  next: string;
+}
+
+export interface ChangePasswordInput {
+  password: string;
+  confirmPassword: string;
+}
 
 /** What the login page needs to know before the owner types anything. */
 export interface LoginOptions {
@@ -326,6 +336,8 @@ export interface TenantDetail {
   balance: TenantBalanceSummary;
   periods: TenantPeriod[];
   ledger: LedgerRow[];
+  /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
+  tenantMessaging: boolean;
 }
 
 /** Data for the edit form: current values, plus the houses that could be added. */
@@ -380,6 +392,8 @@ export interface NewPaymentForm {
   /** Periods with something still owed, oldest first. */
   openPeriods: PeriodLike[];
   savedSignature: SavedSignature | null;
+  /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
+  tenantMessaging: boolean;
 }
 
 export type CreatePaymentInput = Omit<z.infer<typeof createPaymentSchema>, "tenantId">;
@@ -400,6 +414,8 @@ export interface AdjustPaymentForm {
   paymentDate: string;
   periods: AdjustablePeriod[];
   savedSignature: SavedSignature | null;
+  /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
+  tenantMessaging: boolean;
 }
 
 export type CreateAdjustmentInput = Omit<z.infer<typeof createAdjustmentSchema>, "originalPaymentId">;
@@ -427,6 +443,8 @@ export interface ConfirmView {
   unitCodes: string[];
   maskedPhone: string;
   lineItems: { label: string; amount: number; rentPeriodId: string }[];
+  /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
+  tenantMessaging: boolean;
 }
 
 export interface OtpSent {

@@ -4,12 +4,10 @@ import { ApiError } from "@/lib/errors";
 import { formatMoney } from "@/lib/money";
 import { createAdjustmentSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
-import { notFound, parseInput, withParams, type OwnerContext } from "./context";
+import { notFound, parseInput, requireId, requireTenant, withParams, type OwnerContext } from "./context";
 import { confirmUrl, generateConfirmToken, notifyTenant, storeOwnerSignature, withUploadedFile } from "./confirmLinks";
 import { ownerSignatureBytes } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // A mistake on a payment is never edited in place - it's corrected with a new
 // adjustment, which (like a payment, since 0010) counts as soon as it's
@@ -24,8 +22,7 @@ export async function createAdjustment(
 
   const payment = await db.payments.get(paymentId);
   if (!payment || payment.status !== "confirmed") notFound("Payment");
-  const tenant = await db.tenants.get(payment.tenant_id);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, payment.tenant_id);
 
   const signature = await ownerSignatureBytes(db, input.ownerSignaturePng);
   const { id, ownerSignaturePath } = await storeOwnerSignature("adjustments", tenant, signature);
@@ -60,12 +57,12 @@ export async function createAdjustment(
 
 /** Like resendPaymentLink: tenant and amount come from the adjustment itself. */
 export async function resendAdjustmentLink(ctx: OwnerContext, adjustmentId: string): Promise<LinkResent> {
+  requireId(adjustmentId, "Adjustment");
   const db = await ownerDb();
   const adjustment = await db.adjustments.get(adjustmentId);
   if (!adjustment) notFound("Adjustment");
   if (adjustment.acknowledged_at) throw new ApiError(409, "The tenant has already acknowledged this adjustment");
-  const tenant = await db.tenants.get(adjustment.tenant_id);
-  if (!tenant) notFound("Tenant");
+  const tenant = await requireTenant(db, adjustment.tenant_id);
 
   const { token, tokenHash, expiresAt } = generateConfirmToken();
   if (!(await db.adjustments.rotateToken(adjustmentId, tokenHash, expiresAt))) {
@@ -83,7 +80,7 @@ export async function adjustmentReceipt(
   ctx: OwnerContext,
   adjustmentId: string
 ): Promise<{ bytes: Uint8Array; fileName: string }> {
-  if (!UUID.test(adjustmentId)) notFound("Adjustment");
+  requireId(adjustmentId, "Adjustment");
   const db = await ownerDb();
   const adjustment = await db.adjustments.get(adjustmentId);
   if (!adjustment) notFound("Adjustment");

@@ -5,6 +5,7 @@ import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
 import { LinkButton } from "@/components/ui/Loading";
 import UnitsGrid from "@/components/domain/UnitsGrid";
 import { isVacant, parseHouseFilter } from "@/lib/domain/houses";
+import { routes } from "@/lib/routes";
 
 export default async function HousesPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { show } = await searchParams;
@@ -19,7 +20,7 @@ export default async function HousesPage({ searchParams }: { searchParams: Promi
         title="Houses"
         subtitle={`${units.length} house${units.length === 1 ? "" : "s"} across ${towers} tower${towers === 1 ? "" : "s"}, ${vacant} vacant.`}
         action={
-          <LinkButton href="/dashboard/houses/new" variant="contained" startIcon={<AddHomeWorkRoundedIcon />}>
+          <LinkButton href={routes.houses.new} variant="contained" startIcon={<AddHomeWorkRoundedIcon />}>
             Add house
           </LinkButton>
         }

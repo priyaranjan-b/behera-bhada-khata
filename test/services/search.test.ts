@@ -13,11 +13,11 @@ describe("getSearchIndex", () => {
   it("lists tenants with their houses and puts the occupant on held houses", async () => {
     const index = await getSearchIndex(ctx);
     expect(index.tenants).toEqual([
-      { tenantId: "tenant-1", displayName: "Asha", name: "Asha", businessName: null, status: "active", unitCodes: ["AC-T1-G01", "AC-T1-G02"] },
+      { tenantId: "00000000-0000-4000-8000-000000000101", displayName: "Asha", name: "Asha", businessName: null, status: "active", unitCodes: ["AC-T1-G01", "AC-T1-G02"] },
     ]);
     expect(index.units.map((u) => [u.unitCode, u.occupant?.tenantId ?? null])).toEqual([
-      ["AC-T1-G01", "tenant-1"],
-      ["AC-T1-G02", "tenant-1"],
+      ["AC-T1-G01", "00000000-0000-4000-8000-000000000101"],
+      ["AC-T1-G02", "00000000-0000-4000-8000-000000000101"],
     ]);
   });
 

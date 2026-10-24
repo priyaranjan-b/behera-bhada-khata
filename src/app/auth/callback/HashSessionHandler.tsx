@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
-import CircularProgress from "@mui/material/CircularProgress";
+import { LinkButton, Loader } from "@/components/ui/Loading";
 import { BrandIcon } from "@/components/shell/BrandMark";
 import { PublicCard, PublicLayout } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
+import { routes } from "@/lib/routes";
 
 export default function HashSessionHandler({ next }: { next: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export default function HashSessionHandler({ next }: { next: string }) {
 
       const hashError = params.get("error_description") ?? params.get("error");
       if (hashError) {
-        setError(hashError.replace(/\+/g, " "));
+        setError(hashError);
         return;
       }
 
@@ -67,7 +67,7 @@ export default function HashSessionHandler({ next }: { next: string }) {
             </Typography>
           ) : (
             <>
-              <CircularProgress size={28} aria-label="Signing you in" />
+              <Loader label="Signing you in" />
               <Typography role="status" variant="body2" color="textSecondary">
                 Signing you in…
               </Typography>
@@ -76,10 +76,10 @@ export default function HashSessionHandler({ next }: { next: string }) {
         </Stack>
         {error ? (
           <>
-            <Alert severity="error">{decodeURIComponent(error)}</Alert>
-            <Button href="/login" variant="contained" size="large" fullWidth>
+            <Alert severity="error">{error}</Alert>
+            <LinkButton href={routes.login()} variant="contained" size="large" fullWidth>
               Back to sign in
-            </Button>
+            </LinkButton>
           </>
         ) : null}
       </PublicCard>

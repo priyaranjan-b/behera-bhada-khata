@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { apiPaths } from "@/lib/api-client";
+import { safeNext } from "@/lib/redirects";
 import HashSessionHandler from "./HashSessionHandler";
 
 export default async function AuthCallbackPage({
@@ -8,7 +9,8 @@ export default async function AuthCallbackPage({
   searchParams: Promise<{ code?: string; next?: string }>;
 }) {
   const { code, next } = await searchParams;
-  const target = next ?? "/dashboard";
+  // Checked here because the hash flow below navigates to it in the browser.
+  const target = safeNext(next);
 
   // PKCE flow: the API exchanges the code and sets the session cookies (a
   // page render can't set cookies), then redirects on to `next`.

@@ -23,7 +23,7 @@ export const OWNER_ID = "00000000-0000-4000-8000-00000000000a";
 
 export function tenant(overrides: Partial<Tenant> = {}): Tenant {
   return {
-    id: "tenant-1",
+    id: "00000000-0000-4000-8000-000000000101",
     name: "Asha",
     business_name: null,
     phone: "+919876543210",
@@ -41,15 +41,15 @@ export function tenant(overrides: Partial<Tenant> = {}): Tenant {
 
 export function payment(overrides: Partial<Payment> = {}): Payment {
   return {
-    id: "payment-1",
-    tenant_id: "tenant-1",
+    id: "00000000-0000-4000-8000-000000000201",
+    tenant_id: "00000000-0000-4000-8000-000000000101",
     amount: "5000.00",
     payment_date: "2026-03-05",
     mode: "upi",
     note: null,
     // Since 0010 a payment is confirmed as soon as it's recorded.
     status: "confirmed",
-    owner_signature_path: "payments/property-1/tenant-1/payment-1/owner-signature.png",
+    owner_signature_path: "payments/property-1/00000000-0000-4000-8000-000000000101/00000000-0000-4000-8000-000000000201/owner-signature.png",
     tenant_signature_path: null,
     otp_verified_at: null,
     pdf_path: null,
@@ -82,11 +82,11 @@ const units: Unit[] = ["AC-T1-G01", "AC-T1-G02"].map((unit_code) => ({
   created_at: "",
   updated_at: "",
 }));
-/** tenant-1 holds both houses of AC-T1 at one combined rent. */
+/** 00000000-0000-4000-8000-000000000101 holds both houses of AC-T1 at one combined rent. */
 const occupancy: UnitOccupancy[] = units.map((u) => ({
   unit_code: u.unit_code,
   property_code: "AC-T1",
-  tenant_id: "tenant-1",
+  tenant_id: "00000000-0000-4000-8000-000000000101",
   tenant_name: "Asha",
   tenant_business_name: null,
   start_date: "2026-01-01",
@@ -95,14 +95,14 @@ const occupancy: UnitOccupancy[] = units.map((u) => ({
 }));
 const rate: TenantRentRate = {
   id: 1,
-  tenant_id: "tenant-1",
+  tenant_id: "00000000-0000-4000-8000-000000000101",
   effective_month: "2026-01-01",
   monthly_amount: "5000.00",
   created_at: "",
 };
 const period: RentPeriod = {
   id: "period-mar",
-  tenant_id: "tenant-1",
+  tenant_id: "00000000-0000-4000-8000-000000000101",
   period_month: "2026-03-01",
   amount_due: "5000.00",
   amount_allocated: "0.00",
@@ -111,7 +111,7 @@ const period: RentPeriod = {
 };
 const allocation: PaymentAllocation = {
   id: "alloc-1",
-  payment_id: "payment-1",
+  payment_id: "00000000-0000-4000-8000-000000000201",
   rent_period_id: "period-mar",
   amount_allocated: "5000.00",
   created_at: "",
@@ -123,8 +123,8 @@ export const PNG_DATA_URL =
 
 function build() {
   const state = {
-    tenants: new Map<string, Tenant>([["tenant-1", tenant()]]),
-    payments: new Map<string, Payment>([["payment-1", payment()]]),
+    tenants: new Map<string, Tenant>([["00000000-0000-4000-8000-000000000101", tenant()]]),
+    payments: new Map<string, Payment>([["00000000-0000-4000-8000-000000000201", payment()]]),
     adjustments: new Map<string, Adjustment>(),
     files: new Map<string, Uint8Array>(),
     proofs: new Map<string, PaymentProof>(),
@@ -163,7 +163,7 @@ function build() {
     tenants: {
       list: vi.fn(async () => [...state.tenants.values()]),
       get: vi.fn(async (id: string) => state.tenants.get(id) ?? null),
-      create: vi.fn(async () => ({ id: "tenant-new" })),
+      create: vi.fn(async () => ({ id: "00000000-0000-4000-8000-000000000199" })),
       update: vi.fn(async () => undefined),
       moveOut: vi.fn(async () => undefined),
       correctPaidThrough: vi.fn(async (_id: string, paidThrough: string) => paidThrough),
@@ -196,7 +196,7 @@ function build() {
     occupancy: { listForTenant: vi.fn(async () => occupancy) },
     rentPeriods: { listByIds: vi.fn(async () => [period]), ensure: vi.fn(async () => 0) },
     payments: {
-      findByTokenHash: vi.fn(async () => state.payments.get("payment-1") ?? null),
+      findByTokenHash: vi.fn(async () => state.payments.get("00000000-0000-4000-8000-000000000201") ?? null),
       get: vi.fn(async (id: string) => state.payments.get(id) ?? null),
       listAllocations: vi.fn(async () => [allocation]),
       listProofs: vi.fn(async (ids: string[]) => [...state.proofs.values()].filter((p) => ids.includes(p.payment_id))),
@@ -232,6 +232,8 @@ function build() {
     getSession: vi.fn(async () => ({ userId: OWNER_ID, isOwner: true })),
     sendMagicLink: vi.fn(async () => undefined),
     generateMagicLink: vi.fn(async () => "https://auth.test/link"),
+    signInWithPassword: vi.fn(async (_email: string, password: string) => password === "correct-horse"),
+    updatePassword: vi.fn(async () => undefined),
     ownerNames: vi.fn(async () => ({ owner: "Ramesh Sahu", signature: "Anil Sahu" })),
     exchangeCode: vi.fn(),
     setSession: vi.fn(),
@@ -264,4 +266,12 @@ export function infraMock() {
       return fakes.auth;
     },
   };
+}
+
+/** Launch-before-Twilio: unset every Twilio variable for this test. */
+export async function withoutTwilio() {
+  for (const key of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM"]) {
+    vi.stubEnv(key, "");
+  }
+  (await import("@/server/env")).resetEnvCacheForTests();
 }

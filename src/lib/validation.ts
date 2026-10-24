@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { isDateKey } from "@/lib/dates";
+import { PAYMENT_MODES, PREFERRED_CHANNELS, RECORD_TYPES, UNIT_TYPES } from "@/lib/types";
 
 // Every request body the API accepts, validated by the service that receives
 // it (parseInput in src/server/services/context.ts). Client-safe, so forms
@@ -53,11 +54,6 @@ export const tenantDocumentTypeSchema = z
   .min(1, "Choose or type what each document is")
   .max(60, "Keep a document type under 60 characters");
 
-/** One type per uploaded file, in the order the files are sent. */
-export const uploadTenantDocumentsSchema = z.object({
-  documentTypes: z.array(tenantDocumentTypeSchema).min(1, "Choose at least one file").max(10),
-});
-
 /**
  * Payment proof attachments (0009_payment_proofs.sql). One request carries
  * them all, so the total stays under Vercel's 4.5 MB request body limit; the
@@ -70,12 +66,50 @@ export const PROOF_LIMITS = {
   accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf",
 } as const;
 
+/** Shape of a file-upload limit; the schema, the service and the form all read the same one. */
+export type FileLimits = { maxFiles: number; maxTotalBytes: number; accept: string };
+
+/**
+ * Tenant documents (0011_tenant_documents.sql), per save. Same request-size
+ * ceiling as proofs today, but kept separate so the two can change apart.
+ */
+export const DOCUMENT_LIMITS: FileLimits = { ...PROOF_LIMITS };
+
+/** One type per uploaded file, in the order the files are sent. */
+export const uploadTenantDocumentsSchema = z.object({
+  documentTypes: z
+    .array(tenantDocumentTypeSchema)
+    .min(1, "Choose at least one file")
+    .max(DOCUMENT_LIMITS.maxFiles, `Attach at most ${DOCUMENT_LIMITS.maxFiles} documents at a time`),
+});
+
 // ---- Auth --------------------------------------------------------------------
 
+const emailSchema = z.string().trim().toLowerCase().pipe(z.email("Enter a valid email"));
+
 export const magicLinkSchema = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email")),
+  email: emailSchema,
   next: z.string().max(2048).optional(),
 });
+
+/** Owner password length (72 = the most bcrypt, and so Supabase Auth, uses). */
+export const PASSWORD_LIMITS = { minLength: 8, maxLength: 72 } as const;
+
+export const passwordSignInSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, "Enter your password").max(PASSWORD_LIMITS.maxLength),
+  next: z.string().max(2048).optional(),
+});
+
+export const changePasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(PASSWORD_LIMITS.minLength, `Use at least ${PASSWORD_LIMITS.minLength} characters`)
+      .max(PASSWORD_LIMITS.maxLength, `Use at most ${PASSWORD_LIMITS.maxLength} characters`),
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, { path: ["confirmPassword"], message: "The passwords don't match" });
 
 export const sessionTokensSchema = z.object({
   accessToken: z.string().min(1).max(8192),
@@ -126,7 +160,7 @@ export const createUnitSchema = z.object({
   propertyCode: propertyCodeSchema,
   houseNumber: houseNumberSchema,
   floor: floorSchema,
-  unitType: z.enum(["residential", "commercial"]),
+  unitType: z.enum(UNIT_TYPES),
   label: optionalText(100),
 });
 
@@ -134,7 +168,7 @@ const tenantContact = {
   name: z.string().trim().min(1, "Required").max(200),
   businessName: optionalText(200),
   phone: phoneE164Schema,
-  preferredChannel: z.enum(["whatsapp", "sms", "both"]),
+  preferredChannel: z.enum(PREFERRED_CHANNELS),
 };
 
 /** One tenant, the houses they take on `leaseStart`, and their combined monthly rent. */
@@ -190,7 +224,7 @@ export const createPaymentSchema = z.object({
   tenantId: z.uuid(),
   amount: positiveMoneySchema,
   paymentDate: dateKeySchema,
-  mode: z.enum(["cash", "bank_transfer", "upi", "cheque", "other"]),
+  mode: z.enum(PAYMENT_MODES),
   note: optionalText(500),
   allocations: z.array(paymentAllocationInputSchema).min(1, "Select at least one period").max(240),
   /** Drawn for this payment; omitted = the saved signature (owner_profile, 0013). */
@@ -240,12 +274,12 @@ export const ownerProfileSchema = z.object({
 
 export const otpSendSchema = z.object({
   token: z.string().min(1).max(200),
-  recordType: z.enum(["payment", "adjustment"]),
+  recordType: z.enum(RECORD_TYPES),
 });
 
 export const confirmSchema = z.object({
   token: z.string().min(1).max(200),
-  recordType: z.enum(["payment", "adjustment"]),
+  recordType: z.enum(RECORD_TYPES),
   otpCode: z.string().trim().regex(/^\d{4,10}$/, "Enter the code from the SMS"),
   tenantSignaturePng: signaturePngSchema,
 });

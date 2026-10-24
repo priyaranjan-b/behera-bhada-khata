@@ -9,6 +9,7 @@ import MenuItem from "@mui/material/MenuItem";
 import { FormActions, SectionCard } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
 import type { LocationSummary } from "@/lib/contracts";
+import { routes } from "@/lib/routes";
 
 export default function PropertyForm({ locations }: { locations: LocationSummary[] }) {
   const router = useAppRouter();
@@ -27,7 +28,7 @@ export default function PropertyForm({ locations }: { locations: LocationSummary
     setSubmitting(true);
     try {
       const { code } = await api.dashboard.properties.create({ locationCode, towerCode: tower, name });
-      router.push(`/dashboard/properties/${code}`);
+      router.push(routes.properties.detail(code));
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save that tower."));
@@ -73,7 +74,7 @@ export default function PropertyForm({ locations }: { locations: LocationSummary
         </SectionCard>
         <FormActions
           error={error}
-          cancelHref="/dashboard/properties"
+          cancelHref={routes.properties.list}
           submitLabel="Save"
           pendingLabel="Saving…"
           pending={submitting}

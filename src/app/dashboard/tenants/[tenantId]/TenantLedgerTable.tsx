@@ -7,12 +7,14 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import type { GridColDef } from "@mui/x-data-grid";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
+import { yearMonthOf } from "@/lib/dates";
 import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { GridCell } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
 import ProofsButton from "@/components/domain/ProofsButton";
 import { apiHref, apiPaths } from "@/lib/api-client";
+import { routes } from "@/lib/routes";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 
@@ -33,7 +35,7 @@ const TYPE_LABEL: Record<LedgerRow["type"], string> = {
 // Every payment/adjustment counts once recorded (0010): its receipt can be
 // downloaded straight away (e.g. to send on WhatsApp), and the tenant can be
 // sent a link to acknowledge it until they have.
-function ActionsCell({ row, tenantId }: { row: LedgerRow; tenantId: string }) {
+function ActionsCell({ row, tenantId, tenantMessaging }: { row: LedgerRow; tenantId: string; tenantMessaging: boolean }) {
   if (row.type === "charge" || !row.refId) return null;
   return (
     <GridCell align="end">
@@ -51,11 +53,11 @@ function ActionsCell({ row, tenantId }: { row: LedgerRow; tenantId: string }) {
         Receipt
       </Button>
       {row.type === "payment" && row.status === "confirmed" ? (
-        <LinkButton size="small" href={`/dashboard/payments/${row.refId}/adjust`}>
+        <LinkButton size="small" href={routes.payments.adjust(row.refId)}>
           Adjust
         </LinkButton>
       ) : null}
-      {row.acknowledged ? null : (
+      {row.acknowledged || !tenantMessaging ? null : (
         <ResendButton kind={row.type === "payment" ? "payment" : "adjustment"} recordId={row.refId} tenantId={tenantId} />
       )}
     </GridCell>
@@ -72,7 +74,16 @@ function blankZero(value: number | null | undefined) {
   return value ? value : null;
 }
 
-export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[]; tenantId: string }) {
+export default function TenantLedgerTable({
+  rows,
+  tenantId,
+  tenantMessaging,
+}: {
+  rows: LedgerRow[];
+  tenantId: string;
+  /** Twilio is set up; otherwise there's no "Send link". */
+  tenantMessaging: boolean;
+}) {
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -82,7 +93,7 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
     return rows.filter((row) => {
       if (filterMode === "month") {
         if (!month) return true;
-        return row.date.slice(0, 7) === month;
+        return yearMonthOf(row.date) === month;
       }
       if (filterMode === "range") {
         if (fromDate && row.date < fromDate) return false;
@@ -149,10 +160,10 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
         minWidth: 320,
         headerAlign: "right",
         align: "right",
-        renderCell: ({ row }) => <ActionsCell row={row} tenantId={tenantId} />,
+        renderCell: ({ row }) => <ActionsCell row={row} tenantId={tenantId} tenantMessaging={tenantMessaging} />,
       },
     ],
-    [tenantId, ledgerOrder]
+    [tenantId, tenantMessaging, ledgerOrder]
   );
 
   function resetFilters(mode: FilterMode) {

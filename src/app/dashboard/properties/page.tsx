@@ -6,6 +6,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { serverApi } from "@/lib/api-client/server";
+import { routes } from "@/lib/routes";
 import { EmptyState, PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { AppCard, BadgeRow, IconTile } from "@/components/ui";
 import LinkButton from "@/components/ui/Loading/LinkButton";
@@ -15,7 +16,7 @@ export default async function PropertiesPage() {
   const towerCount = groups.reduce((n, g) => n + g.properties.length, 0);
 
   const addButton = (
-    <LinkButton href="/dashboard/properties/new" variant="contained" startIcon={<AddRoundedIcon />}>
+    <LinkButton href={routes.properties.new} variant="contained" startIcon={<AddRoundedIcon />}>
       Add tower
     </LinkButton>
   );
@@ -57,7 +58,7 @@ export default async function PropertiesPage() {
               const vacant = property.totalUnits - property.occupiedUnits;
               return (
                 <Grid key={property.code} size={{ xs: 12, sm: 6, lg: 4 }}>
-                  <AppCard href={`/dashboard/properties/${property.code}`} sx={{ height: "100%" }}>
+                  <AppCard href={routes.properties.detail(property.code)} sx={{ height: "100%" }}>
                     <Stack spacing={2} useFlexGap sx={{ height: "100%" }}>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
                         <IconTile icon={<ApartmentRoundedIcon fontSize="small" />} size="sm" />

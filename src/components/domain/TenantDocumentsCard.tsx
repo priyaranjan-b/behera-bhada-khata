@@ -27,7 +27,7 @@ import { api, apiHref, apiPaths, errorMessage } from "@/lib/api-client";
 import type { TenantDocumentView } from "@/lib/contracts";
 import { dateKeyOf } from "@/lib/dates";
 import { formatBytes, prepareProofFile } from "@/lib/proofImages";
-import { PROOF_LIMITS, TENANT_DOCUMENT_TYPES } from "@/lib/validation";
+import { DOCUMENT_LIMITS, TENANT_DOCUMENT_TYPES } from "@/lib/validation";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 import Loader from "@/components/ui/Loading/Loader";
 
@@ -81,9 +81,9 @@ export default function TenantDocumentsCard({
 
   async function add(picked: File[]) {
     setError(null);
-    const room = PROOF_LIMITS.maxFiles - pending.length;
+    const room = DOCUMENT_LIMITS.maxFiles - pending.length;
     if (picked.length > room) {
-      setError(`You can add up to ${PROOF_LIMITS.maxFiles} files per save.`);
+      setError(`You can add up to ${DOCUMENT_LIMITS.maxFiles} files per save.`);
       picked = picked.slice(0, Math.max(room, 0));
     }
     if (picked.length === 0) return;
@@ -93,8 +93,8 @@ export default function TenantDocumentsCard({
       const next = [...pending];
       let total = pendingBytes;
       for (const file of prepared) {
-        if (total + file.size > PROOF_LIMITS.maxTotalBytes) {
-          setError(`"${file.name}" would take this save over ${formatBytes(PROOF_LIMITS.maxTotalBytes)}; save, then add it.`);
+        if (total + file.size > DOCUMENT_LIMITS.maxTotalBytes) {
+          setError(`"${file.name}" would take this save over ${formatBytes(DOCUMENT_LIMITS.maxTotalBytes)}; save, then add it.`);
           continue;
         }
         next.push({ file, documentType: "" });
@@ -136,7 +136,7 @@ export default function TenantDocumentsCard({
           size="small"
           startIcon={<AddRoundedIcon />}
           onClick={() => inputRef.current?.click()}
-          disabled={busy || pending.length >= PROOF_LIMITS.maxFiles}
+          disabled={busy || pending.length >= DOCUMENT_LIMITS.maxFiles}
           loading={preparing}
         >
           Add files
@@ -146,7 +146,7 @@ export default function TenantDocumentsCard({
       <input
         ref={inputRef}
         type="file"
-        accept={PROOF_LIMITS.accept}
+        accept={DOCUMENT_LIMITS.accept}
         multiple
         hidden
         onChange={(e) => {
@@ -161,8 +161,8 @@ export default function TenantDocumentsCard({
       {pending.length > 0 ? (
         <Stack spacing={1.5}>
           <Typography variant="caption" color="textSecondary">
-            New - uploaded when you save ({pending.length}/{PROOF_LIMITS.maxFiles} · {formatBytes(pendingBytes)} of{" "}
-            {formatBytes(PROOF_LIMITS.maxTotalBytes)})
+            New - uploaded when you save ({pending.length}/{DOCUMENT_LIMITS.maxFiles} · {formatBytes(pendingBytes)} of{" "}
+            {formatBytes(DOCUMENT_LIMITS.maxTotalBytes)})
           </Typography>
           {pending.map((doc, i) => (
             // One row per file: name on the left, its type on the right, centred on one line

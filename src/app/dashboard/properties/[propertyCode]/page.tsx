@@ -5,6 +5,7 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 import MeetingRoomRoundedIcon from "@mui/icons-material/MeetingRoomRounded";
 import { serverApi } from "@/lib/api-client/server";
+import { routes } from "@/lib/routes";
 import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
 import PropertyTenantsGrid from "./PropertyTenantsGrid";
@@ -14,18 +15,17 @@ import LinkButton from "@/components/ui/Loading/LinkButton";
 export default async function PropertyPage({ params }: { params: Promise<{ propertyCode: string }> }) {
   const { propertyCode } = await params;
   const { property, units, tenants } = await serverApi.dashboard.properties.detail(propertyCode);
-  const base = `/dashboard/properties/${property.code}`;
   const vacant = units.filter((u) => u.isActive && !u.currentTenant).length;
 
   const actions = (
     <ActionStack>
-      <LinkButton href={`${base}/units/new`} variant="outlined" startIcon={<AddHomeWorkRoundedIcon />}>
+      <LinkButton href={routes.properties.newUnit(property.code)} variant="outlined" startIcon={<AddHomeWorkRoundedIcon />}>
         Add house
       </LinkButton>
-      <LinkButton href={`${base}/tenants/bulk`} variant="outlined" startIcon={<UploadFileRoundedIcon />}>
+      <LinkButton href={routes.properties.bulkTenants(property.code)} variant="outlined" startIcon={<UploadFileRoundedIcon />}>
         Bulk upload
       </LinkButton>
-      <LinkButton href={`${base}/tenants/new`} variant="contained" startIcon={<AddRoundedIcon />}>
+      <LinkButton href={routes.properties.newTenant(property.code)} variant="contained" startIcon={<AddRoundedIcon />}>
         Add tenant
       </LinkButton>
     </ActionStack>

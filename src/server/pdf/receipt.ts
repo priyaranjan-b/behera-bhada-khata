@@ -7,6 +7,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type Color, type PDFEmbeddedPage, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { addMonthsToKey, formatDateKey, formatDateTime, formatMonth } from "@/lib/dates";
 import { amountInWords, formatMoney, round2 } from "@/lib/money";
+import { paymentModeLabel } from "@/lib/domain/payments";
 import { prepareProof } from "./proofPages";
 
 export interface ReceiptLineItem {
@@ -241,14 +242,6 @@ function roundedRectPath(width: number, height: number, r: number): string {
   return `M ${r} 0 H ${width - r} Q ${width} 0 ${width} ${r} V ${height - r} Q ${width} ${height} ${width - r} ${height} H ${r} Q 0 ${height} 0 ${height - r} V ${r} Q 0 0 ${r} 0 Z`;
 }
 
-const MODE_LABELS: Record<string, string> = {
-  cash: "Cash",
-  bank_transfer: "Bank transfer",
-  upi: "UPI",
-  cheque: "Cheque",
-  other: "Other",
-};
-
 type ProofTile =
   | { kind: "image"; caption: string; image: PDFImage }
   | { kind: "pdf"; caption: string; page: PDFEmbeddedPage }
@@ -366,7 +359,7 @@ export async function generateReceiptPdf(input: ReceiptInput): Promise<Uint8Arra
     row(input.unitCodes.length > 1 ? "Houses" : "House", input.unitCodes.join(", "), { maxLines: MAX_HOUSE_LINES });
   }
   row(isPayment ? "Payment date" : "Date", formatDateKey(input.date));
-  if (input.mode) row("Payment method", MODE_LABELS[input.mode] ?? input.mode);
+  if (input.mode) row("Payment method", paymentModeLabel(input.mode));
   if (input.correctsReceiptNo) row("Corrects receipt", `#${input.correctsReceiptNo}`);
   if (input.note) row(isPayment ? "Note" : "Reason", input.note, { maxLines: MAX_NOTE_LINES });
   rule();

@@ -14,10 +14,11 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { BarChart } from "@mui/x-charts/BarChart";
 import type { MonthlyTrendPoint } from "@/lib/domain/reports";
+import { APP_LOCALE } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 
-const compact = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
+const compact = new Intl.NumberFormat(APP_LOCALE, { notation: "compact", maximumFractionDigits: 1 });
 
 /** Billed vs collected per month (template PageViewsBarChart look), with a table view for screen readers. */
 export default function BillingCollectionChart({ data }: { data: MonthlyTrendPoint[] }) {

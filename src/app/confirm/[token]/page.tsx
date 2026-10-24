@@ -8,6 +8,7 @@ import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import { apiHref, apiPaths } from "@/lib/api-client";
 import { serverApi } from "@/lib/api-client/server";
 import { formatMoney } from "@/lib/money";
+import { paymentModeLabel } from "@/lib/domain/payments";
 import { BrandMark } from "@/components/shell/BrandMark";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import {
@@ -74,7 +75,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
 
           <DetailList>
             <DetailRow label="Date">{record.date}</DetailRow>
-            {record.mode ? <DetailRow label="Mode">{record.mode}</DetailRow> : null}
+            {record.mode ? <DetailRow label="Mode">{paymentModeLabel(record.mode)}</DetailRow> : null}
           </DetailList>
 
           {record.note ? (
@@ -99,6 +100,12 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
               View receipt
             </Button>
           </Stack>
+        ) : !record.tenantMessaging ? (
+          <Alert severity="info">
+            <AlertTitle>Acknowledging isn&apos;t available yet</AlertTitle>
+            The {recordLabel.toLowerCase()} is recorded and counts. Signing it here needs an SMS code, which isn&apos;t
+            set up yet; ask the owner for your receipt.
+          </Alert>
         ) : isExpired ? (
           <Alert severity="warning">
             <AlertTitle>Link expired</AlertTitle>

@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { refreshSession } from "@/server/infra/proxy";
+import { routes } from "@/lib/routes";
 
-const PROTECTED_PREFIX = "/dashboard";
+const PROTECTED_PREFIX = routes.home;
 
 export async function proxy(request: NextRequest) {
   const { response, isAuthed } = await refreshSession(request);
 
   if (request.nextUrl.pathname.startsWith(PROTECTED_PREFIX) && !isAuthed) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL(routes.login(), request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
   }

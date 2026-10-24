@@ -13,9 +13,10 @@ import Link from "@/components/ui/Link";
 import DataTable from "@/components/ui/DataTable";
 import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { DetailList, DetailRow, GridCell } from "@/components/ui";
-import { formatFloor } from "@/lib/domain/tenant";
+import { UNIT_TYPE_LABELS, formatFloor } from "@/lib/domain/tenant";
 import type { UnitRow } from "@/lib/contracts";
 import { HOUSE_FILTERS, matchesHouseFilter, type HouseFilter } from "@/lib/domain/houses";
+import { routes } from "@/lib/routes";
 
 function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
   return (
@@ -26,7 +27,7 @@ function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () =>
           <DetailList dividers>
             {[...unit.history].reverse().map((h) => (
               <DetailRow key={`${h.tenantId}-${h.startDate}`} label={`${h.startDate} → ${h.endDate ?? "now"}`}>
-                <MuiLink component={Link} href={`/dashboard/tenants/${h.tenantId}`}>
+                <MuiLink component={Link} href={routes.tenants.detail(h.tenantId)}>
                   {h.tenantName}
                 </MuiLink>
               </DetailRow>
@@ -75,7 +76,7 @@ export default function UnitsGrid({
     valueGetter: (_v, row) => `${row.propertyCode} ${row.propertyName} ${row.locationName}`,
     renderCell: ({ row }) => (
       <GridCell direction="column" spacing={0}>
-        <MuiLink component={Link} href={`/dashboard/properties/${row.propertyCode}`} variant="body2" noWrap>
+        <MuiLink component={Link} href={routes.properties.detail(row.propertyCode)} variant="body2" noWrap>
           {row.propertyCode} · {row.propertyName}
         </MuiLink>
         <Typography variant="caption" color="textSecondary" noWrap>
@@ -114,7 +115,7 @@ export default function UnitsGrid({
       minWidth: 120,
       renderCell: ({ row }) => (
         <GridCell>
-          <TagPill label={row.unitType === "commercial" ? "Commercial" : "Residential"} />
+          <TagPill label={UNIT_TYPE_LABELS[row.unitType]} />
         </GridCell>
       ),
     },
@@ -127,7 +128,7 @@ export default function UnitsGrid({
       renderCell: ({ row }) => (
         <GridCell>
           {row.currentTenant ? (
-            <MuiLink component={Link} href={`/dashboard/tenants/${row.currentTenant.id}`} noWrap>
+            <MuiLink component={Link} href={routes.tenants.detail(row.currentTenant.id)} noWrap>
               {row.currentTenant.displayName}
             </MuiLink>
           ) : row.isActive ? (

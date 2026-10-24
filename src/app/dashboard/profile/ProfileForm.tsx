@@ -14,6 +14,7 @@ import { api, errorMessage } from "@/lib/api-client";
 import type { OwnerProfileView } from "@/lib/contracts";
 import { ownerFullName } from "@/lib/domain/owner";
 import { signatureImageToPng } from "@/lib/signatureImage";
+import { routes } from "@/lib/routes";
 
 /** What happens to the saved signature on Save. */
 type SignatureChange = { kind: "upload"; dataUrl: string } | { kind: "draw" } | { kind: "remove" } | null;
@@ -65,7 +66,7 @@ export default function ProfileForm({ profile }: { profile: OwnerProfileView }) 
         removeSignature: change?.kind === "remove",
       });
       setChange(null);
-      router.replace("/dashboard/profile?saved=1");
+      router.replace(routes.profile({ saved: "1" }));
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save your profile."));
@@ -178,7 +179,7 @@ export default function ProfileForm({ profile }: { profile: OwnerProfileView }) 
         <Grid size={12}>
           <FormActions
             error={error}
-            cancelHref="/dashboard"
+            cancelHref={routes.home}
             submitLabel="Save"
             pendingLabel="Saving…"
             pending={submitting}
