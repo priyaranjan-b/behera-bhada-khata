@@ -32,6 +32,7 @@ export default function StatCard({
   caption,
   badge,
   sparkline,
+  href,
 }: {
   title: string;
   value: string;
@@ -39,6 +40,8 @@ export default function StatCard({
   badge?: { label: string; tone: BadgeTone };
   // `format` is a key, not a function, because Server Components render this.
   sparkline?: { data: number[]; labels: string[]; trend: Trend; format?: "money" };
+  /** Makes the whole card a link (it lifts on hover), e.g. to a pre-filtered list. */
+  href?: string;
 }) {
   const theme = useTheme();
   const gradientId = useId().replace(/:/g, "");
@@ -49,7 +52,7 @@ export default function StatCard({
     : undefined;
 
   return (
-    <AppCard sx={{ height: "100%", flexGrow: 1 }}>
+    <AppCard href={href} sx={{ height: "100%", flexGrow: 1 }}>
       <CardContent>
         <Typography component="h2" variant="subtitle2" gutterBottom>
           {title}

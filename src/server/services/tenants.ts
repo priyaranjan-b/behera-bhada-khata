@@ -1,6 +1,7 @@
 import "server-only";
 import * as z from "zod";
 import type {
+  AnyTowerTenantForm,
   BulkCreateResult,
   Created,
   EditTenantForm,
@@ -143,6 +144,12 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       currentMonthKey()
     ),
   };
+}
+
+/** Vacant houses in every tower, for "Add tenant" without starting from a tower. */
+export async function getAnyTowerTenantForm(_ctx: OwnerContext): Promise<AnyTowerTenantForm> {
+  const db = await ownerDb();
+  return { availableUnits: await availableUnits(db) };
 }
 
 /** Onboards a tenant onto one or more vacant houses at one combined rent. */

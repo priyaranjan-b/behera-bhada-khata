@@ -8,13 +8,14 @@ import {
   buildMonthlyReport,
   compareAging,
 } from "@/lib/domain/reports";
+import { isVacant } from "@/lib/domain/houses";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import type { RentPeriod } from "@/lib/types";
 import { ownerDb } from "@/server/infra";
 import type { OwnerContext } from "./context";
 import { ensureRentPeriodsFor } from "./periods";
-import { loadPlacements, placementOf } from "./placements";
+import { holdsUnit, loadPlacements, placementOf } from "./placements";
 
 const TREND_MONTHS = 6;
 
@@ -40,11 +41,13 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
   await ensureRentPeriodsFor(activeIds);
 
   const tenantIds = allTenants.map((t) => t.id);
-  const [periods, payments, adjustments, placements] = await Promise.all([
+  const [periods, payments, adjustments, placements, units, occupancy] = await Promise.all([
     db.rentPeriods.listForTenants(tenantIds, { openOrFrom: fromMonth }),
     db.payments.listForTenants(tenantIds, { status: "confirmed", fromDate: trendMonthKeys[0] }),
     db.adjustments.listForTenants(tenantIds, { status: "confirmed", fromDate: trendMonthKeys[0] }),
     loadPlacements(db, tenantIds),
+    db.units.list(),
+    db.occupancy.list(),
   ]);
 
   const periodsByTenant = new Map<string, RentPeriod[]>();
@@ -80,7 +83,15 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
     trendMonthKeys.map((k) => k.slice(0, 7))
   );
 
-  return { monthKey, report, trend };
+  // Same rule as the Houses page's "Vacant" filter: in use, nobody holding it today.
+  const held = new Set(occupancy.filter((o) => holdsUnit(o)).map((o) => o.unit_code));
+  const inUse = units.filter((u) => u.is_active);
+  const houses = {
+    total: inUse.length,
+    vacant: inUse.filter((u) => isVacant({ isActive: u.is_active, occupied: held.has(u.unit_code) })).length,
+  };
+
+  return { monthKey, report, trend, houses };
 }
 
 /**

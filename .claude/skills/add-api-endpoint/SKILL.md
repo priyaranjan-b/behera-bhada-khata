@@ -101,6 +101,16 @@ In `src/server/services/<domain>.ts` (start the file with `import "server-only"`
   cover it in `test/schema.test.ts`.
 - A public endpoint that sends SMS/email or is worth brute-forcing calls
   `enforceRateLimits([...])`; its route passes `requestMeta(request)`.
+- Validate path ids first: a malformed uuid is a 404 before any DB call.
+  Reuse the shared tenant lookup / record-kind helpers in `./context` (or
+  add them there) rather than repeating `get` + `notFound` per function.
+- No magic numbers: signed-URL lifetimes and rate limits are named
+  constants in `./context`; input limits are exported from `validation.ts`
+  and the schema and the service check read the same constant.
+- Enums (`mode`, `status`, `recordType`, ...) come from the `as const`
+  arrays in `src/lib/types.ts`; never write `z.enum([...])` literals.
+- Payment and adjustment flows are twins: change both through one helper
+  keyed by record kind instead of copy-editing two functions.
 - Derive facts from the database, not the request: e.g. resend reads the
   tenant and amount from the record, and never trusts ids or amounts the
   client could change.
@@ -174,8 +184,21 @@ with a readable `error` for invalid input.
 - Don't call `fetch` directly in a component. Go through `api`.
 - Don't have a Server Component fetch `/api/...`. Use `serverApi`.
 - Don't edit or delete ledger rows (`payments`, `adjustments`, allocations).
-  Corrections are new `adjustments`, and only the confirm flow flips
-  `pending → confirmed` (via `confirm_payment` / `confirm_adjustment`).
+  Corrections are new `adjustments`. Records are `confirmed` when written
+  (0010); the tenant's confirm flow only sets `acknowledged_at` via
+  `acknowledge_payment` / `acknowledge_adjustment`.
+- Don't put parsing, casts or redirects in `route.ts`; the service takes the
+  raw body and parses it.
+- Don't leave a doc comment detached from its function when inserting code
+  between them.
+
+## Before you finish
+
+- [ ] Route is one line per method; path in `paths.ts`, method in
+      `ApiQueries`/`ApiCommands`, `http.ts` and (for reads) `server.ts`.
+- [ ] Service validates every input and id; limits and enums are shared
+      constants; no duplicated helper from another service.
+- [ ] A test in `test/services/` (and `test/schema.test.ts` for SQL).
 - Don't read-modify-write a balance in JS; let SQL do `x = x + delta`.
 - Don't reintroduce `owner_id` columns or owner filters. Ownership is the single
   `app_owner` row (see `docs/database-design.md`, D1).

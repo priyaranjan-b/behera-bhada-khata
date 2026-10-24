@@ -8,10 +8,18 @@ import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
 import { FormActions, SectionCard } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
+import type { PropertyHeader } from "@/lib/contracts";
 import type { UnitType } from "@/lib/types";
 
-export default function UnitForm({ propertyCode }: { propertyCode: string }) {
+/**
+ * Adds a house to a tower. With `propertyCode` the tower is fixed (the
+ * tower's own Add house page); with `towers` the owner picks it here (the
+ * side-menu shortcut).
+ */
+export default function UnitForm({ propertyCode: fixedTower, towers }: { propertyCode?: string; towers?: PropertyHeader[] }) {
   const router = useAppRouter();
+  const [chosenTower, setChosenTower] = useState(towers?.length === 1 ? towers[0].code : "");
+  const propertyCode = fixedTower ?? chosenTower;
   const [houseNumber, setHouseNumber] = useState("");
   const [floor, setFloor] = useState("");
   const [unitType, setUnitType] = useState<UnitType>("residential");
@@ -20,11 +28,15 @@ export default function UnitForm({ propertyCode }: { propertyCode: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const house = houseNumber.trim().toUpperCase();
-  const back = `/dashboard/properties/${propertyCode}`;
+  const back = fixedTower ? `/dashboard/properties/${fixedTower}` : "/dashboard/properties";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!propertyCode) {
+      setError("Choose the tower this house is in");
+      return;
+    }
     setSubmitting(true);
     try {
       await api.dashboard.properties.createUnit(propertyCode, {
@@ -33,7 +45,7 @@ export default function UnitForm({ propertyCode }: { propertyCode: string }) {
         unitType,
         label: label.trim() || undefined,
       });
-      router.push(back);
+      router.push(`/dashboard/properties/${propertyCode}`);
       router.refresh();
     } catch (err) {
       setError(errorMessage(err, "Couldn't save that house."));
@@ -45,12 +57,29 @@ export default function UnitForm({ propertyCode }: { propertyCode: string }) {
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 720 }}>
       <Stack spacing={2}>
         <SectionCard title="House details">
+          {fixedTower ? null : (
+            <TextField
+              label="Tower"
+              select
+              value={chosenTower}
+              onChange={(e) => setChosenTower(e.target.value)}
+              helperText={towers?.length ? "The house code starts with the tower's code" : "No towers yet - add a property first"}
+              required
+              fullWidth
+            >
+              {(towers ?? []).map((t) => (
+                <MenuItem key={t.code} value={t.code}>
+                  {t.code} - {t.name} ({t.locationName})
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <TextField
               label="House number"
               value={houseNumber}
               onChange={(e) => setHouseNumber(e.target.value)}
-              helperText={house ? `House code: ${propertyCode}-${house}` : "e.g. G13 or 108"}
+              helperText={house && propertyCode ? `House code: ${propertyCode}-${house}` : "e.g. G13 or 108"}
               required
               fullWidth
             />

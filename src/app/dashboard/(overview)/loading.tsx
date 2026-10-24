@@ -14,8 +14,8 @@ export default function OverviewLoading() {
     <PageSkeleton label="Loading overview…">
       <PageHeaderSkeleton action />
       <Grid container spacing={2} columns={12}>
-        {Array.from({ length: 4 }, (_, i) => (
-          <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
+        {Array.from({ length: 5 }, (_, i) => (
+          <Grid key={i} size={{ xs: 12, sm: 6, lg: "grow" }}>
             <StatCardSkeleton />
           </Grid>
         ))}

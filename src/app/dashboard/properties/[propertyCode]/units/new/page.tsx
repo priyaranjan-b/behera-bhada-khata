@@ -1,7 +1,7 @@
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { PageHeader } from "@/components/ui/DataDisplay";
-import UnitForm from "./UnitForm";
+import UnitForm from "@/components/domain/UnitForm";
 
 export default async function NewUnitPage({ params }: { params: Promise<{ propertyCode: string }> }) {
   const { propertyCode } = await params;

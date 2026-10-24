@@ -1,6 +1,7 @@
 import "server-only";
 import type {
   LocationGroup,
+  NewHouseForm,
   NewPropertyForm,
   NewTenantForm,
   PropertyDetail,
@@ -9,7 +10,7 @@ import type {
 } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
 import { tenantDisplayName } from "@/lib/domain/tenant";
-import type { Location, Property } from "@/lib/types";
+import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
 import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
@@ -71,24 +72,24 @@ export async function getPropertyHeader(ctx: OwnerContext, propertyCode: string)
   return loadHeader(ctx, propertyCode);
 }
 
-/** A tower: its houses (with who is in each, and who was) and its current tenants. */
-export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Promise<PropertyDetail> {
-  const code = parsePropertyCode(rawCode);
-  const db = await ownerDb();
-  const [property, locations, units, occupancy] = await Promise.all([
-    db.properties.get(code),
-    db.locations.list(),
-    db.units.list({ propertyCode: code }),
-    db.occupancy.list({ propertyCode: code }),
-  ]);
-  if (!property) notFound("Property");
-
-  const today = todayKey();
-  const unitRows: UnitRow[] = units.map((unit) => {
+/** Table rows for houses: who is in each today, and who was. */
+function toUnitRows(
+  units: Unit[],
+  occupancy: UnitOccupancy[],
+  properties: Property[],
+  locations: Location[],
+  today = todayKey()
+): UnitRow[] {
+  const headers = new Map(properties.map((p) => [p.property_code, toHeader(p, locations)]));
+  return units.map((unit) => {
     const history = occupancy.filter((o) => o.unit_code === unit.unit_code);
     const holder = history.find((o) => holdsUnit(o, today));
+    const header = headers.get(unit.property_code);
     return {
       unitCode: unit.unit_code,
+      propertyCode: unit.property_code,
+      propertyName: header?.name ?? unit.property_code,
+      locationName: header?.locationName ?? "",
       houseNumber: unit.house_number,
       floor: unit.floor,
       unitType: unit.unit_type,
@@ -109,6 +110,34 @@ export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Pro
       })),
     };
   });
+}
+
+/** Every house in every tower (/dashboard/houses), by tower then house. */
+export async function listHouses(_ctx: OwnerContext): Promise<UnitRow[]> {
+  const db = await ownerDb();
+  const [locations, properties, units, occupancy] = await Promise.all([
+    db.locations.list(),
+    db.properties.list(),
+    db.units.list(),
+    db.occupancy.list(),
+  ]);
+  return toUnitRows(units, occupancy, properties, locations);
+}
+
+/** A tower: its houses (with who is in each, and who was) and its current tenants. */
+export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Promise<PropertyDetail> {
+  const code = parsePropertyCode(rawCode);
+  const db = await ownerDb();
+  const [property, locations, units, occupancy] = await Promise.all([
+    db.properties.get(code),
+    db.locations.list(),
+    db.units.list({ propertyCode: code }),
+    db.occupancy.list({ propertyCode: code }),
+  ]);
+  if (!property) notFound("Property");
+
+  const today = todayKey();
+  const unitRows = toUnitRows(units, occupancy, [property], locations, today);
 
   // Tenants currently holding a house in this tower.
   const tenantIds = [...new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.tenant_id))];
@@ -165,6 +194,17 @@ export async function createUnit(ctx: OwnerContext, rawCode: string, body: unkno
 }
 
 /** The "add tenant" form opened from a tower: that tower, plus every vacant house. */
+/** Every tower, for the "Add house" shortcut's tower picker. */
+export async function getNewHouseForm(_ctx: OwnerContext): Promise<NewHouseForm> {
+  const db = await ownerDb();
+  const [properties, locations] = await Promise.all([db.properties.list(), db.locations.list()]);
+  return {
+    towers: properties
+      .map((p) => toHeader(p, locations))
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })),
+  };
+}
+
 export async function getNewTenantForm(ctx: OwnerContext, rawCode: string): Promise<NewTenantForm> {
   const property = await loadHeader(ctx, rawCode);
   const db = await ownerDb();

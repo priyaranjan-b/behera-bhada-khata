@@ -320,6 +320,58 @@ until the tenant-signed copy exists.
   `src/lib/validation.ts` (`parseInput`), so validation holds whichever
   transport calls them.
 
+### Single source of truth (rules from the Oct 2026 code review)
+
+Each of these was found broken somewhere; keep them when adding code.
+
+- **Redirect targets are untrusted.** Any `next`/return URL from a query
+  param goes through `safeNext` (`src/server/services/auth.ts`) before
+  `redirect`, `router.push` or `window.location.assign`, on the server and
+  the client alike.
+- **Enums are declared once.** Payment modes, tenant/ledger statuses, record
+  types, unit types and channels are one `as const` array (or union) in
+  `src/lib/types.ts`; zod enums, `<MenuItem>` lists and display labels
+  derive from it. Never show a raw enum value (`bank_transfer`) to a user:
+  map it through a label record in `src/lib/domain/` (client-safe, so the
+  PDF and the UI share it). Compare statuses through helpers in
+  `src/lib/domain/tenant.ts`, not repeated string literals.
+- **A limit lives in one exported constant** in `src/lib/validation.ts`
+  (like `PROOF_LIMITS`). The zod schema, the service check and the form
+  (`maxLength`, `accept`, "6-digit code", "at most N files") all read it.
+  Payment proofs and tenant documents are different things: don't reuse one
+  limit for the other.
+- **Domain rules exist once, in `src/lib/domain/`.** A component that needs
+  e.g. billing start calls `billingStartFor`, vacancy calls `isVacant`; it
+  never re-derives the rule inline. Month input ↔ month key conversions and
+  month arithmetic go through helpers in `src/lib/dates.ts`, not
+  `.slice(0, 7)` or `` `${month}-01` ``.
+- **Every date a user sees is formatted** (`formatDateKey`, `formatMonth`,
+  `formatDateTime`); never render a raw `yyyy-MM-dd`. Every number/date
+  formatter passes `APP_LOCALE` (no `"en-IN"` literals, no
+  `toLocaleString(undefined, …)`, which differs between server and browser).
+- **Page URLs and flash params are not ad-hoc strings.** Build page links
+  with a route helper (add it to `src/lib/routes.ts`, mirroring `apiPaths`,
+  with `encodeURIComponent`) and keep flash query keys in one constant shared
+  by the writer and the `FlashAlert` reader. A new page also gets its entry
+  in `ROUTE_LABELS` (`AppBreadcrumbs.tsx`), or its crumb trail breaks.
+- **Third copy = extract.** When the same block appears in a second file,
+  extract it before adding a third: grid columns go in
+  `src/components/ui/DataTable/columns.ts`, status → tone/label maps in
+  `src/lib/domain/`, repeated form plumbing (submit/error/redirect, file
+  queue, confirm dialog) in a hook or kit component. In services: the tenant
+  lookup + `notFound`, uuid checks, file upload with rollback and
+  payment/adjustment twins share one helper keyed by record kind.
+- **No magic numbers in services:** signed-URL lifetimes and rate limits are
+  named constants in `src/server/services/context.ts`. Ids from the URL are
+  validated (malformed uuid → 404) before any DB lookup, in every service,
+  not just some.
+- **Imports:** the Loading kit is imported from `@/components/ui/Loading`
+  (the barrel), never a deep path. Export only what another module uses.
+- **Tests:** a new service function gets a case in `test/services/`, a new
+  pure helper a colocated `*.test.ts`.
+- After deleting or moving a route, run `npx next typegen`: stale
+  `.next/types/validator.ts` otherwise fails `npm run typecheck`.
+
 ### UI & styling
 
 - Theme: `src/theme/` is the MUI Dashboard template (MIT, copied from
@@ -382,6 +434,19 @@ until the tenant-signed copy exists.
   `DataTable` (Data Grid), `LoadingButton`/`LinkButton` (Button), `Loader`
   (progress), `StatusBadge`/`TagPill` (Chip). Don't import
   `@mui/material/Card` outside `AppCard`.
+- **Colours live in the theme.** No hex/rgba literals in components (the
+  shell and `DataTable/styles.ts` included): add a token to
+  `src/theme/appTokens.ts` and read it from there.
+- **`"use client"` only where needed.** A file that mixes server-safe
+  primitives with one interactive piece splits the interactive piece into
+  its own client file, so the rest stays usable from Server Components.
+  One component per file; `DataDisplay.tsx` and `Skeletons.tsx` are the
+  only deliberate groupings.
+- **Ids for ARIA wiring** (`aria-controls`, `aria-labelledby`) come from
+  `useId()`, never a fixed string: components are mounted more than once.
+  Icon-only and repeated per-row buttons get an `aria-label` naming the row.
+- **Stable grid inputs:** `DataTable` `columns`, `filters` and callbacks are
+  module constants or memoised, not rebuilt on every render.
 - **Loading** lives in `src/components/ui/Loading/` and every busy state is
   drawn by its `Loader`, so loading can be restyled in one place; never
   render `CircularProgress`/`LinearProgress` directly. `NavigationProgress`

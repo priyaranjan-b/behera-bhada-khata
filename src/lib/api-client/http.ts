@@ -68,11 +68,16 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         newUnit: (code) => get(p.dashboard.properties.newUnit(code)),
         create: (input) => post(p.dashboard.properties.list, input),
         createUnit: (code, input) => post(p.dashboard.properties.units(code), input),
-        createTenant: (id, input) => post(p.dashboard.properties.tenants(id), input),
         bulkCreateTenants: (id, tenants) => post(p.dashboard.properties.bulkTenants(id), { tenants }),
+      },
+      houses: {
+        list: () => get(p.dashboard.houses.list),
+        newForm: () => get(p.dashboard.houses.new),
       },
       tenants: {
         list: () => get(p.dashboard.tenants.list),
+        newForm: () => get(p.dashboard.tenants.new),
+        create: (input) => post(p.dashboard.tenants.list, input),
         detail: (id) => get(p.dashboard.tenants.detail(id)),
         edit: (id) => get(p.dashboard.tenants.edit(id)),
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),

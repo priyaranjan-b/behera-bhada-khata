@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { GridColDef } from "@mui/x-data-grid";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -15,6 +15,7 @@ import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { DetailList, DetailRow, GridCell } from "@/components/ui";
 import { formatFloor } from "@/lib/domain/tenant";
 import type { UnitRow } from "@/lib/contracts";
+import { HOUSE_FILTERS, matchesHouseFilter, type HouseFilter } from "@/lib/domain/houses";
 
 function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
   return (
@@ -42,20 +43,50 @@ function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () =>
   );
 }
 
+/**
+ * Houses with who is in each. On a tower page it lists that tower's houses;
+ * with `showTower` it lists every house (the Houses page) and adds the tower
+ * column and a "Show" filter, starting from `initialFilter`.
+ */
 export default function UnitsGrid({
   units,
   propertyName,
   subtitle,
   emptyState,
+  showTower = false,
+  initialFilter = "all",
 }: {
   units: UnitRow[];
   propertyName: string;
   subtitle?: string;
   emptyState?: React.ReactNode;
+  showTower?: boolean;
+  initialFilter?: HouseFilter;
 }) {
   const [historyOf, setHistoryOf] = useState<UnitRow | null>(null);
+  const [filter, setFilter] = useState<HouseFilter>(initialFilter);
+  const rows = useMemo(() => (showTower ? units.filter((u) => matchesHouseFilter({ isActive: u.isActive, occupied: Boolean(u.currentTenant) }, filter)) : units), [units, filter, showTower]);
+
+  const towerColumn: GridColDef<UnitRow> = {
+    field: "propertyCode",
+    headerName: "Tower",
+    flex: 1,
+    minWidth: 170,
+    valueGetter: (_v, row) => `${row.propertyCode} ${row.propertyName} ${row.locationName}`,
+    renderCell: ({ row }) => (
+      <GridCell direction="column" spacing={0}>
+        <MuiLink component={Link} href={`/dashboard/properties/${row.propertyCode}`} variant="body2" noWrap>
+          {row.propertyCode} · {row.propertyName}
+        </MuiLink>
+        <Typography variant="caption" color="textSecondary" noWrap>
+          {row.locationName}
+        </Typography>
+      </GridCell>
+    ),
+  };
 
   const columns: GridColDef<UnitRow>[] = [
+    ...(showTower ? [towerColumn] : []),
     {
       field: "unitCode",
       headerName: "House",
@@ -134,12 +165,18 @@ export default function UnitsGrid({
       <DataTable<UnitRow>
         title="Houses"
         subtitle={subtitle}
-        rows={units}
+        rows={rows}
+        totalCount={units.length}
         columns={columns}
         getRowId={(row) => row.unitCode}
-        rowDensity="dense"
-        search={units.length > 8 ? { placeholder: "Search house, occupant…" } : false}
-        label={`Houses at ${propertyName}`}
+        rowDensity={showTower ? "standard" : "dense"}
+        filters={
+          showTower
+            ? [{ label: "Show", value: filter, options: HOUSE_FILTERS, onChange: setFilter, defaultValue: "all" }]
+            : []
+        }
+        search={units.length > 8 ? { placeholder: showTower ? "Search house, tower, occupant…" : "Search house, occupant…" } : false}
+        label={showTower ? "All houses" : `Houses at ${propertyName}`}
         noRowsLabel="No houses match."
         emptyState={emptyState}
       />

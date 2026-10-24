@@ -1,5 +1,6 @@
 import type {
   AdjustPaymentForm,
+  AnyTowerTenantForm,
   BulkCreateResult,
   ConfirmInput,
   ConfirmView,
@@ -17,6 +18,7 @@ import type {
   EditTenantForm,
   LocationGroup,
   MoveOutInput,
+  NewHouseForm,
   NewPropertyForm,
   NewTenantForm,
   OwnerProfileView,
@@ -38,6 +40,7 @@ import type {
   SessionTokens,
   TenantDetail,
   TenantSearchRow,
+  UnitRow,
 } from "@/lib/contracts";
 
 /**
@@ -65,8 +68,16 @@ export interface ApiQueries {
       bulkTenants(propertyCode: string): Promise<NewTenantForm>;
       newUnit(propertyCode: string): Promise<PropertyHeader>;
     };
+    houses: {
+      /** Every house in every tower, with who is in it. */
+      list(): Promise<UnitRow[]>;
+      /** Every tower, for the "Add house" shortcut. */
+      newForm(): Promise<NewHouseForm>;
+    };
     tenants: {
       list(): Promise<TenantSearchRow[]>;
+      /** Vacant houses in every tower, for the "Add tenant" shortcut. */
+      newForm(): Promise<AnyTowerTenantForm>;
       detail(tenantId: string): Promise<TenantDetail>;
       edit(tenantId: string): Promise<EditTenantForm>;
       newPayment(tenantId: string): Promise<NewPaymentForm>;
@@ -92,10 +103,10 @@ export interface ApiCommands {
     properties: {
       create(input: CreatePropertyInput): Promise<{ code: string }>;
       createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;
-      createTenant(propertyCode: string, input: CreateTenantInput): Promise<Created>;
       bulkCreateTenants(propertyCode: string, tenants: unknown[]): Promise<BulkCreateResult>;
     };
     tenants: {
+      create(input: CreateTenantInput): Promise<Created>;
       update(tenantId: string, input: UpdateTenantInput): Promise<void>;
       moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
       correctPaidThrough(tenantId: string, input: CorrectPaidThroughInput): Promise<void>;

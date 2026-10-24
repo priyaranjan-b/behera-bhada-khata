@@ -113,8 +113,17 @@ function matchesStatus(row: TenantSearchRow, status: StatusFilter): boolean {
   }
 }
 
-export default function TenantSearchList({ rows }: { rows: TenantSearchRow[] }) {
-  const [status, setStatus] = useState<StatusFilter>("current");
+export default function TenantSearchList({
+  rows,
+  initialStatus,
+}: {
+  rows: TenantSearchRow[];
+  /** `?show=` from the URL (e.g. "overdue" from the dashboard card); unknown values fall back to current tenants. */
+  initialStatus?: string;
+}) {
+  const [status, setStatus] = useState<StatusFilter>(
+    STATUS_OPTIONS.find((o) => o.value === initialStatus)?.value ?? "current"
+  );
   const filtered = useMemo(() => rows.filter((row) => matchesStatus(row, status)), [rows, status]);
 
   return (

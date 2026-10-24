@@ -21,7 +21,8 @@ import { formatMoney } from "@/lib/money";
 import type { PreferredChannel } from "@/lib/types";
 
 type Mode =
-  | { kind: "create"; propertyCode: string }
+  // propertyCode: the tower the form was opened from; omitted for the side-menu shortcut.
+  | { kind: "create"; propertyCode?: string }
   | { kind: "edit"; tenant: EditTenantForm["tenant"] };
 
 function unitCaption(u: AvailableUnit): string {
@@ -53,7 +54,7 @@ export default function TenantForm({
   const movedOut = editing?.status === "inactive";
   // From the paper register: details may still be missing, nothing billed yet.
   const draft = editing?.status === "draft";
-  const homeTower = mode.kind === "create" ? mode.propertyCode : null;
+  const homeTower = mode.kind === "create" ? (mode.propertyCode ?? null) : null;
 
   // Options grouped by tower, the tower the form was opened from first.
   const options = useMemo(
@@ -111,7 +112,11 @@ export default function TenantForm({
     for (let m = billingStart; m <= currentMonthKey() && n < 1200; m = addMonthsToKey(m, 1)) n++;
     return n;
   })();
-  const cancelHref = editing ? `/dashboard/tenants/${editing.id}` : `/dashboard/properties/${homeTower}`;
+  const cancelHref = editing
+    ? `/dashboard/tenants/${editing.id}`
+    : homeTower
+      ? `/dashboard/properties/${homeTower}`
+      : "/dashboard/tenants";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -148,7 +153,16 @@ export default function TenantForm({
           unitsEffective: unitsChanged ? unitsEffective : undefined,
           rentEffectiveMonth: rentChanged ? `${rentEffectiveMonth}-01` : undefined,
           leaseStart: draft && leaseStart ? leaseStart : undefined,
-          paidThrough: draft && paidThrough ? `${paidThrough}-01` : undefined,
+          // Blank = nothing paid yet: send the month before the lease month so
+          // billing starts at move-in, as the preview says (update_tenant would
+          // otherwise default a missing value to last month).
+          paidThrough: !draft
+            ? undefined
+            : paidThrough
+              ? `${paidThrough}-01`
+              : leaseStart
+                ? addMonthsToKey(monthKeyOf(leaseStart), -1)
+                : undefined,
           // Only a draft's deposit can change; leave it out otherwise.
           depositAmount: draft && deposit ? Number(deposit) : undefined,
         });
@@ -169,7 +183,7 @@ export default function TenantForm({
         }
         router.push(`/dashboard/tenants/${mode.tenant.id}?saved=1`);
       } else {
-        const { id } = await api.dashboard.properties.createTenant(mode.propertyCode, {
+        const { id } = await api.dashboard.tenants.create({
           ...contact,
           leaseStart,
           paidThrough: paidThrough ? `${paidThrough}-01` : undefined,
@@ -308,7 +322,7 @@ export default function TenantForm({
                   billingStart
                     ? `Billing starts ${formatMonth(billingStart)}. Months before that were settled outside the app.`
                     : draft
-                      ? "Last month already paid on paper; billing starts the month after"
+                      ? "Last month already paid on paper. Leave blank if nothing is paid yet - billing starts from the move-in month"
                       : "Leave blank for a new tenant: billing starts from the lease start"
                 }
                 fullWidth

@@ -8,7 +8,7 @@ import { serverApi } from "@/lib/api-client/server";
 import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
 import PropertyTenantsGrid from "./PropertyTenantsGrid";
-import UnitsGrid from "./UnitsGrid";
+import UnitsGrid from "@/components/domain/UnitsGrid";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 
 export default async function PropertyPage({ params }: { params: Promise<{ propertyCode: string }> }) {

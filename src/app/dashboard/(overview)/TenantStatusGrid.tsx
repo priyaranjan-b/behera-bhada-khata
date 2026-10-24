@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import type { GridColDef } from "@mui/x-data-grid";
+import Box from "@mui/material/Box";
 import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { StatusChip } from "@/components/domain/StatusChip";
@@ -58,29 +60,68 @@ const columns: GridColDef<TenantMonthRow>[] = [
   },
 ];
 
+type MonthFilter = "all" | "due" | "collected" | "unpaid";
+
+const MONTH_FILTERS: { value: MonthFilter; label: string }[] = [
+  { value: "all", label: "All tenants" },
+  { value: "due", label: "Rent due" },
+  { value: "collected", label: "Paid something" },
+  { value: "unpaid", label: "Not fully paid" },
+];
+
+// "due" and "collected" are the tenants behind the Expected and Collected cards.
+function matchesMonth(row: TenantMonthRow, filter: MonthFilter): boolean {
+  switch (filter) {
+    case "due":
+      return row.monthDue > 0;
+    case "collected":
+      return row.monthAllocated > 0;
+    case "unpaid":
+      return row.monthDue > row.monthAllocated;
+    default:
+      return true;
+  }
+}
+
 export default function TenantStatusGrid({
   rows,
   monthLabel,
   emptyState,
+  initialShow,
+  id,
 }: {
   rows: TenantMonthRow[];
   monthLabel: string;
   emptyState?: React.ReactNode;
+  /** `?show=` from the URL; unknown values show everyone. */
+  initialShow?: string;
+  /** Anchor the dashboard cards jump to. */
+  id?: string;
 }) {
+  const [filter, setFilter] = useState<MonthFilter>(
+    MONTH_FILTERS.find((f) => f.value === initialShow)?.value ?? "all"
+  );
+  const filtered = useMemo(() => rows.filter((row) => matchesMonth(row, filter)), [rows, filter]);
+
   return (
-    <DataTable<TenantMonthRow>
-      title="Tenants"
-      subtitle={`Rent status for ${monthLabel}`}
-      rows={rows}
-      columns={columns}
-      getRowId={(row) => row.tenantId}
-      search={{ placeholder: "Search tenant…" }}
-      noRowsLabel="No tenants match."
-      emptyState={emptyState}
-      initialState={{
-        sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },
-        columns: { columnVisibilityModel: {} },
-      }}
-    />
+    // scrollMarginTop keeps the table clear of the sticky top bar when a card jumps here.
+    <Box id={id} sx={{ scrollMarginTop: 80 }}>
+      <DataTable<TenantMonthRow>
+        title="Tenants"
+        subtitle={`Rent status for ${monthLabel}`}
+        rows={filtered}
+        totalCount={rows.length}
+        filters={[{ label: "Show", value: filter, options: MONTH_FILTERS, onChange: setFilter, defaultValue: "all" }]}
+        columns={columns}
+        getRowId={(row) => row.tenantId}
+        search={{ placeholder: "Search tenant…" }}
+        noRowsLabel="No tenants match."
+        emptyState={emptyState}
+        initialState={{
+          sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },
+          columns: { columnVisibilityModel: {} },
+        }}
+      />
+    </Box>
   );
 }

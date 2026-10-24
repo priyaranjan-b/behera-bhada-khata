@@ -8,7 +8,11 @@ import AppLayout, { type AppTab } from "@/components/shell/AppLayout";
 // (Breadcrumbs derive themselves — see shell/AppBreadcrumbs.)
 function tabForPath(pathname: string): AppTab | undefined {
   if (pathname === "/dashboard") return "summary";
+  // Quick-add pages before their sections, so the shortcut is the one highlighted.
+  if (pathname === "/dashboard/tenants/new") return "addTenant";
+  if (pathname === "/dashboard/houses/new") return "addHouse";
   if (pathname.startsWith("/dashboard/properties")) return "properties";
+  if (pathname.startsWith("/dashboard/houses")) return "houses";
   if (pathname.startsWith("/dashboard/tenants")) return "tenants";
   if (pathname.startsWith("/dashboard/defaulters")) return "defaulters";
   return undefined;

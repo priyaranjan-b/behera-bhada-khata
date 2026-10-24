@@ -21,6 +21,9 @@ needs new data, run the `add-api-endpoint` skill first.
 - **Nav tab:** a top-level section also needs a `NAV_ITEMS` entry in
   `src/components/shell/nav.tsx`, plus a case in
   `tabForPath` in `DashboardShell.tsx`.
+- **Menu shortcut:** a "start this form from anywhere" page (Add tenant,
+  Add house) goes in `QUICK_ADD_ITEMS` in the same file, with an exact-path
+  case in `tabForPath` placed before the section checks.
 
 ## Page skeleton
 
@@ -111,9 +114,32 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
   top progress bar).
 - **Public pages** (login, confirm): `PublicLayout`, `PublicCard`, `PublicHeading`.
 
+## Before you finish: review checklist
+
+These mistakes have shipped before (see CLAUDE.md → "Single source of truth"):
+
+- [ ] New page has its `ROUTE_LABELS` entry; data segment has `loading.tsx`
+      (card-shaped skeletons) and, if it can 404, a specific `not-found.tsx`.
+- [ ] No hex/rgba, no `"en-IN"`, no raw `yyyy-MM-dd`, no `.slice(0, 7)` on
+      keys, no raw enum values (`bank_transfer`) in the UI.
+- [ ] Limits, enum options and labels come from `validation.ts` /
+      `types.ts` / `src/lib/domain/`, not literals in the form.
+- [ ] Business rules (billing start, vacancy, overdue tone) call the
+      `src/lib/domain/` helper instead of re-implementing it.
+- [ ] Page links and flash params use the shared helpers; any `next`
+      redirect goes through `safeNext`.
+- [ ] A column, status badge, form-submit block or confirm dialog that
+      already exists elsewhere is reused (or extracted now), not copied.
+- [ ] Navigating buttons are `LinkButton`, spinners are `Loader`, kit
+      imports come from the barrel, `useAppRouter` not `useRouter`.
+- [ ] One component per file; `"use client"` only on the interactive file;
+      `useId()` for ARIA ids; row buttons have a row-specific `aria-label`.
+- [ ] `DataTable` columns/filters are stable (module const or `useMemo`).
+
 ## Verify
 
-1. Run `npx tsc --noEmit -p .` and `npm run lint`.
+1. Run `npx tsc --noEmit -p .` and `npm run lint` (if a deleted route shows
+   up in `.next/types`, run `npx next typegen`).
 2. Check the page in Chrome against the running dev server (`localhost:3000`).
    The owner signs in themselves; never enter credentials.
    - Light and dark mode.

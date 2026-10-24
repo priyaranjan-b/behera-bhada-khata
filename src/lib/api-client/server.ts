@@ -9,15 +9,17 @@ import { getConfirmView } from "@/server/services/confirm";
 import { getDashboardSummary, getDefaultersReport } from "@/server/services/dashboard";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
 import {
+  getNewHouseForm,
   getNewPropertyForm,
   getNewTenantForm,
   getPropertyDetail,
   getPropertyHeader,
+  listHouses,
   listProperties,
 } from "@/server/services/properties";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getSearchIndex } from "@/server/services/search";
-import { getEditTenantForm, getTenantDetail, listTenants } from "@/server/services/tenants";
+import { getAnyTowerTenantForm, getEditTenantForm, getTenantDetail, listTenants } from "@/server/services/tenants";
 import type { OwnerContext } from "@/server/services/context";
 import { createHttpApi } from "./http";
 import type { ApiQueries } from "./types";
@@ -48,8 +50,13 @@ const inProcessApi: ApiQueries = {
       bulkTenants: async (code) => getNewTenantForm(await owner(), code),
       newUnit: async (code) => getPropertyHeader(await owner(), code),
     },
+    houses: {
+      list: async () => listHouses(await owner()),
+      newForm: async () => getNewHouseForm(await owner()),
+    },
     tenants: {
       list: async () => listTenants(await owner()),
+      newForm: async () => getAnyTowerTenantForm(await owner()),
       detail: async (id) => getTenantDetail(await owner(), id),
       edit: async (id) => getEditTenantForm(await owner(), id),
       newPayment: async (id) => getNewPaymentForm(await owner(), id),

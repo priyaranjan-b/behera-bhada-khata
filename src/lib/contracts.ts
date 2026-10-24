@@ -68,6 +68,8 @@ export interface DashboardSummary {
   monthKey: string;
   report: MonthlyReport;
   trend: MonthlyTrendPoint[];
+  /** In-use houses (retired ones left out) and how many have nobody in them today. */
+  houses: { total: number; vacant: number };
 }
 
 // ---- /api/dashboard/defaulters (tenants behind on rent, by months) -----------
@@ -161,6 +163,10 @@ export interface OccupancyEntry {
 
 export interface UnitRow {
   unitCode: string;
+  /** The tower, e.g. "AC-T1", and its name / site name - for tables across towers. */
+  propertyCode: string;
+  propertyName: string;
+  locationName: string;
   houseNumber: string;
   floor: string | null;
   unitType: UnitType;
@@ -208,6 +214,16 @@ export interface AvailableUnit {
 export interface NewTenantForm {
   property: PropertyHeader;
   availableUnits: AvailableUnit[];
+}
+
+/** /dashboard/tenants/new: add a tenant without starting from a tower. */
+export interface AnyTowerTenantForm {
+  availableUnits: AvailableUnit[];
+}
+
+/** /dashboard/houses/new: add a house, choosing its tower on the form. */
+export interface NewHouseForm {
+  towers: PropertyHeader[];
 }
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
