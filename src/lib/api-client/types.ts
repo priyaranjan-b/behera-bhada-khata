@@ -5,6 +5,7 @@ import type {
   ConfirmView,
   Confirmed,
   Created,
+  CorrectPaidThroughInput,
   CreatedAdjustment,
   CreateAdjustmentInput,
   CreatePaymentInput,
@@ -12,11 +13,14 @@ import type {
   CreateTenantInput,
   CreateUnitInput,
   DashboardSummary,
+  DefaultersReport,
   EditTenantForm,
   LocationGroup,
   MoveOutInput,
   NewPropertyForm,
   NewTenantForm,
+  OwnerProfileView,
+  UpdateOwnerProfileInput,
   UpdateTenantInput,
   MagicLinkResult,
   NewPaymentForm,
@@ -47,8 +51,12 @@ export interface ApiQueries {
   };
   dashboard: {
     summary(month?: string): Promise<DashboardSummary>;
+    /** Tenants behind on rent, most months behind first. */
+    defaulters(): Promise<DefaultersReport>;
     /** Top-bar search index (tenants and houses). */
     search(): Promise<SearchIndex>;
+    /** The owner's name and saved signature (Profile page, app shell). */
+    profile(): Promise<OwnerProfileView>;
     properties: {
       list(): Promise<LocationGroup[]>;
       newForm(): Promise<NewPropertyForm>;
@@ -80,6 +88,7 @@ export interface ApiCommands {
     signOut(): Promise<void>;
   };
   dashboard: {
+    updateProfile(input: UpdateOwnerProfileInput): Promise<void>;
     properties: {
       create(input: CreatePropertyInput): Promise<{ code: string }>;
       createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;
@@ -89,6 +98,7 @@ export interface ApiCommands {
     tenants: {
       update(tenantId: string, input: UpdateTenantInput): Promise<void>;
       moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
+      correctPaidThrough(tenantId: string, input: CorrectPaidThroughInput): Promise<void>;
       /** `proofs`: photos/PDFs of the payment, sent as multipart (see PROOF_LIMITS). */
       createPayment(tenantId: string, input: CreatePaymentInput, proofs?: File[]): Promise<RecordCreated>;
       /** ID proof, photo, agreement... as multipart; `documentTypes[i]` is the type of `files[i]`. */

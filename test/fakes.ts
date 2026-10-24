@@ -6,6 +6,7 @@
 import { vi } from "vitest";
 import type {
   Adjustment,
+  OwnerProfile,
   Payment,
   PaymentAllocation,
   PaymentProof,
@@ -57,6 +58,7 @@ export function payment(overrides: Partial<Payment> = {}): Payment {
     created_at: "2026-03-05T04:00:00Z",
     confirmed_at: "2026-03-05T04:00:00Z",
     acknowledged_at: null,
+    receipt_no: "2026/03/001",
     ...overrides,
   };
 }
@@ -127,10 +129,17 @@ function build() {
     files: new Map<string, Uint8Array>(),
     proofs: new Map<string, PaymentProof>(),
     documents: new Map<string, TenantDocument>(),
+    profile: null as OwnerProfile | null,
     rateLimitAllows: true,
   };
 
   const owner = {
+    ownerProfile: {
+      get: vi.fn(async () => state.profile),
+      save: vi.fn(async (p: Pick<OwnerProfile, "first_name" | "last_name" | "signature_name" | "signature_path">) => {
+        state.profile = { singleton: true, created_at: "", updated_at: "", ...p };
+      }),
+    },
     locations: {
       list: vi.fn(async () => [
         { location_code: "AC", name: "Arnapal Chakk Complex", address: null, created_at: "", updated_at: "" },
@@ -157,6 +166,7 @@ function build() {
       create: vi.fn(async () => ({ id: "tenant-new" })),
       update: vi.fn(async () => undefined),
       moveOut: vi.fn(async () => undefined),
+      correctPaidThrough: vi.fn(async (_id: string, paidThrough: string) => paidThrough),
     },
     rentPeriods: { listForTenants: vi.fn(async () => [period]), listByIds: vi.fn(async () => [period]) },
     payments: {
@@ -178,13 +188,18 @@ function build() {
   };
 
   const system = {
+    locations: {
+      get: vi.fn(async () => ({ location_code: "AC", name: "Arnapal Chakk Complex", address: null, created_at: "", updated_at: "" })),
+    },
     properties: { get: vi.fn(async () => property) },
     tenants: { get: vi.fn(async (id: string) => state.tenants.get(id) ?? null) },
     occupancy: { listForTenant: vi.fn(async () => occupancy) },
     rentPeriods: { listByIds: vi.fn(async () => [period]), ensure: vi.fn(async () => 0) },
     payments: {
       findByTokenHash: vi.fn(async () => state.payments.get("payment-1") ?? null),
+      get: vi.fn(async (id: string) => state.payments.get(id) ?? null),
       listAllocations: vi.fn(async () => [allocation]),
+      listProofs: vi.fn(async (ids: string[]) => [...state.proofs.values()].filter((p) => ids.includes(p.payment_id))),
       acknowledge: vi.fn(async () => true),
     },
     adjustments: {
@@ -200,7 +215,7 @@ function build() {
       if (state.files.has(path)) throw new Error(`exists: ${path}`);
       state.files.set(path, bytes);
     }),
-    download: vi.fn(async () => Uint8Array.from(Buffer.from(PNG_DATA_URL.split(",")[1], "base64"))),
+    download: vi.fn(async (_path: string) => Uint8Array.from(Buffer.from(PNG_DATA_URL.split(",")[1], "base64"))),
     signedUrl: vi.fn(async (path: string) => `https://storage.test/${path}?sig`),
     remove: vi.fn(async (paths: string[]) => {
       for (const p of paths) state.files.delete(p);
@@ -217,7 +232,7 @@ function build() {
     getSession: vi.fn(async () => ({ userId: OWNER_ID, isOwner: true })),
     sendMagicLink: vi.fn(async () => undefined),
     generateMagicLink: vi.fn(async () => "https://auth.test/link"),
-    ownerDisplayName: vi.fn(async () => "Priyaranjan"),
+    ownerNames: vi.fn(async () => ({ owner: "Ramesh Sahu", signature: "Anil Sahu" })),
     exchangeCode: vi.fn(),
     setSession: vi.fn(),
     signOut: vi.fn(),

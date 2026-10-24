@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Box from "@mui/material/Box";
@@ -28,7 +28,7 @@ export function RouteModal({
   maxWidth?: "sm" | "md" | "lg";
   children: React.ReactNode;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
 

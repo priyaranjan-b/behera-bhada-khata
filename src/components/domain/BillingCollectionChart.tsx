@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
+import AppCard from "@/components/ui/AppCard";
 import CardContent from "@mui/material/CardContent";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
@@ -31,7 +31,7 @@ export default function BillingCollectionChart({ data }: { data: MonthlyTrendPoi
   const rate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : null;
 
   return (
-    <Card variant="outlined" sx={{ width: "100%" }}>
+    <AppCard sx={{ width: "100%" }}>
       <CardContent>
         <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
           <Typography component="h2" variant="subtitle2" gutterBottom>
@@ -90,6 +90,6 @@ export default function BillingCollectionChart({ data }: { data: MonthlyTrendPoi
           />
         )}
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }

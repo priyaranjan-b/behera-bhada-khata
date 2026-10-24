@@ -3,15 +3,8 @@
 import { useMemo, useState } from "react";
 import type { GridColDef } from "@mui/x-data-grid";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlineOutlined";
-import AppDataGrid from "@/components/ui/AppDataGrid";
-import {
-  DashboardCardPanel,
-  EmptyState,
-  IdentityCell,
-  StatusBadge,
-  TagPill,
-} from "@/components/ui/DataDisplay";
-import PanelFilterSelect from "@/components/ui/PanelFilterSelect";
+import DataTable from "@/components/ui/DataTable";
+import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
 import type { TenantSearchRow } from "@/lib/contracts";
@@ -124,39 +117,24 @@ export default function TenantSearchList({ rows }: { rows: TenantSearchRow[] }) 
   const [status, setStatus] = useState<StatusFilter>("current");
   const filtered = useMemo(() => rows.filter((row) => matchesStatus(row, status)), [rows, status]);
 
-  const statusFilter = (
-    <PanelFilterSelect<StatusFilter>
-      label="Status"
-      value={status}
-      options={STATUS_OPTIONS}
-      onChange={setStatus}
-    />
-  );
-
   return (
-    <DashboardCardPanel
+    <DataTable<TenantSearchRow>
       title="Tenants"
-      subtitle={`${filtered.length} of ${rows.length}`}
-      action={rows.length > 0 ? statusFilter : undefined}
-      flush
-    >
-      {rows.length === 0 ? (
+      rows={filtered}
+      totalCount={rows.length}
+      columns={columns}
+      getRowId={(row) => row.tenantId}
+      filters={[{ label: "Show", value: status, options: STATUS_OPTIONS, onChange: setStatus, defaultValue: "current" }]}
+      search={{ placeholder: "Search tenant, house…" }}
+      noRowsLabel="No tenants match this filter."
+      initialState={{ sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] } }}
+      emptyState={
         <EmptyState
           icon={<PeopleOutlineIcon />}
           title="No tenants yet"
           description="Open a tower under Properties and add a tenant to one or more of its houses."
         />
-      ) : (
-        <AppDataGrid<TenantSearchRow>
-          rows={filtered}
-          columns={columns}
-          getRowId={(row) => row.tenantId}
-          quickFilter
-          label="Tenants"
-          localeText={{ noRowsLabel: "No tenants match this filter." }}
-          initialState={{ sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] } }}
-        />
-      )}
-    </DashboardCardPanel>
+      }
+    />
   );
 }

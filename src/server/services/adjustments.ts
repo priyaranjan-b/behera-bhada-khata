@@ -6,6 +6,7 @@ import { createAdjustmentSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
 import { confirmUrl, generateConfirmToken, notifyTenant, storeOwnerSignature, withUploadedFile } from "./confirmLinks";
+import { ownerSignatureBytes } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,7 +27,8 @@ export async function createAdjustment(
   const tenant = await db.tenants.get(payment.tenant_id);
   if (!tenant) notFound("Tenant");
 
-  const { id, ownerSignaturePath } = await storeOwnerSignature("adjustments", tenant, input.ownerSignaturePng);
+  const signature = await ownerSignatureBytes(db, input.ownerSignaturePng);
+  const { id, ownerSignaturePath } = await storeOwnerSignature("adjustments", tenant, signature);
   const { token, tokenHash, expiresAt } = generateConfirmToken();
 
   // The database checks the allocations against the original payment,

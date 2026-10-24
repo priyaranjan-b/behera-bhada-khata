@@ -1,17 +1,20 @@
 "use client";
 
 import Box from "@mui/material/Box";
+import useScrollTrigger from "@mui/material/useScrollTrigger";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
 import { Search } from "./Search";
 import { TOPBAR_HEIGHT } from "./nav";
-import { shellSurfaceSx } from "./surface";
+import { topBarGlassSx } from "./surface";
 
 /**
  * Desktop top bar (template Header, as a full-width sticky bar): search in the
  * centre, color-mode switch on the right. Same height as the side menu's brand
- * block so the two bottom borders form one line.
+ * block so the two bottom borders form one line. Always pinned; frosted glass
+ * with a shadow once the page scrolls, so content passes visibly underneath.
  */
 export function Header() {
+  const scrolled = useScrollTrigger({ disableHysteresis: true, threshold: 4 });
   return (
     <Box
       component="header"
@@ -29,11 +32,11 @@ export function Header() {
           borderBottom: "1px solid",
           borderColor: "divider",
         },
-        shellSurfaceSx,
+        (theme) => topBarGlassSx(theme, scrolled),
       ]}
     >
       <Box sx={{ gridColumn: 2 }}>
-        <Search />
+        <Search showShortcut />
       </Box>
       <Box sx={{ justifySelf: "end" }}>
         <ColorModeIconDropdown aria-label="Change color mode" />

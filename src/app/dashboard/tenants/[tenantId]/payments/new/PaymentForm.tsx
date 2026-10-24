@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
@@ -9,7 +9,6 @@ import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import { type SignaturePadHandle } from "@/components/ui/SignaturePad";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import {
   AmountRow,
@@ -17,9 +16,9 @@ import {
   FileAttachmentsField,
   FormActions,
   SectionCard,
-  SignatureField,
   SummaryLine,
 } from "@/components/ui";
+import { OwnerSignatureField, type OwnerSignatureHandle } from "@/components/domain/OwnerSignatureField";
 import { suggestAllocations, summarizeBalance, type PeriodLike } from "@/lib/domain/allocation";
 import { currentMonthKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
@@ -27,19 +26,22 @@ import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTena
 import { prepareProofFile } from "@/lib/proofImages";
 import { PROOF_LIMITS } from "@/lib/validation";
 import { api, errorMessage } from "@/lib/api-client";
-import type { CreatePaymentInput } from "@/lib/contracts";
+import type { CreatePaymentInput, SavedSignature } from "@/lib/contracts";
 
 export default function PaymentForm({
   tenantId,
   periods,
+  savedSignature,
   inDialog = false,
 }: {
   tenantId: string;
   periods: PeriodLike[];
+  /** From the Profile page; used unless the owner signs by hand. */
+  savedSignature: SavedSignature | null;
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => todayKey());
   const [mode, setMode] = useState("bank_transfer");
@@ -49,7 +51,7 @@ export default function PaymentForm({
   const [manualAllocations, setManualAllocations] = useState<Record<string, number> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const padHandle = useRef<SignaturePadHandle | null>(null);
+  const signatureHandle = useRef<OwnerSignatureHandle | null>(null);
 
   const amountNumber = Number(amount) || 0;
   const suggested = useMemo(() => suggestAllocations(periods, amountNumber), [periods, amountNumber]);
@@ -73,7 +75,8 @@ export default function PaymentForm({
     e.preventDefault();
     setError(null);
 
-    if (!padHandle.current || padHandle.current.isEmpty()) {
+    const signature = signatureHandle.current?.value();
+    if (signature === null) {
       setError("Please sign before saving");
       return;
     }
@@ -92,7 +95,7 @@ export default function PaymentForm({
           mode: mode as CreatePaymentInput["mode"],
           note: note || undefined,
           allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
-          ownerSignaturePng: padHandle.current.toPngDataUrl(),
+          ownerSignaturePng: signature,
           notifyTenant: notify,
         },
         proofs
@@ -168,7 +171,7 @@ export default function PaymentForm({
               disabled={submitting}
             />
 
-            <SignatureField title="Owner signature" onReady={(handle) => (padHandle.current = handle)} />
+            <OwnerSignatureField saved={savedSignature} onReady={(handle) => (signatureHandle.current = handle)} />
           </Stack>
         </Grid>
 

@@ -10,7 +10,7 @@ import DialogActions from "@mui/material/DialogActions";
 import MuiLink from "@mui/material/Link";
 import Typography from "@mui/material/Typography";
 import Link from "@/components/ui/Link";
-import AppDataGrid from "@/components/ui/AppDataGrid";
+import DataTable from "@/components/ui/DataTable";
 import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { DetailList, DetailRow, GridCell } from "@/components/ui";
 import { formatFloor } from "@/lib/domain/tenant";
@@ -42,7 +42,17 @@ function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () =>
   );
 }
 
-export default function UnitsGrid({ units, propertyName }: { units: UnitRow[]; propertyName: string }) {
+export default function UnitsGrid({
+  units,
+  propertyName,
+  subtitle,
+  emptyState,
+}: {
+  units: UnitRow[];
+  propertyName: string;
+  subtitle?: string;
+  emptyState?: React.ReactNode;
+}) {
   const [historyOf, setHistoryOf] = useState<UnitRow | null>(null);
 
   const columns: GridColDef<UnitRow>[] = [
@@ -121,12 +131,17 @@ export default function UnitsGrid({ units, propertyName }: { units: UnitRow[]; p
 
   return (
     <>
-      <AppDataGrid<UnitRow>
+      <DataTable<UnitRow>
+        title="Houses"
+        subtitle={subtitle}
         rows={units}
         columns={columns}
         getRowId={(row) => row.unitCode}
-        quickFilter={units.length > 8}
+        rowDensity="dense"
+        search={units.length > 8 ? { placeholder: "Search house, occupant…" } : false}
         label={`Houses at ${propertyName}`}
+        noRowsLabel="No houses match."
+        emptyState={emptyState}
       />
       <HistoryDialog unit={historyOf} onClose={() => setHistoryOf(null)} />
     </>

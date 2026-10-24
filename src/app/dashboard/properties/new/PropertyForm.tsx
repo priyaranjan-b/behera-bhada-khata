@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -11,7 +11,7 @@ import { api, errorMessage } from "@/lib/api-client";
 import type { LocationSummary } from "@/lib/contracts";
 
 export default function PropertyForm({ locations }: { locations: LocationSummary[] }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [locationCode, setLocationCode] = useState(locations[0]?.code ?? "");
   const [towerCode, setTowerCode] = useState("");
   const [name, setName] = useState("");

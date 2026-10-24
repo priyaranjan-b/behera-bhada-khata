@@ -5,7 +5,9 @@ vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
 
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
-const { createTenant, getTenantDetail, moveOutTenant, updateTenant } = await import("@/server/services/tenants");
+const { correctPaidThrough, createTenant, getTenantDetail, moveOutTenant, updateTenant } = await import(
+  "@/server/services/tenants"
+);
 const { getPropertyDetail } = await import("@/server/services/properties");
 const { confirmRecord } = await import("@/server/services/confirm");
 const { createPayment } = await import("@/server/services/payments");
@@ -138,10 +140,23 @@ describe("receipts and storage", () => {
 
     await confirmRecord("token", { recordType: "payment", otpCode: "123456", tenantSignaturePng: PNG_DATA_URL }, { ip: "x" });
     expect(vi.mocked(generateReceiptPdf).mock.calls[0][0]).toMatchObject({
-      propertyName: "Tower 1",
+      propertyName: "Arnapal Chakk Complex, Tower 1",
       unitCodes: ["AC-T1-G01", "AC-T1-G02"],
     });
     const [, patch] = fakes.system.payments.acknowledge.mock.calls[0] as unknown as [string, { pdf_path: string }];
     expect(patch.pdf_path).toMatch(/^payments\/tenant-1\/payment-1\/[0-9a-f-]{36}\/receipt\.pdf$/);
+  });
+});
+
+describe("correctPaidThrough", () => {
+  it("takes a yyyy-MM month and passes the first of it to the database", async () => {
+    await correctPaidThrough(ctx, "tenant-1", { paidThrough: "2026-07" });
+    expect(fakes.owner.tenants.correctPaidThrough).toHaveBeenCalledWith("tenant-1", "2026-07-01");
+  });
+
+  it("rejects a bad month and an unknown tenant", async () => {
+    await expect(correctPaidThrough(ctx, "tenant-1", { paidThrough: "July" })).rejects.toMatchObject({ status: 400 });
+    await expect(correctPaidThrough(ctx, "nobody", { paidThrough: "2026-07" })).rejects.toMatchObject({ status: 404 });
+    expect(fakes.owner.tenants.correctPaidThrough).not.toHaveBeenCalled();
   });
 });

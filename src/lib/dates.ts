@@ -85,3 +85,13 @@ export function formatDateTime(instant: Date | string): string {
     timeZoneName: "short",
   });
 }
+
+/** "24 Oct 2026" for a date key (yyyy-MM-dd); fixed locale and UTC, like formatMonth. */
+export function formatDateKey(dateKey: string): string {
+  return new Date(`${dateKey.slice(0, 10)}T00:00:00Z`).toLocaleDateString(APP_LOCALE, {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}

@@ -27,13 +27,12 @@ export function recordFolder(kind: "payments" | "adjustments", tenantId: string,
   return `${kind}/${tenantId}/${recordId}`;
 }
 
-/** New record id + owner signature uploaded under it. */
+/** New record id + owner signature (drawn, or the saved one) uploaded under it. */
 export async function storeOwnerSignature(
   kind: "payments" | "adjustments",
   tenant: Pick<Tenant, "id">,
-  signaturePng: string
+  bytes: Uint8Array
 ): Promise<{ id: string; ownerSignaturePath: string }> {
-  const bytes = pngDataUrlToBytes(signaturePng);
   const id = randomUUID();
   const ownerSignaturePath = `${recordFolder(kind, tenant.id, id)}/owner-signature.png`;
   try {

@@ -3,7 +3,8 @@
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
-import Link from "@/components/ui/Link";
+import LinkButton from "@/components/ui/Loading/LinkButton";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 /** Button group: full-width stack on phones, a row from `sm`. */
 export function ActionStack({ align = "end", children }: { align?: "start" | "end"; children: React.ReactNode }) {
@@ -54,19 +55,21 @@ export function FormActions({
             {cancelLabel}
           </Button>
         ) : cancelHref ? (
-          <Button component={Link} href={cancelHref} variant="outlined" size="large">
+          <LinkButton href={cancelHref} variant="outlined" size="large" disabled={pending}>
             {cancelLabel}
-          </Button>
+          </LinkButton>
         ) : null}
-        <Button
+        <LoadingButton
           type={onAction ? "button" : "submit"}
           onClick={onAction}
           variant="contained"
           size="large"
-          disabled={disabled || pending}
+          disabled={disabled}
+          loading={pending}
+          loadingPosition="start"
         >
           {pending && pendingLabel ? pendingLabel : submitLabel}
-        </Button>
+        </LoadingButton>
       </Stack>
     </Stack>
   );

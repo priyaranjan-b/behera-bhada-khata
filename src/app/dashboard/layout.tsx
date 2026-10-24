@@ -8,5 +8,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await serverApi.auth.session();
   // Not the owner: send them back to sign in with a clear message.
   if (!session.isOwner) redirect("/login?error=owner");
-  return <DashboardShell ownerEmail={session.email}>{children}</DashboardShell>;
+  const profile = await serverApi.dashboard.profile();
+  return (
+    <DashboardShell ownerEmail={session.email} ownerName={profile.displayName ?? undefined}>
+      {children}
+    </DashboardShell>
+  );
 }

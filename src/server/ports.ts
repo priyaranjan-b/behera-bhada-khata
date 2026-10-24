@@ -10,6 +10,7 @@ import type {
   Database,
   LedgerStatus,
   Location,
+  OwnerProfile,
   Payment,
   PaymentAllocation,
   PaymentProof,
@@ -109,6 +110,12 @@ export interface AcknowledgementPatch {
 // ---- The owner's data (an implementation must refuse anyone but the single app owner) ----
 
 export interface OwnerRepositories {
+  /** The owner's name (0013): one row. */
+  ownerProfile: {
+    get(): Promise<OwnerProfile | null>;
+    /** Creates or replaces the row. */
+    save(profile: Pick<OwnerProfile, "first_name" | "last_name" | "signature_name" | "signature_path">): Promise<void>;
+  };
   locations: {
     /** By code. */
     list(): Promise<Location[]>;
@@ -154,6 +161,12 @@ export interface OwnerRepositories {
     update(id: string, changes: TenantChanges): Promise<void>;
     /** Ends every tenancy on `date`, marks the tenant inactive and drops untouched later months. */
     moveOut(id: string, date: string): Promise<void>;
+    /**
+     * Fixes an active tenant's "rent paid up to" (0014): billing starts the
+     * month after. Earlier adds the months as owed; later drops months, 409
+     * if one has a payment. Returns the new billing start.
+     */
+    correctPaidThrough(id: string, paidThrough: string): Promise<string>;
   };
   rentPeriods: {
     /**
@@ -206,6 +219,9 @@ export interface OwnerRepositories {
 // the tenant confirm link (possession of the token), rent-period upkeep, rate limits and cron. ----
 
 export interface SystemRepositories {
+  locations: {
+    get(locationCode: string): Promise<Location | null>;
+  };
   properties: {
     get(propertyCode: string): Promise<Property | null>;
   };
@@ -227,7 +243,11 @@ export interface SystemRepositories {
   };
   payments: {
     findByTokenHash(tokenHash: string): Promise<Payment | null>;
+    /** For an adjustment receipt: the receipt number it corrects. */
+    get(id: string): Promise<Payment | null>;
     listAllocations(paymentId: string): Promise<PaymentAllocation[]>;
+    /** Proof files, appended to the tenant-signed receipt. */
+    listProofs(paymentIds: string[]): Promise<PaymentProof[]>;
     /**
      * Records the tenant's signature, OTP time and signed receipt. Moves no
      * money (the payment counted when it was recorded). False if it was
@@ -260,8 +280,12 @@ export interface AuthGateway {
   sendMagicLink(email: string, redirectTo: string, options: { allowSignUp: boolean }): Promise<void>;
   /** Dev only: creates the sign-in link without sending email. */
   generateMagicLink(email: string, redirectTo: string): Promise<string>;
-  /** Name to print on receipts for the app owner (profile name, else email), or null if none is set. */
-  ownerDisplayName(): Promise<string | null>;
+  /**
+   * For receipts, which the tenant's confirm flow renders without a session:
+   * the owner's name (owner_profile, else the account's name or email) and
+   * the name under the signature (signature_name, else the owner's name).
+   */
+  ownerNames(): Promise<{ owner: string; signature: string } | null>;
   /** Completes a PKCE sign-in and sets the session cookies. */
   exchangeCode(code: string): Promise<void>;
   /** Completes an implicit-flow sign-in and sets the session cookies. */

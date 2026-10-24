@@ -70,6 +70,7 @@ export async function getConfirmView(token: string): Promise<ConfirmView> {
 
   return {
     recordType: ctx.recordType,
+    receiptNo: ctx.record.receiptNo,
     acknowledged: Boolean(ctx.record.acknowledgedAt),
     isExpired: isExpired(ctx),
     amount: ctx.record.amount,

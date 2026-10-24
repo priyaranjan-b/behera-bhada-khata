@@ -1,25 +1,23 @@
-import Link from "@/components/ui/Link";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import Card from "@mui/material/Card";
 import Grid from "@mui/material/Grid";
-import Button from "@mui/material/Button";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
-import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { serverApi } from "@/lib/api-client/server";
 import { EmptyState, PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
-import { BadgeRow, IconTile } from "@/components/ui";
+import { AppCard, BadgeRow, IconTile } from "@/components/ui";
+import LinkButton from "@/components/ui/Loading/LinkButton";
 
 export default async function PropertiesPage() {
   const groups = await serverApi.dashboard.properties.list();
   const towerCount = groups.reduce((n, g) => n + g.properties.length, 0);
 
   const addButton = (
-    <Button component={Link} href="/dashboard/properties/new" variant="contained" startIcon={<AddRoundedIcon />}>
+    <LinkButton href="/dashboard/properties/new" variant="contained" startIcon={<AddRoundedIcon />}>
       Add tower
-    </Button>
+    </LinkButton>
   );
 
   return (
@@ -31,14 +29,14 @@ export default async function PropertiesPage() {
       />
 
       {towerCount === 0 ? (
-        <Card variant="outlined">
+        <AppCard>
           <EmptyState
             icon={<ApartmentRoundedIcon />}
             title="No towers yet"
             description="Load the master data (supabase/seed) or add a tower to a site to start tracking rent."
             action={groups.length > 0 ? addButton : undefined}
           />
-        </Card>
+        </AppCard>
       ) : null}
 
       {groups.map(({ location, properties }) => (
@@ -59,7 +57,7 @@ export default async function PropertiesPage() {
               const vacant = property.totalUnits - property.occupiedUnits;
               return (
                 <Grid key={property.code} size={{ xs: 12, sm: 6, lg: 4 }}>
-                  <Card variant="outlined" sx={{ height: "100%" }}>
+                  <AppCard href={`/dashboard/properties/${property.code}`} sx={{ height: "100%" }}>
                     <Stack spacing={2} useFlexGap sx={{ height: "100%" }}>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
                         <IconTile icon={<ApartmentRoundedIcon fontSize="small" />} size="sm" />
@@ -71,6 +69,7 @@ export default async function PropertiesPage() {
                             {property.code}
                           </Typography>
                         </Box>
+                        <ChevronRightRoundedIcon aria-hidden color="action" />
                       </Stack>
 
                       <BadgeRow>
@@ -87,21 +86,8 @@ export default async function PropertiesPage() {
                           </>
                         )}
                       </BadgeRow>
-
-                      <Box sx={{ mt: "auto" }}>
-                        <Button
-                          component={Link}
-                          href={`/dashboard/properties/${property.code}`}
-                          variant="outlined"
-                          size="small"
-                          endIcon={<ArrowForwardRoundedIcon />}
-                          aria-label={`View ${property.name}`}
-                        >
-                          View
-                        </Button>
-                      </Box>
                     </Stack>
-                  </Card>
+                  </AppCard>
                 </Grid>
               );
             })}

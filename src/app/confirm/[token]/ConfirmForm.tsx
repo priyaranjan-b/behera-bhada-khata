@@ -12,6 +12,7 @@ import StepLabel from "@mui/material/StepLabel";
 import { type SignaturePadHandle } from "@/components/ui/SignaturePad";
 import { SectionCard, SignatureField } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 type ConfirmStep = "idle" | "sendingOtp" | "otpSent" | "submitting" | "success";
 
@@ -106,9 +107,9 @@ export default function ConfirmForm({
       {stepper}
 
       {step === "idle" || step === "sendingOtp" ? (
-        <Button variant="contained" size="large" fullWidth onClick={sendOtp} disabled={step === "sendingOtp"}>
+        <LoadingButton variant="contained" size="large" fullWidth onClick={sendOtp} loading={step === "sendingOtp"}>
           {step === "sendingOtp" ? "Sending code…" : `Send verification code to ${maskedPhone}`}
-        </Button>
+        </LoadingButton>
       ) : (
         <>
           <SignatureField title="Your signature" onReady={(handle) => (padHandle.current = handle)} />
@@ -126,9 +127,15 @@ export default function ConfirmForm({
             />
           </SectionCard>
 
-          <Button variant="contained" size="large" fullWidth onClick={submitConfirmation} disabled={step === "submitting"}>
+          <LoadingButton
+            variant="contained"
+            size="large"
+            fullWidth
+            onClick={submitConfirmation}
+            loading={step === "submitting"}
+          >
             {step === "submitting" ? "Saving…" : "Sign & acknowledge"}
-          </Button>
+          </LoadingButton>
         </>
       )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -11,7 +11,7 @@ import { api, errorMessage } from "@/lib/api-client";
 import type { UnitType } from "@/lib/types";
 
 export default function UnitForm({ propertyCode }: { propertyCode: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [houseNumber, setHouseNumber] = useState("");
   const [floor, setFloor] = useState("");
   const [unitType, setUnitType] = useState<UnitType>("residential");

@@ -14,6 +14,7 @@ import EventRepeatRoundedIcon from "@mui/icons-material/EventRepeatRounded";
 import { BrandMark } from "@/components/shell/BrandMark";
 import { PublicCard, PublicHeading, PublicLayout } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 const valuePoints = [
   {
@@ -140,9 +141,9 @@ export default function LoginForm({
                   fullWidth
                 />
                 {state.step === "error" ? <Alert severity="error">{state.message}</Alert> : null}
-                <Button type="submit" variant="contained" size="large" fullWidth disabled={state.step === "sending"}>
+                <LoadingButton type="submit" variant="contained" size="large" fullWidth loading={state.step === "sending"}>
                   {state.step === "sending" ? "Sending…" : "Send sign-in link"}
-                </Button>
+                </LoadingButton>
                 {devLogin ? (
                   <Typography variant="caption" color="textSecondary">
                     Dev mode: no email will actually be sent - you&apos;ll get a clickable sign-in

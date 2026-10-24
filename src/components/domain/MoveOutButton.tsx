@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -15,6 +15,7 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { api, errorMessage } from "@/lib/api-client";
 import { todayKey } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 /**
  * Ends all of a tenant's houses on a date. Their ledger stays: dues up to the
@@ -32,7 +33,7 @@ export default function MoveOutButton({
   unitCodes: string[];
   outstanding: number;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(todayKey());
   const [busy, setBusy] = useState(false);
@@ -87,9 +88,9 @@ export default function MoveOutButton({
           <Button onClick={() => setOpen(false)} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="contained" color="error" onClick={confirm} disabled={busy || !date}>
+          <LoadingButton variant="contained" color="error" onClick={confirm} disabled={!date} loading={busy}>
             {busy ? "Moving out…" : "Move out"}
-          </Button>
+          </LoadingButton>
         </DialogActions>
       </Dialog>
     </>

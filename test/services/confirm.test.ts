@@ -38,7 +38,8 @@ describe("confirmRecord", () => {
     expect(result.receiptUrl).toContain(patch.pdf_path);
     // The owner's real name goes on the receipt.
     expect(vi.mocked(generateReceiptPdf).mock.calls[0][0]).toMatchObject({
-      ownerName: "Priyaranjan",
+      ownerName: "Ramesh Sahu",
+      signatureName: "Anil Sahu",
       totalAmount: 5000,
       tenantSignaturePng: expect.any(Uint8Array),
       otpVerifiedAt: expect.any(String),

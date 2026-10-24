@@ -13,7 +13,7 @@ import { tenantDisplayName } from "@/lib/domain/tenant";
 import { buildTenantLedger } from "@/lib/domain/tenantLedger";
 import { errorMessage } from "@/lib/errors";
 import type { RentPeriod } from "@/lib/types";
-import { createTenantSchema, moveOutSchema, updateTenantSchema } from "@/lib/validation";
+import { correctPaidThroughSchema, createTenantSchema, moveOutSchema, updateTenantSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
 import { notFound, parseInput, type OwnerContext } from "./context";
@@ -245,6 +245,14 @@ export async function updateTenant(ctx: OwnerContext, tenantId: string, body: un
 }
 
 /** Ends every tenancy on the move-out date; dues up to then stay on the ledger. */
+/** Fixes "rent paid up to" on an active tenant; see correct_paid_through (0014). */
+export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const { paidThrough } = parseInput(correctPaidThroughSchema, body);
+  const db = await ownerDb();
+  if (!(await db.tenants.get(tenantId))) notFound("Tenant");
+  await db.tenants.correctPaidThrough(tenantId, paidThrough);
+}
+
 export async function moveOutTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const { moveOutDate } = parseInput(moveOutSchema, body);
   const db = await ownerDb();

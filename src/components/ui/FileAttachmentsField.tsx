@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
-import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
@@ -13,6 +11,8 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import { formatBytes } from "@/lib/proofImages";
 import { SectionCard } from "./Surfaces";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
+import Loader from "@/components/ui/Loading/Loader";
 
 /**
  * Section for attaching several files (photos, PDFs): a picker that also
@@ -127,21 +127,22 @@ export function FileAttachmentsField({
           }}
         />
         <Stack spacing={1} sx={{ alignItems: "center" }}>
-          <Button
+          <LoadingButton
             variant="outlined"
             startIcon={<AttachFileRoundedIcon />}
             onClick={() => inputRef.current?.click()}
-            disabled={disabled || busy || full}
+            disabled={disabled || full}
+            loading={busy}
           >
             {full ? "Limit reached" : "Add photos or PDFs"}
-          </Button>
+          </LoadingButton>
           <Typography variant="caption" color="textSecondary">
             or drop files here
           </Typography>
         </Stack>
       </Box>
 
-      {busy ? <LinearProgress aria-label="Preparing files" /> : null}
+      {busy ? <Loader variant="bar" label="Preparing files" /> : null}
       {error ? (
         <Typography variant="caption" color="error" role="alert">
           {error}

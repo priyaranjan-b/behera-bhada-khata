@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
+import AppCard from "@/components/ui/AppCard";
 import CardContent from "@mui/material/CardContent";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -49,7 +49,7 @@ export default function StatCard({
     : undefined;
 
   return (
-    <Card variant="outlined" sx={{ height: "100%", flexGrow: 1 }}>
+    <AppCard sx={{ height: "100%", flexGrow: 1 }}>
       <CardContent>
         <Typography component="h2" variant="subtitle2" gutterBottom>
           {title}
@@ -86,6 +86,6 @@ export default function StatCard({
           </Box>
         </Stack>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }

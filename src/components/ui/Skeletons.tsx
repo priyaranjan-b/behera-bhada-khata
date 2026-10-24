@@ -2,7 +2,7 @@
 // like the real component so the page doesn't jump when data arrives.
 // Server-safe (no "use client").
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
+import AppCard from "@/components/ui/AppCard";
 import CardContent from "@mui/material/CardContent";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
@@ -42,7 +42,7 @@ export function PageHeaderSkeleton({ action = false }: { action?: boolean }) {
 /** Matches `StatCard`: title, value + badge, caption, 50px sparkline. */
 export function StatCardSkeleton() {
   return (
-    <Card aria-hidden variant="outlined" sx={{ height: "100%", flexGrow: 1 }}>
+    <AppCard aria-hidden sx={{ height: "100%", flexGrow: 1 }}>
       <CardContent>
         <Typography variant="subtitle2" gutterBottom>
           <Skeleton width="40%" />
@@ -62,14 +62,14 @@ export function StatCardSkeleton() {
           <Skeleton variant="rounded" height={50} />
         </Stack>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }
 
 /** Matches `BillingCollectionChart`: header row, total, caption, 260px chart. */
 export function ChartCardSkeleton({ height = 260 }: { height?: number }) {
   return (
-    <Card aria-hidden variant="outlined" sx={{ width: "100%" }}>
+    <AppCard aria-hidden sx={{ width: "100%" }}>
       <CardContent>
         <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
           <Typography variant="subtitle2" gutterBottom sx={{ width: 160 }}>
@@ -85,14 +85,14 @@ export function ChartCardSkeleton({ height = 260 }: { height?: number }) {
         </Typography>
         <Skeleton variant="rounded" height={height} sx={{ mt: 2.5 }} />
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }
 
 /** Matches a `SectionCard` of `DetailRow`s (label left, value right). */
 export function DetailCardSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <Card aria-hidden component="section" variant="outlined">
+    <AppCard aria-hidden component="section">
       <Stack spacing={2}>
         <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
           <Typography variant="subtitle2" sx={{ width: 160 }}>
@@ -111,46 +111,47 @@ export function DetailCardSkeleton({ rows = 4 }: { rows?: number }) {
           </Stack>
         ))}
       </Stack>
-    </Card>
+    </AppCard>
   );
 }
 
-/** Matches a flush `DashboardCardPanel` holding an `AppDataGrid` (52px rows). */
+/** Matches a `DataTable`: one toolbar row, a header band and 56px rows. */
 export function PanelSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <Card aria-hidden component="section" variant="outlined" sx={{ p: 0 }}>
-      <Stack spacing={2} sx={{ pt: 2 }}>
-        <Box sx={{ px: 2, width: 260 }}>
-          <Typography variant="subtitle2">
-            <Skeleton width="50%" />
-          </Typography>
-          <Typography variant="caption" component="p">
-            <Skeleton />
-          </Typography>
-        </Box>
-        <Box>
-          <Skeleton variant="rectangular" height={40} />
-          {Array.from({ length: rows }, (_, i) => (
-            <Stack
-              key={i}
-              direction="row"
-              spacing={1.25}
-              sx={{ alignItems: "center", height: 52, px: 2, borderBottom: 1, borderColor: "divider" }}
-            >
-              <Skeleton variant="circular" width={32} height={32} sx={{ flexShrink: 0 }} />
-              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <Typography variant="body2">
-                  <Skeleton width="30%" />
-                </Typography>
-                <Typography variant="caption">
-                  <Skeleton width="20%" />
-                </Typography>
-              </Box>
-              <Skeleton variant="rounded" width={72} height={24} />
-            </Stack>
-          ))}
-        </Box>
+    <AppCard aria-hidden component="section" sx={{ p: 0 }}>
+      <Stack
+        direction="row"
+        sx={{ alignItems: "center", gap: 2, px: 2, py: 1.25, minHeight: 60, borderBottom: 1, borderColor: "divider" }}
+      >
+        <Typography variant="subtitle1" sx={{ width: 160 }}>
+          <Skeleton />
+        </Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <Skeleton variant="rounded" width={150} height={36} sx={{ borderRadius: 999, display: { xs: "none", sm: "block" } }} />
+        <Skeleton variant="rounded" width={220} height={36} sx={{ borderRadius: 999, display: { xs: "none", sm: "block" } }} />
+        <Skeleton variant="circular" width={36} height={36} />
+        <Skeleton variant="circular" width={36} height={36} />
       </Stack>
-    </Card>
+      <Skeleton variant="rectangular" height={44} />
+      {Array.from({ length: rows }, (_, i) => (
+        <Stack
+          key={i}
+          direction="row"
+          spacing={1.25}
+          sx={{ alignItems: "center", height: 56, px: 2, borderBottom: 1, borderColor: "divider" }}
+        >
+          <Skeleton variant="circular" width={32} height={32} sx={{ flexShrink: 0 }} />
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography variant="body2">
+              <Skeleton width="30%" />
+            </Typography>
+            <Typography variant="caption">
+              <Skeleton width="20%" />
+            </Typography>
+          </Box>
+          <Skeleton variant="rounded" width={72} height={24} />
+        </Stack>
+      ))}
+    </AppCard>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Papa from "papaparse";
 import type { GridColDef } from "@mui/x-data-grid";
 import Stack from "@mui/material/Stack";
@@ -11,7 +11,7 @@ import Alert from "@mui/material/Alert";
 import Tooltip from "@mui/material/Tooltip";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
-import AppDataGrid from "@/components/ui/AppDataGrid";
+import DataTable from "@/components/ui/DataTable";
 import { DashboardCardPanel, StatusBadge } from "@/components/ui/DataDisplay";
 import { ActionStack, BadgeRow, DropzoneCard, FormActions, GridCell } from "@/components/ui";
 import { createTenantSchema } from "@/lib/validation";
@@ -139,7 +139,7 @@ export default function BulkTenantUpload({
   propertyCode: string;
   vacantUnitCodes: string[];
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -284,10 +284,15 @@ export default function BulkTenantUpload({
             }
             flush
           >
-            <AppDataGrid<ParsedRow>
+            <DataTable<ParsedRow>
+              variant="plain"
               rows={rows}
               columns={previewColumns}
               getRowId={(row) => row.rowNumber}
+              rowDensity="dense"
+              search={false}
+              columnsButton={false}
+              filterButton={false}
               label="CSV preview"
             />
           </DashboardCardPanel>

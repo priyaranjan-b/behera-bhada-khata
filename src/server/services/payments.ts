@@ -15,6 +15,7 @@ import {
   withUploadedFile,
 } from "./confirmLinks";
 import { checkProofFiles, storeProofs } from "./proofs";
+import { ownerSignatureBytes, savedSignatureFor } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
 import { ensureRentPeriodsFor } from "./periods";
 
@@ -24,7 +25,10 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
   if (!tenant) notFound("Tenant");
 
   await ensureRentPeriodsFor([tenantId]);
-  const periods = await db.rentPeriods.listForTenants([tenantId], { openOnly: true });
+  const [periods, savedSignature] = await Promise.all([
+    db.rentPeriods.listForTenants([tenantId], { openOnly: true }),
+    savedSignatureFor(db, ctx),
+  ]);
 
   return {
     tenantId,
@@ -35,6 +39,7 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
       amount_due: p.amount_due,
       amount_allocated: p.amount_allocated,
     })),
+    savedSignature,
   };
 }
 
@@ -51,7 +56,8 @@ export async function createPayment(
   const tenant = await db.tenants.get(tenantId);
   if (!tenant) notFound("Tenant");
 
-  const { id, ownerSignaturePath } = await storeOwnerSignature("payments", tenant, input.ownerSignaturePng);
+  const signature = await ownerSignatureBytes(db, input.ownerSignaturePng);
+  const { id, ownerSignaturePath } = await storeOwnerSignature("payments", tenant, signature);
   const proofRows = await withUploadedFile(ownerSignaturePath, () =>
     storeProofs(recordFolder("payments", tenant.id, id), proofFiles)
   );
@@ -94,9 +100,10 @@ export async function getAdjustPaymentForm(ctx: OwnerContext, paymentId: string)
   // Only a confirmed payment can be corrected; a pending one is still awaiting the tenant.
   if (!payment || payment.status !== "confirmed") notFound("Payment");
 
-  const [tenant, allocations] = await Promise.all([
+  const [tenant, allocations, savedSignature] = await Promise.all([
     db.tenants.get(payment.tenant_id),
     db.payments.listAllocations(paymentId),
+    savedSignatureFor(db, ctx),
   ]);
   const rentPeriods = await db.rentPeriods.listByIds(allocations.map((a) => a.rent_period_id));
   const periodMonthById = new Map(rentPeriods.map((p) => [p.id, p.period_month]));
@@ -112,6 +119,7 @@ export async function getAdjustPaymentForm(ctx: OwnerContext, paymentId: string)
       periodMonth: periodMonthById.get(a.rent_period_id) ?? "",
       originallyAllocated: Number(a.amount_allocated),
     })),
+    savedSignature,
   };
 }
 

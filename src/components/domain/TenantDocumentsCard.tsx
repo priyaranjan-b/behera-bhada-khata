@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import Avatar from "@mui/material/Avatar";
@@ -12,7 +12,6 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
-import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -29,6 +28,8 @@ import type { TenantDocumentView } from "@/lib/contracts";
 import { dateKeyOf } from "@/lib/dates";
 import { formatBytes, prepareProofFile } from "@/lib/proofImages";
 import { PROOF_LIMITS, TENANT_DOCUMENT_TYPES } from "@/lib/validation";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
+import Loader from "@/components/ui/Loading/Loader";
 
 /** A file added on the Edit tenant page with its own type; uploaded when the form is saved. */
 export interface PendingDocument {
@@ -68,7 +69,7 @@ export default function TenantDocumentsCard({
   onPendingChange: (pending: PendingDocument[]) => void;
   disabled?: boolean;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState(saved);
   const [preparing, setPreparing] = useState(false);
@@ -131,14 +132,15 @@ export default function TenantDocumentsCard({
       caption="ID proof, passport photo, rent agreement… Photos or PDFs, kept privately with this tenant."
       icon={<DescriptionOutlinedIcon />}
       action={
-        <Button
+        <LoadingButton
           size="small"
           startIcon={<AddRoundedIcon />}
           onClick={() => inputRef.current?.click()}
           disabled={busy || pending.length >= PROOF_LIMITS.maxFiles}
+          loading={preparing}
         >
           Add files
-        </Button>
+        </LoadingButton>
       }
     >
       <input
@@ -153,7 +155,7 @@ export default function TenantDocumentsCard({
           void add(picked);
         }}
       />
-      {preparing ? <LinearProgress aria-label="Preparing files" /> : null}
+      {preparing ? <Loader variant="bar" label="Preparing files" /> : null}
       {error ? <Alert severity="error">{error}</Alert> : null}
 
       {pending.length > 0 ? (
@@ -270,9 +272,9 @@ export default function TenantDocumentsCard({
           <Button onClick={() => setToDelete(null)} disabled={deleting}>
             Cancel
           </Button>
-          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
+          <LoadingButton variant="contained" color="error" onClick={confirmDelete} loading={deleting}>
             {deleting ? "Deleting…" : "Delete"}
-          </Button>
+          </LoadingButton>
         </DialogActions>
       </Dialog>
     </SectionCard>

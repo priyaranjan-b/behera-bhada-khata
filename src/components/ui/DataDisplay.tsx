@@ -3,11 +3,11 @@
 // src/theme/customizations/app.ts), so nothing here hard-codes a palette.
 // Server-safe (no "use client"): Server Component pages render these
 // directly; interactive pieces live in their own client files
-// (e.g. PanelFilterSelect).
+// (e.g. DataTable).
 import { useId } from "react";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
+import AppCard from "@/components/ui/AppCard";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -69,7 +69,7 @@ export function DashboardCardPanel({
   const headingId = useId();
   const inset = flush ? { px: 2 } : undefined;
   return (
-    <Card component="section" variant="outlined" aria-labelledby={headingId} sx={flush ? { p: 0 } : undefined}>
+    <AppCard component="section" aria-labelledby={headingId} sx={flush ? { p: 0 } : undefined}>
       <Stack spacing={2} sx={flush ? { pt: 2 } : undefined}>
         <Stack direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "space-between", ...inset }}>
           <Box sx={{ minWidth: 0 }}>
@@ -87,7 +87,7 @@ export function DashboardCardPanel({
         {toolbar ? <Box sx={inset}>{toolbar}</Box> : null}
         <Box>{children}</Box>
       </Stack>
-    </Card>
+    </AppCard>
   );
 }
 
@@ -95,27 +95,10 @@ export function DashboardCardPanel({
 /* Status badges + tags                                                */
 /* ------------------------------------------------------------------ */
 
-export type BadgeTone = "success" | "warning" | "danger" | "info" | "neutral";
-
-const CHIP_COLOR = {
-  success: "success",
-  warning: "warning",
-  danger: "error",
-  info: "info",
-  neutral: "default",
-} as const;
-
-/** Pastel status pill with a leading dot; the theme colours each tone. */
-export function StatusBadge({ tone = "neutral", label }: { tone?: BadgeTone; label: string }) {
-  return (
-    <Chip
-      size="small"
-      color={CHIP_COLOR[tone]}
-      label={label}
-      icon={<Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }} />}
-    />
-  );
-}
+// StatusBadge is a client component: built in a Server Component, the
+// identical dot `icon` elements get deduplicated in the RSC payload and Chip
+// drops some of them during SSR (hydration mismatch).
+export { StatusBadge, type BadgeTone } from "./StatusBadge";
 
 /** Neutral, quieter label for categories (property name, unit, mode). */
 export function TagPill({ label }: { label: string }) {

@@ -24,6 +24,7 @@ export default async function AdjustPaymentPage({
         periods={payment.periods}
         tenantId={payment.tenantId}
         originalAmount={payment.amount}
+        savedSignature={payment.savedSignature}
       />
     </Stack>
   );

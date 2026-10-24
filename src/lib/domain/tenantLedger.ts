@@ -22,6 +22,7 @@ export interface LedgerRow {
   balance: number; // running balance after this row, in chronological order
   status: LedgerRowStatus;
   refId?: string; // payment/adjustment id, for receipt/adjust/resend actions
+  receiptNo?: string; // 2026/10/001 or ADJ/2026/10/001 (0012), as printed on the receipt
   proofs?: LedgerProof[]; // payments only
   /** Payments/adjustments: the tenant signed + verified (optional; 0010). */
   acknowledged?: boolean;
@@ -41,6 +42,7 @@ interface PaymentInput {
   note: string | null;
   status: string;
   acknowledged_at?: string | null;
+  receipt_no?: string;
   proofs?: LedgerProof[];
 }
 
@@ -52,6 +54,7 @@ interface AdjustmentInput {
   created_at: string;
   confirmed_at: string | null;
   acknowledged_at?: string | null;
+  receipt_no?: string;
 }
 
 // Pure aggregation - merges rent charges (debits) with payments and
@@ -95,6 +98,7 @@ export function buildTenantLedger(
       credit: round2(Number(payment.amount)),
       status: payment.status === "confirmed" ? "confirmed" : "pending",
       refId: payment.id,
+      receiptNo: payment.receipt_no,
       proofs: payment.proofs ?? [],
       acknowledged: Boolean(payment.acknowledged_at),
     });
@@ -111,6 +115,7 @@ export function buildTenantLedger(
       credit: delta > 0 ? round2(delta) : 0,
       status: adjustment.status === "confirmed" ? "confirmed" : "pending",
       refId: adjustment.id,
+      receiptNo: adjustment.receipt_no,
       acknowledged: Boolean(adjustment.acknowledged_at),
     });
   }

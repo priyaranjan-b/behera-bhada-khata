@@ -2,7 +2,6 @@ import Link from "@/components/ui/Link";
 import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
 import MuiLink from "@mui/material/Link";
-import Button from "@mui/material/Button";
 import Alert from "@mui/material/Alert";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -11,12 +10,14 @@ import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf } from "@/lib/
 import { formatMoney } from "@/lib/money";
 import FlashAlert from "@/components/ui/FlashAlert";
 import StatCard from "@/components/ui/StatCard";
-import { DashboardCardPanel, PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
+import { PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { ActionStack, BadgeRow, DetailList, DetailRow, SectionCard } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
+import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import { unitMixLabel } from "@/lib/domain/tenant";
 import TenantLedgerTable from "./TenantLedgerTable";
 import TenantPeriodsGrid, { type TenantPeriodRow } from "./TenantPeriodsGrid";
+import LinkButton from "@/components/ui/Loading/LinkButton";
 
 export default async function TenantPage({
   params,
@@ -63,9 +64,9 @@ export default async function TenantPage({
         }
         action={
           <ActionStack>
-            <Button component={Link} href={`/dashboard/tenants/${tenantId}/edit`} variant="outlined" startIcon={<EditRoundedIcon />}>
+            <LinkButton href={`/dashboard/tenants/${tenantId}/edit`} variant="outlined" startIcon={<EditRoundedIcon />}>
               Edit
-            </Button>
+            </LinkButton>
             {active || draft ? (
               <MoveOutButton
                 tenantId={tenantId}
@@ -75,14 +76,13 @@ export default async function TenantPage({
               />
             ) : null}
             {draft ? null : (
-              <Button
-                component={Link}
+              <LinkButton
                 href={`/dashboard/tenants/${tenantId}/payments/new`}
                 variant="contained"
                 startIcon={<AddRoundedIcon />}
               >
                 Record payment
-              </Button>
+              </LinkButton>
             )}
           </ActionStack>
         }
@@ -170,6 +170,13 @@ export default async function TenantPage({
                       ? ` · paid up to ${formatMonth(addMonthsToKey(tenant.billingStart, -1))} before the app`
                       : "")
                   : "Not billed yet"}
+                {active && tenant.leaseStart && tenant.billingStart ? (
+                  <CorrectPaidThroughButton
+                    tenantId={tenantId}
+                    leaseStart={tenant.leaseStart}
+                    billingStart={tenant.billingStart}
+                  />
+                ) : null}
               </DetailRow>
             </DetailList>
           </SectionCard>
@@ -231,9 +238,7 @@ export default async function TenantPage({
         </Grid>
       </Grid>
 
-      <DashboardCardPanel title="Months" subtitle="Rent owed and allocated per month" flush>
-        <TenantPeriodsGrid rows={periodRows} />
-      </DashboardCardPanel>
+      <TenantPeriodsGrid rows={periodRows} />
 
       <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} />
     </Stack>

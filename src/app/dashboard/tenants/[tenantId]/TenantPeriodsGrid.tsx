@@ -1,7 +1,7 @@
 "use client";
 
 import type { GridColDef } from "@mui/x-data-grid";
-import AppDataGrid, { moneyColumn } from "@/components/ui/AppDataGrid";
+import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/domain/StatusChip";
 import type { TenantPeriod } from "@/lib/contracts";
 
@@ -34,11 +34,14 @@ const columns: GridColDef<TenantPeriodRow>[] = [
 
 export default function TenantPeriodsGrid({ rows }: { rows: TenantPeriodRow[] }) {
   return (
-    <AppDataGrid<TenantPeriodRow>
+    <DataTable<TenantPeriodRow>
+      title="Months"
+      subtitle="Rent owed and allocated per month"
       rows={rows}
       columns={columns}
-      label="Rent by month"
-      localeText={{ noRowsLabel: "No months billed yet." }}
+      rowDensity="dense"
+      search={false}
+      noRowsLabel="No months billed yet."
       initialState={{ sorting: { sortModel: [{ field: "periodMonth", sort: "desc" }] } }}
     />
   );

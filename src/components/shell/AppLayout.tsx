@@ -19,13 +19,18 @@ export default function AppLayout({
   children,
   currentTab,
   ownerEmail,
+  ownerName,
 }: {
   children: React.ReactNode;
   currentTab?: AppTab;
   ownerEmail?: string;
+  ownerName?: string;
 }) {
   return (
-    <Box sx={{ display: "flex", minHeight: "100dvh" }}>
+    // flexShrink 0: <body> is a full-height flex column (globals.css), and with an explicit
+    // minHeight this frame would otherwise shrink to the window height and let long pages
+    // overflow it - taking the sticky top bar (bounded by <main>) away after one screen.
+    <Box sx={{ display: "flex", minHeight: "100dvh", flexShrink: 0 }}>
       <Box
         component="a"
         href="#main-content"
@@ -47,8 +52,8 @@ export default function AppLayout({
         Skip to main content
       </Box>
 
-      <SideMenu currentTab={currentTab} ownerEmail={ownerEmail} />
-      <AppNavbar currentTab={currentTab} ownerEmail={ownerEmail} />
+      <SideMenu currentTab={currentTab} ownerEmail={ownerEmail} ownerName={ownerName} />
+      <AppNavbar currentTab={currentTab} ownerEmail={ownerEmail} ownerName={ownerName} />
 
       <Box
         component="main"

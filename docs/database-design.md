@@ -14,6 +14,7 @@ why.
 
 ```
 app_owner            the single account that owns the rent book (one row)
+  └ owner_profile    the owner's name, the signer's name and saved signature (one row)
 
 locations            AC          Arnapal Chakk Complex          (site)
   └ properties       AC-T1       Tower 1                        (tower)
@@ -42,6 +43,9 @@ tenants              uuid        a person or business
 | `0009_payment_proofs.sql` | `payment_proofs` (photo/PDF attachments of a payment, written by `create_payment`); bucket takes photos, 4 MB |
 | `0010_instant_confirmation.sql` | payments/adjustments count when recorded; tenant sign + OTP becomes an optional acknowledgement (`acknowledged_at`); ledger writable only through `create_*` |
 | `0011_tenant_documents.sql` | `tenant_documents`: ID proof, photo, agreement... on a tenant, with a free-text type |
+| `0014_correct_paid_through.sql` | `correct_paid_through()`: fix an active tenant's "rent paid up to" |
+| `0013_owner_profile.sql` | `owner_profile`: the owner's first/last name, who signs on their behalf, and that signer's saved signature |
+| `0012_receipt_numbers.sql` | receipt numbers: `payments.receipt_no` (2026/10/001), `adjustments.receipt_no` (ADJ/2026/10/001), `receipt_counters` |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -430,6 +434,76 @@ characters): the form suggests common types (`TENANT_DOCUMENT_TYPES` in
 documents people keep varies (shop licences, electricity bills, police
 verification); a fixed list would force "Other" and lose the meaning, and a
 lookup table is more machinery than suggestions in the form.
+
+### D22 — Receipt numbers: a monthly series taken in the same transaction
+
+**Decision (0012).** Every payment has `receipt_no` = `yyyy/MM/NNN`
+(`2026/10/001`): the month it was **recorded** in Asia/Kolkata, then a
+sequence shared by all tenants that restarts at 001 each month (and grows to
+four digits past 999 rather than wrapping). Adjustments have their own series,
+`ADJ/yyyy/MM/NNN`, and their receipt cites the number of the payment they
+correct. The receipt PDF prints the number instead of the uuid.
+
+**Rules.**
+- **Taken inside `create_payment` / `create_adjustment`** via
+  `next_receipt_no(series, at)`, which upserts `receipt_counters (series,
+  month, last_no)`. The upsert's row lock serializes concurrent recordings
+  in the month, and because it's the same transaction as the insert, a
+  rejected write rolls its number back: no gaps.
+- **Never changes:** a `prevent_key_change('receipt_no')` trigger (as for
+  the place codes, D2), on top of the owner's column grant not covering it.
+- **Nobody touches the counter directly:** RLS on with no policies, and
+  `next_receipt_no` is executable by no app role - only the definer
+  functions call it.
+- **Existing rows** were numbered by the migration in `created_at` order
+  within each month, and the counters seeded from them.
+
+**Why the recorded month, not the payment date.** Numbers then follow the
+order receipts were issued; a backdated payment doesn't take a number in a
+month whose receipts are already out. **Why a counter table, not a
+sequence.** Sequences don't roll back (gaps on every rejected payment) and
+can't restart per month.
+
+### D23 — The owner's name is master data; the signer can be someone else
+
+**Decision (0013).** `owner_profile` is one row keyed like `app_owner`
+(`singleton`, referencing it): `first_name`, `last_name`,
+`signature_name` and `signature_path`. Receipts print the owner's name as
+the landlord and `signature_name` under the signature ("Anil
+Sahu, on behalf of Ramesh Sahu"); with no `signature_name` the
+owner signs. Before a profile exists, receipts fall back to the account's
+name or email.
+
+**Rules.**
+- **Keyed to the rent book, not the login:** it describes the owner, so it
+  stays if ownership is moved to another account by updating `app_owner`.
+- **Owner only:** RLS with `is_app_owner()` for select, insert and update;
+  no delete. A single-row write needs no SQL function (D5).
+- **Saved signature:** a PNG under `owner/` in the private bucket. A
+  payment or adjustment recorded without a drawn signature gets a **copy**
+  of it in its own folder, so replacing or removing the saved signature
+  never changes a receipt already issued (the old file is then deleted).
+
+**Why a separate table and not columns on `app_owner`.** `app_owner` is
+the authorization fact behind every policy and is hidden from the browser
+roles; the profile is display data the owner edits, with its own RLS.
+
+### D24 — "Rent paid up to" can be corrected while no payment depends on it
+
+**Decision (0014).** `correct_paid_through(tenant, paid_through)` (owner,
+`SECURITY DEFINER`) moves an **active** tenant's `billing_start` (D17) to
+`billing_start_for(lease_start, paid_through)`.
+- **Earlier:** the missing months are created as owed, and the first rent
+  rate's `effective_month` moves back with billing (same amount), so they
+  are priced.
+- **Later:** the months before the new start are deleted; `BBK09` if any
+  payment or adjustment is allocated to one of them.
+- Payments already recorded keep their allocations. Moving one to another
+  month is not something this does: the ledger is append-only (D4).
+
+**Why.** A wrong "paid up to" when completing a draft either invents
+arrears or hides them, and `billing_start` is otherwise fixed once active.
+Dropping a month that a payment covers would orphan money, hence the refusal.
 
 ---
 

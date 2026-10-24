@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Noto_Sans_Oriya } from "next/font/google";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { Suspense } from "react";
 import ThemeRegistry from "@/components/ThemeRegistry";
+import NavigationProgress from "@/components/ui/Loading/NavigationProgress";
 import "./globals.css";
 
 const inter = Inter({
@@ -28,7 +30,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${inter.variable} ${notoOriya.variable}`} suppressHydrationWarning>
       <body>
         <InitColorSchemeScript attribute="data-mui-color-scheme" />
-        <ThemeRegistry>{children}</ThemeRegistry>
+        <ThemeRegistry>
+          {/* Reads search params, so it needs its own boundary to keep pages static-renderable. */}
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
+          {children}
+        </ThemeRegistry>
       </body>
     </html>
   );

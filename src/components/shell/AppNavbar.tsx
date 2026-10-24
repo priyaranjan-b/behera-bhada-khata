@@ -13,6 +13,9 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import Box from "@mui/material/Box";
+import Link from "@/components/ui/Link";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
 import { BrandMark } from "./BrandMark";
 import { MenuContent } from "./MenuContent";
@@ -21,6 +24,7 @@ import { Search } from "./Search";
 import { useSignOut } from "./useSignOut";
 import { shellSurfaceSx } from "./surface";
 import type { AppTab } from "./nav";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 export const MOBILE_NAVBAR_HEIGHT = 64;
 
@@ -28,7 +32,15 @@ export const MOBILE_NAVBAR_HEIGHT = 64;
  * Phone/tablet top bar with a right-hand slide-out menu (template AppNavbar +
  * SideMenuMobile). The search icon swaps the bar for the top-bar search.
  */
-export function AppNavbar({ currentTab, ownerEmail }: { currentTab?: AppTab; ownerEmail?: string }) {
+export function AppNavbar({
+  currentTab,
+  ownerEmail,
+  ownerName,
+}: {
+  currentTab?: AppTab;
+  ownerEmail?: string;
+  ownerName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const { signOut, signingOut } = useSignOut();
@@ -78,18 +90,41 @@ export function AppNavbar({ currentTab, ownerEmail }: { currentTab?: AppTab; own
       >
         <Stack sx={{ width: "min(80dvw, 300px)", height: "100%" }}>
           <Stack direction="row" sx={{ p: 2, gap: 1.5, alignItems: "center" }}>
-            <OwnerAvatar email={ownerEmail} size={32} />
-            <Typography variant="subtitle2" noWrap>
-              {ownerEmail ?? "Owner"}
-            </Typography>
+            <OwnerAvatar email={ownerEmail} name={ownerName} size={32} />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle2" noWrap>
+                {ownerName ?? ownerEmail ?? "Owner"}
+              </Typography>
+              {ownerName && ownerEmail ? (
+                <Typography variant="caption" component="p" noWrap color="textSecondary">
+                  {ownerEmail}
+                </Typography>
+              ) : null}
+            </Box>
           </Stack>
           <Divider />
           <MenuContent currentTab={currentTab} onNavigate={() => setOpen(false)} />
           <Divider />
-          <Stack sx={{ p: 2 }}>
-            <Button variant="outlined" fullWidth startIcon={<LogoutRoundedIcon />} onClick={signOut} disabled={signingOut}>
-              {signingOut ? "Signing out…" : "Sign out"}
+          <Stack sx={{ p: 2, gap: 1 }}>
+            <Button
+              component={Link}
+              href="/dashboard/profile"
+              variant="outlined"
+              fullWidth
+              startIcon={<PersonRoundedIcon />}
+              onClick={() => setOpen(false)}
+            >
+              Profile
             </Button>
+            <LoadingButton
+              variant="outlined"
+              fullWidth
+              startIcon={<LogoutRoundedIcon />}
+              onClick={signOut}
+              loading={signingOut}
+            >
+              {signingOut ? "Signing out…" : "Sign out"}
+            </LoadingButton>
           </Stack>
         </Stack>
       </Drawer>

@@ -1,16 +1,15 @@
-import Link from "@/components/ui/Link";
 import Stack from "@mui/material/Stack";
-import Button from "@mui/material/Button";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AddHomeWorkRoundedIcon from "@mui/icons-material/AddHomeWorkRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
 import MeetingRoomRoundedIcon from "@mui/icons-material/MeetingRoomRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { DashboardCardPanel, EmptyState, PageHeader } from "@/components/ui/DataDisplay";
+import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
 import PropertyTenantsGrid from "./PropertyTenantsGrid";
 import UnitsGrid from "./UnitsGrid";
+import LinkButton from "@/components/ui/Loading/LinkButton";
 
 export default async function PropertyPage({ params }: { params: Promise<{ propertyCode: string }> }) {
   const { propertyCode } = await params;
@@ -20,15 +19,15 @@ export default async function PropertyPage({ params }: { params: Promise<{ prope
 
   const actions = (
     <ActionStack>
-      <Button component={Link} href={`${base}/units/new`} variant="outlined" startIcon={<AddHomeWorkRoundedIcon />}>
+      <LinkButton href={`${base}/units/new`} variant="outlined" startIcon={<AddHomeWorkRoundedIcon />}>
         Add house
-      </Button>
-      <Button component={Link} href={`${base}/tenants/bulk`} variant="outlined" startIcon={<UploadFileRoundedIcon />}>
+      </LinkButton>
+      <LinkButton href={`${base}/tenants/bulk`} variant="outlined" startIcon={<UploadFileRoundedIcon />}>
         Bulk upload
-      </Button>
-      <Button component={Link} href={`${base}/tenants/new`} variant="contained" startIcon={<AddRoundedIcon />}>
+      </LinkButton>
+      <LinkButton href={`${base}/tenants/new`} variant="contained" startIcon={<AddRoundedIcon />}>
         Add tenant
-      </Button>
+      </LinkButton>
     </ActionStack>
   );
 
@@ -36,37 +35,30 @@ export default async function PropertyPage({ params }: { params: Promise<{ prope
     <Stack spacing={2}>
       <PageHeader title={property.name} subtitle={`${property.code} · ${property.locationName}`} action={actions} />
 
-      <DashboardCardPanel
-        title="Houses"
-        subtitle={units.length ? `${units.length} house${units.length === 1 ? "" : "s"} · ${vacant} vacant` : undefined}
-        flush
-      >
-        {units.length === 0 ? (
+      <UnitsGrid
+        units={units}
+        propertyName={property.name}
+        subtitle={units.length ? `${vacant} vacant` : undefined}
+        emptyState={
           <EmptyState
             icon={<MeetingRoomRoundedIcon />}
             title="No houses yet"
             description="Add the houses, shops and rooms in this tower so tenants can be placed in them."
           />
-        ) : (
-          <UnitsGrid units={units} propertyName={property.name} />
-        )}
-      </DashboardCardPanel>
+        }
+      />
 
-      <DashboardCardPanel
-        title="Tenants"
-        subtitle={tenants.length ? `${tenants.length} current tenant${tenants.length === 1 ? "" : "s"}` : undefined}
-        flush
-      >
-        {tenants.length === 0 ? (
+      <PropertyTenantsGrid
+        rows={tenants}
+        propertyName={property.name}
+        emptyState={
           <EmptyState
             icon={<PeopleOutlineRoundedIcon />}
             title="No tenants yet"
             description="Add a tenant to one or more vacant houses, or bulk upload several at once."
           />
-        ) : (
-          <PropertyTenantsGrid rows={tenants} propertyName={property.name} />
-        )}
-      </DashboardCardPanel>
+        }
+      />
     </Stack>
   );
 }

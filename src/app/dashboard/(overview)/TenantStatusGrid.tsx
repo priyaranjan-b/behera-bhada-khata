@@ -1,7 +1,7 @@
 "use client";
 
 import type { GridColDef } from "@mui/x-data-grid";
-import AppDataGrid, { moneyColumn } from "@/components/ui/AppDataGrid";
+import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { StatusChip } from "@/components/domain/StatusChip";
 import { formatMoney } from "@/lib/money";
@@ -58,14 +58,25 @@ const columns: GridColDef<TenantMonthRow>[] = [
   },
 ];
 
-export default function TenantStatusGrid({ rows, monthLabel }: { rows: TenantMonthRow[]; monthLabel: string }) {
+export default function TenantStatusGrid({
+  rows,
+  monthLabel,
+  emptyState,
+}: {
+  rows: TenantMonthRow[];
+  monthLabel: string;
+  emptyState?: React.ReactNode;
+}) {
   return (
-    <AppDataGrid<TenantMonthRow>
+    <DataTable<TenantMonthRow>
+      title="Tenants"
+      subtitle={`Rent status for ${monthLabel}`}
       rows={rows}
       columns={columns}
       getRowId={(row) => row.tenantId}
-      quickFilter
-      label={`Tenant rent status for ${monthLabel}`}
+      search={{ placeholder: "Search tenant…" }}
+      noRowsLabel="No tenants match."
+      emptyState={emptyState}
       initialState={{
         sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },
         columns: { columnVisibilityModel: {} },

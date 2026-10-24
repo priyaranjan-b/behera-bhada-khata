@@ -12,7 +12,7 @@ import { addMonthsToKey, formatMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import BillingCollectionChart from "@/components/domain/BillingCollectionChart";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
-import { DashboardCardPanel, EmptyState, PageHeader } from "@/components/ui/DataDisplay";
+import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
 import { InsetBox } from "@/components/ui";
 import TenantStatusGrid from "./TenantStatusGrid";
 
@@ -114,17 +114,17 @@ export default async function DashboardPage({
 
       <BillingCollectionChart data={trend} />
 
-      <DashboardCardPanel title="Tenants" subtitle={`Rent status for ${monthLabel}`} flush>
-        {report.rows.length === 0 ? (
+      <TenantStatusGrid
+        rows={report.rows}
+        monthLabel={monthLabel}
+        emptyState={
           <EmptyState
             icon={<PeopleOutlineIcon />}
             title="No active tenants yet"
             description="Add a property and a tenant to start tracking rent."
           />
-        ) : (
-          <TenantStatusGrid rows={report.rows} monthLabel={monthLabel} />
-        )}
-      </DashboardCardPanel>
+        }
+      />
     </Stack>
   );
 }

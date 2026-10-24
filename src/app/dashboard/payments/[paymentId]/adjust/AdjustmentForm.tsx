@@ -1,19 +1,19 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
 import Divider from "@mui/material/Divider";
 import TextField from "@mui/material/TextField";
-import { type SignaturePadHandle } from "@/components/ui/SignaturePad";
 import { StatusBadge } from "@/components/ui/DataDisplay";
-import { AmountRow, FormActions, SectionCard, SignatureField, SummaryLine } from "@/components/ui";
+import { AmountRow, FormActions, SectionCard, SummaryLine } from "@/components/ui";
+import { OwnerSignatureField, type OwnerSignatureHandle } from "@/components/domain/OwnerSignatureField";
 import { formatMonth } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import { api, errorMessage } from "@/lib/api-client";
-import type { AdjustablePeriod } from "@/lib/contracts";
+import type { AdjustablePeriod, SavedSignature } from "@/lib/contracts";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 
 export default function AdjustmentForm({
@@ -21,19 +21,22 @@ export default function AdjustmentForm({
   periods,
   tenantId,
   originalAmount,
+  savedSignature,
 }: {
   paymentId: string;
   periods: AdjustablePeriod[];
   tenantId: string;
   originalAmount: number;
+  /** From the Profile page; used unless the owner signs by hand. */
+  savedSignature: SavedSignature | null;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [deltas, setDeltas] = useState<Record<string, number>>({});
   const [reason, setReason] = useState("");
   const [notify, setNotify] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const padHandle = useRef<SignaturePadHandle | null>(null);
+  const signatureHandle = useRef<OwnerSignatureHandle | null>(null);
 
   const allocations = useMemo(
     () =>
@@ -48,7 +51,8 @@ export default function AdjustmentForm({
     e.preventDefault();
     setError(null);
 
-    if (!padHandle.current || padHandle.current.isEmpty()) {
+    const signature = signatureHandle.current?.value();
+    if (signature === null) {
       setError("Please sign before saving");
       return;
     }
@@ -67,7 +71,7 @@ export default function AdjustmentForm({
         deltaAmount: total,
         reason: reason.trim(),
         allocations,
-        ownerSignaturePng: padHandle.current.toPngDataUrl(),
+        ownerSignaturePng: signature,
         notifyTenant: notify,
       });
       router.push(`/dashboard/tenants/${created.tenantId}?${recordedFlash(created.notified)}`);
@@ -111,7 +115,7 @@ export default function AdjustmentForm({
               />
             </SectionCard>
 
-            <SignatureField title="Owner signature" onReady={(handle) => (padHandle.current = handle)} />
+            <OwnerSignatureField saved={savedSignature} onReady={(handle) => (signatureHandle.current = handle)} />
           </Stack>
         </Grid>
 

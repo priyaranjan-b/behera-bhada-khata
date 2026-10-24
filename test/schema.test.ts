@@ -157,7 +157,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`
-    truncate adjustment_allocations, adjustments, payment_allocations, payments, rent_periods,
+    truncate adjustment_allocations, adjustments, payment_allocations, payments, receipt_counters, rent_periods,
       tenant_units, tenant_rent_rates, tenants, units, properties, locations, rate_limits, app_owner, auth.users cascade;
     insert into auth.users (id, email) values ('${OWNER_A}', 'a@example.com'), ('${OWNER_B}', 'b@example.com');
     insert into app_owner (user_id) values ('${OWNER_A}');
@@ -677,7 +677,7 @@ describe("single owner (app_owner + is_app_owner)", () => {
   });
 
   it("fails closed: with no owner registered, even the former owner sees nothing", async () => {
-    await db.exec(`truncate app_owner`);
+    await db.exec(`truncate app_owner cascade`); // cascade: owner_profile (0013) references it
     expect(await as(owner(OWNER_A), `select * from tenants`)).toEqual([]);
     expect(
       await errorCode(createTenant(OWNER_A, { name: "X", rent: 1, leaseStart: "2026-03-01", units: ["AC-T1-G06"] }))
@@ -968,5 +968,163 @@ describe("tenant documents (0011)", () => {
     expect(await errorCode(add(owner(OWNER_B), doc({ path: `tenants/${fx.tenantA}/documents/b.jpg` })))).toBe("42501");
     expect(await as(owner(OWNER_B), `delete from tenant_documents returning id`)).toEqual([]);
     expect((await db.query(`select 1 from tenant_documents`)).rows).toHaveLength(1);
+  });
+});
+
+describe("receipt numbers (0012)", () => {
+  const month = () =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit" })
+      .format(new Date())
+      .replace("-", "/");
+  const receiptNos = async (table: "payments" | "adjustments") =>
+    (await db.query<{ receipt_no: string }>(`select receipt_no from ${table} order by created_at, receipt_no`)).rows.map(
+      (r) => r.receipt_no
+    );
+
+  it("numbers payments yyyy/MM/NNN in the recorded month, one series across tenants", async () => {
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    await createPayment(owner(OWNER_A), {
+      tenant: fx.tenantA2,
+      amount: 4000,
+      allocations: [{ rent_period_id: fx.otherTenantPeriod, amount: 4000 }],
+    });
+    expect(await receiptNos("payments")).toEqual([`${month()}/001`, `${month()}/002`]);
+  });
+
+  it("leaves no gap when a payment is rejected", async () => {
+    const full = [{ rent_period_id: fx.periods[0].id, amount: 5000 }];
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: full });
+    expect(await errorCode(createPayment(owner(OWNER_A), { amount: 5000, allocations: full }))).toBe("BBK00");
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[1].id, amount: 5000 }] });
+    expect(await receiptNos("payments")).toEqual([`${month()}/001`, `${month()}/002`]);
+  });
+
+  it("gives adjustments their own ADJ/ series", async () => {
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    await as(
+      owner(OWNER_A),
+      `select create_adjustment(gen_random_uuid(), $1, -100, 'x', 'sig.png', md5(random()::text), now(), $2::jsonb)`,
+      [await latestPaymentId(), JSON.stringify([{ rent_period_id: fx.periods[0].id, amount: -100 }])]
+    );
+    expect(await receiptNos("adjustments")).toEqual([`ADJ/${month()}/001`]);
+    expect(await receiptNos("payments")).toEqual([`${month()}/001`]);
+  });
+
+  it("can't be changed, and the counter is nobody's to touch", async () => {
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    expect(await errorCode(db.query(`update payments set receipt_no = '2000/01/001'`))).toBe("BBK00");
+    expect(await errorCode(as(owner(OWNER_A), `select * from receipt_counters`))).toBe("42501");
+    expect(await errorCode(as(owner(OWNER_A), `select next_receipt_no('payment', now())`))).toBe("42501");
+    expect(await errorCode(as(service, `select next_receipt_no('payment', now())`))).toBe("42501");
+  });
+
+  it("uses the Asia/Kolkata month and grows past 999 instead of truncating", async () => {
+    // 2026-10-31 20:00 UTC is already 1 November in India.
+    const [{ no }] = (
+      await db.query<{ no: string }>(`select next_receipt_no('payment', '2026-10-31T20:00:00Z') as no`)
+    ).rows;
+    expect(no).toBe("2026/11/001");
+    await db.exec(`update receipt_counters set last_no = 999 where month = '2026-11-01'`);
+    const [{ next }] = (
+      await db.query<{ next: string }>(`select next_receipt_no('payment', '2026-11-02T00:00:00Z') as next`)
+    ).rows;
+    expect(next).toBe("2026/11/1000");
+  });
+});
+
+describe("owner profile (0013)", () => {
+  const save = (who: Role, first: string, signature: string | null = null) =>
+    as(
+      who,
+      `insert into owner_profile (first_name, last_name, signature_name, signature_path)
+       values ($1, 'Sahu', 'Anil Sahu', $2)
+       on conflict (singleton) do update set first_name = excluded.first_name, signature_path = excluded.signature_path`,
+      [first, signature]
+    );
+
+  it("lets the owner create and edit the one row, but not delete it", async () => {
+    await save(owner(OWNER_A), "Ramesh");
+    await save(owner(OWNER_A), "Ramesh", "owner/signature-1.png");
+    expect(await as(owner(OWNER_A), `select first_name, signature_path from owner_profile`)).toEqual([
+      { first_name: "Ramesh", signature_path: "owner/signature-1.png" },
+    ]);
+    expect(await errorCode(as(owner(OWNER_A), `delete from owner_profile`))).toBe("42501");
+    expect(await errorCode(as(owner(OWNER_A), `insert into owner_profile (singleton, first_name) values (false, 'x')`))).toBe(
+      "23514"
+    );
+  });
+
+  it("checks names and keeps the signature in the owner folder", async () => {
+    expect(await errorCode(save(owner(OWNER_A), " Ramesh"))).toBe("23514");
+    expect(await errorCode(save(owner(OWNER_A), ""))).toBe("23514");
+    expect(await errorCode(save(owner(OWNER_A), "Ramesh", "payments/x.png"))).toBe("23514");
+  });
+
+  it("shows another account nothing and lets it write nothing", async () => {
+    await save(owner(OWNER_A), "Ramesh");
+    expect(await as(owner(OWNER_B), `select * from owner_profile`)).toEqual([]);
+    expect(await errorCode(as(owner(OWNER_B), `update owner_profile set first_name = 'x' returning 1`))).toBe("ok");
+    expect((await db.query<{ first_name: string }>(`select first_name from owner_profile`)).rows).toEqual([
+      { first_name: "Ramesh" },
+    ]);
+    await db.exec(`truncate owner_profile`);
+    expect(await errorCode(save(owner(OWNER_B), "Mallory"))).toBe("42501");
+  });
+});
+
+describe("correct_paid_through (0014)", () => {
+  const correct = (who: Role, paidThrough: string | null, tenant = fx.tenantA) =>
+    as<{ billing_start: string }>(
+      who,
+      `select to_char(correct_paid_through($1, $2::date), 'YYYY-MM-DD') as billing_start`,
+      [tenant, paidThrough]
+    );
+  const billingStart = async () =>
+    (
+      await db.query<{ b: string }>(`select to_char(billing_start, 'YYYY-MM-DD') as b from tenants where id = $1`, [
+        fx.tenantA,
+      ])
+    ).rows[0].b;
+  const months = async () => (await periodsOf(fx.tenantA)).map((p) => p.period_month);
+
+  it("moves billing later, dropping the months it no longer bills", async () => {
+    // Asha: lease 2026-01-15, billed Jan-Mar.
+    expect(await correct(owner(OWNER_A), "2026-01-01")).toEqual([{ billing_start: "2026-02-01" }]);
+    expect(await billingStart()).toBe("2026-02-01");
+    expect(await months()).toEqual(["2026-02-01", "2026-03-01"]);
+  });
+
+  it("moves billing earlier (not before the lease month), adding the months as owed at the first rent", async () => {
+    await correct(owner(OWNER_A), "2026-02-01");
+    expect(await months()).toEqual(["2026-03-01"]);
+    expect(await correct(owner(OWNER_A), "2025-06-01")).toEqual([{ billing_start: "2026-01-01" }]);
+    expect(await periodsOf(fx.tenantA)).toEqual([
+      { period_month: "2026-01-01", amount_due: 5000 },
+      { period_month: "2026-02-01", amount_due: 5000 },
+      { period_month: "2026-03-01", amount_due: 5000 },
+    ]);
+    const rates = await db.query<{ m: string }>(
+      `select to_char(effective_month, 'YYYY-MM-DD') as m from tenant_rent_rates where tenant_id = $1`,
+      [fx.tenantA]
+    );
+    expect(rates.rows).toEqual([{ m: "2026-01-01" }]);
+  });
+
+  it("won't drop a month that has a payment, and leaves payments where they are", async () => {
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[1].id, amount: 5000 }] });
+    expect(await errorCode(correct(owner(OWNER_A), "2026-02-01"))).toBe("BBK09");
+    expect(await billingStart()).toBe("2026-01-01");
+    // Dropping only the unpaid January is fine; February keeps its payment.
+    await correct(owner(OWNER_A), "2026-01-01");
+    expect(await allocated(fx.periods[1].id)).toBe(5000);
+  });
+
+  it("refuses non-owners, drafts and moved-out tenants, and a missing month", async () => {
+    expect(await errorCode(correct(owner(OWNER_B), "2026-01-01"))).toBe("BBK04");
+    expect(await errorCode(correct(owner(OWNER_A), null))).toBe("BBK00");
+    expect(await errorCode(correct(owner(OWNER_A), "2099-01-01"))).toBe("BBK00");
+    await as(owner(OWNER_A), `select move_out_tenant($1, '2026-03-31')`, [fx.tenantA]);
+    expect(await errorCode(correct(owner(OWNER_A), "2026-01-01"))).toBe("BBK09");
+    expect(await errorCode(as(owner(OWNER_A), `update tenants set billing_start = '2026-02-01'`))).toBe("42501");
   });
 });

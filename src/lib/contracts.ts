@@ -3,7 +3,7 @@
 // is typed by them, and pages/components render them. Nothing here knows
 // which database sits behind the API.
 import type * as z from "zod";
-import type { MonthlyReport, MonthlyTrendPoint } from "@/lib/domain/reports";
+import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "@/lib/domain/reports";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
@@ -17,6 +17,8 @@ import type {
   createTenantSchema,
   createUnitSchema,
   moveOutSchema,
+  correctPaidThroughSchema,
+  ownerProfileSchema,
   updateTenantSchema,
 } from "@/lib/validation";
 
@@ -66,6 +68,59 @@ export interface DashboardSummary {
   monthKey: string;
   report: MonthlyReport;
   trend: MonthlyTrendPoint[];
+}
+
+// ---- /api/dashboard/defaulters (tenants behind on rent, by months) -----------
+
+export interface DefaulterRow extends TenantAging {
+  tenantId: string;
+  displayName: string;
+  /** The person, when displayName is a business. */
+  contactName: string | null;
+  phone: string | null;
+  propertyName: string;
+  /** Current houses (last houses, for a tenant who moved out). */
+  unitCodes: string[];
+  movedOut: boolean;
+  /** Rent in effect now (the last rent, for a tenant who moved out). */
+  monthlyRent: number;
+  /** Date of the latest payment, yyyy-MM-dd, or null if none was recorded. */
+  lastPaymentDate: string | null;
+}
+
+export interface DefaultersReport {
+  /** The last month counted (the month before this one), yyyy-MM-01. */
+  asOfMonth: string;
+  totalOutstanding: number;
+  /** Tenants by months behind. */
+  groups: AgingGroup[];
+  /** Most months behind first (compareAging). */
+  rows: DefaulterRow[];
+}
+
+// ---- /api/dashboard/profile (the owner's name and saved signature) -----------
+
+export interface OwnerProfileView {
+  /** null until the profile is first saved. */
+  firstName: string | null;
+  lastName: string | null;
+  /** Who signs receipts on the owner's behalf; null = the owner. */
+  signatureName: string | null;
+  /** The login account. */
+  email: string | null;
+  /** "Ramesh Sahu", or null without a profile. */
+  displayName: string | null;
+  /** Short-lived URL of the saved signature, if any. */
+  signatureUrl: string | null;
+}
+
+export type UpdateOwnerProfileInput = z.input<typeof ownerProfileSchema>;
+
+/** The signature a payment/adjustment form can use instead of drawing one. */
+export interface SavedSignature {
+  url: string;
+  /** Printed under it on the receipt. */
+  signerName: string;
 }
 
 // ---- /api/dashboard/properties (sites -> towers -> houses) -------------------
@@ -301,11 +356,14 @@ export type UploadTenantDocumentsInput = z.infer<typeof uploadTenantDocumentsSch
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type MoveOutInput = z.infer<typeof moveOutSchema>;
 
+export type CorrectPaidThroughInput = z.input<typeof correctPaidThroughSchema>;
+
 export interface NewPaymentForm {
   tenantId: string;
   tenantName: string;
   /** Periods with something still owed, oldest first. */
   openPeriods: PeriodLike[];
+  savedSignature: SavedSignature | null;
 }
 
 export type CreatePaymentInput = Omit<z.infer<typeof createPaymentSchema>, "tenantId">;
@@ -325,6 +383,7 @@ export interface AdjustPaymentForm {
   amount: number;
   paymentDate: string;
   periods: AdjustablePeriod[];
+  savedSignature: SavedSignature | null;
 }
 
 export type CreateAdjustmentInput = Omit<z.infer<typeof createAdjustmentSchema>, "originalPaymentId">;
@@ -337,6 +396,8 @@ export interface CreatedAdjustment extends RecordCreated {
 
 export interface ConfirmView {
   recordType: RecordType;
+  /** 2026/10/001 (ADJ/... for an adjustment), as printed on the receipt. */
+  receiptNo: string;
   /** The tenant has already signed + verified (optional since 0010; the payment counts regardless). */
   acknowledged: boolean;
   isExpired: boolean;

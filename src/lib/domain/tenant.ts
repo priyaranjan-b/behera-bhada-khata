@@ -1,3 +1,4 @@
+import { addMonthsToKey, monthKeyOf } from "@/lib/dates";
 import type { UnitType } from "@/lib/types";
 
 export interface TenantDisplayLike {
@@ -46,4 +47,15 @@ export function formatFloor(floor: string | null): string {
   if (floor === "G") return "Ground floor";
   if (floor.startsWith("B")) return floor === "B" ? "Basement" : `Basement ${floor.slice(1)}`;
   return `Floor ${floor}`;
+}
+
+/**
+ * First billed month: the month after "rent paid up to" (a month key), never
+ * before the lease month. Same rule as billing_start_for() in 0008.
+ */
+export function billingStartFor(leaseStart: string, paidThrough: string | null): string {
+  const leaseMonth = monthKeyOf(leaseStart);
+  if (!paidThrough) return leaseMonth;
+  const afterPaid = addMonthsToKey(monthKeyOf(paidThrough), 1);
+  return afterPaid > leaseMonth ? afterPaid : leaseMonth;
 }

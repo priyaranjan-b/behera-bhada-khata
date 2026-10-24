@@ -1,7 +1,7 @@
 "use client";
 
 import type { GridColDef } from "@mui/x-data-grid";
-import AppDataGrid, { moneyColumn } from "@/components/ui/AppDataGrid";
+import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { IdentityCell, StatusBadge } from "@/components/ui/DataDisplay";
 import { UnitCell } from "@/components/ui";
 import type { PropertyTenantRow } from "@/lib/contracts";
@@ -47,13 +47,24 @@ const columns: GridColDef<PropertyTenantRow>[] = [
   },
 ];
 
-export default function PropertyTenantsGrid({ rows, propertyName }: { rows: PropertyTenantRow[]; propertyName: string }) {
+export default function PropertyTenantsGrid({
+  rows,
+  propertyName,
+  emptyState,
+}: {
+  rows: PropertyTenantRow[];
+  propertyName: string;
+  emptyState?: React.ReactNode;
+}) {
   return (
-    <AppDataGrid<PropertyTenantRow>
+    <DataTable<PropertyTenantRow>
+      title="Tenants"
+      subtitle={`Current tenants at ${propertyName}`}
       rows={rows}
       columns={columns}
-      quickFilter={rows.length > 5}
-      label={`Tenants at ${propertyName}`}
+      search={rows.length > 5 ? { placeholder: "Search tenant…" } : false}
+      noRowsLabel="No tenants match."
+      emptyState={emptyState}
     />
   );
 }

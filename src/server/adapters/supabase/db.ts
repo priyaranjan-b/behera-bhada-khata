@@ -32,6 +32,15 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
   }
 
   return {
+    ownerProfile: {
+      async get() {
+        return must(await db.from("owner_profile").select("*").maybeSingle(), "get owner profile");
+      },
+      async save(profile) {
+        mustWrite(await db.from("owner_profile").upsert({ singleton: true, ...profile }), "save owner profile");
+      },
+    },
+
     locations: {
       async list() {
         return must(
@@ -190,6 +199,12 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
           await db.rpc("move_out_tenant", { p_tenant_id: id, p_move_out_date: date }),
           "move out tenant"
         );
+      },
+      async correctPaidThrough(id, paidThrough) {
+        return mustWrite(
+          await db.rpc("correct_paid_through", { p_tenant_id: id, p_paid_through: paidThrough }),
+          "correct paid up to"
+        ) as string;
       },
     },
 
@@ -350,6 +365,15 @@ export function supabaseSystemRepositories(): SystemRepositories {
   const db: Supabase = createAdminClient();
 
   return {
+    locations: {
+      async get(locationCode) {
+        return must(
+          await db.from("locations").select("*").eq("location_code", locationCode).maybeSingle(),
+          "get location"
+        );
+      },
+    },
+
     properties: {
       async get(propertyCode) {
         return must(
@@ -396,10 +420,20 @@ export function supabaseSystemRepositories(): SystemRepositories {
       async findByTokenHash(tokenHash) {
         return must(await db.from("payments").select("*").eq("token_hash", tokenHash).maybeSingle(), "find payment");
       },
+      async get(id) {
+        return must(await db.from("payments").select("*").eq("id", id).maybeSingle(), "get payment");
+      },
       async listAllocations(paymentId) {
         return must(
           await db.from("payment_allocations").select("*").eq("payment_id", paymentId),
           "list payment allocations"
+        );
+      },
+      async listProofs(paymentIds) {
+        if (paymentIds.length === 0) return [];
+        return must(
+          await db.from("payment_proofs").select("*").in("payment_id", paymentIds).order("storage_path"),
+          "list payment proofs"
         );
       },
       async acknowledge(id, patch) {

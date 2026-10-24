@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
+import AppCard from "@/components/ui/AppCard";
 import Stack, { type StackProps } from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
@@ -33,9 +33,8 @@ export function SectionCard({
 }) {
   const headingId = useId();
   return (
-    <Card
+    <AppCard
       component="section"
-      variant="outlined"
       aria-labelledby={headingId}
       sx={[sticky && { position: { md: "sticky" }, top: { md: 16 } }, fill && { height: "100%" }]}
     >
@@ -66,7 +65,7 @@ export function SectionCard({
         </Stack>
         {children}
       </Stack>
-    </Card>
+    </AppCard>
   );
 }
 
@@ -128,7 +127,7 @@ export function DropzoneCard({
   actions: React.ReactNode;
 }) {
   return (
-    <Card variant="outlined" sx={{ borderStyle: "dashed", borderWidth: 2, py: 4 }}>
+    <AppCard depth="flat" sx={{ borderStyle: "dashed", borderWidth: 2, py: 4 }}>
       <Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center" }}>
         <IconTile icon={icon} />
         <Typography component="h2" variant="subtitle2">
@@ -139,6 +138,6 @@ export function DropzoneCard({
         </Typography>
         <Box sx={{ pt: 1, width: { xs: "100%", sm: "auto" } }}>{actions}</Box>
       </Stack>
-    </Card>
+    </AppCard>
   );
 }

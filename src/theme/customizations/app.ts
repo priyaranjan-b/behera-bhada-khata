@@ -1,15 +1,22 @@
 // App-specific additions on top of the MUI Dashboard template customizations.
 // Kept separate from the copied template files so those stay easy to re-sync;
 // index.ts merges these per component (variants are appended, not replaced).
-import type { Components, Theme } from "@mui/material/styles";
+import { alpha, type Components, type Theme } from "@mui/material/styles";
 import { chipClasses } from "@mui/material/Chip";
 import { brand, gray, orange } from "../themePrimitives";
-import { lightSurfaces } from "../appTokens";
+import { cardShadows, lightSurfaces, slate } from "../appTokens";
 
 declare module "@mui/material/Chip" {
   interface ChipPropsVariantOverrides {
     /** Neutral, squarer label for categories (property, unit type…). */
     tag: true;
+  }
+}
+// Card takes its `variant` union from Paper.
+declare module "@mui/material/Paper" {
+  interface PaperPropsVariantOverrides {
+    /** Bordered card with a layered "3D" shadow; render it via `<AppCard>`. */
+    raised: true;
   }
 }
 declare module "@mui/material/Avatar" {
@@ -109,6 +116,43 @@ export const appCustomizations: Components<Theme> = {
       {
         props: {},
         style: ({ theme }) => theme.applyStyles("light", { backgroundColor: lightSurfaces.paper }),
+      },
+      {
+        props: { variant: "raised" },
+        style: ({ theme }) => ({
+          border: `1px solid ${(theme.vars || theme).palette.divider}`,
+          background: alpha(gray[900], 0.55),
+          boxShadow: cardShadows.dark.rest,
+          transition: theme.transitions.create(["box-shadow", "transform", "border-color"], { duration: 200 }),
+          // <AppCard interactive | href>: a link card. Lift only where hover
+          // exists (no sticky hover on touch); keyboard focus gets a ring.
+          "&[data-interactive]": {
+            // Also a link (<AppCard href>): an <a> is inline by default.
+            display: "block",
+            cursor: "pointer",
+            color: "inherit",
+            textDecoration: "none",
+            "@media (hover: hover)": {
+              "&:hover": { transform: "translateY(-2px)", boxShadow: cardShadows.dark.hover },
+            },
+            "&:focus-visible": {
+              outline: `2px solid ${(theme.vars || theme).palette.primary.main}`,
+              outlineOffset: 2,
+            },
+            "&:active": { transform: "translateY(0)", boxShadow: cardShadows.dark.rest },
+          },
+          ...theme.applyStyles("light", {
+            background: lightSurfaces.paper,
+            borderColor: lightSurfaces.border,
+            boxShadow: cardShadows.light.rest,
+            "&[data-interactive]": {
+              "@media (hover: hover)": {
+                "&:hover": { boxShadow: cardShadows.light.hover, borderColor: slate[400] },
+              },
+              "&:active": { boxShadow: cardShadows.light.rest },
+            },
+          }),
+        }),
       },
     ],
   },

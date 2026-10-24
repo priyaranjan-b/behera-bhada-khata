@@ -82,6 +82,10 @@ both together.
   to" entered when onboarding or completing a draft (never before the lease
   month). `lease_start` is history only, so an old lease start doesn't
   create years of fake arrears.
+- **Correcting "paid up to"** (`0014_correct_paid_through.sql`, D24): the
+  "Correct" button by "Billing from" on an active tenant's page calls
+  `correct_paid_through`, which moves `billing_start` and adds or drops
+  months (refused if a dropped month has a payment).
 - **Security deposit** (`tenants.deposit_amount`, optional): set when
   onboarding or while a draft, then frozen by a trigger once the tenant is
   active (D18).
@@ -126,6 +130,17 @@ both together.
   browser (`src/lib/proofImages.ts`) and sends multipart
   (`readJsonWithFiles` in `src/server/http.ts`); the service checks the
   bytes and the limits in `PROOF_LIMITS` (`src/lib/validation.ts`).
+- **Receipt numbers** (`0012_receipt_numbers.sql`, D22): `payments.receipt_no`
+  `2026/10/001` (month recorded, Asia/Kolkata; one series across tenants,
+  restarting each month), adjustments `ADJ/2026/10/001`. Taken by
+  `create_payment` / `create_adjustment` in the same transaction (no gaps),
+  frozen by a trigger; shown on the receipt, the ledger and the confirm page.
+- **Owner profile** (`0013_owner_profile.sql`, D23): the owner's first/last
+  name (landlord on receipts, name in the app shell), `signature_name` for
+  whoever signs on their behalf, and a saved signature (`owner/...png`) that
+  the payment and adjustment forms use unless you sign by hand - each record
+  gets its own copy. Edited on `/dashboard/profile`
+  (`src/server/services/profile.ts`).
 - **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
   agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,
   `src/server/services/tenantDocuments.ts`), one `tenant_documents` row per
@@ -251,6 +266,15 @@ Receipt data for both sides comes from `src/server/services/receipts.ts`;
 the owner's download (`.../payments/[id]/receipt`) renders it on demand
 until the tenant-signed copy exists.
 
+- The receipt (`src/server/pdf/receipt.ts`) is always two pages at most.
+  Page 1 is a card layout (brand, receipt number, tenant, details, charges,
+  total + amount in words via `amountInWords` in `src/lib/money.ts`, owner
+  and tenant signatures) and never overflows: long values are capped and
+  ellipsised, and more than `MAX_LINE_ROWS` months collapse into ranges
+  (`compactLineItems`). Page 2, if there are proofs, shows up to 6 as a grid
+  (`src/server/pdf/proofPages.ts`: images go through `sharp` to JPEG, since
+  pdf-lib can't embed WebP; a PDF proof shows its pages; HEIC or unreadable
+  files get a note).
 - The receipt embeds Noto Sans + Noto Sans Oriya (`src/server/pdf/fonts/`,
   OFL) because the standard PDF fonts can't encode `₹` or Odia; they're
   traced into the route via `outputFileTracingIncludes` in `next.config.ts`
@@ -311,23 +335,63 @@ until the tenant-signed copy exists.
   (`SectionCard`, `FormActions`, `SignatureField`, `PublicLayout`, …;
   `DataDisplay.tsx` for `PageHeader`, `DashboardCardPanel`, `StatusBadge`,
   `EmptyState`; `Skeletons.tsx` for per-card `loading.tsx` placeholders
-  sized like the real cards; `AppDataGrid.tsx` for tables; `Link`,
+  sized like the real cards; `AppCard.tsx` for every card surface;
+  `DataTable/` for tables; `Loading/` for busy states; `Link`,
   `FlashAlert`, …), `src/components/shell/` = dashboard chrome,
   `src/components/domain/` = data-aware widgets (`ResendButton`,
   `StatusChip`, `BillingCollectionChart`). One component per file,
   `PascalCase.tsx`. Keep server-safe files free of `"use client"`; put
   interactive pieces (callbacks, state) in their own client file, as with
-  `PanelFilterSelect`.
+  `DataTable`.
+- Tables: `DataTable` (`src/components/ui/DataTable/`) wraps
+  `@mui/x-data-grid` and owns its card. Configure it with props, not a
+  wrapping `DashboardCardPanel`: `title`/`subtitle` (one toolbar row with a
+  count chip), `filters` ("Show: …" selects that filter `rows` before the
+  grid; pass `totalCount` so the chip reads "12 of 26" and `defaultValue` so
+  "Clear filters" can reset them), `toolbarExtra` (e.g. date inputs),
+  `search`, `columnsButton`/`filterButton`/`exportCsv`, `pageSize`
+  (default 10), `emptyState` (when there are no rows at all), `noRowsLabel`,
+  `rowDensity` (`standard` 56px for avatar + two-line cells, `dense` 44px)
+  and `variant="plain"` inside another card. Money columns via
+  `moneyColumn`.
 - The top-bar search (`src/components/shell/Search.tsx`, also behind the
   search icon in the mobile `AppNavbar`) loads `GET /api/dashboard/search`
   once per page and matches tenants (name, business) and houses (label,
   code) in the browser with `src/lib/domain/search.ts`.
+- Defaulters (`/dashboard/defaulters`, `getDefaultersReport` in
+  `src/server/services/dashboard.ts`): every tenant, moved-out ones too,
+  with rent unpaid for an ended month, most months behind first. Aging
+  (`agingOf`, `compareAging`, `agingGroups`, `AGING_BUCKETS` in
+  `src/lib/domain/reports.ts`) splits the arrears by how long ago each month
+  ended; the cards group tenants by how many months they're behind.
 - Every segment with its own data has `error.tsx` (props `error` + `retry` —
   Next 16 renamed `reset`), `loading.tsx` and, where `notFound()` is likely,
   `not-found.tsx`; the root has `global-error.tsx` (renders its own `<html>`
   and theme).
 - One-time messages after a redirect use a query param plus `FlashAlert`,
   which removes the param so reloads and Back don't repeat it.
+- **Customising an MUI component = a reusable kit component.** Whenever an
+  MUI component needs a look or behaviour beyond its plain props (shadow,
+  shape, loading state, extra slots…), wrap it once in `src/components/ui/`
+  (or a theme variant in `src/theme/customizations/app.ts` when it's
+  purely visual) and use that wrapper everywhere, so every screen stays
+  consistent. Never restyle MUI ad hoc in a page or feature component. Check
+  the kit first and extend an existing wrapper with a prop rather than
+  forking it. The wrappers so far: `AppCard` (Card: raised 3D shadow, `href`
+  makes the whole card a link, `depth="flat"` for dashed/inset surfaces),
+  `DataTable` (Data Grid), `LoadingButton`/`LinkButton` (Button), `Loader`
+  (progress), `StatusBadge`/`TagPill` (Chip). Don't import
+  `@mui/material/Card` outside `AppCard`.
+- **Loading** lives in `src/components/ui/Loading/` and every busy state is
+  drawn by its `Loader`, so loading can be restyled in one place; never
+  render `CircularProgress`/`LinearProgress` directly. `NavigationProgress`
+  (mounted once in `app/layout.tsx`) shows a top bar for every internal link
+  click, Back/Forward and router transition. Use `useAppRouter()` instead of
+  `next/navigation`'s `useRouter` (its push/replace/refresh/back run in a
+  transition that feeds that bar). A button that does async work is a
+  `LoadingButton` (pass `loading`, or return a promise from `onClick`); a
+  button that navigates is a `LinkButton` (spins until the route loads);
+  form footers get both through `FormActions`.
 - Pages (`src/app/**`) set **layout only** (Stack/Grid props, `alignItems`,
   `minWidth: 0`, `maxWidth`). No colour, typography, border, radius or shadow
   `sx`, no `@/theme` imports. Text colour via the Typography/Link prop

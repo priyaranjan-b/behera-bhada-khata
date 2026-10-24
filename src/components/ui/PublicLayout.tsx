@@ -1,7 +1,7 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import Card from "@mui/material/Card";
+import AppCard from "@/components/ui/AppCard";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
@@ -64,9 +64,9 @@ export function PublicLayout({
 /** Outlined card used for the sign-in / status panels on public pages. */
 export function PublicCard({ children }: { children: React.ReactNode }) {
   return (
-    <Card variant="outlined" sx={{ width: "100%", maxWidth: WIDTHS.sm, mx: "auto", p: { xs: 2.5, sm: 4 } }}>
+    <AppCard sx={{ width: "100%", maxWidth: WIDTHS.sm, mx: "auto", p: { xs: 2.5, sm: 4 } }}>
       <Stack spacing={3}>{children}</Stack>
-    </Card>
+    </AppCard>
   );
 }
 

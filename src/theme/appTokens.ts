@@ -20,3 +20,20 @@ export const lightSurfaces = {
   border: slate[200],
   rowHover: slate[50],
 } as const;
+
+/**
+ * Layered card shadows for `<AppCard>` (Card `variant="raised"`): a tight
+ * contact shadow plus a soft, wide ambient one, so cards read as lifted off
+ * the canvas. Dark mode adds a faint top highlight since black shadows barely
+ * show on a dark canvas.
+ */
+export const cardShadows = {
+  light: {
+    rest: "0 1px 2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.06), 0 10px 24px -8px rgba(15, 23, 42, 0.12)",
+    hover: "0 2px 4px rgba(15, 23, 42, 0.06), 0 8px 16px -4px rgba(15, 23, 42, 0.10), 0 22px 40px -12px rgba(15, 23, 42, 0.22)",
+  },
+  dark: {
+    rest: "inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 24px -8px rgba(0, 0, 0, 0.6)",
+    hover: "inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 4px rgba(0, 0, 0, 0.5), 0 22px 40px -12px rgba(0, 0, 0, 0.75)",
+  },
+} as const;

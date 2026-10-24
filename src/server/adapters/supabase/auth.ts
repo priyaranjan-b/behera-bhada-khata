@@ -1,4 +1,5 @@
 import "server-only";
+import { ownerFullName } from "@/lib/domain/owner";
 import { ApiError } from "@/lib/errors";
 import type { AuthGateway } from "@/server/ports";
 import { createAdminClient, createSessionClient } from "./clients";
@@ -40,17 +41,26 @@ export const supabaseAuth: AuthGateway = {
     return data.properties.action_link;
   },
 
-  async ownerDisplayName() {
+  async ownerNames() {
     const admin = createAdminClient();
-    const { data: owner } = await admin.from("app_owner").select("user_id").maybeSingle();
+    const [{ data: owner }, { data: profile }] = await Promise.all([
+      admin.from("app_owner").select("user_id").maybeSingle(),
+      admin.from("owner_profile").select("*").maybeSingle(),
+    ]);
     if (!owner) return null;
-    const { data, error } = await admin.auth.admin.getUserById(owner.user_id);
-    if (error || !data.user) return null;
-    const meta = data.user.user_metadata ?? {};
-    const name = [meta.full_name, meta.name, meta.display_name].find(
-      (v): v is string => typeof v === "string" && v.trim() !== ""
-    );
-    return name?.trim() ?? data.user.email ?? null;
+    let name = ownerFullName(profile?.first_name, profile?.last_name);
+    if (!name) {
+      // No profile yet: the account's own name, else its email.
+      const { data, error } = await admin.auth.admin.getUserById(owner.user_id);
+      if (error || !data.user) return null;
+      const meta = data.user.user_metadata ?? {};
+      const metaName = [meta.full_name, meta.name, meta.display_name].find(
+        (v): v is string => typeof v === "string" && v.trim() !== ""
+      );
+      name = metaName?.trim() ?? data.user.email ?? null;
+    }
+    if (!name) return null;
+    return { owner: name, signature: profile?.signature_name ?? name };
   },
 
   async exchangeCode(code) {

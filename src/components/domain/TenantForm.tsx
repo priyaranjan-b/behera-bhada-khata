@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
@@ -48,7 +48,7 @@ export default function TenantForm({
   /** Edit mode: the tenant's saved documents; new ones added here upload on Save (0011). */
   documents?: TenantDocumentView[];
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const editing = mode.kind === "edit" ? mode.tenant : null;
   const movedOut = editing?.status === "inactive";
   // From the paper register: details may still be missing, nothing billed yet.

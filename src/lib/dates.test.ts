@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsToKey, currentMonthKey, dateKeyOf, formatMonth, isDateKey, monthKeyOf, todayKey } from "./dates";
+import { addMonthsToKey, currentMonthKey, dateKeyOf, formatDateKey, formatMonth, isDateKey, monthKeyOf, todayKey } from "./dates";
 
 describe("dates (Asia/Kolkata)", () => {
   it("puts an early-morning IST instant on the IST day, not the UTC one", () => {
@@ -28,5 +28,6 @@ describe("dates (Asia/Kolkata)", () => {
   it("labels months the same whatever the runtime's own zone", () => {
     expect(formatMonth("2026-03-01")).toBe("March 2026");
     expect(formatMonth("2026-03-01", "short")).toBe("Mar 2026");
+    expect(formatDateKey("2026-10-04")).toBe("4 Oct 2026");
   });
 });

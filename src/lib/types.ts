@@ -54,6 +54,29 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      /** The owner's name (0013): one row, edited on the Profile page. */
+      owner_profile: {
+        Row: {
+          singleton: boolean;
+          first_name: string;
+          last_name: string | null;
+          /** Under the landlord signature on receipts; null = the owner's name. */
+          signature_name: string | null;
+          /** Saved signature PNG (owner/....png in the bucket); copied onto each new record. */
+          signature_path: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          singleton?: true;
+          first_name: string;
+          last_name: string | null;
+          signature_name: string | null;
+          signature_path: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["owner_profile"]["Insert"]>;
+        Relationships: [];
+      };
       locations: {
         Row: {
           location_code: string;
@@ -264,6 +287,8 @@ export interface Database {
           confirmed_at: string | null;
           /** Tenant signed + verified an OTP (0010); optional, never moves money. */
           acknowledged_at: string | null;
+          /** 2026/10/001: recorded month + sequence across tenants (0012). Never changes. */
+          receipt_no: string;
         };
         Insert: {
           id?: string;
@@ -345,6 +370,8 @@ export interface Database {
           confirmed_at: string | null;
           /** Tenant signed + verified an OTP (0010); optional, never moves money. */
           acknowledged_at: string | null;
+          /** ADJ/2026/10/001: the adjustments series (0012). Never changes. */
+          receipt_no: string;
         };
         Insert: {
           id?: string;
@@ -437,6 +464,11 @@ export interface Database {
         Args: { p_tenant_id: string; p_move_out_date: string };
         Returns: undefined;
       };
+      /** 0014: returns the new billing_start. */
+      correct_paid_through: {
+        Args: { p_tenant_id: string; p_paid_through: string };
+        Returns: string;
+      };
       ensure_rent_periods: {
         Args: { p_tenant_ids: string[] | null; p_through: string };
         Returns: number;
@@ -481,6 +513,7 @@ export interface Database {
   };
 }
 
+export type OwnerProfile = Database["public"]["Tables"]["owner_profile"]["Row"];
 export type Location = Database["public"]["Tables"]["locations"]["Row"];
 export type Property = Database["public"]["Tables"]["properties"]["Row"];
 export type Unit = Database["public"]["Tables"]["units"]["Row"];

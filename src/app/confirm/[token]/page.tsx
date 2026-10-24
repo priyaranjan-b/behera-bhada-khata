@@ -50,6 +50,7 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
           }
         >
           <DetailList>
+            <DetailRow label="Receipt no.">#{record.receiptNo}</DetailRow>
             <DetailRow label="Property">{record.propertyName}</DetailRow>
             {record.unitCodes.length > 0 ? (
               <DetailRow label={record.unitCodes.length === 1 ? "House" : "Houses"}>{record.unitCodes.join(", ")}</DetailRow>

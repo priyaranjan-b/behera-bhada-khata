@@ -10,13 +10,23 @@ function tabForPath(pathname: string): AppTab | undefined {
   if (pathname === "/dashboard") return "summary";
   if (pathname.startsWith("/dashboard/properties")) return "properties";
   if (pathname.startsWith("/dashboard/tenants")) return "tenants";
+  if (pathname.startsWith("/dashboard/defaulters")) return "defaulters";
   return undefined;
 }
 
-export default function DashboardShell({ children, ownerEmail }: { children: React.ReactNode; ownerEmail?: string }) {
+export default function DashboardShell({
+  children,
+  ownerEmail,
+  ownerName,
+}: {
+  children: React.ReactNode;
+  ownerEmail?: string;
+  /** From the Profile page (owner_profile); falls back to the email. */
+  ownerName?: string;
+}) {
   const pathname = usePathname();
   return (
-    <AppLayout currentTab={tabForPath(pathname)} ownerEmail={ownerEmail}>
+    <AppLayout currentTab={tabForPath(pathname)} ownerEmail={ownerEmail} ownerName={ownerName}>
       {children}
     </AppLayout>
   );

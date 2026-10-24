@@ -174,6 +174,11 @@ export const moveOutSchema = z.object({
   moveOutDate: dateKeySchema,
 });
 
+/** The last month rent was paid outside the app (yyyy-MM or yyyy-MM-01). */
+export const correctPaidThroughSchema = z.object({
+  paidThrough: monthKeySchema,
+});
+
 // ---- Payments & adjustments -------------------------------------------------
 
 export const paymentAllocationInputSchema = z.object({
@@ -188,7 +193,8 @@ export const createPaymentSchema = z.object({
   mode: z.enum(["cash", "bank_transfer", "upi", "cheque", "other"]),
   note: optionalText(500),
   allocations: z.array(paymentAllocationInputSchema).min(1, "Select at least one period").max(240),
-  ownerSignaturePng: signaturePngSchema,
+  /** Drawn for this payment; omitted = the saved signature (owner_profile, 0013). */
+  ownerSignaturePng: signaturePngSchema.optional(),
   /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */
   notifyTenant: z.boolean().optional(),
 });
@@ -203,9 +209,31 @@ export const createAdjustmentSchema = z.object({
   deltaAmount: nonZeroMoneySchema,
   reason: z.string().trim().min(3, "Explain what's being corrected").max(500),
   allocations: z.array(adjustmentAllocationInputSchema).min(1, "Select at least one period").max(240),
-  ownerSignaturePng: signaturePngSchema,
+  /** Drawn for this adjustment; omitted = the saved signature (owner_profile, 0013). */
+  ownerSignaturePng: signaturePngSchema.optional(),
   /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */
   notifyTenant: z.boolean().optional(),
+});
+
+// ---- Owner profile (0013) ----------------------------------------------------
+
+/** Trimmed; empty means "not set". */
+const optionalName = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullish()
+    .transform((v) => v || null);
+
+export const ownerProfileSchema = z.object({
+  firstName: z.string().trim().min(1, "Enter the owner's first name").max(60),
+  lastName: optionalName(60),
+  /** Who signs receipts on the owner's behalf; empty = the owner. */
+  signatureName: optionalName(120),
+  /** A new saved signature; omit to keep the current one. */
+  signaturePng: signaturePngSchema.optional(),
+  removeSignature: z.boolean().optional(),
 });
 
 // ---- Tenant confirm flow ----------------------------------------------------

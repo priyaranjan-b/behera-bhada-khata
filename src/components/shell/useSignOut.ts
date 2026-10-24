@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import { api } from "@/lib/api-client";
 
 export function useSignOut() {
-  const router = useRouter();
+  const router = useAppRouter();
   const [signingOut, setSigningOut] = useState(false);
 
   async function signOut() {

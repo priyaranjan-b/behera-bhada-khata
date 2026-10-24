@@ -7,16 +7,14 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import type { GridColDef } from "@mui/x-data-grid";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
-import AppDataGrid, { moneyColumn } from "@/components/ui/AppDataGrid";
-import { DashboardCardPanel } from "@/components/ui/DataDisplay";
-import PanelFilterSelect from "@/components/ui/PanelFilterSelect";
+import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { GridCell } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
 import ProofsButton from "@/components/domain/ProofsButton";
-import Link from "@/components/ui/Link";
 import { apiHref, apiPaths } from "@/lib/api-client";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import LinkButton from "@/components/ui/Loading/LinkButton";
 
 type FilterMode = "all" | "range" | "month";
 
@@ -53,9 +51,9 @@ function ActionsCell({ row, tenantId }: { row: LedgerRow; tenantId: string }) {
         Receipt
       </Button>
       {row.type === "payment" && row.status === "confirmed" ? (
-        <Button size="small" component={Link} href={`/dashboard/payments/${row.refId}/adjust`}>
+        <LinkButton size="small" href={`/dashboard/payments/${row.refId}/adjust`}>
           Adjust
-        </Button>
+        </LinkButton>
       ) : null}
       {row.acknowledged ? null : (
         <ResendButton kind={row.type === "payment" ? "payment" : "adjustment"} recordId={row.refId} tenantId={tenantId} />
@@ -66,7 +64,8 @@ function ActionsCell({ row, tenantId }: { row: LedgerRow; tenantId: string }) {
 
 function captionOf(row: LedgerRow): string {
   if (row.type === "charge") return TYPE_LABEL.charge;
-  return `${TYPE_LABEL[row.type]} · ${row.acknowledged ? "signed by tenant" : "not signed by tenant"}`;
+  const signed = row.acknowledged ? "signed by tenant" : "not signed by tenant";
+  return `${row.receiptNo ? `#${row.receiptNo}` : TYPE_LABEL[row.type]} · ${signed}`;
 }
 
 function blankZero(value: number | null | undefined) {
@@ -163,66 +162,48 @@ export default function TenantLedgerTable({ rows, tenantId }: { rows: LedgerRow[
     setMonth("");
   }
 
-  const filterSelect = (
-    <PanelFilterSelect<FilterMode>
-      label="Filter"
-      value={filterMode}
-      options={FILTER_OPTIONS}
-      onChange={resetFilters}
-    />
-  );
-
   const dateInputs =
-    filterMode !== "all" ? (
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        {filterMode === "range" ? (
-          <>
-            <TextField
-              label="From"
-              type="date"
-              size="small"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-            <TextField
-              label="To"
-              type="date"
-              size="small"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          </>
-        ) : (
-          <TextField
-            label="Month"
-            type="month"
-            size="small"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-        )}
+    filterMode === "all" ? undefined : filterMode === "range" ? (
+      <Stack direction="row" spacing={1}>
+        <TextField
+          label="From"
+          type="date"
+          size="small"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <TextField
+          label="To"
+          type="date"
+          size="small"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
       </Stack>
-    ) : undefined;
+    ) : (
+      <TextField
+        label="Month"
+        type="month"
+        size="small"
+        value={month}
+        onChange={(e) => setMonth(e.target.value)}
+        slotProps={{ inputLabel: { shrink: true } }}
+      />
+    );
 
   return (
-    <DashboardCardPanel
+    <DataTable<LedgerRow>
       title="Ledger"
       subtitle="Charges, payments and corrections"
-      action={filterSelect}
-      toolbar={dateInputs}
-      flush
-    >
-      <AppDataGrid<LedgerRow>
-        rows={filtered}
-        columns={columns}
-        pageSize={10}
-        label="Tenant ledger"
-        localeText={{ noRowsLabel: "No entries match this filter." }}
-        initialState={{ sorting: { sortModel: [{ field: "date", sort: "desc" }] } }}
-      />
-    </DashboardCardPanel>
+      rows={filtered}
+      totalCount={rows.length}
+      columns={columns}
+      filters={[{ label: "Show", value: filterMode, options: FILTER_OPTIONS, onChange: resetFilters, defaultValue: "all" }]}
+      toolbarExtra={dateInputs}
+      noRowsLabel="No entries match this filter."
+      initialState={{ sorting: { sortModel: [{ field: "date", sort: "desc" }] } }}
+    />
   );
 }

@@ -73,6 +73,12 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
   dark schemes.
 - **Light-only styles:** `theme.applyStyles("light", {...})`. Put a
   specificity hack (`&&`) *outside* `applyStyles`, never inside it.
+- **Customising MUI = a reusable component.** If an MUI component needs
+  anything beyond its plain props (shadow, shape, loading, extra slots…),
+  wrap it once in `src/components/ui/` (or add a theme variant in
+  `src/theme/customizations/app.ts` if it's purely visual) and use the
+  wrapper everywhere, so screens stay consistent. Check the kit first;
+  extend a wrapper with a prop rather than forking it.
 - **Anything needed twice:** a component in `src/components/ui/` or a theme
   override in `src/theme/customizations/app.ts`. Light-mode surface tokens
   are in `src/theme/appTokens.ts`. Leave the copied template files in
@@ -80,17 +86,29 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
 
 ## Kit to reach for first
 
-- **Page structure:** `PageHeader` and `DashboardCardPanel` (with the `flush`
-  prop for grids) from `@/components/ui/DataDisplay`, plus `EmptyState`;
-  loading skeletons from `@/components/ui/Skeletons`. `PanelFilterSelect` is its own client file.
+- **Page structure:** `PageHeader` and `DashboardCardPanel` from
+  `@/components/ui/DataDisplay`, plus `EmptyState`; loading skeletons from
+  `@/components/ui/Skeletons` (`PanelSkeleton` matches a `DataTable`).
 - **Forms:** `SectionCard`, `FormActions`, `SignatureField`, `AmountRow`,
   `SummaryLine`.
 - **Detail rows:** `DetailList`/`DetailRow`, `BadgeRow`, `ActionStack`,
   `IconTile`, `InsetBox`, `GridCell`, `UnitCell`, `DropzoneCard`.
 - **Badges:** `StatusBadge` and `TagPill` from `@/components/ui/DataDisplay`,
   `StatusChip` from `@/components/domain/StatusChip`.
-- **Tables:** `AppDataGrid` (`@/components/ui/AppDataGrid`) plus `moneyColumn`. Row types come from
-  `src/lib/contracts.ts`.
+- **Tables:** `DataTable` plus `moneyColumn` (`@/components/ui/DataTable`).
+  It brings its own card and one-row toolbar, so don't wrap it in
+  `DashboardCardPanel`. Pass `title`, `filters` (status selects, with
+  `totalCount` + `defaultValue`), `search`, `emptyState` and `rowDensity`.
+  Page size defaults to 10. Columns live in a small client `*Grid.tsx` next
+  to the page. Row types come from `src/lib/contracts.ts`.
+- **Cards:** `AppCard` (`@/components/ui`) for every card surface: raised
+  3D shadow, `href` turns the whole card into a link (lift + focus ring),
+  `depth="flat"` for dashed/inset areas. Never import `@mui/material/Card`.
+- **Loading:** from `@/components/ui/Loading`: `LoadingButton` (async
+  actions: `loading`, or return a promise from `onClick`), `LinkButton`
+  (instead of `<Button component={Link}>`), `Loader` (any other busy
+  state), `useAppRouter()` (instead of `useRouter`, so navigations show the
+  top progress bar).
 - **Public pages** (login, confirm): `PublicLayout`, `PublicCard`, `PublicHeading`.
 
 ## Verify

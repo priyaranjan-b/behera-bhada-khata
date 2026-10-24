@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Button from "@mui/material/Button";
+import { useAppRouter } from "@/components/ui/Loading";
 import { api } from "@/lib/api-client";
+import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 /** Rotates a record's acknowledge link and (re)sends it to the record's tenant, until they've signed. */
 export default function ResendButton({
@@ -15,7 +15,7 @@ export default function ResendButton({
   recordId: string;
   tenantId: string;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [busy, setBusy] = useState(false);
 
   async function handleClick() {
@@ -31,8 +31,8 @@ export default function ResendButton({
   }
 
   return (
-    <Button size="small" onClick={handleClick} disabled={busy}>
+    <LoadingButton size="small" onClick={handleClick} loading={busy}>
       Send link
-    </Button>
+    </LoadingButton>
   );
 }

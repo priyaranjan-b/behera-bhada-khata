@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/errors";
 import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { getConfirmView } from "@/server/services/confirm";
-import { getDashboardSummary } from "@/server/services/dashboard";
+import { getDashboardSummary, getDefaultersReport } from "@/server/services/dashboard";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
 import {
   getNewPropertyForm,
@@ -15,6 +15,7 @@ import {
   getPropertyHeader,
   listProperties,
 } from "@/server/services/properties";
+import { getOwnerProfile } from "@/server/services/profile";
 import { getSearchIndex } from "@/server/services/search";
 import { getEditTenantForm, getTenantDetail, listTenants } from "@/server/services/tenants";
 import type { OwnerContext } from "@/server/services/context";
@@ -36,7 +37,9 @@ const inProcessApi: ApiQueries = {
   },
   dashboard: {
     summary: async (month) => getDashboardSummary(await owner(), month),
+    defaulters: async () => getDefaultersReport(await owner()),
     search: async () => getSearchIndex(await owner()),
+    profile: async () => getOwnerProfile(await owner()),
     properties: {
       list: async () => listProperties(await owner()),
       newForm: async () => getNewPropertyForm(await owner()),

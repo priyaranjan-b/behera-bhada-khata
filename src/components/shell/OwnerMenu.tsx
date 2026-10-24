@@ -13,31 +13,35 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import Link from "@/components/ui/Link";
+import { ownerInitials } from "@/lib/domain/owner";
 import { useSignOut } from "./useSignOut";
+import Loader from "@/components/ui/Loading/Loader";
 
-export function OwnerAvatar({ email, size = 36 }: { email?: string; size?: number }) {
+export function OwnerAvatar({ email, name, size = 36 }: { email?: string; name?: string; size?: number }) {
   return (
     <Avatar
       variant="soft"
       sx={{ width: size, height: size, fontSize: size * 0.42 }}
     >
-      {(email?.[0] ?? "O").toUpperCase()}
+      {ownerInitials(name, email)}
     </Avatar>
   );
 }
 
-/** Owner card pinned to the bottom of the side menu, with Sign out in an options menu. */
-export function OwnerCard({ email }: { email?: string }) {
+/** Owner card pinned to the bottom of the side menu, with Profile and Sign out in an options menu. */
+export function OwnerCard({ email, name }: { email?: string; name?: string }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const { signOut, signingOut } = useSignOut();
   const open = Boolean(anchorEl);
 
   return (
     <Stack direction="row" sx={{ p: 2, gap: 1, alignItems: "center", borderTop: "1px solid", borderColor: "divider" }}>
-      <OwnerAvatar email={email} />
+      <OwnerAvatar email={email} name={name} />
       <Box sx={{ mr: "auto", minWidth: 0 }}>
-        <Typography variant="body2">
-          Owner
+        <Typography variant="body2" noWrap title={name}>
+          {name ?? "Owner"}
         </Typography>
         <Typography variant="caption" noWrap component="p" color="textSecondary" title={email}>
           {email ?? "Signed in"}
@@ -67,10 +71,16 @@ export function OwnerCard({ email }: { email?: string }) {
           <ListItemText primary="Signed in as" secondary={email} />
         </MenuItem>
         <Divider sx={{ my: "4px !important" }} />
+        <MenuItem component={Link} href="/dashboard/profile" onClick={() => setAnchorEl(null)}>
+          <ListItemText>Profile</ListItemText>
+          <ListItemIcon sx={{ ml: "auto", minWidth: "0 !important" }}>
+            <PersonRoundedIcon fontSize="small" />
+          </ListItemIcon>
+        </MenuItem>
         <MenuItem onClick={signOut} disabled={signingOut}>
           <ListItemText>{signingOut ? "Signing out…" : "Sign out"}</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: "0 !important" }}>
-            <LogoutRoundedIcon fontSize="small" />
+            {signingOut ? <Loader size="sm" /> : <LogoutRoundedIcon fontSize="small" />}
           </ListItemIcon>
         </MenuItem>
       </Menu>

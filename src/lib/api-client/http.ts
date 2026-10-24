@@ -55,7 +55,10 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
     },
     dashboard: {
       summary: (month) => get(month ? `${p.dashboard.summary}?month=${encodeURIComponent(month)}` : p.dashboard.summary),
+      defaulters: () => get(p.dashboard.defaulters),
       search: () => get(p.dashboard.search),
+      profile: () => get(p.dashboard.profile),
+      updateProfile: (input) => put(p.dashboard.profile, input),
       properties: {
         list: () => get(p.dashboard.properties.list),
         newForm: () => get(p.dashboard.properties.new),
@@ -74,6 +77,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         edit: (id) => get(p.dashboard.tenants.edit(id)),
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),
         moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
+        correctPaidThrough: (id, input) => post(p.dashboard.tenants.paidThrough(id), input),
         newPayment: (id) => get(p.dashboard.tenants.newPayment(id)),
         createPayment: (id, input, proofs) => postWithFiles(p.dashboard.tenants.payments(id), input, "proofs", proofs),
         uploadDocuments: (id, input, files) => postWithFiles(p.dashboard.tenants.documents(id), input, "files", files),

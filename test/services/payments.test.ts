@@ -9,6 +9,7 @@ vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => n
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
 const { createPayment, paymentProofUrl, paymentReceipt, resendPaymentLink } = await import("@/server/services/payments");
 const { getTenantDetail } = await import("@/server/services/tenants");
+const { adjustmentReceipt } = await import("@/server/services/adjustments");
 
 const ctx = { ownerId: OWNER_ID };
 
@@ -208,8 +209,54 @@ describe("instant confirmation (0010)", () => {
     fakes.state.files.set(row.owner_signature_path!, new Uint8Array([1]));
 
     const file = await paymentReceipt(ctx, id);
-    expect(file.fileName).toBe("receipt-Asha-2026-03-05.pdf");
+    expect(file.fileName).toBe("receipt-2026-03-001.pdf");
     expect(vi.mocked(generateReceiptPdf).mock.calls[0][0]).toMatchObject({ totalAmount: 5000, tenantSignaturePng: undefined });
+  });
+
+  it("prints the receipt number and appends the proofs, leaving out one that can't be downloaded", async () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    fakes.state.payments.set(id, payment({ id }));
+    for (const [n, name] of ["upi.webp", "gone.jpg"].entries()) {
+      fakes.state.proofs.set(`proof-${n}`, {
+        id: `proof-${n}`,
+        payment_id: id,
+        storage_path: `payments/tenant-1/${id}/proofs/${name}`,
+        file_name: name,
+        content_type: name.endsWith(".webp") ? "image/webp" : "image/jpeg",
+        size_bytes: 10,
+        created_at: "",
+      });
+    }
+    fakes.storage.download.mockImplementation(async (path: string) => {
+      if (path.endsWith("gone.jpg")) throw new Error("not found");
+      return new Uint8Array([1]);
+    });
+
+    await paymentReceipt(ctx, id);
+    const input = vi.mocked(generateReceiptPdf).mock.calls[0][0];
+    expect(input).toMatchObject({ kind: "payment", receiptNo: "2026/03/001", correctsReceiptNo: null });
+    expect(input.propertyName).toBe("Arnapal Chakk Complex, Tower 1");
+    expect(input.proofs).toEqual([{ fileName: "upi.webp", contentType: "image/webp", bytes: new Uint8Array([1]) }]);
+  });
+
+  it("names the payment an adjustment corrects", async () => {
+    const id = "00000000-0000-4000-8000-000000000004";
+    fakes.state.adjustments.set(id, {
+      ...payment({ id }),
+      original_payment_id: "payment-1",
+      delta_amount: "-500.00",
+      reason: "Recorded too much",
+      receipt_no: "ADJ/2026/03/001",
+    });
+
+    const file = await adjustmentReceipt(ctx, id);
+    expect(file.fileName).toBe("adjustment-ADJ-2026-03-001.pdf");
+    expect(vi.mocked(generateReceiptPdf).mock.calls[0][0]).toMatchObject({
+      kind: "adjustment",
+      receiptNo: "ADJ/2026/03/001",
+      correctsReceiptNo: "2026/03/001",
+      proofs: [],
+    });
   });
 
   it("serves the tenant-signed copy once they've acknowledged", async () => {
