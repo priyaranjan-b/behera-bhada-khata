@@ -127,8 +127,10 @@ CI (`.github/workflows/ci.yml`) runs the same on every push and pull request.
    `OWNER_EMAILS` and a `CRON_SECRET` of 16+ random characters (the server
    refuses to start without it). Twilio may stay unset for now. Don't set
    `ALLOW_DEV_LOGIN` - it is ignored in production anyway.
-4. Deploy. `vercel.json` already schedules `/api/cron/ensure-periods` to run
-   daily - Vercel automatically sends `Authorization: Bearer $CRON_SECRET`
+4. Deploy. `vercel.json` runs the functions in Mumbai (`bom1`), next to the
+   Supabase project (`ap-south-1`) - every page makes several database round
+   trips, so keep the two in the same region if either moves. It also
+   schedules `/api/cron/ensure-periods` to run daily - Vercel automatically sends `Authorization: Bearer $CRON_SECRET`
    for cron invocations, so no extra setup is needed.
 5. **Smoke test**: sign in with the password; record a payment (it shows
    "not delivered" without Twilio) and download its receipt PDF; check that
