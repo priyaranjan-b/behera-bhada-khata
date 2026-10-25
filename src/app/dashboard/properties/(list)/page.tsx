@@ -11,6 +11,7 @@ import { EmptyState, PageHeader, StatusBadge, TagPill } from "@/components/ui/Da
 import { AppCard, BadgeRow, IconTile, SummaryLine } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { TOWER_CELL } from "./towerCell";
 
 export default async function PropertiesPage() {
   const groups = await serverApi.dashboard.properties.list();
@@ -58,7 +59,7 @@ export default async function PropertiesPage() {
             {properties.map((property) => {
               const vacant = property.totalUnits - property.occupiedUnits;
               return (
-                <Grid key={property.code} size={{ xs: 12, sm: 6, lg: 4 }}>
+                <Grid key={property.code} size={TOWER_CELL}>
                   <AppCard href={routes.properties.detail(property.code)} sx={{ height: "100%" }}>
                     <Stack spacing={2} useFlexGap sx={{ height: "100%" }}>
                       <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>

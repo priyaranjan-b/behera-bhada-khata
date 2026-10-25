@@ -118,6 +118,58 @@ export function DetailCardSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
+/** Matches a section heading over a group of cards: h6 title, body2 caption (a site on Properties). */
+export function SectionHeadingSkeleton() {
+  return (
+    <Box aria-hidden>
+      <Typography variant="h6" sx={{ width: 260, maxWidth: "70%" }}>
+        <Skeleton />
+      </Typography>
+      <Typography variant="body2" sx={{ width: 340, maxWidth: "90%" }}>
+        <Skeleton />
+      </Typography>
+    </Box>
+  );
+}
+
+/**
+ * Matches a linked tile card: 40px `IconTile` + name/code + chevron, a strong
+ * `SummaryLine` and a badge row (a tower card on Properties).
+ */
+export function TileCardSkeleton() {
+  return (
+    <AppCard aria-hidden sx={{ height: "100%" }}>
+      <Stack spacing={2}>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
+          <Skeleton variant="rounded" width={40} height={40} />
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="subtitle2" sx={{ width: "60%" }}>
+              <Skeleton />
+            </Typography>
+            <Typography variant="caption" component="p" sx={{ width: "30%" }}>
+              <Skeleton />
+            </Typography>
+          </Box>
+          <Skeleton variant="circular" width={24} height={24} />
+        </Stack>
+        <Stack direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
+          <Typography variant="body2" sx={{ width: "35%" }}>
+            <Skeleton />
+          </Typography>
+          <Typography variant="subtitle2" sx={{ width: "30%" }}>
+            <Skeleton />
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={1}>
+          <Skeleton variant="rounded" width={88} height={20} />
+          <Skeleton variant="rounded" width={96} height={20} />
+          <Skeleton variant="rounded" width={88} height={20} />
+        </Stack>
+      </Stack>
+    </AppCard>
+  );
+}
+
 /** Matches a `DataTable`: one toolbar row, a header band and 56px rows. */
 export function PanelSkeleton({ rows = 6 }: { rows?: number }) {
   return (
