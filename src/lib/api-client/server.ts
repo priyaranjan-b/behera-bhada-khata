@@ -9,7 +9,8 @@ import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/
 import { listActivity, tenantHistory, unitHistory } from "@/server/services/audit";
 import { getConfirmView } from "@/server/services/confirm";
 import { getBillingReport } from "@/server/services/billing";
-import { getDashboardSummary, getDefaultersReport } from "@/server/services/dashboard";
+import { getDefaultersReport } from "@/server/services/dashboard";
+import { getAttention, getHouseCounts, getOverviewMonth, getOverviewTrend, getPortfolio } from "@/server/services/overview";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
 import {
   getNewHouseForm,
@@ -41,7 +42,13 @@ const inProcessApi: ApiQueries = {
     loginOptions: async () => getLoginOptions(),
   },
   dashboard: {
-    summary: async (month, options) => getDashboardSummary(await owner(), month, options),
+    overview: {
+      month: async (month, options) => getOverviewMonth(await owner(), month, options),
+      trend: async (options) => getOverviewTrend(await owner(), options),
+      houses: async () => getHouseCounts(await owner()),
+      attention: async () => getAttention(await owner()),
+      portfolio: async (options) => getPortfolio(await owner(), options),
+    },
     defaulters: async () => getDefaultersReport(await owner()),
     billing: async (query) => getBillingReport(await owner(), query),
     activity: async (query) => listActivity(await owner(), query ?? {}),

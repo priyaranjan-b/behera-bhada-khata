@@ -14,7 +14,13 @@ export const apiPaths = {
     callback: "/api/auth/callback",
   },
   dashboard: {
-    summary: "/api/dashboard",
+    overview: {
+      month: "/api/dashboard/overview/month",
+      trend: "/api/dashboard/overview/trend",
+      houses: "/api/dashboard/overview/houses",
+      attention: "/api/dashboard/overview/attention",
+      portfolio: "/api/dashboard/overview/portfolio",
+    },
     defaulters: "/api/dashboard/defaulters",
     billing: "/api/dashboard/billing",
     activity: "/api/dashboard/activity",

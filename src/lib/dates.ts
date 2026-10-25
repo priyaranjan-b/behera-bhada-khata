@@ -56,6 +56,11 @@ export function currentMonthKey(now: Date = new Date()): string {
   return monthKeyOf(todayKey(now));
 }
 
+/** Month key of a `?month=yyyy-MM` param; missing or malformed means the current month. */
+export function monthKeyFromParam(month: string | null | undefined, now: Date = new Date()): string {
+  return month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? monthKeyOf(month) : currentMonthKey(now);
+}
+
 /** Month key `months` months after (or before, if negative) the given one. */
 export function addMonthsToKey(monthKey: string, months: number): string {
   const year = Number(monthKey.slice(0, 4));

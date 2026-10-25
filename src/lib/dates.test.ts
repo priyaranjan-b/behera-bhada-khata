@@ -6,6 +6,7 @@ import {
   formatDateKey,
   formatMonth,
   isDateKey,
+  monthKeyFromParam,
   monthKeyOf,
   monthsBetween,
   todayKey,
@@ -48,6 +49,14 @@ describe("month helpers", () => {
     expect(yearMonthOf("2026-10-01")).toBe("2026-10");
     expect(yearMonthOf("2026-10-24")).toBe("2026-10");
     expect(monthKeyOf(yearMonthOf("2026-10-24"))).toBe("2026-10-01");
+  });
+
+  it("reads a ?month= param, falling back to the current month", () => {
+    const now = new Date("2026-10-15T06:00:00Z");
+    expect(monthKeyFromParam("2026-07", now)).toBe("2026-07-01");
+    expect(monthKeyFromParam(undefined, now)).toBe("2026-10-01");
+    expect(monthKeyFromParam("2026-13", now)).toBe("2026-10-01");
+    expect(monthKeyFromParam("2026-07-01", now)).toBe("2026-10-01");
   });
 
   it("counts whole months between month keys", () => {

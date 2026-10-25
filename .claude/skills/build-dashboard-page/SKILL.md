@@ -55,6 +55,25 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
   (`PageHeaderSkeleton`, `StatCardSkeleton`, `ChartCardSkeleton`,
   `PanelSkeleton` from `@/components/ui/Skeletons`), not a page-wide spinner,
   and, if it can fail independently, `error.tsx` (`EmptyState` + `retry`).
+- **A page of independent cards (a dashboard): stream it in sections (A12),**
+  as on the Overview (`src/app/dashboard/(overview)/`).
+  - **Parts of a section:**
+    - a data call: a service function and a GET, shaped for the section;
+    - an async component in `sections/` taking promises;
+    - a slot in a `*Layout.tsx`, and its placeholder in a single
+      slot → skeleton map (`OVERVIEW_SKELETONS`) that `page.tsx` uses as
+      fallbacks and `loading.tsx` spreads into the layout. A placeholder is
+      a kit skeleton with a size prop (`DetailCardSkeleton rows={5}`),
+      never a new skeleton component per card;
+    - an `AsyncSection` boundary (`@/components/ui/AsyncSection`) with
+      `title` and `fallback`, keyed by the params its data depends on.
+  - **In `page.tsx`:** start every call before awaiting anything, and never
+    `await` one call before starting the next.
+  - **Shared reads:** reads several sections need go through `cache()`
+    loaders in the service, never repeated `db.*` calls.
+  - **Adding a section:** do it only for a different data source, cost or
+    refresh trigger. Otherwise extend an existing section. Keep it to about
+    6 calls per page.
 - Client mutations follow `try { await api.… ; router.push(…); router.refresh(); }`,
   with `catch` calling `setError(errorMessage(err, "…"))` and passing it to
   `FormActions error={…}`.

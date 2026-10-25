@@ -53,8 +53,8 @@ development, required in production.
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
   real names stay local, `statusLabel`, the custom Excel export
   (`exportValue`, MUI's is Premium-only), the per-tower monthly-rent split,
-  the audit history screens and events (A10), and Govt rent counted as paid
-  direct (A11). Read it before changing
+  the audit history screens and events (A10), Govt rent counted as paid
+  direct (A11), and the Overview streamed in sections (A12). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -458,6 +458,12 @@ Each of these was found broken somewhere; keep them when adding code.
   search icon in the mobile `AppNavbar`) loads `GET /api/dashboard/search`
   once per page and matches tenants (name, business) and houses (label,
   code) in the browser with `src/lib/domain/search.ts`.
+- The Overview (`/dashboard`) is streamed in sections (A12): one call per
+  section (`serverApi.dashboard.overview.*`, `src/server/services/overview.ts`,
+  shared reads through its `cache()` loaders), each rendered by
+  `sections/*.tsx` inside an `AsyncSection` (Suspense + per-card error
+  boundary), placed by `OverviewLayout`; the placeholders are one map,
+  `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`.
 - Defaulters (`/dashboard/defaulters`, `getDefaultersReport` in
   `src/server/services/dashboard.ts`): every tenant, moved-out ones too,
   with rent unpaid for an ended month, most months behind first. Aging

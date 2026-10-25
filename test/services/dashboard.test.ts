@@ -4,7 +4,7 @@ import { OWNER_ID, fakes, payment, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getDashboardSummary, getDefaultersReport } = await import("@/server/services/dashboard");
+const { getDefaultersReport } = await import("@/server/services/dashboard");
 
 const ctx = { ownerId: OWNER_ID };
 
@@ -74,51 +74,5 @@ describe("getDefaultersReport", () => {
       ["m4to6", 0, 0],
       ["m7plus", 0, 0],
     ]);
-  });
-});
-
-describe("getDashboardSummary", () => {
-  beforeEach(() => {
-    resetFakes();
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-10-15T06:00:00Z"));
-  });
-  afterEach(() => vi.useRealTimers());
-
-  it("adds defaulters, sites, tenant types, attention and portfolio facts", async () => {
-    const GOVT = "00000000-0000-4000-8000-000000000102";
-    const DRAFT = "00000000-0000-4000-8000-000000000103";
-    fakes.owner.tenants.list.mockResolvedValue([
-      tenant({ deposit_amount: "10000.00" }),
-      tenant({ id: GOVT, name: "Block Office", tenant_kind: "government", rent_tracked: false, billing_start: null }),
-      tenant({ id: DRAFT, name: "Mohan", status: "draft", billing_start: null, deposit_amount: "2000.00" }),
-    ]);
-    fakes.owner.rentPeriods.listForTenants.mockResolvedValue([
-      period("00000000-0000-4000-8000-000000000101", "2026-09-01"),
-      period("00000000-0000-4000-8000-000000000101", "2026-10-01"),
-      period("00000000-0000-4000-8000-000000000101", "2026-11-01", "5000.00"),
-    ]);
-
-    const summary = await getDashboardSummary(ctx, "2026-10");
-
-    // Only billed tenants get rent months topped up.
-    expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000101"], expect.any(String));
-    expect(summary.defaulters).toMatchObject({ tenantCount: 1, totalOutstanding: 5000 });
-    expect(summary.defaulters.top.map((r) => r.displayName)).toEqual(["Asha"]);
-    expect(summary.sites).toEqual([
-      { siteCode: "AC", siteName: "Arnapal Chakk Complex", expected: 5000, collected: 0, outstanding: 5000, collectionRate: 0 },
-    ]);
-    expect(summary.kinds.map((k) => [k.kind, k.tenants, k.expected, k.paidDirectTenants])).toEqual([
-      ["individual", 1, 5000, 0],
-      ["business", 0, 0, 0],
-      ["government", 1, 0, 1],
-    ]);
-    expect(summary.attention.map((a) => [a.kind, a.tenants.map((t) => t.displayName)])).toEqual([
-      ["drafts", ["Mohan"]],
-      ["noDocuments", ["Asha", "Block Office"]],
-      // The fake payment hasn't been signed by the tenant (messaging is on in tests).
-      ["unacknowledged", ["Asha"]],
-    ]);
-    expect(summary.portfolio).toEqual({ rentRoll: 5000, depositsHeld: 12000, advancePaid: 5000, paidDirectRent: 0 });
   });
 });

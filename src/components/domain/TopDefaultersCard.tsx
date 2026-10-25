@@ -6,14 +6,19 @@ import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import { BadgeRow, DetailList, SectionCard } from "@/components/ui";
 import { EmptyState, StatusBadge } from "@/components/ui/DataDisplay";
 import LinkButton from "@/components/ui/Loading/LinkButton";
-import type { DashboardSummary } from "@/lib/contracts";
+import type { DefaultersReport } from "@/lib/contracts";
 import { AGING_BAND_TONE } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 
+/** How many defaulters the Overview lists (the Defaulters page has them all). */
+const TOP_DEFAULTERS = 5;
+
 /** Overview: who is furthest behind today, with everyone's arrears by age band. */
-export default function TopDefaultersCard({ defaulters }: { defaulters: DashboardSummary["defaulters"] }) {
-  const { top, tenantCount, totalOutstanding, groups } = defaulters;
+export default function TopDefaultersCard({ report }: { report: DefaultersReport }) {
+  const { rows, totalOutstanding, groups } = report;
+  const top = rows.slice(0, TOP_DEFAULTERS);
+  const tenantCount = rows.length;
   return (
     <SectionCard
       title="Top defaulters"

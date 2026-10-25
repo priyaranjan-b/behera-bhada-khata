@@ -56,7 +56,13 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       signOut: () => post(p.auth.signOut),
     },
     dashboard: {
-      summary: (month, options = {}) => get(withQuery(p.dashboard.summary, { month, paidDirect: options.paidDirect })),
+      overview: {
+        month: (month, options = {}) => get(withQuery(p.dashboard.overview.month, { month, paidDirect: options.paidDirect })),
+        trend: (options = {}) => get(withQuery(p.dashboard.overview.trend, { paidDirect: options.paidDirect })),
+        houses: () => get(p.dashboard.overview.houses),
+        attention: () => get(p.dashboard.overview.attention),
+        portfolio: (options = {}) => get(withQuery(p.dashboard.overview.portfolio, { paidDirect: options.paidDirect })),
+      },
       defaulters: () => get(p.dashboard.defaulters),
       billing: (query = {}) => get(withQuery(p.dashboard.billing, { ...query })),
       activity: (query = {}) => get(withQuery(p.dashboard.activity, { ...query })),

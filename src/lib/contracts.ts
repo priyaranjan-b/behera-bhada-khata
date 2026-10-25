@@ -4,7 +4,7 @@
 // which database sits behind the API.
 import type * as z from "zod";
 import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "@/lib/domain/reports";
-import type { AttentionItem, KindBreakdown, SiteCollection } from "@/lib/domain/overview";
+import type { KindBreakdown, SiteCollection } from "@/lib/domain/overview";
 import type { BillingTotals } from "@/lib/domain/billing";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
@@ -86,24 +86,29 @@ export interface SessionTokens {
   refreshToken: string;
 }
 
-// ---- /api/dashboard --------------------------------------------------------
+// ---- /api/dashboard/overview/* (one section of the Overview each, A12) ------
 
-export interface DashboardSummary {
+/** /overview/month: the selected month's figures, per tenant, site and tenant type. */
+export interface OverviewMonth {
   /** First of the reported month, yyyy-MM-dd. */
   monthKey: string;
   report: MonthlyReport;
-  trend: MonthlyTrendPoint[];
-  /** In-use houses (retired ones left out) and how many have nobody in them today. */
-  houses: { total: number; vacant: number };
-  /** Who's behind today (not the selected month): the worst few, and the aging bands of everyone. */
-  defaulters: { top: DefaulterRow[]; tenantCount: number; totalOutstanding: number; groups: AgingGroup[] };
   /** The selected month per site. */
   sites: SiteCollection[];
   /** The selected month by tenant type. */
   kinds: KindBreakdown[];
-  attention: AttentionItem[];
-  portfolio: PortfolioFacts;
   paidDirect: PaidDirectState;
+}
+
+/** /overview/trend: billed vs collected for the last few months, up to this one. */
+export interface OverviewTrend {
+  trend: MonthlyTrendPoint[];
+}
+
+/** /overview/houses: in-use houses (retired ones left out) and how many have nobody in them today. */
+export interface HouseCounts {
+  total: number;
+  vacant: number;
 }
 
 /** Government rent paid direct (A11): whether any exists, and whether this report includes it. */

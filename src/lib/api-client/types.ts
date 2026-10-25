@@ -1,3 +1,4 @@
+import type { AttentionItem } from "@/lib/domain/overview";
 import type { PaidDirectView } from "@/lib/types";
 import type {
   BillingQuery,
@@ -20,15 +21,18 @@ import type {
   CreatePropertyInput,
   CreateTenantInput,
   CreateUnitInput,
-  DashboardSummary,
   DefaultersReport,
   EditTenantForm,
+  HouseCounts,
   LocationGroup,
   MoveOutInput,
   NewHouseForm,
   NewPropertyForm,
   NewTenantForm,
+  OverviewMonth,
+  OverviewTrend,
   OwnerProfileView,
+  PortfolioFacts,
   UpdateOwnerProfileInput,
   UpdateTenantInput,
   MagicLinkResult,
@@ -61,7 +65,14 @@ export interface ApiQueries {
     loginOptions(): Promise<LoginOptions>;
   };
   dashboard: {
-    summary(month?: string, options?: { paidDirect?: PaidDirectView }): Promise<DashboardSummary>;
+    /** The Overview, one section per call so each card streams in on its own (A12). */
+    overview: {
+      month(month?: string, options?: { paidDirect?: PaidDirectView }): Promise<OverviewMonth>;
+      trend(options?: { paidDirect?: PaidDirectView }): Promise<OverviewTrend>;
+      houses(): Promise<HouseCounts>;
+      attention(): Promise<AttentionItem[]>;
+      portfolio(options?: { paidDirect?: PaidDirectView }): Promise<PortfolioFacts>;
+    };
     /** Tenants behind on rent, most months behind first. */
     defaulters(): Promise<DefaultersReport>;
     /** Rent billed per tenant per month in a range, and the payments for it. */

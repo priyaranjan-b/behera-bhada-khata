@@ -24,6 +24,17 @@ export async function ensureRentPeriodsFor(tenantIds: string[]): Promise<void> {
   await systemDb().rentPeriods.ensure(tenantIds, throughMonth());
 }
 
+/** Rent months by tenant id. */
+export function groupPeriods(periods: RentPeriod[]): Map<string, RentPeriod[]> {
+  const byTenant = new Map<string, RentPeriod[]>();
+  for (const period of periods) {
+    const list = byTenant.get(period.tenant_id) ?? [];
+    list.push(period);
+    byTenant.set(period.tenant_id, list);
+  }
+  return byTenant;
+}
+
 /** The tenants the app bills (active, rent tracked - 0016), for ensureRentPeriodsFor. */
 export function billedTenantIds(tenants: Tenant[]): string[] {
   return tenants.filter((t) => isRentTracked({ status: t.status, rentTracked: t.rent_tracked })).map((t) => t.id);

@@ -239,3 +239,69 @@ arrive every month. Rejected alternatives:
 - **Leaving it out** made rent roll and collection understate what the
   property earns.
 
+
+## Overview
+
+### A12 — The Overview streams in sections, one data call each
+
+**Decision.** `/dashboard` is a set of independent **sections**, each loaded
+by its own call and shown as soon as it is ready. A section has four parts:
+- **Data:** a service function and a GET under `/api/dashboard/overview/*`
+  (`month`, `trend`, `houses`, `attention`, `portfolio`; the defaulters card
+  reuses `/api/dashboard/defaulters`). These live in
+  `src/server/services/overview.ts`.
+- **A section component** in `src/app/dashboard/(overview)/sections/`: an
+  async Server Component that awaits its promise(s) and renders the cards.
+- **A slot** in `OverviewLayout.tsx`, plus its placeholder in
+  `OVERVIEW_SKELETONS` (`overviewSkeletons.tsx`). A placeholder is one of the
+  kit skeletons (`DetailCardSkeleton rows={n}`, `ChartCardSkeleton`, …) sized
+  like the card, never a new component. `page.tsx` uses it as the section's
+  fallback, and `loading.tsx` fills the whole layout with them, so the two
+  can't drift.
+- **A boundary:** `AsyncSection` (`src/components/ui/`), which is a
+  `<Suspense>` inside a `CardErrorBoundary` (`catchError` from `next/error`).
+  A section that fails shows its own "Try again" card. `redirect()` and
+  `notFound()` still pass through.
+
+How the pieces fit:
+- **Start every call first.** `page.tsx` starts every call before anything
+  awaits, so the calls run in parallel.
+- **Key boundaries by their inputs.** Each boundary is keyed by what its
+  data depends on (`monthKey`, the paid-direct view). Switching the month
+  reloads only the month's cards.
+- **Shared reads run once.** The tenant list, the `ensure_rent_periods`
+  write, placements, rent months and recent payments come from loaders
+  wrapped in React `cache()` (top of `overview.ts`). Within one render they
+  run once, however many sections need them, and `getDefaultersReport`
+  uses the same `billedTenants()`.
+
+**Rules for changing it.**
+- **A new card whose data an existing section already loads:** extend that
+  section's contract.
+- **A new section and endpoint:** only for data with a different source, a
+  different cost or a different refresh trigger (the selected month vs
+  today).
+- **Shared reads:** go through the cached loaders, never a section's own
+  `db.*` call for the same rows.
+- **Contracts:** per section and view-ready. Cards take the slice they
+  render.
+- **Size:** keep about 6 calls per page. More than that means the sections
+  are too fine-grained.
+
+**Why.** Before this, one `getDashboardSummary` call returned everything:
+- the slowest part held back every card;
+- one failure blanked the page;
+- the defaulters logic was duplicated.
+
+One call per card would instead repeat the base reads and the
+`ensure_rent_periods` write on every call.
+
+Rejected alternatives:
+- **Client-side fetching** adds JS, only starts after hydration, and repeats
+  auth.
+
+Trade-offs:
+- Over the HTTP transport (`API_BASE_URL`), `cache()` doesn't span requests,
+  so each endpoint reloads the base data.
+- Sections may read moments apart. That is fine for a dashboard. Never
+  combine figures from two sections into one number.
