@@ -9,7 +9,8 @@ import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
 import type { TenantSearchRow } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
-import { TENANT_KIND_LABELS, tenantKindTags } from "@/lib/domain/tenant";
+import { tenantTypeTags } from "@/lib/domain/tenant";
+import TenantKindTags from "@/components/domain/TenantKindTags";
 
 type StatusFilter = "current" | "drafts" | "untracked" | "overdue" | "outstanding" | "settled" | "movedOut" | "all";
 
@@ -38,7 +39,7 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
         name={row.displayName}
         caption={
           row.status === "active"
-            ? ([...tenantKindTags(row), row.contactName].filter(Boolean).join(" · ") || undefined)
+            ? (row.contactName ?? undefined)
             : row.status === "draft"
               ? "Draft - add phone, rent, lease start"
               : `Moved out ${row.movedOutOn ?? ""}`
@@ -47,14 +48,16 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
       />
     ),
   },
-  // Hidden by default; shown from the Columns button.
   {
     field: "tenantKind",
     headerName: "Type",
-    minWidth: 140,
+    minWidth: 150,
     flex: 0.8,
-    valueGetter: (_value, row) => tenantKindTags(row).join(" · ") || TENANT_KIND_LABELS[row.tenantKind],
+    // The label (not the raw value) so search, sorting and the export read "Government".
+    valueGetter: (_value, row) => tenantTypeTags(row).join(" · "),
+    renderCell: ({ row }) => <TenantKindTags tenantKind={row.tenantKind} rentTracked={row.rentTracked} />,
   },
+  // Hidden by default; shown from the Columns button.
   {
     field: "phone",
     headerName: "Phone",
@@ -118,7 +121,7 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
 
 const INITIAL_STATE: GridInitialState = {
   sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },
-  columns: { columnVisibilityModel: { phone: false, tenantKind: false } },
+  columns: { columnVisibilityModel: { phone: false } },
 };
 
 function matchesStatus(row: TenantSearchRow, status: StatusFilter): boolean {

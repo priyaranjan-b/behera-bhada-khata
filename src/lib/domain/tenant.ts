@@ -37,10 +37,10 @@ export function isRentTracked(tenant: { status: TenantStatus; rentTracked: boole
   return tenant.status === "active" && tenant.rentTracked;
 }
 
-/** Tags shown next to a tenant's name: "Govt", plus "Rent paid direct" while its rent isn't tracked (0016). */
-export function tenantKindTags(tenant: { tenantKind: TenantKind; rentTracked: boolean }): string[] {
-  if (!isGovernment(tenant.tenantKind)) return [];
-  return tenant.rentTracked ? ["Govt"] : ["Govt", "Rent paid direct"];
+/** A tenant's type as tags: "Business", or "Government" plus "Rent paid direct" while its rent isn't tracked (0016). */
+export function tenantTypeTags(tenant: { tenantKind: TenantKind; rentTracked: boolean }): string[] {
+  const label = TENANT_KIND_LABELS[tenant.tenantKind];
+  return tenant.rentTracked ? [label] : [label, "Rent paid direct"];
 }
 
 export const UNIT_TYPE_LABELS: Record<UnitType, string> = {

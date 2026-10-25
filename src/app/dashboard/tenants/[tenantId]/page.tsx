@@ -159,8 +159,10 @@ export default async function TenantPage({
           <SectionCard title="Details" fill>
             <DetailList dividers>
               <DetailRow label="Status">
+                <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
+              </DetailRow>
+              <DetailRow label="Tenant type">
                 <BadgeRow align="end">
-                  <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
                   <TenantKindTags tenantKind={tenant.tenantKind} rentTracked={tenant.rentTracked} />
                 </BadgeRow>
               </DetailRow>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatFloor, formatUnits, unitMix, billingStartFor, isGovernment, isRentTracked, TENANT_KIND_OPTIONS, tenantKindTags } from "./tenant";
+import { formatFloor, formatUnits, unitMix, billingStartFor, isGovernment, isRentTracked, TENANT_KIND_OPTIONS, tenantTypeTags } from "./tenant";
 
 describe("tenant display helpers", () => {
   it("groups house codes by tower", () => {
@@ -37,10 +37,10 @@ describe("government tenants (0016)", () => {
     expect(isRentTracked({ status: "inactive", rentTracked: true })).toBe(false);
   });
 
-  it("tags a government tenant, and says when its rent is paid direct", () => {
-    expect(tenantKindTags({ tenantKind: "business", rentTracked: true })).toEqual([]);
-    expect(tenantKindTags({ tenantKind: "government", rentTracked: true })).toEqual(["Govt"]);
-    expect(tenantKindTags({ tenantKind: "government", rentTracked: false })).toEqual(["Govt", "Rent paid direct"]);
+  it("tags every tenant with its type, and says when the rent is paid direct", () => {
+    expect(tenantTypeTags({ tenantKind: "business", rentTracked: true })).toEqual(["Business"]);
+    expect(tenantTypeTags({ tenantKind: "government", rentTracked: true })).toEqual(["Government"]);
+    expect(tenantTypeTags({ tenantKind: "government", rentTracked: false })).toEqual(["Government", "Rent paid direct"]);
   });
 
   it("labels every kind, and only government is exempt", () => {
