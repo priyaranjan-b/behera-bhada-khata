@@ -1,5 +1,11 @@
 # Split page APIs into logical sections
 
+**Status: done (Oct 2026).** Task 1 `22bcfb7`, task 2 `9c38822`, task 4
+(Billing) `c3ed888`, task 3 (tower) `b3579c0`. One deviation from the plan:
+the tenant and tower pages have no `loading.tsx`, because one in their
+folder would also show while their child pages (edit, forms, the payment
+modal) load.
+
 Follow-up to the Overview rework (A12, `22114f5`), applying the rule in
 `CLAUDE.md` → "Split a page's data into logical reads" and the
 `add-api-endpoint` skill to the remaining pages. Each task below is one PR:

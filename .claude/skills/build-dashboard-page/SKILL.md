@@ -69,6 +69,17 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
       `title` and `fallback`, keyed by the params its data depends on.
   - **In `page.tsx`:** start every call before awaiting anything, and never
     `await` one call before starting the next.
+    - **Exception: a record page.** A detail page may `await` its one small
+      header call first: it carries the 404 and decides which sections exist
+      (e.g. no money calls for a Govt tenant paying direct). Then it starts the
+      rest. Examples: the tenant page and the tower page.
+    - **Header buttons that need data** go in a `silent` `AsyncSection` with
+      `fallback={null}`, so the rest of the header doesn't wait. Examples:
+      Move out (owed amount) and Stop tracking.
+  - **`loading.tsx`:** add one only when the segment has no child pages. A
+    `loading.tsx` in `[tenantId]/` would also show while `/edit` and the
+    payment modal load. Those record pages rely on their section fallbacks
+    and the generic dashboard skeleton instead.
   - **Shared reads:** reads several sections need go through the `cache()`
     loaders in `src/server/services/loaders.ts` (add one there if missing),
     never repeated `db.*` calls. Inside a section, start every read in one

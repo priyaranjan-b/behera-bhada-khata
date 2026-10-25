@@ -264,6 +264,18 @@ by its own call and shown as soon as it is ready. A section has four parts:
   A section that fails shows its own "Try again" card. `redirect()` and
   `notFound()` still pass through.
 
+**Pages that follow it:**
+
+| Page | Calls |
+|---|---|
+| Overview | `overview/{month,trend,houses,attention,portfolio}`, `defaulters`, `paid-direct` |
+| Tenant page | `tenants/[id]` (profile), `…/account`, `…/ledger`, `…/history` |
+| Billing | `billing` (rows and totals), `billing/received`, `paid-direct` |
+| Tower page | `properties/[code]` (header), `…/units`, `…/tenants` |
+
+Every other page shows one list or one form, so it keeps a single call. The
+audit is in `docs/plans/split-page-apis.md`.
+
 How the pieces fit:
 - **Start every call first.** `page.tsx` starts every call before anything
   awaits, so the calls run in parallel.
