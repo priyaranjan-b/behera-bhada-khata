@@ -42,6 +42,7 @@ export const apiPaths = {
       history: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/history`,
       moveOut: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out`,
       paidThrough: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/paid-through`,
+      rentTracking: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/rent-tracking`,
       payments: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments`,
       newPayment: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments/new`,
       documents: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/documents`,

@@ -1,5 +1,7 @@
 import "server-only";
 import { addMonthsToKey, currentMonthKey } from "@/lib/dates";
+import { isRentTracked } from "@/lib/domain/tenant";
+import type { Tenant } from "@/lib/types";
 import { systemDb } from "@/server/infra";
 
 const LOOKAHEAD_MONTHS = 2;
@@ -18,6 +20,11 @@ function throughMonth(): string {
 export async function ensureRentPeriodsFor(tenantIds: string[]): Promise<void> {
   if (tenantIds.length === 0) return;
   await systemDb().rentPeriods.ensure(tenantIds, throughMonth());
+}
+
+/** The tenants the app bills (active, rent tracked - 0016), for ensureRentPeriodsFor. */
+export function billedTenantIds(tenants: Tenant[]): string[] {
+  return tenants.filter((t) => isRentTracked({ status: t.status, rentTracked: t.rent_tracked })).map((t) => t.id);
 }
 
 /** Cron: top up periods for every active tenant and drop expired rate-limit counters. */

@@ -3,16 +3,24 @@ import { formatMoney } from "@/lib/money";
 import {
   AUDIT_ACTIONS,
   PREFERRED_CHANNELS,
+  TENANT_KINDS,
   TENANT_STATUSES,
   UNIT_TYPES,
   type AuditAction,
   type AuditActorKind,
   type PreferredChannel,
+  type TenantKind,
   type TenantStatus,
   type UnitType,
 } from "@/lib/types";
 import { paymentModeLabel } from "./payments";
-import { PREFERRED_CHANNEL_LABELS, TENANT_STATUS_DISPLAY, UNIT_TYPE_LABELS, formatFloor } from "./tenant";
+import {
+  PREFERRED_CHANNEL_LABELS,
+  TENANT_KIND_LABELS,
+  TENANT_STATUS_DISPLAY,
+  UNIT_TYPE_LABELS,
+  formatFloor,
+} from "./tenant";
 
 // How audit_log rows (0015, D25) read on screen and in downloads: one label
 // per action, one label and format per column, so no raw value or column
@@ -37,6 +45,8 @@ const ACTIONS: Record<AuditAction, { label: string; category: AuditCategory }> =
   "tenant.activated": { label: "Draft completed, billing started", category: "tenants" },
   "tenant.moved_out": { label: "Moved out", category: "tenants" },
   "billing_start.corrected": { label: "\"Paid up to\" corrected", category: "rent" },
+  "rent_tracking.started": { label: "Rent tracking started", category: "rent" },
+  "rent_tracking.stopped": { label: "Rent tracking turned off", category: "rent" },
   "tenancy.started": { label: "House added", category: "houses" },
   "tenancy.ended": { label: "House left", category: "houses" },
   "tenancy.changed": { label: "House dates changed", category: "houses" },
@@ -100,6 +110,7 @@ type Format =
   | "month"
   | "datetime"
   | "status"
+  | "kind"
   | "channel"
   | "unitType"
   | "floor"
@@ -115,6 +126,8 @@ const FIELDS: [column: string, label: string, format: Format][] = [
   ["phone", "Phone", "text"],
   ["preferred_channel", "Messages by", "channel"],
   ["status", "Status", "status"],
+  ["tenant_kind", "Tenant type", "kind"],
+  ["rent_tracked", "Rent tracked here", "yesNo"],
   ["lease_start", "Lease start", "date"],
   ["billing_start", "Billing from", "month"],
   ["moved_out_on", "Moved out on", "date"],
@@ -167,6 +180,8 @@ function formatValue(value: unknown, format: Format): string {
       return typeof value === "string" ? formatDateTime(value) : "—";
     case "status":
       return isOneOf<TenantStatus>(TENANT_STATUSES, value) ? TENANT_STATUS_DISPLAY[value].label : "—";
+    case "kind":
+      return isOneOf<TenantKind>(TENANT_KINDS, value) ? TENANT_KIND_LABELS[value] : "—";
     case "channel":
       return isOneOf<PreferredChannel>(PREFERRED_CHANNELS, value) ? PREFERRED_CHANNEL_LABELS[value] : "—";
     case "unitType":

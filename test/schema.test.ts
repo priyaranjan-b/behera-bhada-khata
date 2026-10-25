@@ -1263,3 +1263,107 @@ describe("audit log (0015)", () => {
     ]);
   });
 });
+
+describe("government tenants with untracked rent (0016)", () => {
+  /** A government tenant whose rent is paid to the owner directly: no phone, no billing. */
+  async function createGovt(rent: number | null = 20000): Promise<string> {
+    const [row] = await as<{ id: string }>(
+      owner(OWNER_A),
+      `select create_tenant('Block Office', null, null, 'both', $1, '2026-01-01', array['AC-T1-G03'], null, null,
+         'government', false) as id`,
+      [rent]
+    );
+    return row.id;
+  }
+
+  async function tenantRow(id: string) {
+    const { rows } = await db.query<{ status: string; tenant_kind: string; rent_tracked: boolean; billing_start: string | null }>(
+      `select status, tenant_kind, rent_tracked, to_char(billing_start, 'YYYY-MM-DD') as billing_start
+       from tenants where id = $1`,
+      [id]
+    );
+    return rows[0];
+  }
+
+  it("is active and holds its houses, but never gets rent months, even when asked by id", async () => {
+    const id = await createGovt();
+    expect(await tenantRow(id)).toEqual({
+      status: "active",
+      tenant_kind: "government",
+      rent_tracked: false,
+      billing_start: null,
+    });
+    expect((await tenancies("AC-T1-G03")).map((t) => t.tenant_id)).toEqual([id]);
+    await as(service, `select ensure_rent_periods($1::uuid[], '2026-12-01')`, [[id]]);
+    await as(service, `select ensure_rent_periods(null, '2026-12-01')`);
+    expect(await periodsOf(id)).toEqual([]);
+    // Rent is optional while untracked.
+    await db.exec(`truncate tenant_units cascade`);
+    expect(await errorCode(createGovt(null))).toBe("ok");
+  });
+
+  it("only a government tenant may skip tracking or the phone; existing tenants are backfilled by business name", async () => {
+    const create = (kind: string, phone: string | null, tracked: boolean) =>
+      as(
+        owner(OWNER_A),
+        `select create_tenant('X', null, $1, 'both', 1000, '2026-01-01', array['AC-T1-G04'], null, null, $2, $3)`,
+        [phone, kind, tracked]
+      );
+    expect(await errorCode(create("business", "+919876543210", false))).toBe("BBK00");
+    expect(await errorCode(create("individual", null, true))).toBe("BBK00");
+    expect(await errorCode(create("government", null, true))).toBe("ok");
+    expect(await errorCode(db.query(`update tenants set rent_tracked = false where id = $1`, [fx.tenantA]))).toBe("23514");
+    expect((await tenantRow(fx.tenantA)).tenant_kind).toBe("individual");
+  });
+
+  it("a government draft is completed untracked with just a lease start", async () => {
+    const [{ id }] = (
+      await db.query<{ id: string }>(`insert into tenants (name, status, preferred_channel) values ('Tahasil', 'draft', 'both') returning id`)
+    ).rows;
+    await as(
+      owner(OWNER_A),
+      `select update_tenant($1, 'Tahasil', null, null, 'both', array['AC-T1-G05'], null, null, null, '2025-04-01', null, null,
+         'government', false)`,
+      [id]
+    );
+    expect(await tenantRow(id)).toEqual({ status: "active", tenant_kind: "government", rent_tracked: false, billing_start: null });
+    // It can't change type while untracked.
+    expect(
+      await errorCode(
+        as(owner(OWNER_A), `select update_tenant($1, 'Tahasil', null, '+919876543210', 'both', null, null, null, null, null,
+          null, null, 'business')`, [id])
+      )
+    ).toBe("BBK09");
+  });
+
+  it("start_rent_tracking bills from the month after 'paid up to'; stop undoes it until a payment exists", async () => {
+    const id = await createGovt(null);
+    expect(await errorCode(as(owner(OWNER_A), `select start_rent_tracking($1, null, '2026-02-01')`, [id]))).toBe("BBK00");
+    expect(await errorCode(as(owner(OWNER_B), `select start_rent_tracking($1, 20000, '2026-02-01')`, [id]))).toBe("BBK04");
+    expect(await errorCode(as(owner(OWNER_A), `select correct_paid_through($1, '2026-02-01')`, [id]))).toBe("BBK09");
+
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `select start_rent_tracking($1, 20000, '2026-02-01')`, [id]);
+    expect(await tenantRow(id)).toMatchObject({ rent_tracked: true, billing_start: "2026-03-01" });
+    const months = await periodsOf(id);
+    expect(months[0]).toEqual({ period_month: "2026-03-01", amount_due: 20000 });
+    expect(await errorCode(as(owner(OWNER_A), `select start_rent_tracking($1, 20000, null)`, [id]))).toBe("BBK09");
+
+    const { rows: actions } = await db.query<{ action: string }>(
+      `select action from audit_log where entity_type = 'tenant' order by id`
+    );
+    expect(actions.map((a) => a.action)).toEqual(["rent_tracking.started"]);
+
+    await as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]);
+    expect(await tenantRow(id)).toMatchObject({ rent_tracked: false, billing_start: null });
+    expect(await periodsOf(id)).toEqual([]);
+
+    await as(owner(OWNER_A), `select start_rent_tracking($1, null, '2026-02-01')`, [id]);
+    const [march] = (
+      await db.query<{ id: string }>(`select id from rent_periods where tenant_id = $1 and period_month = '2026-03-01'`, [id])
+    ).rows;
+    await createPayment(owner(OWNER_A), { tenant: id, amount: 20000, allocations: [{ rent_period_id: march.id, amount: 20000 }] });
+    expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]))).toBe("BBK09");
+    expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [fx.tenantA]))).toBe("BBK09");
+  });
+});

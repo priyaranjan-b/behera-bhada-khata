@@ -24,6 +24,7 @@ import type {
   RentPeriod,
   Tenant,
   TenantDocument,
+  TenantKind,
   TenantRentRate,
   TenantStatus,
   Unit,
@@ -52,15 +53,20 @@ export interface NewUnit {
 export interface NewTenant {
   name: string;
   business_name: string | null;
-  phone: string;
+  /** Optional only for a government tenant. */
+  phone: string | null;
   preferred_channel: PreferredChannel;
-  monthly_rent: number;
+  /** Optional only when `rent_tracked` is false (the agreement rent). */
+  monthly_rent: number | null;
   lease_start: string;
   unit_codes: string[];
   /** Rent settled outside the app up to this month; null = bill from the lease month. */
   paid_through: string | null;
   /** Security deposit, fixed from creation. */
   deposit_amount: number | null;
+  tenant_kind: TenantKind;
+  /** false: government rent paid to the owner directly - never billed (0016). */
+  rent_tracked: boolean;
 }
 
 /**
@@ -84,6 +90,10 @@ export interface TenantChanges {
   paid_through: string | null;
   /** A draft's deposit (null clears it); for an active tenant null or the stored value, else 409. */
   deposit_amount: number | null;
+  /** null = unchanged. A tenant whose rent isn't tracked must stay government (409). */
+  tenant_kind: TenantKind | null;
+  /** Drafts only: false completes a government draft untracked; null = tracked. */
+  rent_tracked: boolean | null;
 }
 export type NewPayment = Omit<Insert<"payments">, "created_at" | "status" | "amount"> & {
   id: string;
@@ -198,6 +208,13 @@ export interface OwnerRepositories {
      * if one has a payment. Returns the new billing start.
      */
     correctPaidThrough(id: string, paidThrough: string): Promise<string>;
+    /**
+     * Starts billing an untracked government tenant (0016) from the month
+     * after `paidThrough` (null = last month). Returns the billing start.
+     */
+    startRentTracking(id: string, monthlyRent: number | null, paidThrough: string | null): Promise<string>;
+    /** Undoes startRentTracking; 409 once a payment or adjustment is recorded. */
+    stopRentTracking(id: string): Promise<void>;
   };
   rentPeriods: {
     /**

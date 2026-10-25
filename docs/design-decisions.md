@@ -160,7 +160,8 @@ towers) on `/dashboard/properties`. It counts **current** tenancies only
 (started on or before today and still holding the house), takes each
 tenant's rent in effect this month and splits it **evenly across the houses
 they occupy now**, then sums per tower (`round2`). A tower with no
-occupants shows "—".
+occupants shows "—". Government tenants whose rent isn't tracked (D26) are left
+out: that rent goes to the owner's bank, not through the app.
 
 **Why.** Billing is per tenant, not per house (one combined rent covers all
 of a tenant's houses), so there is no per-house rent in the data. An even

@@ -89,6 +89,10 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),
         moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
         correctPaidThrough: (id, input) => post(p.dashboard.tenants.paidThrough(id), input),
+        startRentTracking: (id, input) => post(p.dashboard.tenants.rentTracking(id), input),
+        stopRentTracking: async (id) => {
+          await request("DELETE", p.dashboard.tenants.rentTracking(id));
+        },
         newPayment: (id) => get(p.dashboard.tenants.newPayment(id)),
         createPayment: (id, input, proofs) => postWithFiles(p.dashboard.tenants.payments(id), input, "proofs", proofs),
         uploadDocuments: (id, input, files) => postWithFiles(p.dashboard.tenants.documents(id), input, "files", files),

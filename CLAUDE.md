@@ -100,6 +100,14 @@ both together.
   "Correct" button by "Billing from" on an active tenant's page calls
   `correct_paid_through`, which moves `billing_start` and adds or drops
   months (refused if a dropped month has a payment).
+- **Government tenants** (`0016_government_tenants.sql`, D26):
+  `tenants.tenant_kind` is `individual | business | government`. A
+  government tenant may have no phone, and with `rent_tracked = false`
+  (rent paid to the owner's bank directly) it is active and holds its
+  houses, but has no `billing_start`, no rent months and no Record payment.
+  "Start tracking rent" (`start_rent_tracking`) bills it from the month
+  after "paid up to"; `stop_rent_tracking` undoes that until a payment
+  exists. "Billed" in JS is `isRentTracked` / `billedTenantIds`.
 - **Security deposit** (`tenants.deposit_amount`, optional): set when
   onboarding or while a draft, then frozen by a trigger once the tenant is
   active (D18).

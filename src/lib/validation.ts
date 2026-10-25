@@ -1,7 +1,14 @@
 import * as z from "zod";
 import { isDateKey } from "@/lib/dates";
 import { AUDIT_CATEGORIES } from "@/lib/domain/audit";
-import { PAYMENT_MODES, PREFERRED_CHANNELS, RECORD_TYPES, UNIT_TYPES } from "@/lib/types";
+import {
+  PAYMENT_MODES,
+  PREFERRED_CHANNELS,
+  RECORD_TYPES,
+  TENANT_KINDS,
+  UNIT_TYPES,
+  type TenantKind,
+} from "@/lib/types";
 
 // Every request body the API accepts, validated by the service that receives
 // it (parseInput in src/server/services/context.ts). Client-safe, so forms
@@ -172,17 +179,52 @@ const tenantContact = {
   preferredChannel: z.enum(PREFERRED_CHANNELS),
 };
 
-/** One tenant, the houses they take on `leaseStart`, and their combined monthly rent. */
-export const createTenantSchema = z.object({
-  ...tenantContact,
-  monthlyRentAmount: positiveMoneySchema,
-  leaseStart: dateKeySchema,
-  unitCodes: unitCodesSchema,
-  /** Rent already settled outside the app up to this month; billing starts the month after. */
-  paidThrough: monthKeySchema.optional(),
-  /** Security deposit (optional); can't be changed once the tenant is active. */
-  depositAmount: positiveMoneySchema.optional(),
-});
+/**
+ * Only a government tenant may leave the phone empty or its rent untracked
+ * (0016). An edit that doesn't send the kind keeps the stored one, which the
+ * database checks.
+ */
+function checkGovernmentOnly(
+  input: { tenantKind?: TenantKind; phone?: string; rentTracked?: boolean },
+  ctx: z.RefinementCtx,
+  { phoneRequired }: { phoneRequired: boolean }
+) {
+  if (input.tenantKind === undefined || input.tenantKind === "government") return;
+  if (phoneRequired && !input.phone) ctx.addIssue({ code: "custom", path: ["phone"], message: "Required" });
+  if (input.rentTracked === false) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["rentTracked"],
+      message: "Only a government tenant's rent can be left untracked",
+    });
+  }
+}
+
+/**
+ * One tenant, the houses they take on `leaseStart`, and their combined monthly
+ * rent. A government tenant may have no phone, and with `rentTracked: false`
+ * is never billed (the rent is then optional, the agreement rent).
+ */
+export const createTenantSchema = z
+  .object({
+    ...tenantContact,
+    tenantKind: z.enum(TENANT_KINDS).default("individual"),
+    phone: phoneE164Schema.optional(),
+    rentTracked: z.boolean().default(true),
+    monthlyRentAmount: positiveMoneySchema.optional(),
+    leaseStart: dateKeySchema,
+    unitCodes: unitCodesSchema,
+    /** Rent already settled outside the app up to this month; billing starts the month after. */
+    paidThrough: monthKeySchema.optional(),
+    /** Security deposit (optional); can't be changed once the tenant is active. */
+    depositAmount: positiveMoneySchema.optional(),
+  })
+  .superRefine((input, ctx) => {
+    checkGovernmentOnly(input, ctx, { phoneRequired: true });
+    if (input.rentTracked && input.monthlyRentAmount === undefined) {
+      ctx.addIssue({ code: "custom", path: ["monthlyRentAmount"], message: "Required" });
+    }
+  });
 
 /**
  * The full new state of a tenant. The database works out what changed:
@@ -191,19 +233,25 @@ export const createTenantSchema = z.object({
  * A draft (from the paper register) may be saved with details still missing;
  * phone + rent + `leaseStart` together make it active.
  */
-export const updateTenantSchema = z.object({
-  ...tenantContact,
-  phone: phoneE164Schema.optional(),
-  unitCodes: unitCodesSchema,
-  unitsEffective: dateKeySchema.optional(),
-  monthlyRentAmount: positiveMoneySchema.optional(),
-  rentEffectiveMonth: monthKeySchema.optional(),
-  leaseStart: dateKeySchema.optional(),
-  /** Drafts: rent settled on paper up to this month (default: last month). */
-  paidThrough: monthKeySchema.optional(),
-  /** Drafts only - frozen once active (sending the stored value is fine). */
-  depositAmount: positiveMoneySchema.optional(),
-});
+export const updateTenantSchema = z
+  .object({
+    ...tenantContact,
+    /** Omitted = unchanged. */
+    tenantKind: z.enum(TENANT_KINDS).optional(),
+    phone: phoneE164Schema.optional(),
+    unitCodes: unitCodesSchema,
+    unitsEffective: dateKeySchema.optional(),
+    monthlyRentAmount: positiveMoneySchema.optional(),
+    rentEffectiveMonth: monthKeySchema.optional(),
+    leaseStart: dateKeySchema.optional(),
+    /** Drafts: rent settled on paper up to this month (default: last month). */
+    paidThrough: monthKeySchema.optional(),
+    /** Drafts only - frozen once active (sending the stored value is fine). */
+    depositAmount: positiveMoneySchema.optional(),
+    /** Drafts only: false completes a government draft without billing it. */
+    rentTracked: z.boolean().optional(),
+  })
+  .superRefine((input, ctx) => checkGovernmentOnly(input, ctx, { phoneRequired: false }));
 
 export const moveOutSchema = z.object({
   moveOutDate: dateKeySchema,
@@ -212,6 +260,16 @@ export const moveOutSchema = z.object({
 /** The last month rent was paid outside the app (yyyy-MM or yyyy-MM-01). */
 export const correctPaidThroughSchema = z.object({
   paidThrough: monthKeySchema,
+});
+
+/**
+ * Starts billing an untracked government tenant (0016): from the month after
+ * `paidThrough` (default: last month). `monthlyRentAmount` is needed unless
+ * the agreement rent is already on file.
+ */
+export const startRentTrackingSchema = z.object({
+  monthlyRentAmount: positiveMoneySchema.optional(),
+  paidThrough: monthKeySchema.optional(),
 });
 
 // ---- Payments & adjustments -------------------------------------------------

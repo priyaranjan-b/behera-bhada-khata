@@ -6,9 +6,11 @@ import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { FormActions, SectionCard } from "@/components/ui";
@@ -16,9 +18,15 @@ import TenantDocumentsCard, { type PendingDocument } from "@/components/domain/T
 import { api, errorMessage } from "@/lib/api-client";
 import type { AvailableUnit, EditTenantForm, TenantDocumentView } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf, monthsBetween, todayKey, yearMonthOf } from "@/lib/dates";
-import { PREFERRED_CHANNEL_OPTIONS, billingStartFor, formatFloor } from "@/lib/domain/tenant";
+import {
+  PREFERRED_CHANNEL_OPTIONS,
+  TENANT_KIND_OPTIONS,
+  billingStartFor,
+  formatFloor,
+  isGovernment,
+} from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
-import type { PreferredChannel } from "@/lib/types";
+import type { PreferredChannel, TenantKind } from "@/lib/types";
 
 type Mode =
   // propertyCode: the tower the form was opened from; omitted for the side-menu shortcut.
@@ -72,6 +80,9 @@ export default function TenantForm({
   const [name, setName] = useState(editing?.name ?? "");
   const [businessName, setBusinessName] = useState(editing?.businessName ?? "");
   const [phone, setPhone] = useState(editing?.phone ?? "");
+  const [tenantKind, setTenantKind] = useState<TenantKind>(editing?.tenantKind ?? "individual");
+  // Government only (0016): false = rent goes straight to the owner's bank, never billed here.
+  const [rentTracked, setRentTracked] = useState(editing?.rentTracked ?? true);
   const [preferredChannel, setPreferredChannel] = useState<PreferredChannel>(editing?.preferredChannel ?? "both");
   const [monthlyRent, setMonthlyRent] = useState(editing && editing.monthlyRent > 0 ? String(editing.monthlyRent) : "");
   const [leaseStart, setLeaseStart] = useState(editing?.leaseStart ?? "");
@@ -89,12 +100,20 @@ export default function TenantForm({
   const [error, setError] = useState<string | null>(null);
 
   const unitCodes = units.map((u) => u.unitCode);
-  const hasCommercial = units.some((u) => u.unitType === "commercial") || Boolean(editing?.businessName);
+  const government = isGovernment(tenantKind);
+  const untracked = government && !rentTracked;
+  // Once active, tracking changes only from the tenant page (Start / Stop tracking).
+  const choosingTracking = government && (mode.kind === "create" || draft);
+  // An untracked tenant must stay government (update_tenant refuses otherwise).
+  const kindLocked = Boolean(editing && !draft && !editing.rentTracked);
+  const hasCommercial =
+    units.some((u) => u.unitType === "commercial") || Boolean(editing?.businessName) || tenantKind !== "individual";
   // A draft's houses and rent aren't billed yet, so they change without effective dates.
   const unitsChanged = editing && !draft ? !sameSet(unitCodes, initialCodes) : false;
   const rentChanged = editing && !draft ? Number(monthlyRent) !== editing.monthlyRent : false;
-  const draftComplete = draft && Boolean(phone.trim() && monthlyRent && leaseStart);
-  const settingUpBilling = mode.kind === "create" || draft;
+  const draftComplete =
+    draft && (untracked ? Boolean(leaseStart) : Boolean((phone.trim() || government) && monthlyRent && leaseStart));
+  const settingUpBilling = (mode.kind === "create" || draft) && !untracked;
 
   // billing_start_for() in 0008, shared with the server via src/lib/domain.
   const billingStart =
@@ -120,32 +139,37 @@ export default function TenantForm({
       return;
     }
     setSubmitting(true);
-    if (draft && Boolean(monthlyRent) !== Boolean(leaseStart)) {
-      setError("Enter the monthly rent and lease start together (with the phone) to start billing");
+    if (draft && !untracked && Boolean(monthlyRent) !== Boolean(leaseStart)) {
+      setError(
+        government
+          ? "Enter the monthly rent and lease start together to start billing"
+          : "Enter the monthly rent and lease start together (with the phone) to start billing"
+      );
       setSubmitting(false);
       return;
     }
     const contact = {
       name,
       businessName: hasCommercial ? businessName || undefined : undefined,
-      phone: phone.trim(),
+      phone: phone.trim() || undefined,
       preferredChannel,
+      tenantKind,
       unitCodes,
-      monthlyRentAmount: Number(monthlyRent),
+      monthlyRentAmount: monthlyRent ? Number(monthlyRent) : undefined,
     };
     try {
       if (mode.kind === "edit") {
         await api.dashboard.tenants.update(mode.tenant.id, {
           ...contact,
-          phone: contact.phone || undefined,
-          monthlyRentAmount: monthlyRent ? Number(monthlyRent) : undefined,
+          // Only a draft chooses whether its rent is tracked; afterwards the tenant page does.
+          rentTracked: draft ? rentTracked : undefined,
           unitsEffective: unitsChanged ? unitsEffective : undefined,
           rentEffectiveMonth: rentChanged ? monthKeyOf(rentEffectiveMonth) : undefined,
           leaseStart: draft && leaseStart ? leaseStart : undefined,
           // Blank = nothing paid yet: send the month before the lease month so
           // billing starts at move-in, as the preview says (update_tenant would
           // otherwise default a missing value to last month).
-          paidThrough: !draft
+          paidThrough: !draft || untracked
             ? undefined
             : paidThrough
               ? monthKeyOf(paidThrough)
@@ -174,8 +198,9 @@ export default function TenantForm({
       } else {
         const { id } = await api.dashboard.tenants.create({
           ...contact,
+          rentTracked,
           leaseStart,
-          paidThrough: paidThrough ? monthKeyOf(paidThrough) : undefined,
+          paidThrough: paidThrough && !untracked ? monthKeyOf(paidThrough) : undefined,
           depositAmount: deposit ? Number(deposit) : undefined,
         });
         router.push(`/dashboard/tenants/${id}?saved=1`);
@@ -196,9 +221,29 @@ export default function TenantForm({
             {draft ? (
               <Alert severity={draftComplete ? "success" : "info"}>
                 {draftComplete
-                  ? `Saving will make this tenant active and start billing from ${billingStart ? formatMonth(billingStart) : "the month after rent was paid up to"}.`
-                  : "Draft from the paper register: not billed yet. Add the phone, combined monthly rent, when they moved in and how far rent is already paid, to start billing. You can save partial details now."}
+                  ? untracked
+                    ? "Saving will make this tenant active. Their rent isn't tracked here, so no months fall due."
+                    : `Saving will make this tenant active and start billing from ${billingStart ? formatMonth(billingStart) : "the month after rent was paid up to"}.`
+                  : untracked
+                    ? "Draft from the paper register. Add when they moved in to make them active - their rent isn't tracked here."
+                    : "Draft from the paper register: not billed yet. Add the phone, combined monthly rent, when they moved in and how far rent is already paid, to start billing. You can save partial details now."}
               </Alert>
+            ) : null}
+            {editing && !draft && !editing.rentTracked ? (
+              <Alert severity="info">
+                Rent is paid to you directly and isn&apos;t tracked here. To track it, use &quot;Start tracking rent&quot; on
+                the tenant&apos;s page.
+              </Alert>
+            ) : null}
+            {choosingTracking ? (
+              <FormControlLabel
+                control={<Switch checked={rentTracked} onChange={(e) => setRentTracked(e.target.checked)} />}
+                label={
+                  rentTracked
+                    ? "Track rent in this app (months fall due, shows in Defaulters)"
+                    : "Rent is paid to my bank directly - don't track it"
+                }
+              />
             ) : null}
             {movedOut ? (
               <Alert severity="info">This tenant has moved out, so their houses and rent can no longer change.</Alert>
@@ -259,20 +304,22 @@ export default function TenantForm({
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField
-                label="Combined monthly rent"
+                label={untracked ? "Agreement rent (optional)" : "Combined monthly rent"}
                 type="number"
                 value={monthlyRent}
                 onChange={(e) => setMonthlyRent(e.target.value)}
                 disabled={movedOut}
                 helperText={
-                  draft && !monthlyRent
+                  untracked
+                    ? "For reference only - nothing is billed"
+                    : draft && !monthlyRent
                     ? "Not set yet"
                     : units.length > 1
                     ? `One rent for all ${units.length} houses${Number(monthlyRent) > 0 ? ` (${formatMoney(Number(monthlyRent))})` : ""}`
                     : "Billed once a month for all of this tenant's houses"
                 }
                 slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
-                required={!draft}
+                required={!draft && !untracked}
                 fullWidth
               />
               {editing && !draft ? (
@@ -348,9 +395,29 @@ export default function TenantForm({
           {/* The last card grows to fill the column, matching the left card's bottom edge. */}
           <Stack spacing={2} sx={{ height: "100%", "& > :last-child": { flexGrow: 1 } }}>
             <SectionCard title="Tenant details">
+              <TextField
+                label="Tenant type"
+                select
+                value={tenantKind}
+                onChange={(e) => {
+                  const kind = e.target.value as TenantKind;
+                  setTenantKind(kind);
+                  // A government tenant usually pays the owner's bank directly: default to untracked.
+                  if (mode.kind === "create" || draft) setRentTracked(!isGovernment(kind));
+                }}
+                disabled={kindLocked || movedOut}
+                helperText={kindLocked ? "Start tracking their rent before changing the type" : undefined}
+                fullWidth
+              >
+                {TENANT_KIND_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </TextField>
               {hasCommercial ? (
                 <TextField
-                  label="Business name"
+                  label={government ? "Office / institute name" : "Business name"}
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   helperText="Shown instead of the contact name"
@@ -365,11 +432,17 @@ export default function TenantForm({
                 fullWidth
               />
               <TextField
-                label="Phone"
+                label={government ? "Phone (optional)" : "Phone"}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                helperText={draft && !phone ? "Not known yet - needed before billing starts" : "With country code, e.g. +919876543210"}
-                required={!draft}
+                helperText={
+                  government && !phone
+                    ? "Without a phone, no WhatsApp/SMS links are sent"
+                    : draft && !phone
+                      ? "Not known yet - needed before billing starts"
+                      : "With country code, e.g. +919876543210"
+                }
+                required={!draft && !government}
                 fullWidth
               />
               <TextField

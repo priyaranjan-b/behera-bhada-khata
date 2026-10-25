@@ -15,6 +15,7 @@ import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
 import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
+import { billedTenantIds } from "./periods";
 import { availableUnits, holdsUnit, loadPlacements, placementOf, rentByProperty } from "./placements";
 
 function toHeader(property: Property, locations: Location[]): PropertyHeader {
@@ -43,15 +44,20 @@ async function loadHeader(ctx: OwnerContext, rawCode: string): Promise<PropertyH
 /** Every site with its towers, how full each one is and the rent its current occupants pay. */
 export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[]> {
   const db = await ownerDb();
-  const [locations, properties, units, occupancy] = await Promise.all([
+  const [locations, properties, units, occupancy, tenants] = await Promise.all([
     db.locations.list(),
     db.properties.list(),
     db.units.list(),
     db.occupancy.list(),
+    db.tenants.list(),
   ]);
   const today = todayKey();
   const held = new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.unit_code));
-  const tenantIds = [...new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.tenant_id))];
+  // Rent paid to the owner directly (untracked government tenants, 0016) isn't expected here.
+  const billed = new Set(billedTenantIds(tenants));
+  const tenantIds = [
+    ...new Set(occupancy.filter((o) => holdsUnit(o, today) && billed.has(o.tenant_id)).map((o) => o.tenant_id)),
+  ];
   const rates = tenantIds.length ? await db.rentRates.listForTenants(tenantIds) : [];
   const rent = rentByProperty(occupancy, rates, today);
 
@@ -164,6 +170,8 @@ export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Pro
         phone: tenant.phone,
         monthlyRent: placement.monthlyRent,
         status: tenant.status,
+        tenantKind: tenant.tenant_kind,
+        rentTracked: tenant.rent_tracked,
       };
     });
 

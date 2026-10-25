@@ -5,7 +5,16 @@ vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
 
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
-const { correctPaidThrough, createTenant, getTenantDetail, moveOutTenant, updateTenant } = await import(
+const {
+  correctPaidThrough,
+  createTenant,
+  getTenantDetail,
+  listTenants,
+  moveOutTenant,
+  startRentTracking,
+  stopRentTracking,
+  updateTenant,
+} = await import(
   "@/server/services/tenants"
 );
 const { getPropertyDetail } = await import("@/server/services/properties");
@@ -94,6 +103,8 @@ describe("onboarding and editing", () => {
       lease_start: null,
       paid_through: null,
       deposit_amount: null,
+      tenant_kind: null,
+      rent_tracked: null,
     });
   });
 
@@ -158,6 +169,53 @@ describe("correctPaidThrough", () => {
     await expect(correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "July" })).rejects.toMatchObject({ status: 400 });
     await expect(correctPaidThrough(ctx, "nobody", { paidThrough: "2026-07" })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.correctPaidThrough).not.toHaveBeenCalled();
+  });
+});
+
+describe("government tenants (0016)", () => {
+  const govt = { name: "Block Office", preferredChannel: "both", tenantKind: "government" };
+  const GOVT_ID = "00000000-0000-4000-8000-000000000102";
+
+  it("onboards a government tenant with no phone, no rent and its rent untracked", async () => {
+    await createTenant(ctx, { ...govt, rentTracked: false, leaseStart: "2020-04-01", unitCodes: ["AC-T1-G03"] });
+    expect(fakes.owner.tenants.create).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: null, monthly_rent: null, tenant_kind: "government", rent_tracked: false })
+    );
+  });
+
+  it("refuses a missing phone, an untracked rent or no rent for anyone else", async () => {
+    const base = { ...contact, leaseStart: "2026-02-01", unitCodes: ["AC-T1-G03"] };
+    await expect(createTenant(ctx, { ...base, phone: undefined, monthlyRentAmount: 5000 })).rejects.toMatchObject({ status: 400 });
+    await expect(createTenant(ctx, { ...base, monthlyRentAmount: 5000, rentTracked: false })).rejects.toMatchObject({ status: 400 });
+    await expect(createTenant(ctx, base)).rejects.toMatchObject({ status: 400 });
+    await expect(createTenant(ctx, { ...govt, leaseStart: "2026-02-01", unitCodes: ["AC-T1-G03"] })).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(fakes.owner.tenants.create).not.toHaveBeenCalled();
+  });
+
+  it("an untracked tenant gets no rent months and can start tracking from a month", async () => {
+    fakes.state.tenants.set(GOVT_ID, tenant({ id: GOVT_ID, tenant_kind: "government", rent_tracked: false, billing_start: null }));
+    await listTenants(ctx);
+    expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000101"], expect.any(String));
+
+    await startRentTracking(ctx, GOVT_ID, { monthlyRentAmount: 20000, paidThrough: "2026-02" });
+    expect(fakes.owner.tenants.startRentTracking).toHaveBeenCalledWith(GOVT_ID, 20000, "2026-02-01");
+    await startRentTracking(ctx, GOVT_ID, {});
+    expect(fakes.owner.tenants.startRentTracking).toHaveBeenLastCalledWith(GOVT_ID, null, null);
+    await expect(startRentTracking(ctx, GOVT_ID, { paidThrough: "Feb" })).rejects.toMatchObject({ status: 400 });
+
+    await stopRentTracking(ctx, GOVT_ID);
+    expect(fakes.owner.tenants.stopRentTracking).toHaveBeenCalledWith(GOVT_ID);
+    await expect(stopRentTracking(ctx, "nobody")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("offers to stop tracking only for a government tenant with nothing recorded", async () => {
+    fakes.state.tenants.set(GOVT_ID, tenant({ id: GOVT_ID, tenant_kind: "government" }));
+    expect((await getTenantDetail(ctx, GOVT_ID)).canStopRentTracking).toBe(false); // a payment is recorded
+    fakes.state.payments.clear();
+    expect((await getTenantDetail(ctx, GOVT_ID)).canStopRentTracking).toBe(true);
+    expect((await getTenantDetail(ctx, "00000000-0000-4000-8000-000000000101")).canStopRentTracking).toBe(false);
   });
 });
 

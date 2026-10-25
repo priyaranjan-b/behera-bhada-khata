@@ -14,6 +14,9 @@ export type PreferredChannel = (typeof PREFERRED_CHANNELS)[number];
 /** draft = from the paper register, details incomplete, never billed (0007). */
 export const TENANT_STATUSES = ["draft", "active", "inactive"] as const;
 export type TenantStatus = (typeof TENANT_STATUSES)[number];
+/** Who the tenant is (0016); only a government tenant may skip the phone or rent tracking. */
+export const TENANT_KINDS = ["individual", "business", "government"] as const;
+export type TenantKind = (typeof TENANT_KINDS)[number];
 /** The two kinds of ledger record; each has its own receipt and confirm link. */
 export const RECORD_TYPES = ["payment", "adjustment"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
@@ -43,6 +46,8 @@ export const AUDIT_ACTIONS = [
   "tenant.activated",
   "tenant.moved_out",
   "billing_start.corrected",
+  "rent_tracking.started",
+  "rent_tracking.stopped",
   "tenancy.started",
   "tenancy.ended",
   "tenancy.changed",
@@ -234,6 +239,9 @@ export interface Database {
           billing_start: string | null;
           /** Security deposit (optional); frozen once active (0008 trigger). */
           deposit_amount: string | null;
+          tenant_kind: TenantKind;
+          /** false: rent is paid to the owner directly and not tracked - no rent months (0016). Government only. */
+          rent_tracked: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -528,13 +536,16 @@ export interface Database {
         Args: {
           p_name: string;
           p_business_name: string | null;
-          p_phone: string;
+          p_phone: string | null;
           p_preferred_channel: PreferredChannel;
-          p_monthly_rent: number;
+          /** Optional only when p_rent_tracked is false. */
+          p_monthly_rent: number | null;
           p_lease_start: string;
           p_unit_codes: string[];
           p_paid_through?: string | null;
           p_deposit_amount?: number | null;
+          p_tenant_kind?: TenantKind;
+          p_rent_tracked?: boolean;
         };
         Returns: string;
       };
@@ -552,6 +563,10 @@ export interface Database {
           p_lease_start: string | null;
           p_paid_through?: string | null;
           p_deposit_amount?: number | null;
+          /** null = keep. */
+          p_tenant_kind?: TenantKind | null;
+          /** Only when completing a draft; null = tracked. */
+          p_rent_tracked?: boolean | null;
         };
         Returns: undefined;
       };
@@ -563,6 +578,16 @@ export interface Database {
       correct_paid_through: {
         Args: { p_tenant_id: string; p_paid_through: string };
         Returns: string;
+      };
+      /** 0016: starts billing an untracked government tenant; returns the new billing_start. */
+      start_rent_tracking: {
+        Args: { p_tenant_id: string; p_monthly_rent: number | null; p_paid_through: string | null };
+        Returns: string;
+      };
+      /** 0016: undoes start_rent_tracking while nothing is recorded. */
+      stop_rent_tracking: {
+        Args: { p_tenant_id: string };
+        Returns: undefined;
       };
       ensure_rent_periods: {
         Args: { p_tenant_ids: string[] | null; p_through: string };

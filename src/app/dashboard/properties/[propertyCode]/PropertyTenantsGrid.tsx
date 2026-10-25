@@ -5,7 +5,7 @@ import { IdentityCell } from "@/components/ui/DataDisplay";
 import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { UnitCell } from "@/components/ui";
 import type { PropertyTenantRow } from "@/lib/contracts";
-import { TENANT_STATUS_DISPLAY } from "@/lib/domain/tenant";
+import { TENANT_STATUS_DISPLAY, tenantKindTags } from "@/lib/domain/tenant";
 import type { TenantStatus } from "@/lib/types";
 import { routes } from "@/lib/routes";
 
@@ -18,7 +18,7 @@ const columns: DataTableColDef<PropertyTenantRow>[] = [
     renderCell: ({ row }) => (
       <IdentityCell
         name={row.displayName}
-        caption={row.contactName ?? undefined}
+        caption={[...tenantKindTags(row), row.contactName].filter(Boolean).join(" · ") || undefined}
         href={routes.tenants.detail(row.id)}
       />
     ),

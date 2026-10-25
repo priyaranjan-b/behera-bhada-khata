@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatFloor, formatUnits, unitMix, billingStartFor } from "./tenant";
+import { formatFloor, formatUnits, unitMix, billingStartFor, isGovernment, isRentTracked, TENANT_KIND_OPTIONS, tenantKindTags } from "./tenant";
 
 describe("tenant display helpers", () => {
   it("groups house codes by tower", () => {
@@ -26,5 +26,25 @@ describe("billingStartFor", () => {
     expect(billingStartFor("2021-03-11", "2026-07-01")).toBe("2026-08-01");
     expect(billingStartFor("2026-05-20", "2026-01-01")).toBe("2026-05-01");
     expect(billingStartFor("2026-05-20", null)).toBe("2026-05-01");
+  });
+});
+
+describe("government tenants (0016)", () => {
+  it("bills only an active tenant whose rent is tracked", () => {
+    expect(isRentTracked({ status: "active", rentTracked: true })).toBe(true);
+    expect(isRentTracked({ status: "active", rentTracked: false })).toBe(false);
+    expect(isRentTracked({ status: "draft", rentTracked: true })).toBe(false);
+    expect(isRentTracked({ status: "inactive", rentTracked: true })).toBe(false);
+  });
+
+  it("tags a government tenant, and says when its rent is paid direct", () => {
+    expect(tenantKindTags({ tenantKind: "business", rentTracked: true })).toEqual([]);
+    expect(tenantKindTags({ tenantKind: "government", rentTracked: true })).toEqual(["Govt"]);
+    expect(tenantKindTags({ tenantKind: "government", rentTracked: false })).toEqual(["Govt", "Rent paid direct"]);
+  });
+
+  it("labels every kind, and only government is exempt", () => {
+    expect(TENANT_KIND_OPTIONS.map((o) => o.label)).toEqual(["Individual", "Business", "Government"]);
+    expect(TENANT_KIND_OPTIONS.filter((o) => isGovernment(o.value)).map((o) => o.value)).toEqual(["government"]);
   });
 });

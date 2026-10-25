@@ -35,6 +35,8 @@ export function tenant(overrides: Partial<Tenant> = {}): Tenant {
     moved_out_on: null,
     billing_start: "2026-01-01",
     deposit_amount: null,
+    tenant_kind: "individual",
+    rent_tracked: true,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -207,6 +209,8 @@ function build() {
       update: vi.fn(async () => undefined),
       moveOut: vi.fn(async () => undefined),
       correctPaidThrough: vi.fn(async (_id: string, paidThrough: string) => paidThrough),
+      startRentTracking: vi.fn(async () => "2026-03-01"),
+      stopRentTracking: vi.fn(async () => undefined),
     },
     rentPeriods: { listForTenants: vi.fn(async () => [period]), listByIds: vi.fn(async () => [period]) },
     payments: {

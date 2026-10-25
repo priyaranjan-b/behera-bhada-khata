@@ -14,7 +14,7 @@ import { round2 } from "@/lib/money";
 import type { RentPeriod } from "@/lib/types";
 import { ownerDb } from "@/server/infra";
 import type { OwnerContext } from "./context";
-import { ensureRentPeriodsFor } from "./periods";
+import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { holdsUnit, loadPlacements, placementOf } from "./placements";
 
 const TREND_MONTHS = 6;
@@ -37,8 +37,8 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
 
   const db = await ownerDb();
   const allTenants = await db.tenants.list();
-  const activeIds = allTenants.filter((t) => t.status === "active").map((t) => t.id);
-  await ensureRentPeriodsFor(activeIds);
+  const billedIds = new Set(billedTenantIds(allTenants));
+  await ensureRentPeriodsFor([...billedIds]);
 
   const tenantIds = allTenants.map((t) => t.id);
   const [periods, payments, adjustments, placements, units, occupancy] = await Promise.all([
@@ -61,8 +61,8 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
   // when someone moves out.
   const owes = (id: string) =>
     (periodsByTenant.get(id) ?? []).some((p) => Number(p.amount_due) > Number(p.amount_allocated));
-  // Drafts aren't billed yet, so they never owe.
-  const tenants = allTenants.filter((t) => t.status === "active" || owes(t.id));
+  // Drafts and untracked government tenants (0016) aren't billed, so they never owe.
+  const tenants = allTenants.filter((t) => billedIds.has(t.id) || owes(t.id));
 
   const report = buildMonthlyReport(
     tenants.map((t) => ({
@@ -102,7 +102,7 @@ export async function getDefaultersReport(_ctx: OwnerContext): Promise<Defaulter
   const todayMonthKey = currentMonthKey();
   const db = await ownerDb();
   const allTenants = await db.tenants.list();
-  await ensureRentPeriodsFor(allTenants.filter((t) => t.status === "active").map((t) => t.id));
+  await ensureRentPeriodsFor(billedTenantIds(allTenants));
 
   const periods = await db.rentPeriods.listForTenants(
     allTenants.map((t) => t.id),

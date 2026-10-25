@@ -14,6 +14,7 @@ import type {
   PeriodStatus,
   PreferredChannel,
   RecordType,
+  TenantKind,
   TenantStatus,
   UnitType,
 } from "@/lib/types";
@@ -27,6 +28,7 @@ import type {
   createUnitSchema,
   moveOutSchema,
   correctPaidThroughSchema,
+  startRentTrackingSchema,
   ownerProfileSchema,
   updateTenantSchema,
 } from "@/lib/validation";
@@ -165,7 +167,7 @@ export interface PropertyCard extends PropertyHeader {
   occupiedUnits: number;
   residentialUnits: number;
   commercialUnits: number;
-  /** This month's rent from the current occupants (a tenant across towers is split by house). */
+  /** This month's rent from the current occupants (a tenant across towers is split by house); rent not tracked here (0016) is left out. */
   monthlyRent: number;
 }
 
@@ -211,6 +213,9 @@ export interface PropertyTenantRow {
   phone: string | null;
   monthlyRent: number;
   status: TenantStatus;
+  tenantKind: TenantKind;
+  /** False: government rent paid to the owner directly, not tracked here (0016). */
+  rentTracked: boolean;
 }
 
 export interface PropertyDetail {
@@ -251,7 +256,7 @@ export interface NewHouseForm {
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
 export type CreateUnitInput = Omit<z.infer<typeof createUnitSchema>, "propertyCode">;
-export type CreateTenantInput = z.infer<typeof createTenantSchema>;
+export type CreateTenantInput = z.input<typeof createTenantSchema>;
 
 export interface BulkCreateResult {
   created: number;
@@ -273,6 +278,9 @@ export interface TenantSearchRow {
   propertyName: string;
   locationName: string;
   status: TenantStatus;
+  tenantKind: TenantKind;
+  /** False: government rent paid to the owner directly, not tracked here (0016). */
+  rentTracked: boolean;
   movedOutOn: string | null;
   totalOutstanding: number;
   overdueMonths: number;
@@ -332,8 +340,11 @@ export interface TenantDetail {
     phone: string | null;
     preferredChannel: PreferredChannel;
     status: TenantStatus;
+    tenantKind: TenantKind;
+    /** False: government rent paid to the owner directly - no months, no dues (0016). */
+    rentTracked: boolean;
     leaseStart: string | null;
-    /** First month the app bills; null on drafts. */
+    /** First month the app bills; null on drafts and while rent isn't tracked. */
     billingStart: string | null;
     /** Security deposit held; editable only while a draft. */
     depositAmount: number | null;
@@ -349,6 +360,8 @@ export interface TenantDetail {
   balance: TenantBalanceSummary;
   periods: TenantPeriod[];
   ledger: LedgerRow[];
+  /** A tracked government tenant with nothing recorded yet: rent tracking can still be turned off. */
+  canStopRentTracking: boolean;
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
 }
@@ -362,8 +375,10 @@ export interface EditTenantForm {
     phone: string | null;
     preferredChannel: PreferredChannel;
     status: TenantStatus;
+    tenantKind: TenantKind;
+    rentTracked: boolean;
     leaseStart: string | null;
-    /** First month the app bills; null on drafts. */
+    /** First month the app bills; null on drafts and while rent isn't tracked. */
     billingStart: string | null;
     /** Security deposit held; editable only while a draft. */
     depositAmount: number | null;
@@ -398,6 +413,7 @@ export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type MoveOutInput = z.infer<typeof moveOutSchema>;
 
 export type CorrectPaidThroughInput = z.input<typeof correctPaidThroughSchema>;
+export type StartRentTrackingInput = z.input<typeof startRentTrackingSchema>;
 
 export interface NewPaymentForm {
   tenantId: string;

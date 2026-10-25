@@ -204,6 +204,8 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
             p_unit_codes: input.unit_codes,
             p_paid_through: input.paid_through,
             p_deposit_amount: input.deposit_amount,
+            p_tenant_kind: input.tenant_kind,
+            p_rent_tracked: input.rent_tracked,
           }),
           "create tenant"
         );
@@ -224,6 +226,8 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
             p_lease_start: changes.lease_start,
             p_paid_through: changes.paid_through,
             p_deposit_amount: changes.deposit_amount,
+            p_tenant_kind: changes.tenant_kind,
+            p_rent_tracked: changes.rent_tracked,
           }),
           "update tenant"
         );
@@ -239,6 +243,19 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
           await db.rpc("correct_paid_through", { p_tenant_id: id, p_paid_through: paidThrough }),
           "correct paid up to"
         ) as string;
+      },
+      async startRentTracking(id, monthlyRent, paidThrough) {
+        return mustWrite(
+          await db.rpc("start_rent_tracking", {
+            p_tenant_id: id,
+            p_monthly_rent: monthlyRent,
+            p_paid_through: paidThrough,
+          }),
+          "start rent tracking"
+        ) as string;
+      },
+      async stopRentTracking(id) {
+        mustWrite(await db.rpc("stop_rent_tracking", { p_tenant_id: id }), "stop rent tracking");
       },
     },
 

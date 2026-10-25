@@ -16,6 +16,8 @@ import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { ActionStack, BadgeRow, DetailList, DetailRow, SectionCard } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
+import RentTrackingButton from "@/components/domain/RentTrackingButton";
+import TenantKindTags from "@/components/domain/TenantKindTags";
 import { unitMixLabel } from "@/lib/domain/tenant";
 import { FLASH, routes, type Flash } from "@/lib/routes";
 import TenantLedgerTable from "./TenantLedgerTable";
@@ -33,7 +35,14 @@ export default async function TenantPage({
 }) {
   const { tenantId } = await params;
   const flash = await searchParams;
-  const { tenant, balance: summary, periods, ledger: ledgerRows, tenantMessaging } = await serverApi.dashboard.tenants.detail(tenantId);
+  const {
+    tenant,
+    balance: summary,
+    periods,
+    ledger: ledgerRows,
+    tenantMessaging,
+    canStopRentTracking,
+  } = await serverApi.dashboard.tenants.detail(tenantId);
 
   const thisMonth = currentMonthKey();
   const periodRows: TenantPeriodRow[] = periods.map((p) => ({
@@ -46,6 +55,8 @@ export default async function TenantPage({
   const paidMonths = endedRows.filter((p) => p.status === "paid").length;
   const active = tenant.status === "active";
   const draft = tenant.status === "draft";
+  // Government rent paid to the owner directly (0016): no months, no dues, no payments.
+  const untracked = active && !tenant.rentTracked;
   const houseHistory = [...tenant.unitHistory].reverse();
 
   return (
@@ -73,7 +84,7 @@ export default async function TenantPage({
                 outstanding={summary.totalOutstanding}
               />
             ) : null}
-            {draft ? null : (
+            {draft || untracked ? null : (
               <LinkButton
                 href={routes.tenants.newPayment(tenantId)}
                 variant="contained"
@@ -90,6 +101,22 @@ export default async function TenantPage({
         <Alert severity="info">
           This tenant comes from the paper register and isn&apos;t billed yet. Use <strong>Edit</strong> to add the
           phone, combined monthly rent and lease start - billing starts from the lease start.
+        </Alert>
+      ) : null}
+      {untracked && tenant.leaseStart ? (
+        <Alert
+          severity="info"
+          action={
+            <RentTrackingButton
+              mode="start"
+              tenantId={tenantId}
+              leaseStart={tenant.leaseStart}
+              agreementRent={tenant.monthlyRent}
+            />
+          }
+        >
+          Government tenant: rent is paid to your bank directly under the agreement, so it isn&apos;t tracked here - no
+          months fall due and they never show as defaulters. Start tracking to bill them like any other tenant.
         </Alert>
       ) : null}
       {flash.saved ? (
@@ -128,11 +155,14 @@ export default async function TenantPage({
       ) : null}
 
       <Grid container spacing={2} columns={12}>
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid size={{ xs: 12, md: untracked ? 12 : 6 }}>
           <SectionCard title="Details" fill>
             <DetailList dividers>
               <DetailRow label="Status">
-                <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
+                <BadgeRow align="end">
+                  <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
+                  <TenantKindTags tenantKind={tenant.tenantKind} rentTracked={tenant.rentTracked} />
+                </BadgeRow>
               </DetailRow>
               <DetailRow label={active || draft ? "Houses" : "Last houses"}>
                 <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
@@ -148,7 +178,7 @@ export default async function TenantPage({
               <DetailRow label="Phone">
                 {tenant.phone ? <MuiLink href={`tel:${tenant.phone}`}>{tenant.phone}</MuiLink> : "Not set"}
               </DetailRow>
-              <DetailRow label="Combined rent">
+              <DetailRow label={untracked ? "Agreement rent" : "Combined rent"}>
                 {tenant.monthlyRent > 0 ? `${formatMoney(tenant.monthlyRent)} / month` : "Not set"}
               </DetailRow>
               <DetailRow label="Security deposit">
@@ -161,7 +191,10 @@ export default async function TenantPage({
                     (tenant.leaseStart && tenant.billingStart > monthKeyOf(tenant.leaseStart)
                       ? ` · paid up to ${formatMonth(addMonthsToKey(tenant.billingStart, -1))} before the app`
                       : "")
-                  : "Not billed yet"}
+                  : untracked
+                    ? "Not tracked - paid to you directly"
+                    : "Not billed yet"}
+                {canStopRentTracking ? <RentTrackingButton mode="stop" tenantId={tenantId} /> : null}
                 {active && tenant.leaseStart && tenant.billingStart ? (
                   <CorrectPaidThroughButton
                     tenantId={tenantId}
@@ -173,34 +206,38 @@ export default async function TenantPage({
             </DetailList>
           </SectionCard>
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard
-            title="Outstanding"
-            value={formatMoney(summary.totalOutstanding)}
-            caption={
-              summary.notYetDue > 0
-                ? `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))} · ${formatMoney(summary.notYetDue)} not due yet`
-                : `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))}`
-            }
-            badge={
-              summary.totalOutstanding > 0
-                ? { label: "To collect", tone: "warning" }
-                : { label: "Settled", tone: "success" }
-            }
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatCard
-            title="Months overdue"
-            value={String(summary.overdueMonths)}
-            caption={`${paidMonths} of ${endedRows.length} ended month${endedRows.length === 1 ? "" : "s"} paid`}
-            badge={
-              summary.overdueMonths > 0
-                ? { label: "Follow up", tone: "danger" }
-                : { label: "On track", tone: "success" }
-            }
-          />
-        </Grid>
+        {untracked ? null : (
+          <>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <StatCard
+                title="Outstanding"
+                value={formatMoney(summary.totalOutstanding)}
+                caption={
+                  summary.notYetDue > 0
+                    ? `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))} · ${formatMoney(summary.notYetDue)} not due yet`
+                    : `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))}`
+                }
+                badge={
+                  summary.totalOutstanding > 0
+                    ? { label: "To collect", tone: "warning" }
+                    : { label: "Settled", tone: "success" }
+                }
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <StatCard
+                title="Months overdue"
+                value={String(summary.overdueMonths)}
+                caption={`${paidMonths} of ${endedRows.length} ended month${endedRows.length === 1 ? "" : "s"} paid`}
+                badge={
+                  summary.overdueMonths > 0
+                    ? { label: "Follow up", tone: "danger" }
+                    : { label: "On track", tone: "success" }
+                }
+              />
+            </Grid>
+          </>
+        )}
       </Grid>
 
       <Grid container spacing={2} columns={12}>
@@ -230,9 +267,12 @@ export default async function TenantPage({
         </Grid>
       </Grid>
 
-      <TenantPeriodsGrid rows={periodRows} />
-
-      <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} tenantMessaging={tenantMessaging} />
+      {untracked ? null : (
+        <>
+          <TenantPeriodsGrid rows={periodRows} />
+          <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} tenantMessaging={tenantMessaging} />
+        </>
+      )}
 
       <Suspense fallback={<DetailCardSkeleton rows={6} />}>
         <TenantChangeHistory tenantId={tenantId} />

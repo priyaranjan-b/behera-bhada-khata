@@ -10,6 +10,7 @@ import type {
   Confirmed,
   Created,
   CorrectPaidThroughInput,
+  StartRentTrackingInput,
   CreatedAdjustment,
   CreateAdjustmentInput,
   CreatePaymentInput,
@@ -122,6 +123,10 @@ export interface ApiCommands {
       update(tenantId: string, input: UpdateTenantInput): Promise<void>;
       moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
       correctPaidThrough(tenantId: string, input: CorrectPaidThroughInput): Promise<void>;
+      /** Government tenant (0016): bill from the month after `paidThrough`. */
+      startRentTracking(tenantId: string, input: StartRentTrackingInput): Promise<void>;
+      /** Undo startRentTracking; 409 once a payment is recorded. */
+      stopRentTracking(tenantId: string): Promise<void>;
       /** `proofs`: photos/PDFs of the payment, sent as multipart (see PROOF_LIMITS). */
       createPayment(tenantId: string, input: CreatePaymentInput, proofs?: File[]): Promise<RecordCreated>;
       /** ID proof, photo, agreement... as multipart; `documentTypes[i]` is the type of `files[i]`. */

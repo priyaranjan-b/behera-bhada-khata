@@ -14,12 +14,18 @@ import { tenantDisplayName } from "@/lib/domain/tenant";
 import { buildTenantLedger } from "@/lib/domain/tenantLedger";
 import { errorMessage } from "@/lib/errors";
 import type { RentPeriod } from "@/lib/types";
-import { correctPaidThroughSchema, createTenantSchema, moveOutSchema, updateTenantSchema } from "@/lib/validation";
+import {
+  correctPaidThroughSchema,
+  createTenantSchema,
+  moveOutSchema,
+  startRentTrackingSchema,
+  updateTenantSchema,
+} from "@/lib/validation";
 import { tenantMessagingEnabled } from "@/server/env";
 import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
 import { parseInput, requireTenant, type OwnerContext } from "./context";
-import { ensureRentPeriodsFor } from "./periods";
+import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
 
@@ -29,13 +35,15 @@ function toNewTenant(input: z.infer<typeof createTenantSchema>): NewTenant {
   return {
     name: input.name,
     business_name: input.businessName || null,
-    phone: input.phone,
+    phone: input.phone ?? null,
     preferred_channel: input.preferredChannel,
-    monthly_rent: input.monthlyRentAmount,
+    monthly_rent: input.monthlyRentAmount ?? null,
     lease_start: input.leaseStart,
     unit_codes: input.unitCodes,
     paid_through: input.paidThrough ?? null,
     deposit_amount: input.depositAmount ?? null,
+    tenant_kind: input.tenantKind,
+    rent_tracked: input.rentTracked,
   };
 }
 
@@ -44,7 +52,7 @@ export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]
   const db = await ownerDb();
   const [tenants, locations] = await Promise.all([db.tenants.list(), db.locations.list()]);
   const tenantIds = tenants.map((t) => t.id);
-  await ensureRentPeriodsFor(tenants.filter((t) => t.status === "active").map((t) => t.id));
+  await ensureRentPeriodsFor(billedTenantIds(tenants));
   const [periods, placements] = await Promise.all([
     // Balances only need what's still owed.
     db.rentPeriods.listForTenants(tenantIds, { openOnly: true }),
@@ -73,6 +81,8 @@ export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]
       propertyName: placement.propertyName,
       locationName: locationCodes.map((c) => locationName.get(c) ?? c).join(", "),
       status: tenant.status,
+      tenantKind: tenant.tenant_kind,
+      rentTracked: tenant.rent_tracked,
       movedOutOn: tenant.moved_out_on,
       totalOutstanding: balance.totalOutstanding,
       overdueMonths: balance.overdueMonths,
@@ -84,7 +94,7 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
   const db = await ownerDb();
   const tenant = await requireTenant(db, tenantId);
 
-  if (tenant.status === "active") await ensureRentPeriodsFor([tenantId]);
+  await ensureRentPeriodsFor(billedTenantIds([tenant]));
   const [periods, payments, adjustments, placements] = await Promise.all([
     db.rentPeriods.listForTenants([tenantId]),
     db.payments.listForTenants([tenantId]),
@@ -105,6 +115,8 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       phone: tenant.phone,
       preferredChannel: tenant.preferred_channel,
       status: tenant.status,
+      tenantKind: tenant.tenant_kind,
+      rentTracked: tenant.rent_tracked,
       leaseStart: tenant.lease_start,
       billingStart: tenant.billing_start,
       depositAmount: tenant.deposit_amount === null ? null : Number(tenant.deposit_amount),
@@ -143,6 +155,14 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       adjustments,
       currentMonthKey()
     ),
+    // Same rule as stop_rent_tracking (0016): nothing recorded against any month.
+    canStopRentTracking:
+      tenant.tenant_kind === "government" &&
+      tenant.status === "active" &&
+      tenant.rent_tracked &&
+      payments.length === 0 &&
+      adjustments.length === 0 &&
+      periods.every((p) => Number(p.amount_allocated) === 0),
     tenantMessaging: tenantMessagingEnabled(),
   };
 }
@@ -215,6 +235,8 @@ export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Pr
       phone: tenant.phone,
       preferredChannel: tenant.preferred_channel,
       status: tenant.status,
+      tenantKind: tenant.tenant_kind,
+      rentTracked: tenant.rent_tracked,
       leaseStart: tenant.lease_start,
       billingStart: tenant.billing_start,
       depositAmount: tenant.deposit_amount === null ? null : Number(tenant.deposit_amount),
@@ -247,11 +269,12 @@ export async function updateTenant(ctx: OwnerContext, tenantId: string, body: un
     lease_start: input.leaseStart ?? null,
     paid_through: input.paidThrough ?? null,
     deposit_amount: input.depositAmount ?? null,
+    tenant_kind: input.tenantKind ?? null,
+    rent_tracked: input.rentTracked ?? null,
   });
   await ensureRentPeriodsFor([tenantId]);
 }
 
-/** Ends every tenancy on the move-out date; dues up to then stay on the ledger. */
 /** Fixes "rent paid up to" on an active tenant; see correct_paid_through (0014). */
 export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const { paidThrough } = parseInput(correctPaidThroughSchema, body);
@@ -260,6 +283,26 @@ export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, bo
   await db.tenants.correctPaidThrough(tenantId, paidThrough);
 }
 
+/**
+ * Starts billing a government tenant whose rent was paid to the owner
+ * directly (0016): months from the one after "paid up to" appear at once,
+ * unpaid ended ones as overdue.
+ */
+export async function startRentTracking(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const { monthlyRentAmount, paidThrough } = parseInput(startRentTrackingSchema, body);
+  const db = await ownerDb();
+  await requireTenant(db, tenantId);
+  await db.tenants.startRentTracking(tenantId, monthlyRentAmount ?? null, paidThrough ?? null);
+}
+
+/** Undoes startRentTracking while nothing is recorded against the months (409 after). */
+export async function stopRentTracking(ctx: OwnerContext, tenantId: string): Promise<void> {
+  const db = await ownerDb();
+  await requireTenant(db, tenantId);
+  await db.tenants.stopRentTracking(tenantId);
+}
+
+/** Ends every tenancy on the move-out date; dues up to then stay on the ledger. */
 export async function moveOutTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const { moveOutDate } = parseInput(moveOutSchema, body);
   const db = await ownerDb();

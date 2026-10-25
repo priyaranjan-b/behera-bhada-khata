@@ -20,7 +20,7 @@ locations            AC          Arnapal Chakk Complex          (site)
   └ properties       AC-T1       Tower 1                        (tower)
       └ units        AC-T1-G01   floor G, commercial            (house / shop / room)
 
-tenants              uuid        a person or business
+tenants              uuid        a person, business or government office (D26)
   ├ tenant_units     which houses, from - to     (occupancy history)
   ├ tenant_rent_rates combined monthly rent, from month M  (rent history)
   ├ tenant_documents ID proof, photo, agreement... (files, D21)
@@ -49,6 +49,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0013_owner_profile.sql` | `owner_profile`: the owner's first/last name, who signs on their behalf, and that signer's saved signature |
 | `0012_receipt_numbers.sql` | receipt numbers: `payments.receipt_no` (2026/10/001), `adjustments.receipt_no` (ADJ/2026/10/001), `receipt_counters` |
 | `0015_audit_log.sql` | `audit_log` written by `audit_row_change()` triggers and `log_event()`; `recorded_by` on payments, adjustments, documents, tenancies and rent rates |
+| `0016_government_tenants.sql` | `tenants.tenant_kind` and `rent_tracked`: government tenants whose rent goes to the owner directly (no months until `start_rent_tracking`) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -567,6 +568,54 @@ deleted documents, the profile. None recorded when it was entered or by
 whom. Per-entity history tables would have meant a copy of every table and
 every function; one trigger covers them all. History starts at 0015: older
 changes are only what the dated tables already show.
+
+### D26 — Government tenants: rent paid to the owner directly, tracking switchable
+
+**Decision.** `0016_government_tenants.sql` adds two columns to `tenants`:
+- **`tenant_kind`**: `individual | business | government`. Existing rows
+  were backfilled as `business` when they have a business name, otherwise
+  `individual`. A government tenant may have no phone
+  (`tenants_active_has_phone`). Messaging already skips a missing phone.
+- **`rent_tracked`** (default true): it can be false only for a government
+  tenant (`tenants_untracked_is_government`).
+
+An **untracked** tenant is `active` and holds its houses through
+`tenant_units` as usual. Its `billing_start` is **null**, which is allowed
+only while untracked (`tenants_active_has_billing_start`).
+- `ensure_rent_periods` also checks `rent_tracked`, so it has no rent
+  months, no dues and nothing in Defaulters.
+- Its rent rate is optional: the agreement rent, from the lease month.
+- The app hides Record payment and leaves its rent out of a tower's monthly
+  rent (A9).
+
+Where `rent_tracked` is set and changed:
+- `create_tenant` and `update_tenant` (when completing a draft) set it at
+  the start. An untracked draft goes active with just a lease start.
+- After that, only these functions change it:
+  - **`start_rent_tracking(tenant, rent, paid_through)`** sets
+    `billing_start = billing_start_for(lease_start, paid_through or last
+    month)` (D17). It writes the rent from then if one is given (otherwise
+    the agreement rent must cover that month), then creates the months. From
+    then on it's a normal tenant.
+  - **`stop_rent_tracking`** undoes that while no payment or adjustment is
+    recorded against any month: it deletes the months and clears
+    `billing_start`. After that, tracking is one-way.
+- `correct_paid_through` refuses an untracked tenant.
+- `update_tenant` refuses to change an untracked tenant's kind (`BBK09`).
+- The audit trigger names the switch `rent_tracking.started` /
+  `rent_tracking.stopped`.
+
+**Why.** Some houses are let to government institutes that pay rent
+straight into the owner's bank under their agreement. The owner wants them
+in the rent book for occupancy, not as fake arrears. These alternatives were
+rejected:
+- **Keeping them as drafts** would hide that they are real, current tenants.
+- **A fake "paid" payment every month** would invent ledger records.
+
+Tracking is one-way once money is recorded. A pause/resume would leave a gap
+in the months, which `ensure_rent_periods` would refill from `billing_start`.
+Supporting that would need a billing-end column for an event that hasn't
+happened.
 
 ---
 

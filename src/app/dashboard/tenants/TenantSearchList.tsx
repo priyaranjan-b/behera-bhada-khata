@@ -9,12 +9,14 @@ import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
 import type { TenantSearchRow } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
+import { TENANT_KIND_LABELS, tenantKindTags } from "@/lib/domain/tenant";
 
-type StatusFilter = "current" | "drafts" | "overdue" | "outstanding" | "settled" | "movedOut" | "all";
+type StatusFilter = "current" | "drafts" | "untracked" | "overdue" | "outstanding" | "settled" | "movedOut" | "all";
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "current", label: "Current tenants" },
   { value: "drafts", label: "Drafts - details missing" },
+  { value: "untracked", label: "Govt - rent paid direct" },
   { value: "overdue", label: "Overdue" },
   { value: "outstanding", label: "Has balance" },
   { value: "settled", label: "Settled" },
@@ -36,7 +38,7 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
         name={row.displayName}
         caption={
           row.status === "active"
-            ? (row.contactName ?? undefined)
+            ? ([...tenantKindTags(row), row.contactName].filter(Boolean).join(" · ") || undefined)
             : row.status === "draft"
               ? "Draft - add phone, rent, lease start"
               : `Moved out ${row.movedOutOn ?? ""}`
@@ -46,6 +48,13 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
     ),
   },
   // Hidden by default; shown from the Columns button.
+  {
+    field: "tenantKind",
+    headerName: "Type",
+    minWidth: 140,
+    flex: 0.8,
+    valueGetter: (_value, row) => tenantKindTags(row).join(" · ") || TENANT_KIND_LABELS[row.tenantKind],
+  },
   {
     field: "phone",
     headerName: "Phone",
@@ -93,7 +102,10 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
       return a.overdueMonths - b.overdueMonths || a.totalOutstanding - b.totalOutstanding;
     },
     renderCell: ({ row }) =>
-      row.totalOutstanding > 0 ? (
+      // Rent paid to the owner directly (0016): nothing is tracked, so "Settled" would mislead.
+      !row.rentTracked && row.totalOutstanding <= 0 ? (
+        <TagPill label="Rent paid direct" />
+      ) : row.totalOutstanding > 0 ? (
         <StatusBadge
           tone={row.overdueMonths > 0 ? "danger" : "warning"}
           label={formatMoney(row.totalOutstanding) + (row.overdueMonths > 0 ? ` · ${row.overdueMonths}mo overdue` : "")}
@@ -106,7 +118,7 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
 
 const INITIAL_STATE: GridInitialState = {
   sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },
-  columns: { columnVisibilityModel: { phone: false } },
+  columns: { columnVisibilityModel: { phone: false, tenantKind: false } },
 };
 
 function matchesStatus(row: TenantSearchRow, status: StatusFilter): boolean {
@@ -116,12 +128,14 @@ function matchesStatus(row: TenantSearchRow, status: StatusFilter): boolean {
       return current;
     case "drafts":
       return row.status === "draft";
+    case "untracked":
+      return current && !row.rentTracked;
     case "overdue":
       return row.overdueMonths > 0;
     case "outstanding":
       return row.totalOutstanding > 0;
     case "settled":
-      return current && row.totalOutstanding <= 0;
+      return current && row.rentTracked && row.totalOutstanding <= 0;
     case "movedOut":
       return !current;
     default:
