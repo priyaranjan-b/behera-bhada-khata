@@ -41,7 +41,7 @@ import type {
   PasswordSignInResult,
   NewPaymentForm,
   OtpSent,
-  PropertyDetail,
+  PropertyTenantRow,
   PropertyHeader,
   LinkResent,
   LoginOptions,
@@ -94,7 +94,10 @@ export interface ApiQueries {
     properties: {
       list(): Promise<LocationGroup[]>;
       newForm(): Promise<NewPropertyForm>;
-      detail(propertyCode: string): Promise<PropertyDetail>;
+      /** The tower page's header; its houses and tenants are their own calls (A12). */
+      detail(propertyCode: string): Promise<PropertyHeader>;
+      units(propertyCode: string): Promise<UnitRow[]>;
+      tenants(propertyCode: string): Promise<PropertyTenantRow[]>;
       newTenant(propertyCode: string): Promise<NewTenantForm>;
       bulkTenants(propertyCode: string): Promise<NewTenantForm>;
       newUnit(propertyCode: string): Promise<PropertyHeader>;

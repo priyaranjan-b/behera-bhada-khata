@@ -312,12 +312,6 @@ export interface PropertyTenantRow {
   rentTracked: boolean;
 }
 
-export interface PropertyDetail {
-  property: PropertyHeader;
-  units: UnitRow[];
-  tenants: PropertyTenantRow[];
-}
-
 export interface NewPropertyForm {
   locations: LocationSummary[];
 }

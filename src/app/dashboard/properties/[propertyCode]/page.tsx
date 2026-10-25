@@ -2,20 +2,24 @@ import Stack from "@mui/material/Stack";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AddHomeWorkRoundedIcon from "@mui/icons-material/AddHomeWorkRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
-import PeopleOutlineRoundedIcon from "@mui/icons-material/PeopleOutlineRounded";
-import MeetingRoomRoundedIcon from "@mui/icons-material/MeetingRoomRounded";
 import { serverApi } from "@/lib/api-client/server";
 import { routes } from "@/lib/routes";
-import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
+import { PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
-import PropertyTenantsGrid from "./PropertyTenantsGrid";
-import UnitsGrid from "@/components/domain/UnitsGrid";
+import AsyncSection from "@/components/ui/AsyncSection";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { PanelSkeleton } from "@/components/ui/Skeletons";
+import HousesSection from "./sections/HousesSection";
+import TenantsSection from "./sections/TenantsSection";
 
+// The page loads in sections (A12): it waits only for the header (and its
+// 404), then streams the houses and the tenants on their own calls. No
+// loading.tsx here: one would also show while the tower's forms load.
 export default async function PropertyPage({ params }: { params: Promise<{ propertyCode: string }> }) {
   const { propertyCode } = await params;
-  const { property, units, tenants } = await serverApi.dashboard.properties.detail(propertyCode);
-  const vacant = units.filter((u) => u.isActive && !u.currentTenant).length;
+  const property = await serverApi.dashboard.properties.detail(propertyCode);
+  const units = serverApi.dashboard.properties.units(propertyCode);
+  const tenants = serverApi.dashboard.properties.tenants(propertyCode);
 
   const actions = (
     <ActionStack>
@@ -35,30 +39,13 @@ export default async function PropertyPage({ params }: { params: Promise<{ prope
     <Stack spacing={2}>
       <PageHeader title={property.name} subtitle={`${property.code} · ${property.locationName}`} action={actions} />
 
-      <UnitsGrid
-        units={units}
-        propertyName={property.name}
-        subtitle={units.length ? `${vacant} vacant` : undefined}
-        emptyState={
-          <EmptyState
-            icon={<MeetingRoomRoundedIcon />}
-            title="No houses yet"
-            description="Add the houses, shops and rooms in this tower so tenants can be placed in them."
-          />
-        }
-      />
+      <AsyncSection title="Houses" fallback={<PanelSkeleton rows={6} />}>
+        <HousesSection units={units} propertyName={property.name} />
+      </AsyncSection>
 
-      <PropertyTenantsGrid
-        rows={tenants}
-        propertyName={property.name}
-        emptyState={
-          <EmptyState
-            icon={<PeopleOutlineRoundedIcon />}
-            title="No tenants yet"
-            description="Add a tenant to one or more vacant houses, or bulk upload several at once."
-          />
-        }
-      />
+      <AsyncSection title="Tenants" fallback={<PanelSkeleton rows={4} />}>
+        <TenantsSection tenants={tenants} propertyName={property.name} />
+      </AsyncSection>
     </Stack>
   );
 }

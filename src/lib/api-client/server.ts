@@ -23,10 +23,11 @@ import {
   getNewHouseForm,
   getNewPropertyForm,
   getNewTenantForm,
-  getPropertyDetail,
   getPropertyHeader,
   listHouses,
   listProperties,
+  listPropertyHouses,
+  listPropertyTenants,
 } from "@/server/services/properties";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getSearchIndex } from "@/server/services/search";
@@ -73,7 +74,9 @@ const inProcessApi: ApiQueries = {
     properties: {
       list: async () => listProperties(await owner()),
       newForm: async () => getNewPropertyForm(await owner()),
-      detail: async (code) => getPropertyDetail(await owner(), code),
+      detail: async (code) => getPropertyHeader(await owner(), code),
+      units: async (code) => listPropertyHouses(await owner(), code),
+      tenants: async (code) => listPropertyTenants(await owner(), code),
       newTenant: async (code) => getNewTenantForm(await owner(), code),
       bulkTenants: async (code) => getNewTenantForm(await owner(), code),
       newUnit: async (code) => getPropertyHeader(await owner(), code),

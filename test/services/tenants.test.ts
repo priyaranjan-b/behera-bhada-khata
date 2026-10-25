@@ -19,7 +19,7 @@ const {
 } = await import(
   "@/server/services/tenants"
 );
-const { getPropertyDetail } = await import("@/server/services/properties");
+const { getPropertyHeader, listPropertyHouses, listPropertyTenants } = await import("@/server/services/properties");
 const { confirmRecord } = await import("@/server/services/confirm");
 const { createPayment } = await import("@/server/services/payments");
 
@@ -127,13 +127,22 @@ describe("reads", () => {
   });
 
   it("lists a tower's houses with their occupant; malformed codes are just not found", async () => {
-    const detail = await getPropertyDetail(ctx, "AC-T1");
-    expect(detail.units.map((u) => [u.unitCode, u.currentTenant?.displayName])).toEqual([
+    expect(await getPropertyHeader(ctx, "AC-T1")).toMatchObject({ code: "AC-T1" });
+    expect((await listPropertyHouses(ctx, "AC-T1")).map((u) => [u.unitCode, u.currentTenant?.displayName])).toEqual([
       ["AC-T1-G01", "Asha"],
       ["AC-T1-G02", "Asha"],
     ]);
-    expect(detail.tenants).toEqual([expect.objectContaining({ id: "00000000-0000-4000-8000-000000000101", unitCodes: ["AC-T1-G01", "AC-T1-G02"] })]);
-    await expect(getPropertyDetail(ctx, "not a code")).rejects.toMatchObject({ status: 404 });
+    expect(await listPropertyTenants(ctx, "AC-T1")).toEqual([
+      expect.objectContaining({ id: "00000000-0000-4000-8000-000000000101", unitCodes: ["AC-T1-G01", "AC-T1-G02"] }),
+    ]);
+    for (const read of [getPropertyHeader, listPropertyHouses, listPropertyTenants]) {
+      await expect(read(ctx, "not a code")).rejects.toMatchObject({ status: 404 });
+    }
+    // A well-formed code with no tower is a 404 for every section, not an empty list.
+    fakes.owner.properties.get.mockResolvedValue(null as never);
+    for (const read of [getPropertyHeader, listPropertyHouses, listPropertyTenants]) {
+      await expect(read(ctx, "AC-T9")).rejects.toMatchObject({ status: 404 });
+    }
   });
 });
 

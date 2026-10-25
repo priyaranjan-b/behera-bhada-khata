@@ -4,8 +4,8 @@ import type {
   NewHouseForm,
   NewPropertyForm,
   NewTenantForm,
-  PropertyDetail,
   PropertyHeader,
+  PropertyTenantRow,
   UnitRow,
 } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
@@ -15,6 +15,7 @@ import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
 import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
+import { db as ownerRepos, locationsList, propertyByCode, tenantsList, towerOccupancy } from "./loaders";
 import { billedTenantIds, paidDirectTenants } from "./periods";
 import { availableUnits, holdsUnit, loadPlacements, placementOf, rentByProperty } from "./placements";
 
@@ -32,13 +33,6 @@ function parsePropertyCode(raw: string): string {
   const parsed = propertyCodeSchema.safeParse(decodeURIComponent(raw));
   if (!parsed.success) notFound("Property");
   return parsed.data;
-}
-
-async function loadHeader(ctx: OwnerContext, rawCode: string): Promise<PropertyHeader> {
-  const db = await ownerDb();
-  const [property, locations] = await Promise.all([db.properties.get(parsePropertyCode(rawCode)), db.locations.list()]);
-  if (!property) notFound("Property");
-  return toHeader(property, locations);
 }
 
 /** Every site with its towers, how full each one is and the rent its current occupants pay. */
@@ -83,8 +77,15 @@ export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[
   });
 }
 
-export async function getPropertyHeader(ctx: OwnerContext, propertyCode: string): Promise<PropertyHeader> {
-  return loadHeader(ctx, propertyCode);
+// The tower page loads in sections (A12): the header (GET …/[code]), its houses
+// (…/[code]/units) and its current tenants (…/[code]/tenants). They share the
+// tower row, sites and occupancy through ./loaders.
+
+/** A tower's name and site: the tower page's header, and the Add house form's. */
+export async function getPropertyHeader(_ctx: OwnerContext, rawCode: string): Promise<PropertyHeader> {
+  const code = parsePropertyCode(rawCode);
+  const [property, locations] = await Promise.all([propertyByCode(code), locationsList()]);
+  return toHeader(property, locations);
 }
 
 /** Table rows for houses: who is in each today, and who was. */
@@ -139,25 +140,26 @@ export async function listHouses(_ctx: OwnerContext): Promise<UnitRow[]> {
   return toUnitRows(units, occupancy, properties, locations);
 }
 
-/** A tower: its houses (with who is in each, and who was) and its current tenants. */
-export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Promise<PropertyDetail> {
+/** A tower's houses, with who is in each today and who was - the same rows as /dashboard/houses. */
+export async function listPropertyHouses(_ctx: OwnerContext, rawCode: string): Promise<UnitRow[]> {
   const code = parsePropertyCode(rawCode);
-  const db = await ownerDb();
   const [property, locations, units, occupancy] = await Promise.all([
-    db.properties.get(code),
-    db.locations.list(),
-    db.units.list({ propertyCode: code }),
-    db.occupancy.list({ propertyCode: code }),
+    propertyByCode(code),
+    locationsList(),
+    ownerRepos().then((repos) => repos.units.list({ propertyCode: code })),
+    towerOccupancy(code),
   ]);
-  if (!property) notFound("Property");
+  return toUnitRows(units, occupancy, [property], locations);
+}
 
+/** The tenants holding a house in the tower today. */
+export async function listPropertyTenants(_ctx: OwnerContext, rawCode: string): Promise<PropertyTenantRow[]> {
+  const code = parsePropertyCode(rawCode);
   const today = todayKey();
-  const unitRows = toUnitRows(units, occupancy, [property], locations, today);
-
-  // Tenants currently holding a house in this tower.
+  const [, occupancy, tenants] = await Promise.all([propertyByCode(code), towerOccupancy(code), tenantsList()]);
   const tenantIds = [...new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.tenant_id))];
-  const [tenants, placements] = await Promise.all([db.tenants.list(), loadPlacements(db, tenantIds)]);
-  const tenantRows = tenants
+  const placements = await loadPlacements(await ownerRepos(), tenantIds);
+  return tenants
     .filter((t) => tenantIds.includes(t.id))
     .map((tenant) => {
       const placement = placementOf(placements, tenant.id);
@@ -174,8 +176,6 @@ export async function getPropertyDetail(ctx: OwnerContext, rawCode: string): Pro
         rentTracked: tenant.rent_tracked,
       };
     });
-
-  return { property: toHeader(property, locations), units: unitRows, tenants: tenantRows };
 }
 
 export async function getNewPropertyForm(_ctx: OwnerContext): Promise<NewPropertyForm> {
@@ -223,7 +223,6 @@ export async function getNewHouseForm(_ctx: OwnerContext): Promise<NewHouseForm>
 }
 
 export async function getNewTenantForm(ctx: OwnerContext, rawCode: string): Promise<NewTenantForm> {
-  const property = await loadHeader(ctx, rawCode);
-  const db = await ownerDb();
+  const [property, db] = await Promise.all([getPropertyHeader(ctx, rawCode), ownerDb()]);
   return { property, availableUnits: await availableUnits(db) };
 }

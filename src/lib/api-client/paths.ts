@@ -36,6 +36,7 @@ export const apiPaths = {
       newTenant: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/tenants/new`,
       bulkTenants: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/tenants/bulk`,
       units: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/units`,
+      tenants: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/tenants`,
       newUnit: (propertyCode: string) => `/api/dashboard/properties/${e(propertyCode)}/units/new`,
     },
     houses: {

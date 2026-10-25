@@ -76,6 +76,8 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         list: () => get(p.dashboard.properties.list),
         newForm: () => get(p.dashboard.properties.new),
         detail: (code) => get(p.dashboard.properties.detail(code)),
+        units: (code) => get(p.dashboard.properties.units(code)),
+        tenants: (code) => get(p.dashboard.properties.tenants(code)),
         newTenant: (code) => get(p.dashboard.properties.newTenant(code)),
         bulkTenants: (code) => get(p.dashboard.properties.bulkTenants(code)),
         newUnit: (code) => get(p.dashboard.properties.newUnit(code)),

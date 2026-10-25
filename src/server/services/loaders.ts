@@ -1,10 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import { addMonthsToKey, currentMonthKey } from "@/lib/dates";
-import type { RentPeriod, Tenant } from "@/lib/types";
+import type { Property, RentPeriod, Tenant } from "@/lib/types";
 import { ownerDb } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
-import { requireId, requireTenant } from "./context";
+import { notFound, requireId, requireTenant } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { loadPlacements, type Placements } from "./placements";
 
@@ -106,3 +106,18 @@ export const tenantAdjustments = cache(async (tenantId: string) => {
   requireId(tenantId, "Tenant");
   return (await db()).adjustments.listForTenants([tenantId]);
 });
+
+// ---- One tower (the tower page's sections) -----------------------------------
+
+/** Every site. */
+export const locationsList = cache(async () => (await db()).locations.list());
+
+/** The tower, or 404. `code` is already parsed (propertyCodeSchema). */
+export const propertyByCode = cache(async (code: string): Promise<Property> => {
+  const property = await (await db()).properties.get(code);
+  if (!property) notFound("Property");
+  return property;
+});
+
+/** Who held which of the tower's houses, and when. */
+export const towerOccupancy = cache(async (code: string) => (await db()).occupancy.list({ propertyCode: code }));
