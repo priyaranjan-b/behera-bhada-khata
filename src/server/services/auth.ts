@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { LoginOptions, MagicLinkResult, PasswordSignInResult, Session } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
 import { magicLinkSchema, passwordSignInSchema, sessionTokensSchema } from "@/lib/validation";
@@ -9,11 +10,16 @@ import { safeNext } from "@/lib/redirects";
 import { recordSystemEvent } from "./audit";
 import { enforceRateLimits, parseInput, RATE_LIMITS, type OwnerContext, type RequestMeta } from "./context";
 
-export async function getSession(): Promise<Session> {
+/**
+ * Who is signed in, and whether they're the owner (an `is_app_owner` call).
+ * Cached per page render, so the layout and every owner read share one check;
+ * a route handler runs it once per request anyway.
+ */
+export const getSession = cache(async (): Promise<Session> => {
   const session = await auth.getSession();
   if (!session) throw new ApiError(401, "Unauthorized");
   return session;
-}
+});
 
 export const NOT_OWNER_MESSAGE = "This account isn't the owner of this rent book";
 

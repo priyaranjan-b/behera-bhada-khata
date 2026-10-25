@@ -69,8 +69,10 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
       `title` and `fallback`, keyed by the params its data depends on.
   - **In `page.tsx`:** start every call before awaiting anything, and never
     `await` one call before starting the next.
-  - **Shared reads:** reads several sections need go through `cache()`
-    loaders in the service, never repeated `db.*` calls.
+  - **Shared reads:** reads several sections need go through the `cache()`
+    loaders in `src/server/services/loaders.ts` (add one there if missing),
+    never repeated `db.*` calls. Inside a section, start every read in one
+    `Promise.all`; only rent-month reads wait for `billedTenants()`.
   - **Adding a section:** do it only for a different data source, cost or
     refresh trigger. Otherwise extend an existing section. Keep it to about
     6 calls per page.

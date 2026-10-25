@@ -20,6 +20,7 @@ export const apiPaths = {
       houses: "/api/dashboard/overview/houses",
       attention: "/api/dashboard/overview/attention",
       portfolio: "/api/dashboard/overview/portfolio",
+      paidDirect: "/api/dashboard/overview/paid-direct",
     },
     defaulters: "/api/dashboard/defaulters",
     billing: "/api/dashboard/billing",

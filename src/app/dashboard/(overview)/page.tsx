@@ -40,6 +40,7 @@ export default async function DashboardPage({
   const attention = serverApi.dashboard.overview.attention();
   const portfolio = serverApi.dashboard.overview.portfolio({ paidDirect });
   const defaulters = serverApi.dashboard.defaulters();
+  const paidDirectState = serverApi.dashboard.overview.paidDirect({ paidDirect });
 
   return (
     <OverviewLayout
@@ -49,8 +50,8 @@ export default async function DashboardPage({
           subtitle="How rent is tracking across every property."
           action={
             <ActionStack>
-              <AsyncSection key={monthView} title="Include Govt paid direct" fallback={null} silent>
-                <PaidDirectSwitch month={monthData} />
+              <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
+                <PaidDirectSwitch state={paidDirectState} />
               </AsyncSection>
               <PeriodSwitcher
                 label={formatMonth(monthKey)}

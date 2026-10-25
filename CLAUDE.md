@@ -219,8 +219,9 @@ API        src/app/api/**/route.ts — thin: auth + JSON via src/server/http.ts,
              then one service call. The tree mirrors the pages:
              app/dashboard/tenants/[tenantId]/page.tsx
                ↔ app/api/dashboard/tenants/[tenantId]/route.ts
-             Writes POST to the collection (…/tenants/[id]/payments); a form
-             page's data is a GET at its own path (…/payments/new).
+             Writes POST to the collection (…/tenants/[id]/payments); a
+             page's reads are GETs under its path, one per logical section
+             (…/overview/month, …/overview/trend), never one blob.
 Services   src/server/services/* — business logic, no Next.js/Supabase/Twilio imports
 Ports      src/server/ports.ts — OwnerRepositories, SystemRepositories,
              AuthGateway, FileStorage, Messaging interfaces
@@ -229,6 +230,19 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
            src/server/adapters/twilio/*   — the ONLY code importing twilio
 ```
 
+- **Split a page's data into logical reads, never one big response.** Don't
+  bundle everything a page shows into a single "summary" endpoint and
+  contract. Give each logical section its own GET, service function and
+  contract: the data that changes together, comes from the same source, and
+  costs the same. A component then takes only the slice it renders, and can
+  be reused on another page with its call (`TopDefaultersCard` uses
+  `/api/dashboard/defaulters`, which the Defaulters page uses too). The page
+  starts every call before awaiting any, and streams each section through
+  `AsyncSection`. Reads that several calls need go through the `cache()`
+  loaders in `src/server/services/loaders.ts`, so splitting doesn't repeat
+  queries. Don't go one endpoint per tiny widget either: about 6-7 calls per
+  page, and a single form's data (`…/payments/new`) stays one GET. The
+  Overview is the worked example (A12).
 - Shapes crossing the API are in `src/lib/contracts.ts`; the client surface
   is typed by `ApiQueries`/`ApiCommands` (`src/lib/api-client/types.ts`) and
   every path is in `src/lib/api-client/paths.ts`. Adding an endpoint = service
@@ -460,7 +474,8 @@ Each of these was found broken somewhere; keep them when adding code.
   code) in the browser with `src/lib/domain/search.ts`.
 - The Overview (`/dashboard`) is streamed in sections (A12): one call per
   section (`serverApi.dashboard.overview.*`, `src/server/services/overview.ts`,
-  shared reads through its `cache()` loaders), each rendered by
+  shared reads through the `cache()` loaders in
+  `src/server/services/loaders.ts`), each rendered by
   `sections/*.tsx` inside an `AsyncSection` (Suspense + per-card error
   boundary), placed by `OverviewLayout`; the placeholders are one map,
   `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`.

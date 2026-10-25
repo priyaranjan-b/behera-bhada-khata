@@ -1,7 +1,6 @@
 import "server-only";
-import { cache } from "react";
-import type { HouseCounts, OverviewMonth, OverviewTrend, PortfolioFacts } from "@/lib/contracts";
-import { addMonthsToKey, currentMonthKey, monthKeyFromParam, yearMonthOf } from "@/lib/dates";
+import type { HouseCounts, OverviewMonth, OverviewTrend, PaidDirectState, PortfolioFacts } from "@/lib/contracts";
+import { currentMonthKey, monthKeyFromParam, yearMonthOf } from "@/lib/dates";
 import { buildBillingCollectionTrend, buildMonthlyReport } from "@/lib/domain/reports";
 import {
   buildAttention,
@@ -16,58 +15,31 @@ import { round2 } from "@/lib/money";
 import type { RentPeriod, Tenant } from "@/lib/types";
 import { paidDirectViewSchema } from "@/lib/validation";
 import { tenantMessagingEnabled } from "@/server/env";
-import { ownerDb } from "@/server/infra";
 import type { OwnerContext } from "./context";
-import { billedTenantIds, ensureRentPeriodsFor, groupPeriods, paidDirectPeriods, paidDirectTenants } from "./periods";
-import { holdsUnit, loadPlacements, placementOf } from "./placements";
+import {
+  billedTenants,
+  db,
+  periodsFrom,
+  placements,
+  recentAdjustments,
+  recentMonthKeys,
+  recentPayments,
+  recentPeriods,
+  tenantsList,
+} from "./loaders";
+import { billedTenantIds, groupPeriods, paidDirectPeriods, paidDirectTenants } from "./periods";
+import { holdsUnit, placementOf, type Placements } from "./placements";
 
 // The Overview is several independent sections, each streamed into its own
-// card (A12). They share the reads below through React `cache()`: within one
-// page render every section gets the same promise, so the tenant list, the
-// `ensure_rent_periods` write and the rent months run once. Outside a render
-// (a route handler, a test) `cache` is a plain call. Section functions read
-// shared data only through these loaders, never with their own `db.*` calls.
+// card (A12). Shared reads come from ./loaders (cached per render); within a
+// section every read starts at once - nothing waits for a read it doesn't use.
 
-const TREND_MONTHS = 6;
-
-/** The trend window: the last TREND_MONTHS month keys, ending this month. */
-function trendMonthKeys(): string[] {
-  const today = currentMonthKey();
-  return Array.from({ length: TREND_MONTHS }, (_, i) => addMonthsToKey(today, i - (TREND_MONTHS - 1)));
-}
-
-const tenantsList = cache(async (): Promise<Tenant[]> => (await ownerDb()).tenants.list());
-
-/** Every tenant, after topping up the rent months of the billed ones. */
-export const billedTenants = cache(async (): Promise<Tenant[]> => {
-  const tenants = await tenantsList();
-  await ensureRentPeriodsFor(billedTenantIds(tenants));
-  return tenants;
-});
-
-const placements = cache(async () => loadPlacements(await ownerDb(), (await tenantsList()).map((t) => t.id)));
-
-/** Unpaid rent months (for balances) plus every month from `fromMonth`. */
-const periodsFrom = cache(async (fromMonth: string): Promise<RentPeriod[]> => {
-  const tenants = await billedTenants();
-  return (await ownerDb()).rentPeriods.listForTenants(
-    tenants.map((t) => t.id),
-    { openOrFrom: fromMonth }
-  );
-});
-
-/** Confirmed payments dated from the start of the trend window. */
-const recentPayments = cache(async () =>
-  (await ownerDb()).payments.listForTenants(
-    (await tenantsList()).map((t) => t.id),
-    { status: "confirmed", fromDate: trendMonthKeys()[0] }
-  )
-);
+const showsPaidDirect = (options: { paidDirect?: unknown }) => paidDirectViewSchema.parse(options.paidDirect) === "show";
 
 /** Government rent paid direct (A11) for `months`, or none when hidden. */
 function directPeriods(
   tenants: Tenant[],
-  placement: Awaited<ReturnType<typeof placements>>,
+  placement: Placements,
   months: string[],
   show: boolean
 ): RentPeriod[] {
@@ -84,17 +56,16 @@ export async function getOverviewMonth(
   options: { paidDirect?: unknown } = {}
 ): Promise<OverviewMonth> {
   const monthKey = monthKeyFromParam(month);
-  const showPaidDirect = paidDirectViewSchema.parse(options.paidDirect) === "show";
+  const showPaidDirect = showsPaidDirect(options);
   const todayMonthKey = currentMonthKey();
-  // Same key as the trend's whenever the month is inside its window, so both share one query.
-  const fromMonth = [monthKey, trendMonthKeys()[0]].sort()[0];
-  const [allTenants, stored, placement, db] = await Promise.all([
+  const fromMonth = recentMonthKeys()[0];
+  const [allTenants, stored, placement, locations] = await Promise.all([
     billedTenants(),
-    periodsFrom(fromMonth),
+    // The shared query whenever the month is inside the recent window (the usual case).
+    monthKey < fromMonth ? periodsFrom(monthKey) : recentPeriods(),
     placements(),
-    ownerDb(),
+    db().then((repos) => repos.locations.list()),
   ]);
-  const locations = await db.locations.list();
 
   const billedIds = new Set(billedTenantIds(allTenants));
   const direct = directPeriods(allTenants, placement, [monthKey], showPaidDirect);
@@ -145,26 +116,21 @@ export async function getOverviewMonth(
     { paidDirect: showPaidDirect }
   );
 
-  const paidDirect = { available: paidDirectTenants(allTenants).length > 0, shown: showPaidDirect };
-  return { monthKey, report, sites, kinds, paidDirect };
+  return { monthKey, report, sites, kinds };
 }
 
-/** Billed vs collected for the last TREND_MONTHS months, government rent paid direct included unless hidden. */
+/** Billed vs collected over the recent window, government rent paid direct included unless hidden. */
 export async function getOverviewTrend(_ctx: OwnerContext, options: { paidDirect?: unknown } = {}): Promise<OverviewTrend> {
-  const showPaidDirect = paidDirectViewSchema.parse(options.paidDirect) === "show";
-  const months = trendMonthKeys();
+  const showPaidDirect = showsPaidDirect(options);
+  const months = recentMonthKeys();
   const todayMonthKey = currentMonthKey();
-  const db = await ownerDb();
-  const [allTenants, stored, placement, recorded] = await Promise.all([
+  const [allTenants, stored, placement, recorded, adjustments] = await Promise.all([
     billedTenants(),
-    periodsFrom(months[0]),
+    recentPeriods(),
     placements(),
     recentPayments(),
+    recentAdjustments(),
   ]);
-  const adjustments = await db.adjustments.listForTenants(
-    allTenants.map((t) => t.id),
-    { status: "confirmed", fromDate: months[0] }
-  );
   // Paid-direct months count as billed and as collected that month (A11).
   const direct = directPeriods(allTenants, placement, months, showPaidDirect);
   const payments = [
@@ -180,8 +146,8 @@ export async function getOverviewTrend(_ctx: OwnerContext, options: { paidDirect
 
 /** Same rule as the Houses page's "Vacant" filter: in use, nobody holding it today. */
 export async function getHouseCounts(_ctx: OwnerContext): Promise<HouseCounts> {
-  const db = await ownerDb();
-  const [units, occupancy] = await Promise.all([db.units.list(), db.occupancy.list()]);
+  const repos = await db();
+  const [units, occupancy] = await Promise.all([repos.units.list(), repos.occupancy.list()]);
   const held = new Set(occupancy.filter((o) => holdsUnit(o)).map((o) => o.unit_code));
   const inUse = units.filter((u) => u.is_active);
   return {
@@ -192,12 +158,11 @@ export async function getHouseCounts(_ctx: OwnerContext): Promise<HouseCounts> {
 
 /** Loose ends to tidy: drafts, missing documents, unsigned receipts, rents due a review. */
 export async function getAttention(_ctx: OwnerContext): Promise<AttentionItem[]> {
-  const db = await ownerDb();
   const [allTenants, placement, recorded, withDocuments] = await Promise.all([
     tenantsList(),
     placements(),
     recentPayments(),
-    db.tenantDocuments.tenantIdsWithDocuments(),
+    db().then((repos) => repos.tenantDocuments.tenantIdsWithDocuments()),
   ]);
   const todayMonthKey = currentMonthKey();
   const billedIds = new Set(billedTenantIds(allTenants));
@@ -221,13 +186,13 @@ export async function getAttention(_ctx: OwnerContext): Promise<AttentionItem[]>
 
 /** Standing facts: rent roll, deposits, rent paid in advance, government rent paid direct. */
 export async function getPortfolio(_ctx: OwnerContext, options: { paidDirect?: unknown } = {}): Promise<PortfolioFacts> {
-  const showPaidDirect = paidDirectViewSchema.parse(options.paidDirect) === "show";
+  const showPaidDirect = showsPaidDirect(options);
   const todayMonthKey = currentMonthKey();
   const [allTenants, placement, stored] = await Promise.all([
     billedTenants(),
     placements(),
-    // Months after this one are always inside the trend window's query.
-    periodsFrom(trendMonthKeys()[0]),
+    // Months after this one are always in the recent window's query.
+    recentPeriods(),
   ]);
   const billedIds = new Set(billedTenantIds(allTenants));
   const rentOf = (list: Tenant[]) => round2(list.reduce((sum, t) => sum + placementOf(placement, t.id).monthlyRent, 0));
@@ -243,4 +208,15 @@ export async function getPortfolio(_ctx: OwnerContext, options: { paidDirect?: u
     ),
     paidDirectRent: rentOf(direct),
   };
+}
+
+/**
+ * Whether there is government rent paid direct to show or hide (A11), for the
+ * header switch: only the tenant list, so the switch doesn't wait on the figures.
+ */
+export async function getPaidDirectState(
+  _ctx: OwnerContext,
+  options: { paidDirect?: unknown } = {}
+): Promise<PaidDirectState> {
+  return { available: paidDirectTenants(await tenantsList()).length > 0, shown: showsPaidDirect(options) };
 }

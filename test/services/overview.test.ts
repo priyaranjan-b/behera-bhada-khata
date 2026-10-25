@@ -4,7 +4,7 @@ import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getAttention, getOverviewMonth, getOverviewTrend, getPortfolio } = await import("@/server/services/overview");
+const { getAttention, getOverviewMonth, getOverviewTrend, getPaidDirectState, getPortfolio } = await import("@/server/services/overview");
 
 const ctx = { ownerId: OWNER_ID };
 const ASHA = "00000000-0000-4000-8000-000000000101";
@@ -52,7 +52,14 @@ describe("Overview sections", () => {
       ["business", 0, 0, 0],
       ["government", 1, 0, 1],
     ]);
-    expect(month.paidDirect).toEqual({ available: true, shown: true });
+  });
+
+  it("paid-direct switch: available when a Govt tenant pays direct, shown unless hidden", async () => {
+    expect(await getPaidDirectState(ctx)).toEqual({ available: true, shown: true });
+    expect(await getPaidDirectState(ctx, { paidDirect: "hide" })).toEqual({ available: true, shown: false });
+    // It needs only the tenant list: no rent-month top-up, no rent months.
+    expect(fakes.system.rentPeriods.ensure).not.toHaveBeenCalled();
+    expect(fakes.owner.rentPeriods.listForTenants).not.toHaveBeenCalled();
   });
 
   it("month: a malformed ?month= means the current month", async () => {
@@ -93,7 +100,6 @@ describe("Overview sections", () => {
       paidDirectRent: 0,
     });
     const hidden = await getOverviewMonth(ctx, "2026-10", { paidDirect: "hide" });
-    expect(hidden.paidDirect).toEqual({ available: true, shown: false });
     // Tenant types follows the same switch.
     expect(hidden.kinds.find((k) => k.kind === "government")).toMatchObject({ paidDirectTenants: 0, paidDirectRent: 0 });
     expect((await getOverviewMonth(ctx, "2026-10")).kinds.find((k) => k.kind === "government")).toMatchObject({

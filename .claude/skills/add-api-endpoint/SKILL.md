@@ -40,9 +40,33 @@ If your change adds a new design decision, or changes one, update
 
 ## 1. Pick the path (mirror the page tree)
 
-- A page's data is a **GET at the page's own path under `/api`**:
+- A page's reads are **GETs under the page's own path in `/api`**:
   `app/dashboard/tenants/[tenantId]/payments/new/page.tsx` →
   `app/api/dashboard/tenants/[tenantId]/payments/new/route.ts`.
+- **Split them logically; never return everything the page needs in one
+  big response.** One GET, service function and contract per logical
+  section of the page, e.g. the Overview's `…/overview/month`,
+  `…/overview/trend`, `…/overview/houses` (A12 in
+  `docs/design-decisions.md`).
+  - **Where to cut:** group data that changes together, comes from the same
+    source and costs the same to load. A different query, a different
+    refresh trigger (the selected month vs today) or a much slower read is
+    a different endpoint.
+  - **Reuse before adding.** If an endpoint already returns what a
+    component needs, call it rather than copying its data into a new
+    response. The Overview's top-defaulters card reads
+    `/api/dashboard/defaulters`, the Defaulters page's own endpoint.
+  - **Contracts are per section and view-ready.** A component takes the
+    slice it renders, never a whole page response, so it can move to
+    another page with its call.
+  - **No repeated queries.** Reads that several endpoints need (tenant
+    list, rent months, placements, the `ensure_rent_periods` top-up) go
+    through the `cache()` loaders in `src/server/services/loaders.ts`.
+    Within a page render they run once, however many calls use them.
+  - **Don't over-split.** Aim for about 6-7 calls per page, not one per
+    widget. A single form's data (`…/payments/new`) stays one GET.
+  - **In the page:** start every call before awaiting any, and wrap each
+    section in `AsyncSection` (see the `build-dashboard-page` skill).
 - A write is a **POST to the collection it creates in**:
   `…/tenants/[tenantId]/payments`, `…/payments/[paymentId]/adjustments`.
 - Actions on a record are sub-paths: `…/payments/[paymentId]/resend`, `…/receipt`.
@@ -196,6 +220,9 @@ with a readable `error` for invalid input.
 
 - [ ] Route is one line per method; path in `paths.ts`, method in
       `ApiQueries`/`ApiCommands`, `http.ts` and (for reads) `server.ts`.
+- [ ] Reads are split by logical section, not one page-wide response; an
+      existing endpoint was reused where it already had the data; shared
+      reads go through `src/server/services/loaders.ts`.
 - [ ] Service validates every input and id; limits and enums are shared
       constants; no duplicated helper from another service.
 - [ ] A test in `test/services/` (and `test/schema.test.ts` for SQL).

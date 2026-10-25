@@ -32,6 +32,7 @@ import type {
   OverviewMonth,
   OverviewTrend,
   OwnerProfileView,
+  PaidDirectState,
   PortfolioFacts,
   UpdateOwnerProfileInput,
   UpdateTenantInput,
@@ -72,6 +73,8 @@ export interface ApiQueries {
       houses(): Promise<HouseCounts>;
       attention(): Promise<AttentionItem[]>;
       portfolio(options?: { paidDirect?: PaidDirectView }): Promise<PortfolioFacts>;
+      /** For the "Include Govt paid direct" switch: are there any, and is the view showing them. */
+      paidDirect(options?: { paidDirect?: PaidDirectView }): Promise<PaidDirectState>;
     };
     /** Tenants behind on rent, most months behind first. */
     defaulters(): Promise<DefaultersReport>;

@@ -247,8 +247,9 @@ arrive every month. Rejected alternatives:
 **Decision.** `/dashboard` is a set of independent **sections**, each loaded
 by its own call and shown as soon as it is ready. A section has four parts:
 - **Data:** a service function and a GET under `/api/dashboard/overview/*`
-  (`month`, `trend`, `houses`, `attention`, `portfolio`; the defaulters card
-  reuses `/api/dashboard/defaulters`). These live in
+  (`month`, `trend`, `houses`, `attention`, `portfolio`, and `paid-direct`
+  for the header switch, which needs only the tenant list; the defaulters
+  card reuses `/api/dashboard/defaulters`). These live in
   `src/server/services/overview.ts`.
 - **A section component** in `src/app/dashboard/(overview)/sections/`: an
   async Server Component that awaits its promise(s) and renders the cards.
@@ -270,10 +271,22 @@ How the pieces fit:
   data depends on (`monthKey`, the paid-direct view). Switching the month
   reloads only the month's cards.
 - **Shared reads run once.** The tenant list, the `ensure_rent_periods`
-  write, placements, rent months and recent payments come from loaders
-  wrapped in React `cache()` (top of `overview.ts`). Within one render they
-  run once, however many sections need them, and `getDefaultersReport`
-  uses the same `billedTenants()`.
+  write, placements, rent months, and recent payments and adjustments come
+  from loaders wrapped in React `cache()` in
+  `src/server/services/loaders.ts`, a module of their own so any screen's
+  service can use them. Within one render each runs once, however many
+  sections need it. `getDefaultersReport` reads through them too:
+  `recentPeriods()` (unpaid months plus the last `RECENT_MONTHS`) serves the
+  month figures, the trend, the portfolio and the defaulters with one
+  query.
+- **No waits inside a section.** A section starts all its reads together.
+  Only reads of rent months wait for the `ensure_rent_periods` top-up
+  (`billedTenants()`). The tenant list, placements, payments and documents
+  don't. Defaulters' payment lookup is its one dependent step, because it
+  needs to know who is behind.
+- **The session check is shared too.** `getSession` is cached per render,
+  so the dashboard layout and every owner read share one `is_app_owner`
+  call, and the layout reads the session and profile together.
 
 **Rules for changing it.**
 - **A new card whose data an existing section already loads:** extend that
@@ -285,7 +298,7 @@ How the pieces fit:
   `db.*` call for the same rows.
 - **Contracts:** per section and view-ready. Cards take the slice they
   render.
-- **Size:** keep about 6 calls per page. More than that means the sections
+- **Size:** keep about 6-7 calls per page. More than that means the sections
   are too fine-grained.
 
 **Why.** Before this, one `getDashboardSummary` call returned everything:

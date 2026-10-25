@@ -97,7 +97,6 @@ export interface OverviewMonth {
   sites: SiteCollection[];
   /** The selected month by tenant type. */
   kinds: KindBreakdown[];
-  paidDirect: PaidDirectState;
 }
 
 /** /overview/trend: billed vs collected for the last few months, up to this one. */
