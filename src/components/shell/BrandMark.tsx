@@ -43,7 +43,7 @@ export function BrandMark({ showOdia = true, iconSize = 36 }: { showOdia?: boole
       <BrandIcon size={iconSize} />
       <Box sx={{ minWidth: 0 }}>
         <Typography component="p" variant="subtitle2" noWrap color="textPrimary">
-          Behera Bhada Khata
+          Behera Rent Book
         </Typography>
         {showOdia && (
           <Typography variant="caption" color="textSecondary" component="p">

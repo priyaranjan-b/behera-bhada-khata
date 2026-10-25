@@ -11,7 +11,7 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
   return (
     <html lang="en">
       <body>
-        <title>Something went wrong · Behera Bhada Khata</title>
+        <title>Something went wrong · MyRentHQ</title>
         <ThemeRegistry>
           <PublicLayout width="sm">
             <PublicCard>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { GridColDef } from "@mui/x-data-grid";
+import type { GridColDef, GridInitialState } from "@mui/x-data-grid";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlineOutlined";
 import DataTable from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
@@ -43,6 +43,14 @@ const columns: GridColDef<TenantSearchRow>[] = [
         href={routes.tenants.detail(row.tenantId)}
       />
     ),
+  },
+  // Hidden by default; shown from the Columns button.
+  {
+    field: "phone",
+    headerName: "Phone",
+    minWidth: 140,
+    flex: 0.8,
+    valueFormatter: (value: string | null) => value || "—",
   },
   {
     field: "propertyName",
@@ -94,6 +102,11 @@ const columns: GridColDef<TenantSearchRow>[] = [
   },
 ];
 
+const INITIAL_STATE: GridInitialState = {
+  sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },
+  columns: { columnVisibilityModel: { phone: false } },
+};
+
 function matchesStatus(row: TenantSearchRow, status: StatusFilter): boolean {
   const current = row.status !== "inactive";
   switch (status) {
@@ -137,7 +150,7 @@ export default function TenantSearchList({
       filters={[{ label: "Show", value: status, options: STATUS_OPTIONS, onChange: setStatus, defaultValue: "current" }]}
       search={{ placeholder: "Search tenant, house…" }}
       noRowsLabel="No tenants match this filter."
-      initialState={{ sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] } }}
+      initialState={INITIAL_STATE}
       emptyState={
         <EmptyState
           icon={<PeopleOutlineIcon />}

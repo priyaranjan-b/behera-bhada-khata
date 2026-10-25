@@ -19,7 +19,8 @@ const notoOriya = Noto_Sans_Oriya({
 });
 
 export const metadata: Metadata = {
-  title: "Behera Bhada Khata",
+  title: "MyRentHQ",
+  applicationName: "MyRentHQ",
   description: "Digital rent ledger with mutual sign-off",
 };
 
