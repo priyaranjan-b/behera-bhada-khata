@@ -16,6 +16,7 @@ export const apiPaths = {
   dashboard: {
     summary: "/api/dashboard",
     defaulters: "/api/dashboard/defaulters",
+    activity: "/api/dashboard/activity",
     search: "/api/dashboard/search",
     profile: "/api/dashboard/profile",
     profilePassword: "/api/dashboard/profile/password",
@@ -31,12 +32,14 @@ export const apiPaths = {
     houses: {
       list: "/api/dashboard/houses",
       new: "/api/dashboard/houses/new",
+      history: (unitCode: string) => `/api/dashboard/houses/${e(unitCode)}/history`,
     },
     tenants: {
       list: "/api/dashboard/tenants",
       new: "/api/dashboard/tenants/new",
       detail: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}`,
       edit: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/edit`,
+      history: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/history`,
       moveOut: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out`,
       paidThrough: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/paid-through`,
       payments: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/payments`,

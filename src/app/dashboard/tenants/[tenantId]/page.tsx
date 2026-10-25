@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "@/components/ui/Link";
 import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
@@ -6,7 +7,7 @@ import Alert from "@mui/material/Alert";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf } from "@/lib/dates";
+import { addMonthsToKey, currentMonthKey, formatDateKey, formatMonth, monthKeyOf } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import FlashAlert from "@/components/ui/FlashAlert";
 import StatCard from "@/components/ui/StatCard";
@@ -20,6 +21,8 @@ import { FLASH, routes, type Flash } from "@/lib/routes";
 import TenantLedgerTable from "./TenantLedgerTable";
 import TenantPeriodsGrid, { type TenantPeriodRow } from "./TenantPeriodsGrid";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { DetailCardSkeleton } from "@/components/ui/Skeletons";
+import TenantChangeHistory from "./TenantChangeHistory";
 
 export default async function TenantPage({
   params,
@@ -52,7 +55,7 @@ export default async function TenantPage({
         subtitle={
           [
             tenant.businessName ? `Contact: ${tenant.name}` : null,
-            draft ? "Draft - details missing" : active ? null : `Moved out ${tenant.movedOutOn}`,
+            draft ? "Draft - details missing" : active ? null : `Moved out ${tenant.movedOutOn ? formatDateKey(tenant.movedOutOn) : ""}`,
           ]
             .filter(Boolean)
             .join(" · ") || undefined
@@ -206,7 +209,7 @@ export default async function TenantPage({
             <DetailList dividers>
               {houseHistory.map((h) => (
                 <DetailRow key={`${h.unitCode}-${h.startDate}`} label={h.unitCode}>
-                  {h.startDate} → {h.endDate ?? "now"}
+                  {formatDateKey(h.startDate)} → {h.endDate ? formatDateKey(h.endDate) : "now"}
                 </DetailRow>
               ))}
             </DetailList>
@@ -230,6 +233,10 @@ export default async function TenantPage({
       <TenantPeriodsGrid rows={periodRows} />
 
       <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} tenantMessaging={tenantMessaging} />
+
+      <Suspense fallback={<DetailCardSkeleton rows={6} />}>
+        <TenantChangeHistory tenantId={tenantId} />
+      </Suspense>
     </Stack>
   );
 }

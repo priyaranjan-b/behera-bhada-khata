@@ -14,6 +14,7 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import DataTable from "@/components/ui/DataTable";
 import { DashboardCardPanel, StatusBadge } from "@/components/ui/DataDisplay";
 import { ActionStack, BadgeRow, DropzoneCard, FormActions, GridCell } from "@/components/ui";
+import { downloadBlob } from "@/lib/download";
 import { createTenantSchema } from "@/lib/validation";
 import { api, errorMessage } from "@/lib/api-client";
 import type { z } from "zod";
@@ -122,15 +123,7 @@ const previewColumns: GridColDef<ParsedRow>[] = [
 ];
 
 function downloadSampleCsv(vacant: string[]) {
-  const blob = new Blob([sampleCsv(vacant)], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "tenants-template.csv";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([sampleCsv(vacant)], { type: "text/csv;charset=utf-8;" }), "tenants-template.csv");
 }
 
 export default function BulkTenantUpload({

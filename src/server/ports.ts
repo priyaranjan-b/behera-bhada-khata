@@ -6,6 +6,10 @@
 // stay as they are.
 import type {
   Adjustment,
+  AppAuditAction,
+  AuditAction,
+  AuditActorKind,
+  AuditLogEntry,
   AdjustmentAllocation,
   Database,
   LedgerStatus,
@@ -107,9 +111,36 @@ export interface AcknowledgementPatch {
   otp_verified_at: string;
 }
 
+/** Which audit entries to read: newest first, `beforeId` for the next page. */
+export interface AuditFilter {
+  tenantId?: string;
+  unitCode?: string;
+  propertyCode?: string;
+  actions?: readonly AuditAction[];
+  /** yyyy-MM-dd, inclusive, in the app time zone. */
+  fromDate?: string;
+  toDate?: string;
+  beforeId?: number;
+  limit: number;
+}
+
+/** An app-level event for log_event (0015). Never a secret, OTP, signature or raw IP. */
+export interface AuditEvent {
+  action: AppAuditAction;
+  tenantId?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  context?: Record<string, string | number | boolean | null>;
+}
+
 // ---- The owner's data (an implementation must refuse anyone but the single app owner) ----
 
 export interface OwnerRepositories {
+  /** History of every change (0015): read-only, plus the owner's own app events. */
+  audit: {
+    list(filter: AuditFilter): Promise<AuditLogEntry[]>;
+    log(event: AuditEvent): Promise<void>;
+  };
   /** The owner's name (0013): one row. */
   ownerProfile: {
     get(): Promise<OwnerProfile | null>;
@@ -219,6 +250,10 @@ export interface OwnerRepositories {
 // the tenant confirm link (possession of the token), rent-period upkeep, rate limits and cron. ----
 
 export interface SystemRepositories {
+  audit: {
+    /** Logs an event for someone without an owner session (the tenant, a failed sign-in) or the system. */
+    log(event: AuditEvent & { actorKind: AuditActorKind; actorId?: string | null }): Promise<void>;
+  };
   locations: {
     get(locationCode: string): Promise<Location | null>;
   };

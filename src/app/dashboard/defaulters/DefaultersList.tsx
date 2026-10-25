@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { GridColDef } from "@mui/x-data-grid";
 import Typography from "@mui/material/Typography";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
-import DataTable, { moneyColumn } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { GridCell } from "@/components/ui";
 import type { DefaulterRow } from "@/lib/contracts";
@@ -36,7 +36,7 @@ function ageColumn(key: AgingBucketKey, headerName: string): GridColDef<Defaulte
   });
 }
 
-const columns: GridColDef<DefaulterRow>[] = [
+const columns: DataTableColDef<DefaulterRow>[] = [
   {
     field: "displayName",
     headerName: "Tenant",
@@ -86,6 +86,7 @@ const columns: GridColDef<DefaulterRow>[] = [
     flex: 1,
     minWidth: 180,
     sortable: false,
+    exportValue: (row) => `${row.propertyName} · ${formatUnits(row.unitCodes)}`,
     renderCell: ({ row }) => (
       <GridCell>
         <TagPill label={row.propertyName} />

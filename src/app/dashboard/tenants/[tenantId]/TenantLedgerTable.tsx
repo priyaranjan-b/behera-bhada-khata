@@ -7,7 +7,8 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import type { GridColDef } from "@mui/x-data-grid";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
-import { yearMonthOf } from "@/lib/dates";
+import { formatDateKey, yearMonthOf } from "@/lib/dates";
+import { statusLabel } from "@/lib/domain/status";
 import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { GridCell } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
@@ -114,6 +115,7 @@ export default function TenantLedgerTable({
         headerName: "Date",
         minWidth: 110,
         flex: 0.6,
+        valueFormatter: (value: string) => formatDateKey(value),
         sortComparator: (a: string, b: string, p1, p2) =>
           a.localeCompare(b) || (ledgerOrder.get(String(p1.id)) ?? 0) - (ledgerOrder.get(String(p2.id)) ?? 0),
       },
@@ -137,6 +139,8 @@ export default function TenantLedgerTable({
         field: "status",
         headerName: "Status",
         minWidth: 120,
+        valueFormatter: (value: LedgerRow["status"]) =>
+          value === "billed" ? "" : statusLabel(value === "upcoming" ? "not_due_yet" : value),
         renderCell: ({ row }) =>
           row.status === "billed" ? (
             <Typography variant="caption" color="textSecondary">
@@ -157,6 +161,7 @@ export default function TenantLedgerTable({
         sortable: false,
         filterable: false,
         disableColumnMenu: true,
+        disableExport: true,
         minWidth: 320,
         headerAlign: "right",
         align: "right",

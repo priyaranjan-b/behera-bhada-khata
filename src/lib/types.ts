@@ -21,6 +21,59 @@ export type PeriodStatus = "pending" | "partially_paid" | "paid";
 export const PAYMENT_MODES = ["cash", "bank_transfer", "upi", "cheque", "other"] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 export type LedgerStatus = "pending" | "confirmed";
+/** Who made an audited change (0015). */
+export const AUDIT_ACTOR_KINDS = ["owner", "tenant", "system", "visitor"] as const;
+export type AuditActorKind = (typeof AUDIT_ACTOR_KINDS)[number];
+/**
+ * Every action audit_log records (0015): table changes from audit_row_change()
+ * and the app events log_event() accepts (APP_AUDIT_ACTIONS).
+ */
+export const APP_AUDIT_ACTIONS = [
+  "message.sent",
+  "receipt.downloaded",
+  "auth.sign_in",
+  "auth.sign_in_failed",
+  "auth.password_changed",
+  "auth.signed_out",
+] as const;
+export type AppAuditAction = (typeof APP_AUDIT_ACTIONS)[number];
+export const AUDIT_ACTIONS = [
+  "tenant.created",
+  "tenant.updated",
+  "tenant.activated",
+  "tenant.moved_out",
+  "billing_start.corrected",
+  "tenancy.started",
+  "tenancy.ended",
+  "tenancy.changed",
+  "tenancy.deleted",
+  "rent_rate.set",
+  "rent_rate.changed",
+  "rent_rate.deleted",
+  "rent_period.repriced",
+  "rent_period.deleted",
+  "location.created",
+  "location.updated",
+  "property.created",
+  "property.updated",
+  "unit.created",
+  "unit.updated",
+  "document.added",
+  "document.deleted",
+  "profile.created",
+  "profile.updated",
+  "payment.recorded",
+  "payment.acknowledged",
+  "payment.changed",
+  "adjustment.recorded",
+  "adjustment.acknowledged",
+  "adjustment.changed",
+  "owner.created",
+  "owner.updated",
+  "owner.deleted",
+  ...APP_AUDIT_ACTIONS,
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 /** One row of a create_payment / create_adjustment allocation list (amount is signed for adjustments). */
 export type AllocationArg = {
@@ -198,6 +251,8 @@ export interface Database {
           /** Last day (inclusive); null = still there. */
           end_date: string | null;
           created_at: string;
+          /** The account that wrote the row (0015); fixed once written. */
+          recorded_by: string | null;
         };
         Insert: never;
         Update: never;
@@ -221,6 +276,8 @@ export interface Database {
           content_type: ProofContentType;
           size_bytes: number;
           created_at: string;
+          /** The account that wrote the row (0015); fixed once written. */
+          recorded_by: string | null;
         };
         Insert: {
           id?: string;
@@ -243,6 +300,8 @@ export interface Database {
           effective_month: string;
           monthly_amount: string;
           created_at: string;
+          /** The account that wrote the row (0015); fixed once written. */
+          recorded_by: string | null;
         };
         Insert: never;
         Update: never;
@@ -298,6 +357,8 @@ export interface Database {
           acknowledged_at: string | null;
           /** 2026/10/001: recorded month + sequence across tenants (0012). Never changes. */
           receipt_no: string;
+          /** The account that wrote the row (0015); fixed once written. */
+          recorded_by: string | null;
         };
         Insert: {
           id?: string;
@@ -381,6 +442,8 @@ export interface Database {
           acknowledged_at: string | null;
           /** ADJ/2026/10/001: the adjustments series (0012). Never changes. */
           receipt_no: string;
+          /** The account that wrote the row (0015); fixed once written. */
+          recorded_by: string | null;
         };
         Insert: {
           id?: string;
@@ -418,6 +481,29 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["adjustment_allocations"]["Insert"]>;
+        Relationships: [];
+      };
+      /** Append-only history (0015): written by triggers and log_event(), never edited. */
+      audit_log: {
+        Row: {
+          id: number;
+          at: string;
+          /** Rows written in one transaction are one change. */
+          tx_id: number;
+          actor_id: string | null;
+          actor_kind: AuditActorKind;
+          action: AuditAction;
+          entity_type: string;
+          entity_id: string | null;
+          tenant_id: string | null;
+          unit_code: string | null;
+          property_code: string | null;
+          /** {column: [old, new]} - only what changed. */
+          changes: Record<string, [unknown, unknown]>;
+          context: Record<string, unknown>;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
     };
@@ -518,6 +604,19 @@ export interface Database {
         Returns: boolean;
       };
       prune_rate_limits: { Args: Record<string, never>; Returns: number };
+      /** 0015: app events; the service role may name the actor, the owner logs as themselves. */
+      log_event: {
+        Args: {
+          p_action: AppAuditAction;
+          p_tenant_id?: string | null;
+          p_entity_type?: string | null;
+          p_entity_id?: string | null;
+          p_context?: Record<string, unknown>;
+          p_actor_kind?: AuditActorKind | null;
+          p_actor_id?: string | null;
+        };
+        Returns: undefined;
+      };
     };
   };
 }
@@ -537,3 +636,4 @@ export type PaymentAllocation = Database["public"]["Tables"]["payment_allocation
 export type PaymentProof = Database["public"]["Tables"]["payment_proofs"]["Row"];
 export type Adjustment = Database["public"]["Tables"]["adjustments"]["Row"];
 export type AdjustmentAllocation = Database["public"]["Tables"]["adjustment_allocations"]["Row"];
+export type AuditLogEntry = Database["public"]["Tables"]["audit_log"]["Row"];

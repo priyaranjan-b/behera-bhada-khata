@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/money";
 import { createAdjustmentSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, requireId, requireTenant, withParams, type OwnerContext } from "./context";
+import { recordEvent } from "./audit";
 import { confirmUrl, generateConfirmToken, notifyTenant, storeOwnerSignature, withUploadedFile } from "./confirmLinks";
 import { ownerSignatureBytes } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
@@ -50,7 +51,8 @@ export async function createAdjustment(
       ? null
       : await notifyTenant(
           tenant,
-          `Hi ${tenant.name}, a correction of ${formatMoney(input.deltaAmount)} was recorded on a past rent payment. View and acknowledge it: ${confirmUrl(token)}`
+          `Hi ${tenant.name}, a correction of ${formatMoney(input.deltaAmount)} was recorded on a past rent payment. View and acknowledge it: ${confirmUrl(token)}`,
+          { db, recordType: "adjustment", recordId: id }
         );
   return { id, tenantId: tenant.id, notified };
 }
@@ -70,7 +72,8 @@ export async function resendAdjustmentLink(ctx: OwnerContext, adjustmentId: stri
   }
   const notified = await notifyTenant(
     tenant,
-    `Hi ${tenant.name}, a correction of ${formatMoney(adjustment.delta_amount)} was recorded on your rent. View and acknowledge it: ${confirmUrl(token)}`
+    `Hi ${tenant.name}, a correction of ${formatMoney(adjustment.delta_amount)} was recorded on your rent. View and acknowledge it: ${confirmUrl(token)}`,
+    { db, recordType: "adjustment", recordId: adjustmentId, receiptNo: adjustment.receipt_no }
   );
   return { notified };
 }
@@ -90,5 +93,13 @@ export async function adjustmentReceipt(
     allocations: await db.adjustments.listAllocations(adjustmentId),
   });
   if (!details) notFound("Tenant");
-  return receiptFile(details);
+  const file = await receiptFile(details);
+  await recordEvent(db, {
+    action: "receipt.downloaded",
+    tenantId: adjustment.tenant_id,
+    entityType: "adjustment",
+    entityId: adjustmentId,
+    context: { receiptNo: adjustment.receipt_no },
+  });
+  return file;
 }

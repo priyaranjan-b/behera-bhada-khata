@@ -34,6 +34,7 @@ export interface DataTableConfig {
   columnsButton: boolean;
   filterButton: boolean;
   exportCsv: boolean;
+  exportExcel: boolean;
   pageSizeOptions: number[];
   noRowsLabel: string;
 }

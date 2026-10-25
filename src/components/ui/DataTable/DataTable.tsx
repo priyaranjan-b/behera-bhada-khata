@@ -35,6 +35,8 @@ export type DataTableProps<R extends GridValidRowModel> = Omit<DataGridProps<R>,
   columnsButton?: boolean;
   filterButton?: boolean;
   exportCsv?: boolean;
+  /** "Download Excel" button: the rows and columns as shown, all pages. @default true */
+  exportExcel?: boolean;
   /** Rows per page. @default 10 */
   pageSize?: number;
   pageSizeOptions?: number[];
@@ -65,6 +67,7 @@ export default function DataTable<R extends GridValidRowModel>({
   columnsButton = true,
   filterButton = true,
   exportCsv = false,
+  exportExcel = true,
   pageSize = 10,
   pageSizeOptions = [10, 25, 50, 100],
   emptyState,
@@ -95,12 +98,13 @@ export default function DataTable<R extends GridValidRowModel>({
     columnsButton,
     filterButton,
     exportCsv,
+    exportExcel,
     pageSizeOptions,
     noRowsLabel,
   };
 
   const showToolbar =
-    Boolean(title) || filters.length > 0 || Boolean(toolbarExtra) || Boolean(searchConfig) || columnsButton || filterButton || exportCsv;
+    Boolean(title) || filters.length > 0 || Boolean(toolbarExtra) || Boolean(searchConfig) || columnsButton || filterButton || exportCsv || exportExcel;
   // Hide the footer only while everything fits the smallest page, so a bigger page size can always be undone.
   const hideFooter = rowCount <= Math.min(pageSize, ...pageSizeOptions);
 

@@ -8,7 +8,8 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { serverApi } from "@/lib/api-client/server";
 import { routes } from "@/lib/routes";
 import { EmptyState, PageHeader, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
-import { AppCard, BadgeRow, IconTile } from "@/components/ui";
+import { AppCard, BadgeRow, IconTile, SummaryLine } from "@/components/ui";
+import { formatMoney } from "@/lib/money";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 
 export default async function PropertiesPage() {
@@ -25,7 +26,7 @@ export default async function PropertiesPage() {
     <Stack spacing={3}>
       <PageHeader
         title="Properties"
-        subtitle="Your sites, the towers in each, and how many houses are let."
+        subtitle="Your sites, the towers in each, how many houses are let and the monthly rent their occupants pay."
         action={groups.length > 0 ? addButton : undefined}
       />
 
@@ -40,17 +41,17 @@ export default async function PropertiesPage() {
         </AppCard>
       ) : null}
 
-      {groups.map(({ location, properties }) => (
+      {groups.map(({ location, properties, monthlyRent }) => (
         <Stack key={location.code} spacing={1.5} component="section" aria-labelledby={`site-${location.code}`}>
           <Box>
             <Typography id={`site-${location.code}`} component="h2" variant="h6">
               {location.name} · {location.code}
             </Typography>
-            {location.address ? (
-              <Typography variant="body2" color="textSecondary">
-                {location.address}
-              </Typography>
-            ) : null}
+            <Typography variant="body2" color="textSecondary">
+              {[location.address, `${formatMoney(monthlyRent)} / month`]
+                .filter(Boolean)
+                .join(" · ")}
+            </Typography>
           </Box>
 
           <Grid container spacing={2} columns={12}>
@@ -72,6 +73,12 @@ export default async function PropertiesPage() {
                         </Box>
                         <ChevronRightRoundedIcon aria-hidden color="action" />
                       </Stack>
+
+                      <SummaryLine
+                        label="Monthly rent"
+                        value={property.occupiedUnits > 0 ? formatMoney(property.monthlyRent) : "—"}
+                        emphasis="strong"
+                      />
 
                       <BadgeRow>
                         {property.totalUnits === 0 ? (

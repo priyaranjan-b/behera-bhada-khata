@@ -5,9 +5,18 @@ import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded
 import HomeWorkRoundedIcon from "@mui/icons-material/HomeWorkRounded";
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
 import AddHomeWorkRoundedIcon from "@mui/icons-material/AddHomeWorkRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import { routes } from "@/lib/routes";
 
-export type AppTab = "summary" | "properties" | "houses" | "tenants" | "defaulters" | "addTenant" | "addHouse";
+export type AppTab =
+  | "summary"
+  | "properties"
+  | "houses"
+  | "tenants"
+  | "defaulters"
+  | "activity"
+  | "addTenant"
+  | "addHouse";
 
 export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.ReactNode }[] = [
   { tab: "summary", href: routes.home, label: "Summary", icon: <SpaceDashboardRoundedIcon /> },
@@ -15,6 +24,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
   { tab: "houses", href: routes.houses.list(), label: "Houses", icon: <HomeWorkRoundedIcon /> },
   { tab: "tenants", href: routes.tenants.list(), label: "Tenants", icon: <PeopleRoundedIcon /> },
   { tab: "defaulters", href: routes.defaulters, label: "Defaulters", icon: <PendingActionsRoundedIcon /> },
+  { tab: "activity", href: routes.activity, label: "Activity", icon: <HistoryRoundedIcon /> },
 ];
 
 /** Shortcuts under the main menu: start a form without first opening a tower. */

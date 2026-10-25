@@ -1,4 +1,5 @@
 import { StatusBadge, type BadgeTone } from "@/components/ui/DataDisplay";
+import { statusLabel } from "@/lib/domain/status";
 
 const TONE_BY_STATUS: Record<string, BadgeTone> = {
   pending: "warning",
@@ -10,6 +11,5 @@ const TONE_BY_STATUS: Record<string, BadgeTone> = {
 };
 
 export function StatusChip({ status }: { status: string }) {
-  const label = status.replace(/_/g, " ");
-  return <StatusBadge tone={TONE_BY_STATUS[status] ?? "neutral"} label={label.charAt(0).toUpperCase() + label.slice(1)} />;
+  return <StatusBadge tone={TONE_BY_STATUS[status] ?? "neutral"} label={statusLabel(status)} />;
 }

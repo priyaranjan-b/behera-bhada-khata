@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TenantRentRate, UnitOccupancy } from "@/lib/types";
-import { currentTenancies, holdsUnit, rentInEffect } from "@/server/services/placements";
+import { currentTenancies, holdsUnit, rentByProperty, rentInEffect } from "@/server/services/placements";
 
 const stay = (unit_code: string, start_date: string, end_date: string | null): UnitOccupancy => ({
   unit_code,
@@ -19,6 +19,7 @@ const rate = (effective_month: string, monthly_amount: string): TenantRentRate =
   effective_month,
   monthly_amount,
   created_at: "",
+  recorded_by: null,
 });
 
 describe("placements", () => {
@@ -46,5 +47,27 @@ describe("placements", () => {
     expect(rentInEffect(rates, "2026-06-01")).toBe(5500);
     // A tenant whose lease starts next month shows that first rate.
     expect(rentInEffect([rate("2026-12-01", "7000.00")], "2026-10-01")).toBe(7000);
+  });
+});
+
+describe("rentByProperty", () => {
+  const live = (tenant_id: string, unit_code: string, start_date = "2026-01-01", end_date: string | null = null): UnitOccupancy => ({
+    ...stay(unit_code, start_date, end_date),
+    tenant_id,
+    property_code: unit_code.split("-").slice(0, 2).join("-"),
+  });
+  const rateOf = (tenant_id: string, monthly_amount: string): TenantRentRate => ({ ...rate("2026-01-01", monthly_amount), tenant_id });
+
+  it("adds up the current occupants' rent per tower, splitting a tenant across towers by house", () => {
+    const occupancy = [
+      live("a", "AC-T1-G01"),
+      live("b", "AC-T1-G02"),
+      live("b", "AC-T2-G01"), // b: 9000 across two towers -> 4500 each
+      live("c", "AC-T2-G02", "2025-01-01", "2026-01-31"), // moved out
+      live("d", "AC-T2-G03", "2026-04-01"), // booked from next month
+    ];
+    const rates = [rateOf("a", "5000"), rateOf("b", "9000"), rateOf("c", "7000"), rateOf("d", "6000")];
+    const rent = rentByProperty(occupancy, rates, "2026-03-15", "2026-03-01");
+    expect(Object.fromEntries(rent)).toEqual({ "AC-T1": 9500, "AC-T2": 4500 });
   });
 });

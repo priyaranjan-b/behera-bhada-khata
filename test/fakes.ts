@@ -4,8 +4,10 @@
 // and call resetFakes() in beforeEach. Services read the bindings at call
 // time, so the getters below always hand out the current fakes.
 import { vi } from "vitest";
+import type { AuditEvent, AuditFilter } from "@/server/ports";
 import type {
   Adjustment,
+  AuditLogEntry,
   OwnerProfile,
   Payment,
   PaymentAllocation,
@@ -59,6 +61,7 @@ export function payment(overrides: Partial<Payment> = {}): Payment {
     confirmed_at: "2026-03-05T04:00:00Z",
     acknowledged_at: null,
     receipt_no: "2026/03/001",
+    recorded_by: OWNER_ID,
     ...overrides,
   };
 }
@@ -99,6 +102,7 @@ const rate: TenantRentRate = {
   effective_month: "2026-01-01",
   monthly_amount: "5000.00",
   created_at: "",
+  recorded_by: OWNER_ID,
 };
 const period: RentPeriod = {
   id: "period-mar",
@@ -131,9 +135,45 @@ function build() {
     documents: new Map<string, TenantDocument>(),
     profile: null as OwnerProfile | null,
     rateLimitAllows: true,
+    /** Newest last; list() returns newest first like the database. */
+    audit: [] as AuditLogEntry[],
   };
 
+  function logAudit(event: AuditEvent, actorKind: AuditLogEntry["actor_kind"], actorId: string | null) {
+    state.audit.push({
+      id: state.audit.length + 1,
+      at: new Date().toISOString(),
+      tx_id: state.audit.length + 1,
+      actor_id: actorId,
+      actor_kind: actorKind,
+      action: event.action,
+      entity_type: event.entityType ?? event.action.split(".")[0],
+      entity_id: event.entityId ?? null,
+      tenant_id: event.tenantId ?? null,
+      unit_code: null,
+      property_code: null,
+      changes: {},
+      context: event.context ?? {},
+    });
+  }
+
   const owner = {
+    audit: {
+      list: vi.fn(async (f: AuditFilter) =>
+        [...state.audit]
+          .reverse()
+          .filter(
+            (e) =>
+              (!f.tenantId || e.tenant_id === f.tenantId) &&
+              (!f.unitCode || e.unit_code === f.unitCode) &&
+              (!f.propertyCode || e.property_code === f.propertyCode) &&
+              (!f.actions?.length || f.actions.includes(e.action)) &&
+              (f.beforeId === undefined || e.id < f.beforeId)
+          )
+          .slice(0, f.limit)
+      ),
+      log: vi.fn(async (event: AuditEvent) => logAudit(event, "owner", OWNER_ID)),
+    },
     ownerProfile: {
       get: vi.fn(async () => state.profile),
       save: vi.fn(async (p: Pick<OwnerProfile, "first_name" | "last_name" | "signature_name" | "signature_path">) => {
@@ -154,7 +194,7 @@ function build() {
       create: vi.fn(async (rows: Omit<TenantDocument, "id" | "created_at">[]) => {
         for (const row of rows) {
           const id = `00000000-0000-4000-8000-${String(state.documents.size + 1).padStart(12, "0")}`;
-          state.documents.set(id, { ...row, id, created_at: "2026-10-24T00:00:00Z" });
+          state.documents.set(id, { ...row, id, created_at: "2026-10-24T00:00:00Z", recorded_by: OWNER_ID });
         }
       }),
       remove: vi.fn(async (id: string) => state.documents.delete(id)),
@@ -188,6 +228,11 @@ function build() {
   };
 
   const system = {
+    audit: {
+      log: vi.fn(async (event: AuditEvent & { actorKind: AuditLogEntry["actor_kind"]; actorId?: string | null }) =>
+        logAudit(event, event.actorKind, event.actorId ?? null)
+      ),
+    },
     locations: {
       get: vi.fn(async () => ({ location_code: "AC", name: "Arnapal Chakk Complex", address: null, created_at: "", updated_at: "" })),
     },

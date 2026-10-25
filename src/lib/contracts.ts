@@ -7,7 +7,16 @@ import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
-import type { PeriodStatus, PreferredChannel, RecordType, TenantStatus, UnitType } from "@/lib/types";
+import type { AuditCategory } from "@/lib/domain/audit";
+import type {
+  AuditAction,
+  AuditActorKind,
+  PeriodStatus,
+  PreferredChannel,
+  RecordType,
+  TenantStatus,
+  UnitType,
+} from "@/lib/types";
 import type {
   uploadTenantDocumentsSchema,
   confirmSchema,
@@ -156,11 +165,15 @@ export interface PropertyCard extends PropertyHeader {
   occupiedUnits: number;
   residentialUnits: number;
   commercialUnits: number;
+  /** This month's rent from the current occupants (a tenant across towers is split by house). */
+  monthlyRent: number;
 }
 
 export interface LocationGroup {
   location: LocationSummary;
   properties: PropertyCard[];
+  /** The site's towers' monthlyRent added up. */
+  monthlyRent: number;
 }
 
 /** One tenancy of a house: who, from, to (inclusive; null = still there). */
@@ -455,4 +468,39 @@ export type ConfirmInput = Omit<z.infer<typeof confirmSchema>, "token">;
 
 export interface Confirmed {
   receiptUrl: string;
+}
+
+/** One audit_log row (0015), with names resolved for display. */
+export interface AuditEntry {
+  id: number;
+  /** ISO timestamp. */
+  at: string;
+  /** Entries with the same txId were one change (e.g. a move-out and the months it dropped). */
+  txId: number;
+  actorKind: AuditActorKind;
+  /** "Ramesh Sahu", "Tenant", "System"... */
+  actorName: string;
+  action: AuditAction;
+  entityId: string | null;
+  tenantId: string | null;
+  tenantName: string | null;
+  unitCode: string | null;
+  propertyCode: string | null;
+  changes: Record<string, [unknown, unknown]>;
+  context: Record<string, unknown>;
+}
+
+/** A page of history, newest first; pass `nextBefore` as `before` for the next page. */
+export interface AuditPage {
+  entries: AuditEntry[];
+  nextBefore: number | null;
+}
+
+/** GET /api/dashboard/activity query: all optional. */
+export interface ActivityQuery {
+  category?: AuditCategory;
+  /** yyyy-MM-dd, inclusive. */
+  from?: string;
+  to?: string;
+  before?: number;
 }

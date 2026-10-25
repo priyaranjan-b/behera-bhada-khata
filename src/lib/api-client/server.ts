@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
+import { listActivity, tenantHistory, unitHistory } from "@/server/services/audit";
 import { getConfirmView } from "@/server/services/confirm";
 import { getDashboardSummary, getDefaultersReport } from "@/server/services/dashboard";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
@@ -41,6 +42,7 @@ const inProcessApi: ApiQueries = {
   dashboard: {
     summary: async (month) => getDashboardSummary(await owner(), month),
     defaulters: async () => getDefaultersReport(await owner()),
+    activity: async (query) => listActivity(await owner(), query ?? {}),
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),
     properties: {
@@ -54,12 +56,14 @@ const inProcessApi: ApiQueries = {
     houses: {
       list: async () => listHouses(await owner()),
       newForm: async () => getNewHouseForm(await owner()),
+      history: async (code, before) => unitHistory(await owner(), code, { before }),
     },
     tenants: {
       list: async () => listTenants(await owner()),
       newForm: async () => getAnyTowerTenantForm(await owner()),
       detail: async (id) => getTenantDetail(await owner(), id),
       edit: async (id) => getEditTenantForm(await owner(), id),
+      history: async (id, before) => tenantHistory(await owner(), id, { before }),
       newPayment: async (id) => getNewPaymentForm(await owner(), id),
     },
     payments: {

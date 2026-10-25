@@ -23,6 +23,7 @@ import {
   storeOwnerSignature,
   withUploadedFile,
 } from "./confirmLinks";
+import { recordEvent } from "./audit";
 import { checkProofFiles, storeProofs } from "./proofs";
 import { ownerSignatureBytes, savedSignatureFor } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
@@ -98,7 +99,8 @@ export async function createPayment(
       ? null
       : await notifyTenant(
           tenant,
-          `Hi ${tenant.name}, we received your rent payment of ${formatMoney(input.amount)}. View and acknowledge the receipt: ${confirmUrl(token)}`
+          `Hi ${tenant.name}, we received your rent payment of ${formatMoney(input.amount)}. View and acknowledge the receipt: ${confirmUrl(token)}`,
+          { db, recordType: "payment", recordId: id }
         );
   return { id, notified };
 }
@@ -153,7 +155,8 @@ export async function resendPaymentLink(ctx: OwnerContext, paymentId: string): P
   }
   const notified = await notifyTenant(
     tenant,
-    `Hi ${tenant.name}, your rent payment of ${formatMoney(payment.amount)} is recorded. View and acknowledge the receipt: ${confirmUrl(token)}`
+    `Hi ${tenant.name}, your rent payment of ${formatMoney(payment.amount)} is recorded. View and acknowledge the receipt: ${confirmUrl(token)}`,
+    { db, recordType: "payment", recordId: paymentId, receiptNo: payment.receipt_no }
   );
   return { notified };
 }
@@ -184,5 +187,13 @@ export async function paymentReceipt(ctx: OwnerContext, paymentId: string): Prom
     allocations: await db.payments.listAllocations(paymentId),
   });
   if (!details) notFound("Tenant");
-  return receiptFile(details);
+  const file = await receiptFile(details);
+  await recordEvent(db, {
+    action: "receipt.downloaded",
+    tenantId: payment.tenant_id,
+    entityType: "payment",
+    entityId: paymentId,
+    context: { receiptNo: payment.receipt_no },
+  });
+  return file;
 }

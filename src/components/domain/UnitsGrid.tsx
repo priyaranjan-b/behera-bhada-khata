@@ -1,41 +1,61 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { GridColDef } from "@mui/x-data-grid";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
 import MuiLink from "@mui/material/Link";
+import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "@/components/ui/Link";
-import DataTable from "@/components/ui/DataTable";
+import DataTable, { type DataTableColDef } from "@/components/ui/DataTable";
 import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { DetailList, DetailRow, GridCell } from "@/components/ui";
+import AuditTimeline from "./AuditTimeline";
 import { UNIT_TYPE_LABELS, formatFloor } from "@/lib/domain/tenant";
 import type { UnitRow } from "@/lib/contracts";
 import { HOUSE_FILTERS, matchesHouseFilter, type HouseFilter } from "@/lib/domain/houses";
+import { formatDateKey } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 
 function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
   return (
-    <Dialog open={unit !== null} onClose={onClose} fullWidth maxWidth="xs">
+    <Dialog open={unit !== null} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{unit ? `History of ${unit.unitCode}` : ""}</DialogTitle>
       <DialogContent>
-        {unit && unit.history.length > 0 ? (
-          <DetailList dividers>
-            {[...unit.history].reverse().map((h) => (
-              <DetailRow key={`${h.tenantId}-${h.startDate}`} label={`${h.startDate} → ${h.endDate ?? "now"}`}>
-                <MuiLink component={Link} href={routes.tenants.detail(h.tenantId)}>
-                  {h.tenantName}
-                </MuiLink>
-              </DetailRow>
-            ))}
-          </DetailList>
-        ) : (
-          <EmptyState title="No tenants yet" description="Nobody has been placed in this house." />
-        )}
+        {unit ? (
+          <Stack spacing={3}>
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle2" component="h3">
+                Occupants
+              </Typography>
+              {unit.history.length > 0 ? (
+                <DetailList dividers>
+                  {[...unit.history].reverse().map((h) => (
+                    <DetailRow
+                      key={`${h.tenantId}-${h.startDate}`}
+                      label={`${formatDateKey(h.startDate)} → ${h.endDate ? formatDateKey(h.endDate) : "now"}`}
+                    >
+                      <MuiLink component={Link} href={routes.tenants.detail(h.tenantId)}>
+                        {h.tenantName}
+                      </MuiLink>
+                    </DetailRow>
+                  ))}
+                </DetailList>
+              ) : (
+                <EmptyState title="No tenants yet" description="Nobody has been placed in this house." />
+              )}
+            </Stack>
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle2" component="h3">
+                Changes
+              </Typography>
+              <AuditTimeline source={{ kind: "unit", unitCode: unit.unitCode }} showTenant />
+            </Stack>
+          </Stack>
+        ) : null}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
@@ -68,12 +88,13 @@ export default function UnitsGrid({
   const [filter, setFilter] = useState<HouseFilter>(initialFilter);
   const rows = useMemo(() => (showTower ? units.filter((u) => matchesHouseFilter({ isActive: u.isActive, occupied: Boolean(u.currentTenant) }, filter)) : units), [units, filter, showTower]);
 
-  const towerColumn: GridColDef<UnitRow> = {
+  const towerColumn: DataTableColDef<UnitRow> = {
     field: "propertyCode",
     headerName: "Tower",
     flex: 1,
     minWidth: 170,
     valueGetter: (_v, row) => `${row.propertyCode} ${row.propertyName} ${row.locationName}`,
+    exportValue: (row) => `${row.propertyCode} · ${row.propertyName} · ${row.locationName}`,
     renderCell: ({ row }) => (
       <GridCell direction="column" spacing={0}>
         <MuiLink component={Link} href={routes.properties.detail(row.propertyCode)} variant="body2" noWrap>
@@ -86,7 +107,7 @@ export default function UnitsGrid({
     ),
   };
 
-  const columns: GridColDef<UnitRow>[] = [
+  const columns: DataTableColDef<UnitRow>[] = [
     ...(showTower ? [towerColumn] : []),
     {
       field: "unitCode",
@@ -94,6 +115,7 @@ export default function UnitsGrid({
       flex: 1,
       minWidth: 170,
       valueGetter: (_v, row) => `${row.unitCode} ${row.label ?? ""}`,
+      exportValue: (row) => (row.label ? `${row.unitCode} · ${row.label}` : row.unitCode),
       renderCell: ({ row }) => (
         <GridCell direction="column" spacing={0}>
           <Typography variant="body2" noWrap>
@@ -113,6 +135,7 @@ export default function UnitsGrid({
       field: "unitType",
       headerName: "Type",
       minWidth: 120,
+      valueFormatter: (_value, row) => UNIT_TYPE_LABELS[row.unitType],
       renderCell: ({ row }) => (
         <GridCell>
           <TagPill label={UNIT_TYPE_LABELS[row.unitType]} />
@@ -144,6 +167,7 @@ export default function UnitsGrid({
       headerName: "Since",
       minWidth: 110,
       valueGetter: (_v, row) => row.currentTenant?.since ?? "",
+      valueFormatter: (value: string) => (value ? formatDateKey(value) : ""),
     },
     {
       field: "history",
@@ -151,6 +175,7 @@ export default function UnitsGrid({
       minWidth: 110,
       sortable: false,
       filterable: false,
+      disableExport: true,
       renderCell: ({ row }) => (
         <GridCell align="end">
           <Button size="small" onClick={() => setHistoryOf(row)}>

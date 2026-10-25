@@ -35,6 +35,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/dashboard/payments/:id/adjust": "Adjust payment",
   "/dashboard/profile": "Profile",
   "/dashboard/defaulters": "Defaulters",
+  "/dashboard/activity": "Activity",
 };
 
 const ROUTES = Object.entries(ROUTE_LABELS).map(([pattern, label]) => ({

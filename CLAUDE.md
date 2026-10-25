@@ -45,6 +45,18 @@ development, required in production.
 
 ## Architecture
 
+### Design decisions
+
+- **Database:** `docs/database-design.md` (D1–D25), see below.
+- **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
+  region and hand-migrated production DB (no `db push`), Twilio optional in
+  production (`tenantMessaging`), owner password login, MyRentHQ branding,
+  real names stay local, `statusLabel`, the custom Excel export
+  (`exportValue`, MUI's is Premium-only), the per-tower monthly-rent split,
+  and the audit history screens and events (A10). Read it before changing
+  any of these, and add a new A-number when you make a decision a future
+  session should know.
+
 ### Ledger design (the core domain model)
 
 **Read `docs/database-design.md` before changing anything in the database.**
@@ -148,6 +160,14 @@ both together.
   `src/server/services/tenantDocuments.ts`), one `tenant_documents` row per
   file with a free-text `document_type`. Unlike the ledger, the owner may
   delete them.
+- **Audit log** (`0015_audit_log.sql`, D25): triggers on every vital table
+  append `{column: [old, new]}` diffs to `audit_log` (grouped by `tx_id`);
+  `log_event()` adds app events (messages, receipt downloads, sign-ins).
+  Nobody, not even the service role, can edit or delete it. Reads and the
+  best-effort `recordEvent` are in `src/server/services/audit.ts`, the text
+  in `src/lib/domain/audit.ts`; shown by `AuditTimeline` and
+  `/dashboard/activity` (A10). A new table with vital data gets the
+  trigger (checklist in `docs/database-design.md`).
 - **Recorded = counted** (`0010_instant_confirmation.sql`, D20): both
   ledger tables are written as `status = 'confirmed'` and applied to
   `rent_periods.amount_allocated` in the same transaction. The tenant's
@@ -416,7 +436,9 @@ Each of these was found broken somewhere; keep them when adding code.
   count chip), `filters` ("Show: …" selects that filter `rows` before the
   grid; pass `totalCount` so the chip reads "12 of 26" and `defaultValue` so
   "Clear filters" can reset them), `toolbarExtra` (e.g. date inputs),
-  `search`, `columnsButton`/`filterButton`/`exportCsv`, `pageSize`
+  `search`, `columnsButton`/`filterButton`/`exportCsv`/`exportExcel` (on
+  by default; columns are `DataTableColDef` with an optional `exportValue`,
+  see A8 in `docs/design-decisions.md`), `pageSize`
   (default 10), `emptyState` (when there are no rows at all), `noRowsLabel`,
   `rowDensity` (`standard` 56px for avatar + two-line cells, `dense` 44px)
   and `variant="plain"` inside another card. Money columns via

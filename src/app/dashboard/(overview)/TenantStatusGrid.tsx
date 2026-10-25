@@ -7,6 +7,7 @@ import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { StatusChip } from "@/components/domain/StatusChip";
 import { formatMoney } from "@/lib/money";
+import { statusLabel } from "@/lib/domain/status";
 import type { TenantMonthRow } from "@/lib/domain/reports";
 import { routes } from "@/lib/routes";
 
@@ -39,6 +40,7 @@ const columns: GridColDef<TenantMonthRow>[] = [
     minWidth: 130,
     headerAlign: "right",
     align: "right",
+    valueFormatter: (value: string) => statusLabel(value),
     renderCell: ({ row }) => <StatusChip status={row.monthStatus} />,
   },
   {

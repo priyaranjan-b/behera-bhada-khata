@@ -23,13 +23,13 @@ export type FlashKey = keyof typeof FLASH;
 /** A flash to append to a URL, e.g. `{ saved: "1" }` or `{ paymentCreated: "sent" }`. */
 export type Flash = Partial<Record<FlashKey, string>>;
 
-type Query = Record<string, string | undefined>;
+type Query = Record<string, string | number | undefined>;
 
-/** `path` plus the defined query params (and an optional `#hash`). */
-function withQuery(path: string, query?: Query, hash?: string): string {
+/** `path` plus the defined query params (and an optional `#hash`). Also builds API query strings. */
+export function withQuery(path: string, query?: Query, hash?: string): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined) params.set(key, value);
+    if (value !== undefined) params.set(key, String(value));
   }
   const qs = params.toString();
   return `${path}${qs ? `?${qs}` : ""}${hash ? `#${hash}` : ""}`;
@@ -44,6 +44,7 @@ export const routes = {
   /** `month` is `yyyy-MM` (see monthParam in src/lib/dates.ts). */
   dashboard: (query?: { month?: string; show?: string }, hash?: string) => withQuery("/dashboard", query, hash),
   defaulters: "/dashboard/defaulters",
+  activity: "/dashboard/activity",
   profile: (flash?: Flash) => withQuery("/dashboard/profile", flash),
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
   properties: {

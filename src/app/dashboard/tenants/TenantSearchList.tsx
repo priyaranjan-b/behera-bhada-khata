@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { GridColDef, GridInitialState } from "@mui/x-data-grid";
+import type { GridInitialState } from "@mui/x-data-grid";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlineOutlined";
-import DataTable from "@/components/ui/DataTable";
+import DataTable, { type DataTableColDef } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
@@ -22,7 +22,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "Everyone" },
 ];
 
-const columns: GridColDef<TenantSearchRow>[] = [
+const columns: DataTableColDef<TenantSearchRow>[] = [
   {
     field: "displayName",
     headerName: "Tenant",
@@ -30,6 +30,7 @@ const columns: GridColDef<TenantSearchRow>[] = [
     minWidth: 200,
     // Include the contact name so the quick filter matches it too.
     valueGetter: (_value, row) => (row.contactName ? `${row.displayName} ${row.contactName}` : row.displayName),
+    exportValue: (row) => row.displayName,
     renderCell: ({ row }) => (
       <IdentityCell
         name={row.displayName}
@@ -73,6 +74,7 @@ const columns: GridColDef<TenantSearchRow>[] = [
     minWidth: 200,
     // Codes in the value so the quick filter finds a tenant by house number.
     valueGetter: (_value, row) => `${row.unitMix ?? ""} ${row.unitCodes.join(" ")}`,
+    exportValue: (row) => row.unitCodes.join(", "),
     renderCell: ({ row }) => <UnitCell unitMix={row.unitMix} unitCodes={row.unitCodes} />,
   },
   {

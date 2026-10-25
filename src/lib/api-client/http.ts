@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/errors";
+import { withQuery } from "@/lib/routes";
 import { apiPaths as p } from "./paths";
 import type { Api } from "./types";
 
@@ -57,6 +58,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
     dashboard: {
       summary: (month) => get(month ? `${p.dashboard.summary}?month=${encodeURIComponent(month)}` : p.dashboard.summary),
       defaulters: () => get(p.dashboard.defaulters),
+      activity: (query = {}) => get(withQuery(p.dashboard.activity, { ...query })),
       search: () => get(p.dashboard.search),
       profile: () => get(p.dashboard.profile),
       updateProfile: (input) => put(p.dashboard.profile, input),
@@ -75,6 +77,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       houses: {
         list: () => get(p.dashboard.houses.list),
         newForm: () => get(p.dashboard.houses.new),
+        history: (code, before) => get(withQuery(p.dashboard.houses.history(code), { before })),
       },
       tenants: {
         list: () => get(p.dashboard.tenants.list),
@@ -82,6 +85,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         create: (input) => post(p.dashboard.tenants.list, input),
         detail: (id) => get(p.dashboard.tenants.detail(id)),
         edit: (id) => get(p.dashboard.tenants.edit(id)),
+        history: (id, before) => get(withQuery(p.dashboard.tenants.history(id), { before })),
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),
         moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
         correctPaidThrough: (id, input) => post(p.dashboard.tenants.paidThrough(id), input),

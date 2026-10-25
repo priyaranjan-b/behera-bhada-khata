@@ -1,14 +1,15 @@
 "use client";
 
-import type { GridColDef } from "@mui/x-data-grid";
-import DataTable, { moneyColumn } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
 import { IdentityCell } from "@/components/ui/DataDisplay";
 import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { UnitCell } from "@/components/ui";
 import type { PropertyTenantRow } from "@/lib/contracts";
+import { TENANT_STATUS_DISPLAY } from "@/lib/domain/tenant";
+import type { TenantStatus } from "@/lib/types";
 import { routes } from "@/lib/routes";
 
-const columns: GridColDef<PropertyTenantRow>[] = [
+const columns: DataTableColDef<PropertyTenantRow>[] = [
   {
     field: "displayName",
     headerName: "Tenant",
@@ -28,6 +29,7 @@ const columns: GridColDef<PropertyTenantRow>[] = [
     flex: 1,
     minWidth: 180,
     valueGetter: (_v, row) => row.unitCodes.join(" "),
+    exportValue: (row) => row.unitCodes.join(", "),
     renderCell: ({ row }) => <UnitCell unitMix={row.unitMix} unitCodes={row.unitCodes} />,
   },
   { field: "phone", headerName: "Phone", minWidth: 140, flex: 0.8 },
@@ -38,6 +40,7 @@ const columns: GridColDef<PropertyTenantRow>[] = [
     minWidth: 110,
     headerAlign: "right",
     align: "right",
+    valueFormatter: (value: TenantStatus) => TENANT_STATUS_DISPLAY[value].label,
     renderCell: ({ row }) => <TenantStatusBadge status={row.status} />,
   },
 ];

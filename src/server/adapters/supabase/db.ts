@@ -1,11 +1,36 @@
 import "server-only";
 import type { RentPeriod } from "@/lib/types";
-import type { OwnerRepositories, SystemRepositories } from "@/server/ports";
+import type { AuditEvent, AuditFilter, OwnerRepositories, SystemRepositories } from "@/server/ports";
 import { chunk, createAdminClient, createSessionClient, must, mustWrite, type Supabase } from "./clients";
 
 /** One day before a yyyy-MM-dd key, as an ISO timestamp - a safe lower bound for an app-time-zone day. */
 function dayBefore(dateKey: string): string {
   return new Date(Date.parse(`${dateKey}T00:00:00Z`) - 24 * 60 * 60 * 1000).toISOString();
+}
+
+// Asia/Kolkata has no daylight saving, so a day there is a fixed UTC range.
+const APP_UTC_OFFSET = "+05:30";
+
+function auditQuery(db: Supabase, filter: AuditFilter) {
+  let query = db.from("audit_log").select("*");
+  if (filter.tenantId) query = query.eq("tenant_id", filter.tenantId);
+  if (filter.unitCode) query = query.eq("unit_code", filter.unitCode);
+  if (filter.propertyCode) query = query.eq("property_code", filter.propertyCode);
+  if (filter.actions?.length) query = query.in("action", [...filter.actions]);
+  if (filter.fromDate) query = query.gte("at", `${filter.fromDate}T00:00:00${APP_UTC_OFFSET}`);
+  if (filter.toDate) query = query.lte("at", `${filter.toDate}T23:59:59.999${APP_UTC_OFFSET}`);
+  if (filter.beforeId !== undefined) query = query.lt("id", filter.beforeId);
+  return query.order("id", { ascending: false }).limit(filter.limit);
+}
+
+function logEventArgs(event: AuditEvent) {
+  return {
+    p_action: event.action,
+    p_tenant_id: event.tenantId ?? null,
+    p_entity_type: event.entityType ?? null,
+    p_entity_id: event.entityId ?? null,
+    p_context: event.context ?? {},
+  };
 }
 
 function byPeriodMonth(a: RentPeriod, b: RentPeriod): number {
@@ -32,6 +57,15 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
   }
 
   return {
+    audit: {
+      async list(filter) {
+        return must(await auditQuery(db, filter), "list audit log");
+      },
+      async log(event) {
+        mustWrite(await db.rpc("log_event", logEventArgs(event)), "log event");
+      },
+    },
+
     ownerProfile: {
       async get() {
         return must(await db.from("owner_profile").select("*").maybeSingle(), "get owner profile");
@@ -365,6 +399,15 @@ export function supabaseSystemRepositories(): SystemRepositories {
   const db: Supabase = createAdminClient();
 
   return {
+    audit: {
+      async log(event) {
+        mustWrite(
+          await db.rpc("log_event", { ...logEventArgs(event), p_actor_kind: event.actorKind, p_actor_id: event.actorId ?? null }),
+          "log event"
+        );
+      },
+    },
+
     locations: {
       async get(locationCode) {
         return must(

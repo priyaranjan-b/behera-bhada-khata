@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/errors";
 import { changePasswordSchema, ownerProfileSchema } from "@/lib/validation";
 import { auth, ownerDb, storage } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
+import { recordEvent } from "./audit";
 import { pngDataUrlToBytes } from "./confirmLinks";
 import { parseInput, SIGNED_URL_SECONDS, type OwnerContext } from "./context";
 
@@ -66,6 +67,7 @@ export async function updateOwnerProfile(ctx: OwnerContext, body: unknown): Prom
 export async function changePassword(_ctx: OwnerContext, body: unknown): Promise<void> {
   const { password } = parseInput(changePasswordSchema, body);
   await auth.updatePassword(password);
+  await recordEvent(await ownerDb(), { action: "auth.password_changed" });
 }
 
 /** For the payment/adjustment forms: the saved signature to offer instead of drawing. */

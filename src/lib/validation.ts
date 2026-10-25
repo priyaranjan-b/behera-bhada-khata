@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { isDateKey } from "@/lib/dates";
+import { AUDIT_CATEGORIES } from "@/lib/domain/audit";
 import { PAYMENT_MODES, PREFERRED_CHANNELS, RECORD_TYPES, UNIT_TYPES } from "@/lib/types";
 
 // Every request body the API accepts, validated by the service that receives
@@ -283,3 +284,21 @@ export const confirmSchema = z.object({
   otpCode: z.string().trim().regex(/^\d{4,10}$/, "Enter the code from the SMS"),
   tenantSignaturePng: signaturePngSchema,
 });
+
+// ---- Audit history (0015) ----------------------------------------------------
+
+/** Entries per page of history (Activity page, tenant and house timelines). */
+export const AUDIT_LIMITS = { pageSize: 50 } as const;
+
+/** `before`: the id to continue below (from AuditPage.nextBefore). Query params arrive as strings. */
+export const auditPageSchema = z.object({
+  before: z.coerce.number().int().positive().optional(),
+});
+
+export const activityQuerySchema = auditPageSchema
+  .extend({
+    category: z.enum(AUDIT_CATEGORIES).optional(),
+    from: dateKeySchema.optional(),
+    to: dateKeySchema.optional(),
+  })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, "The start date must be on or before the end date");

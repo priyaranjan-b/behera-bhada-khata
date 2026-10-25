@@ -2,6 +2,7 @@ import "server-only";
 import type { AvailableUnit, TenantHouse } from "@/lib/contracts";
 import { currentMonthKey, todayKey } from "@/lib/dates";
 import { unitMix, type UnitMix } from "@/lib/domain/tenant";
+import { round2 } from "@/lib/money";
 import type { Property, TenantRentRate, Unit, UnitOccupancy } from "@/lib/types";
 import type { OwnerRepositories } from "@/server/ports";
 
@@ -29,6 +30,29 @@ export function rentInEffect(rates: TenantRentRate[], monthKey = currentMonthKey
   const sorted = [...rates].sort((a, b) => a.effective_month.localeCompare(b.effective_month));
   const inEffect = sorted.filter((r) => r.effective_month <= monthKey).pop() ?? sorted[0];
   return inEffect ? Number(inEffect.monthly_amount) : 0;
+}
+
+/**
+ * Each tower's monthly rent from its current occupants. Rent is per tenant,
+ * so a tenant with houses in several towers is split evenly across the
+ * houses they live in today; the towers then add up to the true total.
+ */
+export function rentByProperty(
+  occupancy: UnitOccupancy[],
+  rates: TenantRentRate[],
+  today = todayKey(),
+  monthKey = currentMonthKey()
+): Map<string, number> {
+  const living = occupancy.filter((o) => o.start_date <= today && holdsUnit(o, today));
+  const housesByTenant = groupBy(living, (o) => o.tenant_id);
+  const ratesByTenant = groupBy(rates, (r) => r.tenant_id);
+  const totals = new Map<string, number>();
+  for (const [tenantId, houses] of housesByTenant) {
+    const share = rentInEffect(ratesByTenant.get(tenantId) ?? [], monthKey) / houses.length;
+    for (const o of houses) totals.set(o.property_code, (totals.get(o.property_code) ?? 0) + share);
+  }
+  for (const [code, amount] of totals) totals.set(code, round2(amount));
+  return totals;
 }
 
 export interface Placements {

@@ -1,4 +1,6 @@
 import type {
+  ActivityQuery,
+  AuditPage,
   AdjustPaymentForm,
   AnyTowerTenantForm,
   BulkCreateResult,
@@ -58,6 +60,8 @@ export interface ApiQueries {
     summary(month?: string): Promise<DashboardSummary>;
     /** Tenants behind on rent, most months behind first. */
     defaulters(): Promise<DefaultersReport>;
+    /** Everything that changed, newest first (audit_log, 0015). */
+    activity(query?: ActivityQuery): Promise<AuditPage>;
     /** Top-bar search index (tenants and houses). */
     search(): Promise<SearchIndex>;
     /** The owner's name and saved signature (Profile page, app shell). */
@@ -75,6 +79,8 @@ export interface ApiQueries {
       list(): Promise<UnitRow[]>;
       /** Every tower, for the "Add house" shortcut. */
       newForm(): Promise<NewHouseForm>;
+      /** One house's change history; `before` = AuditPage.nextBefore. */
+      history(unitCode: string, before?: number): Promise<AuditPage>;
     };
     tenants: {
       list(): Promise<TenantSearchRow[]>;
@@ -82,6 +88,8 @@ export interface ApiQueries {
       newForm(): Promise<AnyTowerTenantForm>;
       detail(tenantId: string): Promise<TenantDetail>;
       edit(tenantId: string): Promise<EditTenantForm>;
+      /** One tenant's change history; `before` = AuditPage.nextBefore. */
+      history(tenantId: string, before?: number): Promise<AuditPage>;
       newPayment(tenantId: string): Promise<NewPaymentForm>;
     };
     payments: {

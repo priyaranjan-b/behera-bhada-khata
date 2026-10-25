@@ -158,7 +158,8 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.exec(`
     truncate adjustment_allocations, adjustments, payment_allocations, payments, receipt_counters, rent_periods,
-      tenant_units, tenant_rent_rates, tenants, units, properties, locations, rate_limits, app_owner, auth.users cascade;
+      tenant_units, tenant_rent_rates, tenants, units, properties, locations, rate_limits, app_owner, auth.users,
+      audit_log cascade;
     insert into auth.users (id, email) values ('${OWNER_A}', 'a@example.com'), ('${OWNER_B}', 'b@example.com');
     insert into app_owner (user_id) values ('${OWNER_A}');
 
@@ -1126,5 +1127,139 @@ describe("correct_paid_through (0014)", () => {
     await as(owner(OWNER_A), `select move_out_tenant($1, '2026-03-31')`, [fx.tenantA]);
     expect(await errorCode(correct(owner(OWNER_A), "2026-01-01"))).toBe("BBK09");
     expect(await errorCode(as(owner(OWNER_A), `update tenants set billing_start = '2026-02-01'`))).toBe("42501");
+  });
+});
+
+describe("audit log (0015)", () => {
+  type Entry = { action: string; actor_kind: string; changes: Record<string, [unknown, unknown]>; tx_id: string };
+  const log = async (filter = "true", params: unknown[] = []) =>
+    (
+      await db.query<Entry>(
+        `select action, actor_kind, changes, tx_id::text from audit_log where ${filter} order by id`,
+        params
+      )
+    ).rows;
+  const updateTenant = (args: { phone?: string; rent?: number; month?: string }) =>
+    as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, $2, 'both', null, null, $3, $4, null)`, [
+      fx.tenantA,
+      args.phone ?? "+919876543210",
+      args.rent ?? null,
+      args.month ?? null,
+    ]);
+
+  it("records onboarding: the tenant, the tenancy and the first rent, by the owner", async () => {
+    const rows = await log(`tenant_id = $1`, [fx.tenantA]);
+    expect(rows.map((r) => r.action)).toEqual(["tenant.created", "rent_rate.set", "tenancy.started"]);
+    expect(new Set(rows.map((r) => r.actor_kind))).toEqual(new Set(["owner"]));
+    expect(new Set(rows.map((r) => r.tx_id)).size).toBe(1);
+    expect(rows[1].changes.monthly_amount).toEqual([null, 5000]);
+  });
+
+  it("keeps the old value of an edit, and skips edits that change nothing", async () => {
+    await db.exec(`truncate audit_log`);
+    await updateTenant({ phone: "+919800000000" });
+    await updateTenant({ phone: "+919800000000" });
+    expect(await log()).toEqual([
+      expect.objectContaining({ action: "tenant.updated", changes: { phone: ["+919876543210", "+919800000000"] } }),
+    ]);
+  });
+
+  it("keeps a rent that was overwritten for the same month, and the re-priced months", async () => {
+    await db.exec(`truncate audit_log`);
+    await updateTenant({ rent: 6000, month: "2026-03-01" });
+    await updateTenant({ rent: 6500, month: "2026-03-01" });
+    const rows = await log();
+    expect(rows.map((r) => [r.action, r.changes.monthly_amount ?? r.changes.amount_due])).toEqual([
+      ["rent_rate.set", [null, 6000]],
+      ["rent_period.repriced", [5000, 6000]],
+      ["rent_rate.changed", [6000, 6500]],
+      ["rent_period.repriced", [6000, 6500]],
+    ]);
+  });
+
+  it("groups a move-out with the tenancy it ends and the months it drops", async () => {
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `select move_out_tenant($1, '2026-02-28')`, [fx.tenantA]);
+    const rows = await log();
+    expect(rows.map((r) => r.action).sort()).toEqual(["rent_period.deleted", "tenancy.ended", "tenant.moved_out"]);
+    expect(new Set(rows.map((r) => r.tx_id)).size).toBe(1);
+    expect(rows.find((r) => r.action === "rent_period.deleted")?.changes.period_month).toEqual(["2026-03-01", null]);
+  });
+
+  it("records a corrected 'paid up to' and the months it drops", async () => {
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `select correct_paid_through($1, '2026-01-01')`, [fx.tenantA]);
+    expect((await log()).map((r) => [r.action, Object.keys(r.changes)])).toEqual([
+      ["rent_period.deleted", ["amount_due", "period_month"]],
+      ["billing_start.corrected", ["billing_start"]],
+    ]);
+  });
+
+  it("records master-data edits, documents and payments, and who recorded a payment", async () => {
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `update units set label = 'Chemist' where unit_code = 'AC-T1-G01'`);
+    const [{ id }] = await as<{ id: string }>(
+      owner(OWNER_A),
+      `insert into tenant_documents (tenant_id, document_type, storage_path, file_name, content_type, size_bytes)
+       values ($1, 'ID proof', $2, 'id.jpg', 'image/jpeg', 10) returning id`,
+      [fx.tenantA, `tenants/${fx.tenantA}/documents/id.jpg`]
+    );
+    await as(owner(OWNER_A), `delete from tenant_documents where id = $1`, [id]);
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    const paymentId = await latestPaymentId();
+    await acknowledge("payment", paymentId);
+
+    const rows = await log();
+    expect(rows.map((r) => [r.action, r.actor_kind])).toEqual([
+      ["unit.updated", "owner"],
+      ["document.added", "owner"],
+      ["document.deleted", "owner"],
+      ["payment.recorded", "owner"],
+      ["payment.acknowledged", "tenant"],
+    ]);
+    expect(rows[0].changes).toEqual({ label: [null, "Chemist"] });
+    expect(rows[3].changes).toMatchObject({ amount: [null, 5000], mode: [null, "cash"] });
+    expect(JSON.stringify(rows)).not.toMatch(/token_hash|sig\.png|tenant\.png/);
+
+    const { rows: payment } = await db.query<{ recorded_by: string }>(`select recorded_by from payments where id = $1`, [
+      paymentId,
+    ]);
+    expect(payment).toEqual([{ recorded_by: OWNER_A }]);
+    expect(await errorCode(as(service, `update payments set recorded_by = null where id = $1`, [paymentId]))).toBe("BBK00");
+  });
+
+  it("can't be written, edited or deleted directly - not even by the service role", async () => {
+    for (const who of [owner(OWNER_A), service]) {
+      expect(
+        await errorCode(
+          as(who, `insert into audit_log (actor_kind, action, entity_type) values ('system', 'x.y', 'x')`)
+        )
+      ).toBe("42501");
+      expect(await errorCode(as(who, `update audit_log set action = 'x.y'`))).toBe("42501");
+      expect(await errorCode(as(who, `delete from audit_log`))).toBe("42501");
+    }
+    // Even with table rights, the trigger refuses.
+    expect(await errorCode(db.query(`delete from audit_log`))).toBe("BBK09");
+  });
+
+  it("shows the owner the log, and nobody else", async () => {
+    expect((await as(owner(OWNER_A), `select 1 from audit_log`)).length).toBeGreaterThan(0);
+    expect(await as(owner(OWNER_B), `select 1 from audit_log`)).toEqual([]);
+  });
+
+  it("log_event: the owner logs their own events, the service role names the actor, others are refused", async () => {
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `select log_event('receipt.downloaded', $1, 'payment', 'p1')`, [fx.tenantA]);
+    await as(service, `select log_event('auth.sign_in_failed', null, null, null, '{"method":"password"}', 'visitor')`);
+    expect(await errorCode(as(owner(OWNER_B), `select log_event('auth.sign_in')`))).toBe("BBK04");
+    expect(await errorCode(as(owner(OWNER_A), `select log_event('payment.recorded')`))).toBe("BBK00");
+    expect(await errorCode(as({ role: "anon" } as unknown as Role, `select log_event('auth.sign_in')`))).toBe("42501");
+    const rows = await db.query<{ action: string; actor_kind: string; actor_id: string | null; entity_type: string }>(
+      `select action, actor_kind, actor_id, entity_type from audit_log order by id`
+    );
+    expect(rows.rows).toEqual([
+      { action: "receipt.downloaded", actor_kind: "owner", actor_id: OWNER_A, entity_type: "payment" },
+      { action: "auth.sign_in_failed", actor_kind: "visitor", actor_id: null, entity_type: "auth" },
+    ]);
   });
 });

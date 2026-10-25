@@ -6,6 +6,7 @@ import { devLoginEnabled, env, ownerEmailAllowlist } from "@/server/env";
 import { hashToken } from "@/server/token";
 import { auth } from "@/server/infra";
 import { safeNext } from "@/lib/redirects";
+import { recordSystemEvent } from "./audit";
 import { enforceRateLimits, parseInput, RATE_LIMITS, type OwnerContext, type RequestMeta } from "./context";
 
 export async function getSession(): Promise<Session> {
@@ -85,26 +86,64 @@ export async function signInWithPassword(body: unknown, meta: RequestMeta): Prom
     { key: `password:ip:${meta.ip}`, ...RATE_LIMITS.passwordPerIp },
   ]);
 
-  if (!signInPolicy(email).allowed) throw new ApiError(400, WRONG_PASSWORD);
-  if (!(await auth.signInWithPassword(email, password))) throw new ApiError(400, WRONG_PASSWORD);
+  const knownEmail = signInPolicy(email).allowed;
+  if (!knownEmail || !(await auth.signInWithPassword(email, password))) {
+    await logFailedSignIn(meta, { knownEmail, reason: "wrong_password" });
+    throw new ApiError(400, WRONG_PASSWORD);
+  }
 
   const session = await auth.getSession();
   if (!session?.isOwner) {
     await auth.signOut();
+    await logFailedSignIn(meta, { knownEmail, reason: "not_owner" });
     throw new ApiError(403, NOT_OWNER_MESSAGE);
   }
+  await recordSystemEvent({
+    action: "auth.sign_in",
+    actorKind: "owner",
+    actorId: session.userId,
+    context: { method: "password" },
+  });
   return { next: safeNext(next) };
+}
+
+// The audit log keeps neither the email nor the IP: only whether the email
+// is an owner's, and a hash that tells repeated attempts from one place apart.
+async function logFailedSignIn(meta: RequestMeta, context: { knownEmail: boolean; reason: string }): Promise<void> {
+  await recordSystemEvent({
+    action: "auth.sign_in_failed",
+    actorKind: "visitor",
+    context: { method: "password", ...context, ipHash: hashToken(meta.ip).slice(0, 12) },
+  });
+}
+
+/** An email-link sign-in finished: log it for the owner (another account isn't this rent book's event). */
+async function logEmailLinkSignIn(): Promise<void> {
+  const session = await auth.getSession();
+  if (!session?.isOwner) return;
+  await recordSystemEvent({
+    action: "auth.sign_in",
+    actorKind: "owner",
+    actorId: session.userId,
+    context: { method: "email_link" },
+  });
 }
 
 export async function setSessionFromTokens(body: unknown): Promise<void> {
   const { accessToken, refreshToken } = parseInput(sessionTokensSchema, body);
   await auth.setSession(accessToken, refreshToken);
+  await logEmailLinkSignIn();
 }
 
 export async function exchangeCode(code: string): Promise<void> {
   await auth.exchangeCode(code);
+  await logEmailLinkSignIn();
 }
 
 export async function signOut(): Promise<void> {
+  const session = await auth.getSession();
+  if (session?.isOwner) {
+    await recordSystemEvent({ action: "auth.signed_out", actorKind: "owner", actorId: session.userId });
+  }
   await auth.signOut();
 }

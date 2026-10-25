@@ -1,10 +1,12 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/errors";
-import type { Tenant } from "@/lib/types";
+import type { RecordType, Tenant } from "@/lib/types";
 import { messaging, storage } from "@/server/infra";
+import type { OwnerRepositories } from "@/server/ports";
 import { env, tenantMessagingEnabled } from "@/server/env";
 import { generateConfirmToken } from "@/server/token";
+import { recordEvent } from "./audit";
 
 // Shared by payments and adjustments: both are recorded "pending" with the
 // owner's signature and a hashed one-time token, then the tenant is sent a
@@ -62,11 +64,35 @@ export function confirmUrl(token: string): string {
   return `${env().NEXT_PUBLIC_APP_URL}/confirm/${token}`;
 }
 
-/** Sends the tenant a message on their preferred channel(s); false if no channel accepted it. */
+/** The record a message is about, for the audit log (never the message text). */
+export interface NotifyAbout {
+  db: Pick<OwnerRepositories, "audit">;
+  recordType: RecordType;
+  recordId: string;
+  receiptNo?: string;
+}
+
+/**
+ * Sends the tenant a message on their preferred channel(s); false if no
+ * channel accepted it. Every attempt is logged, delivered or not.
+ */
 export async function notifyTenant(
-  tenant: Pick<Tenant, "phone" | "preferred_channel">,
-  message: string
+  tenant: Pick<Tenant, "id" | "phone" | "preferred_channel">,
+  message: string,
+  about: NotifyAbout
 ): Promise<boolean> {
+  const delivered = await send(tenant, message);
+  await recordEvent(about.db, {
+    action: "message.sent",
+    tenantId: tenant.id,
+    entityType: about.recordType,
+    entityId: about.recordId,
+    context: { channel: tenant.preferred_channel, delivered, receiptNo: about.receiptNo ?? null },
+  });
+  return delivered;
+}
+
+async function send(tenant: Pick<Tenant, "phone" | "preferred_channel">, message: string): Promise<boolean> {
   // A draft tenant may not have a phone yet; without Twilio nobody can be messaged.
   if (!tenant.phone || !tenantMessagingEnabled()) return false;
   try {

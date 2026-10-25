@@ -9,12 +9,13 @@ import type {
   UnitRow,
 } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
+import { round2 } from "@/lib/money";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
 import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
-import { availableUnits, holdsUnit, loadPlacements, placementOf } from "./placements";
+import { availableUnits, holdsUnit, loadPlacements, placementOf, rentByProperty } from "./placements";
 
 function toHeader(property: Property, locations: Location[]): PropertyHeader {
   return {
@@ -39,7 +40,7 @@ async function loadHeader(ctx: OwnerContext, rawCode: string): Promise<PropertyH
   return toHeader(property, locations);
 }
 
-/** Every site with its towers and how full each one is. */
+/** Every site with its towers, how full each one is and the rent its current occupants pay. */
 export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[]> {
   const db = await ownerDb();
   const [locations, properties, units, occupancy] = await Promise.all([
@@ -50,10 +51,12 @@ export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[
   ]);
   const today = todayKey();
   const held = new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.unit_code));
+  const tenantIds = [...new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.tenant_id))];
+  const rates = tenantIds.length ? await db.rentRates.listForTenants(tenantIds) : [];
+  const rent = rentByProperty(occupancy, rates, today);
 
-  return locations.map((location) => ({
-    location: { code: location.location_code, name: location.name, address: location.address },
-    properties: properties
+  return locations.map((location) => {
+    const cards = properties
       .filter((p) => p.location_code === location.location_code)
       .map((p) => {
         const inTower = units.filter((u) => u.property_code === p.property_code && u.is_active);
@@ -63,9 +66,15 @@ export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[
           occupiedUnits: inTower.filter((u) => held.has(u.unit_code)).length,
           residentialUnits: inTower.filter((u) => u.unit_type === "residential").length,
           commercialUnits: inTower.filter((u) => u.unit_type === "commercial").length,
+          monthlyRent: rent.get(p.property_code) ?? 0,
         };
-      }),
-  }));
+      });
+    return {
+      location: { code: location.location_code, name: location.name, address: location.address },
+      properties: cards,
+      monthlyRent: round2(cards.reduce((sum, c) => sum + c.monthlyRent, 0)),
+    };
+  });
 }
 
 export async function getPropertyHeader(ctx: OwnerContext, propertyCode: string): Promise<PropertyHeader> {

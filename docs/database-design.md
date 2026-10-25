@@ -28,6 +28,8 @@ tenants              uuid        a person or business
   ├ payments  ─ payment_allocations    ─┐  append-only ledger,
   │            payment_proofs          │  (files attached to a payment)
   └ adjustments ─ adjustment_allocations ┘  confirmed when recorded (D20)
+
+audit_log            every change to the tables above + app events (D25; append-only, no FKs)
 ```
 
 | Migration | Adds |
@@ -46,6 +48,7 @@ tenants              uuid        a person or business
 | `0014_correct_paid_through.sql` | `correct_paid_through()`: fix an active tenant's "rent paid up to" |
 | `0013_owner_profile.sql` | `owner_profile`: the owner's first/last name, who signs on their behalf, and that signer's saved signature |
 | `0012_receipt_numbers.sql` | receipt numbers: `payments.receipt_no` (2026/10/001), `adjustments.receipt_no` (ADJ/2026/10/001), `receipt_counters` |
+| `0015_audit_log.sql` | `audit_log` written by `audit_row_change()` triggers and `log_event()`; `recorded_by` on payments, adjustments, documents, tenancies and rent rates |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -505,6 +508,66 @@ roles; the profile is display data the owner edits, with its own RLS.
 arrears or hides them, and `billing_start` is otherwise fixed once active.
 Dropping a month that a payment covers would orphan money, hence the refusal.
 
+### D25 — Audit log: every change to vital data, written by triggers
+
+**Decision (0015).** One append-only table, `audit_log`, holds the history
+of everything that changes in place, plus a few app events.
+
+- **Triggers write it.** `audit_row_change()` (`SECURITY DEFINER`) runs
+  after insert/update/delete on `tenants`, `tenant_units`,
+  `tenant_rent_rates`, `rent_periods` (update of `amount_due`, delete),
+  `locations`, `properties`, `units`, `tenant_documents`, `owner_profile`,
+  `payments`, `adjustments` and `app_owner`. No path can skip it: the SQL
+  functions, the owner's direct writes under RLS, the service role and
+  hand-run SQL all go through.
+- **A row is a diff.** `changes` is `{column: [old, new]}` for the columns
+  that changed; an update that changes nothing writes no row. Bookkeeping
+  and secrets are never stored: ids, timestamps, `token_*`, signature and
+  PDF paths, `otp_verified_at`, `storage_path`, and on ledger/period rows
+  `amount_allocated` / `status` / `confirmed_at` (money movement is
+  explained by the payment row itself).
+- **Actions are derived** from table + operation, with a few named cases:
+  a tenant update that sets `status` is `tenant.moved_out` /
+  `tenant.activated`, one that moves `billing_start` is
+  `billing_start.corrected`, a tenancy getting an `end_date` is
+  `tenancy.ended`, `acknowledged_at` is `payment.acknowledged`. The list is
+  `AUDIT_ACTIONS` in `src/lib/types.ts`; labels in `src/lib/domain/audit.ts`.
+- **One change, many rows.** `tx_id` (`txid_current()`) groups what one
+  function call did: a move-out, the tenancies it ended and the months it
+  dropped share it, and the timeline shows them together. No existing
+  function had to change for this.
+- **Who.** `actor_id = auth.uid()`; `actor_kind` is `owner`
+  (`is_app_owner()`), `tenant` (an acknowledgement), `system` (cron, service
+  role, SQL editor) or `visitor` (a failed sign-in).
+- **App events** go through `log_event()`, which accepts only
+  `message.sent`, `receipt.downloaded`, `auth.sign_in`,
+  `auth.sign_in_failed`, `auth.password_changed` and `auth.signed_out`:
+  table actions belong to the trigger. The owner logs as themselves; the
+  service role names the actor (sign-ins use it because the new session
+  isn't on the request yet). The app logs best-effort (`recordEvent` in
+  `src/server/services/audit.ts`): a failed audit write never blocks a
+  payment, a message or a sign-in. Never logged: message text, OTPs,
+  passwords, the email typed into a failed sign-in, or a raw IP (a short
+  hash only).
+- **Nobody edits history.** RLS lets the owner `SELECT`; `insert`,
+  `update`, `delete` and `truncate` are revoked from `authenticated` and
+  `service_role`, and a `before update or delete` trigger raises `BBK09`
+  even for a role with table rights. No foreign keys, so history outlives
+  what it describes. Kept forever (the volume is tiny).
+- **Who recorded it, on the row.** `recorded_by uuid default auth.uid()` on
+  `payments`, `adjustments`, `tenant_documents`, `tenant_units` and
+  `tenant_rent_rates` (the default sees the caller even inside definer
+  functions), frozen by `prevent_key_change('recorded_by')`. Existing rows
+  were backfilled with the owner.
+
+**Why.** D7/D8 keep *effective-dated* history, but several writes still
+overwrite: the tenant's contact details, a rent set twice for the same
+month (`on conflict do update`), re-priced and dropped months, master data,
+deleted documents, the profile. None recorded when it was entered or by
+whom. Per-entity history tables would have meant a copy of every table and
+every function; one trigger covers them all. History starts at 0015: older
+changes are only what the dated tables already show.
+
 ---
 
 ## 3. Checklists
@@ -521,6 +584,10 @@ Dropping a month that a payment covers would orphan money, hence the refusal.
    each one you query by.
 5. Write `COMMENT ON TABLE`, add the table to `src/lib/types.ts`, and add
    schema tests: the owner can, a non-owner sees nothing.
+6. If it holds data worth a history (people, money, places, files), attach
+   `audit_row_change('<entity>')` after insert/update/delete (D25), add any
+   new action to `AUDIT_ACTIONS` with a label in `src/lib/domain/audit.ts`,
+   add its columns to `FIELDS` there, and skip secrets and paths in the trigger.
 
 **Adding a write that touches money or several rows**
 1. Write it as one plpgsql function. Check its invariants, raising `BBK00`,
@@ -533,6 +600,9 @@ Dropping a month that a payment covers would orphan money, hence the refusal.
    `mustWrite` in the adapter.
 5. Add schema tests for the happy path, each rejection, and that a non-owner
    gets `BBK04` or `42501`.
+6. Nothing to add for the audit log: the tables' triggers record what the
+   function changed, grouped by `tx_id` (D25). Add an audit schema test if
+   the change should read as a new kind of action.
 
 **Changing history** (`tenant_units`, `tenant_rent_rates`, the ledger)
 - Don't. Add a row or close an open one through the existing functions; if a

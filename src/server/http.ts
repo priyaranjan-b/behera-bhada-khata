@@ -27,6 +27,11 @@ function toErrorResponse(err: unknown): Response {
   return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
 }
 
+/** The query string as a plain object, for a service to validate (GET filters). */
+export function readQuery(request: Request): Record<string, string> {
+  return Object.fromEntries(new URL(request.url).searchParams);
+}
+
 export async function readJson(request: Request): Promise<unknown> {
   return request.json().catch(() => null);
 }

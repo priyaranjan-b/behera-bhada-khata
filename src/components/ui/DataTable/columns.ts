@@ -20,3 +20,13 @@ export function moneyColumn<R extends GridValidRowModel>(
     ...extra,
   };
 }
+
+/**
+ * A column with an optional `exportValue`: what the Excel download writes when
+ * the grid value is built for search (e.g. name + contact in one string).
+ * Without it the download uses the formatted value, or the number for
+ * `type: "number"` columns.
+ */
+export type DataTableColDef<R extends GridValidRowModel> = GridColDef<R> & {
+  exportValue?: (row: R) => string | number | null;
+};

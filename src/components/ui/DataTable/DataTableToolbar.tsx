@@ -18,6 +18,7 @@ import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ViewColumnOutlinedIcon from "@mui/icons-material/ViewColumnOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import GridOnOutlinedIcon from "@mui/icons-material/GridOnOutlined";
 import {
   ColumnsPanelTrigger,
   ExportCsv,
@@ -33,6 +34,7 @@ import {
   useGridSelector,
 } from "@mui/x-data-grid";
 import { useDataTable } from "./context";
+import { downloadGridAsExcel } from "./exportExcel";
 import { pillControlSx, TOOL_BUTTON, toolbarIconButtonSx } from "./styles";
 
 /**
@@ -159,6 +161,18 @@ export default function DataTableToolbar() {
               <ExportCsv render={<ToolbarButton aria-label="Download CSV" className={TOOL_BUTTON} />}>
                 <FileDownloadOutlinedIcon fontSize="small" />
               </ExportCsv>
+            </Tooltip>
+          ) : null}
+
+          {config.exportExcel ? (
+            <Tooltip title="Download Excel">
+              <ToolbarButton
+                aria-label={config.title ? `Download ${config.title} as Excel` : "Download Excel"}
+                className={TOOL_BUTTON}
+                onClick={() => downloadGridAsExcel(apiRef, config.title)}
+              >
+                <GridOnOutlinedIcon fontSize="small" />
+              </ToolbarButton>
             </Tooltip>
           ) : null}
         </Toolbar>
