@@ -30,7 +30,14 @@ import {
 } from "@/server/services/properties";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getSearchIndex } from "@/server/services/search";
-import { getAnyTowerTenantForm, getEditTenantForm, getTenantDetail, listTenants } from "@/server/services/tenants";
+import {
+  getAnyTowerTenantForm,
+  getEditTenantForm,
+  getTenantAccount,
+  getTenantDetail,
+  getTenantLedger,
+  listTenants,
+} from "@/server/services/tenants";
 import type { OwnerContext } from "@/server/services/context";
 import { createHttpApi } from "./http";
 import type { ApiQueries } from "./types";
@@ -79,6 +86,8 @@ const inProcessApi: ApiQueries = {
       list: async () => listTenants(await owner()),
       newForm: async () => getAnyTowerTenantForm(await owner()),
       detail: async (id) => getTenantDetail(await owner(), id),
+      account: async (id) => getTenantAccount(await owner(), id),
+      ledger: async (id) => getTenantLedger(await owner(), id),
       edit: async (id) => getEditTenantForm(await owner(), id),
       history: async (id, before) => tenantHistory(await owner(), id, { before }),
       newPayment: async (id) => getNewPaymentForm(await owner(), id),

@@ -92,6 +92,8 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         newForm: () => get(p.dashboard.tenants.new),
         create: (input) => post(p.dashboard.tenants.list, input),
         detail: (id) => get(p.dashboard.tenants.detail(id)),
+        account: (id) => get(p.dashboard.tenants.account(id)),
+        ledger: (id) => get(p.dashboard.tenants.ledger(id)),
         edit: (id) => get(p.dashboard.tenants.edit(id)),
         history: (id, before) => get(withQuery(p.dashboard.tenants.history(id), { before })),
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),

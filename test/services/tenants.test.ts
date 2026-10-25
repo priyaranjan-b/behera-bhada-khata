@@ -8,7 +8,9 @@ const { generateReceiptPdf } = await import("@/server/pdf/receipt");
 const {
   correctPaidThrough,
   createTenant,
+  getTenantAccount,
   getTenantDetail,
+  getTenantLedger,
   listTenants,
   moveOutTenant,
   startRentTracking,
@@ -213,16 +215,18 @@ describe("government tenants (0016)", () => {
 
   it("offers to stop tracking only for a government tenant with nothing recorded", async () => {
     fakes.state.tenants.set(GOVT_ID, tenant({ id: GOVT_ID, tenant_kind: "government" }));
-    expect((await getTenantDetail(ctx, GOVT_ID)).canStopRentTracking).toBe(false); // a payment is recorded
+    expect((await getTenantAccount(ctx, GOVT_ID)).canStopRentTracking).toBe(false); // a payment is recorded
     fakes.state.payments.clear();
-    expect((await getTenantDetail(ctx, GOVT_ID)).canStopRentTracking).toBe(true);
-    expect((await getTenantDetail(ctx, "00000000-0000-4000-8000-000000000101")).canStopRentTracking).toBe(false);
+    expect((await getTenantAccount(ctx, GOVT_ID)).canStopRentTracking).toBe(true);
+    expect((await getTenantAccount(ctx, "00000000-0000-4000-8000-000000000101")).canStopRentTracking).toBe(false);
   });
 });
 
 describe("path ids", () => {
   it("404s a malformed tenant id before it reaches the database", async () => {
     await expect(getTenantDetail(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
+    await expect(getTenantAccount(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
+    await expect(getTenantLedger(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
     await expect(moveOutTenant(ctx, "1; drop", { moveOutDate: "2026-10-01" })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.get).not.toHaveBeenCalled();
   });

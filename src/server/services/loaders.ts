@@ -4,6 +4,7 @@ import { addMonthsToKey, currentMonthKey } from "@/lib/dates";
 import type { RentPeriod, Tenant } from "@/lib/types";
 import { ownerDb } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
+import { requireId, requireTenant } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { loadPlacements, type Placements } from "./placements";
 
@@ -69,4 +70,36 @@ export const recentAdjustments = cache(async () => {
     tenants.map((t) => t.id),
     { status: "confirmed", fromDate: recentMonthKeys()[0] }
   );
+});
+
+// ---- One tenant (the tenant page's sections) --------------------------------
+// Ids are checked first (malformed = 404) so the reads that don't need the
+// tenant row start at once instead of waiting for the lookup.
+
+/** The tenant, or 404. */
+export const tenantById = cache(async (tenantId: string): Promise<Tenant> => requireTenant(await db(), tenantId));
+
+/** The tenant's houses and rent history. */
+export const tenantPlacements = cache(async (tenantId: string): Promise<Placements> => {
+  requireId(tenantId, "Tenant");
+  return loadPlacements(await db(), [tenantId]);
+});
+
+/** Every rent month of the tenant, after topping them up if the tenant is billed. */
+export const tenantRentMonths = cache(async (tenantId: string): Promise<RentPeriod[]> => {
+  const tenant = await tenantById(tenantId);
+  await ensureRentPeriodsFor(billedTenantIds([tenant]));
+  return (await db()).rentPeriods.listForTenants([tenantId]);
+});
+
+/** Every payment of the tenant. */
+export const tenantPayments = cache(async (tenantId: string) => {
+  requireId(tenantId, "Tenant");
+  return (await db()).payments.listForTenants([tenantId]);
+});
+
+/** Every adjustment of the tenant. */
+export const tenantAdjustments = cache(async (tenantId: string) => {
+  requireId(tenantId, "Tenant");
+  return (await db()).adjustments.listForTenants([tenantId]);
 });

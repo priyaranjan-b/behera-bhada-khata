@@ -448,11 +448,22 @@ export interface TenantDetail {
     unitHistory: { unitCode: string; startDate: string; endDate: string | null }[];
     rentHistory: { effectiveMonth: string; monthlyAmount: number }[];
   };
+}
+
+// The tenant page loads in sections (A12): the profile above (GET …/[id]),
+// the account (…/[id]/account) and the ledger (…/[id]/ledger).
+
+/** GET …/tenants/[id]/account: what the tenant owes, month by month. */
+export interface TenantAccount {
   balance: TenantBalanceSummary;
   periods: TenantPeriod[];
-  ledger: LedgerRow[];
   /** A tracked government tenant with nothing recorded yet: rent tracking can still be turned off. */
   canStopRentTracking: boolean;
+}
+
+/** GET …/tenants/[id]/ledger: payments and adjustments against the months, with their proofs. */
+export interface TenantLedgerView {
+  ledger: LedgerRow[];
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
 }

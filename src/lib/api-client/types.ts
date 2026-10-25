@@ -51,7 +51,9 @@ import type {
   UploadTenantDocumentsInput,
   Session,
   SessionTokens,
+  TenantAccount,
   TenantDetail,
+  TenantLedgerView,
   TenantSearchRow,
   UnitRow,
 } from "@/lib/contracts";
@@ -106,7 +108,10 @@ export interface ApiQueries {
       list(): Promise<TenantSearchRow[]>;
       /** Vacant houses in every tower, for the "Add tenant" shortcut. */
       newForm(): Promise<AnyTowerTenantForm>;
+      /** The tenant page's profile; its money is in account and ledger (A12). */
       detail(tenantId: string): Promise<TenantDetail>;
+      account(tenantId: string): Promise<TenantAccount>;
+      ledger(tenantId: string): Promise<TenantLedgerView>;
       edit(tenantId: string): Promise<EditTenantForm>;
       /** One tenant's change history; `before` = AuditPage.nextBefore. */
       history(tenantId: string, before?: number): Promise<AuditPage>;

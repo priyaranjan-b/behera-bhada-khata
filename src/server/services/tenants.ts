@@ -5,7 +5,9 @@ import type {
   BulkCreateResult,
   Created,
   EditTenantForm,
+  TenantAccount,
   TenantDetail,
+  TenantLedgerView,
   TenantSearchRow,
 } from "@/lib/contracts";
 import { currentMonthKey } from "@/lib/dates";
@@ -26,6 +28,7 @@ import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
 import { parseInput, requireTenant, type OwnerContext } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
+import { db, tenantAdjustments, tenantById, tenantPayments, tenantPlacements, tenantRentMonths } from "./loaders";
 import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
 
@@ -91,22 +94,10 @@ export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]
   });
 }
 
-export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Promise<TenantDetail> {
-  const db = await ownerDb();
-  const tenant = await requireTenant(db, tenantId);
-
-  await ensureRentPeriodsFor(billedTenantIds([tenant]));
-  const [periods, payments, adjustments, placements] = await Promise.all([
-    db.rentPeriods.listForTenants([tenantId]),
-    db.payments.listForTenants([tenantId]),
-    db.adjustments.listForTenants([tenantId]),
-    loadPlacements(db, [tenantId]),
-  ]);
+/** The tenant page's profile: who they are, their houses and rents - no money (that's account and ledger). */
+export async function getTenantDetail(_ctx: OwnerContext, tenantId: string): Promise<TenantDetail> {
+  const [tenant, placements] = await Promise.all([tenantById(tenantId), tenantPlacements(tenantId)]);
   const placement = placementOf(placements, tenantId);
-  const proofs = await db.payments.listProofs(payments.map((p) => p.id));
-  const proofsByPayment = new Map<string, typeof proofs>();
-  for (const proof of proofs) proofsByPayment.set(proof.payment_id, [...(proofsByPayment.get(proof.payment_id) ?? []), proof]);
-
   return {
     tenant: {
       id: tenant.id,
@@ -135,6 +126,18 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
         monthlyAmount: Number(r.monthly_amount),
       })),
     },
+  };
+}
+
+/** What the tenant owes: the balance and every rent month. */
+export async function getTenantAccount(_ctx: OwnerContext, tenantId: string): Promise<TenantAccount> {
+  const [tenant, periods, payments, adjustments] = await Promise.all([
+    tenantById(tenantId),
+    tenantRentMonths(tenantId),
+    tenantPayments(tenantId),
+    tenantAdjustments(tenantId),
+  ]);
+  return {
     balance: summarizeBalance(periods, currentMonthKey()),
     periods: periods.map((p) => ({
       id: p.id,
@@ -143,6 +146,29 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       amountAllocated: Number(p.amount_allocated),
       status: p.status,
     })),
+    // Same rule as stop_rent_tracking (0016): nothing recorded against any month.
+    canStopRentTracking:
+      tenant.tenant_kind === "government" &&
+      tenant.status === "active" &&
+      tenant.rent_tracked &&
+      payments.length === 0 &&
+      adjustments.length === 0 &&
+      periods.every((p) => Number(p.amount_allocated) === 0),
+  };
+}
+
+/** The tenant's ledger: payments and adjustments against the months, with each payment's proofs. */
+export async function getTenantLedger(_ctx: OwnerContext, tenantId: string): Promise<TenantLedgerView> {
+  const [periods, payments, adjustments, repos] = await Promise.all([
+    tenantRentMonths(tenantId),
+    tenantPayments(tenantId),
+    tenantAdjustments(tenantId),
+    db(),
+  ]);
+  const proofs = await repos.payments.listProofs(payments.map((p) => p.id));
+  const proofsByPayment = new Map<string, typeof proofs>();
+  for (const proof of proofs) proofsByPayment.set(proof.payment_id, [...(proofsByPayment.get(proof.payment_id) ?? []), proof]);
+  return {
     ledger: buildTenantLedger(
       periods,
       payments.map((p) => ({
@@ -156,14 +182,6 @@ export async function getTenantDetail(ctx: OwnerContext, tenantId: string): Prom
       adjustments,
       currentMonthKey()
     ),
-    // Same rule as stop_rent_tracking (0016): nothing recorded against any month.
-    canStopRentTracking:
-      tenant.tenant_kind === "government" &&
-      tenant.status === "active" &&
-      tenant.rent_tracked &&
-      payments.length === 0 &&
-      adjustments.length === 0 &&
-      periods.every((p) => Number(p.amount_allocated) === 0),
     tenantMessaging: tenantMessagingEnabled(),
   };
 }

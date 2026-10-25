@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import Link from "@/components/ui/Link";
 import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
@@ -7,24 +6,32 @@ import Alert from "@mui/material/Alert";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { addMonthsToKey, currentMonthKey, formatDateKey, formatMonth, monthKeyOf } from "@/lib/dates";
+import { addMonthsToKey, formatDateKey, formatMonth, monthKeyOf } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import FlashAlert from "@/components/ui/FlashAlert";
-import StatCard from "@/components/ui/StatCard";
 import { PageHeader, TagPill } from "@/components/ui/DataDisplay";
 import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { ActionStack, BadgeRow, DetailList, DetailRow, SectionCard } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
+import AsyncSection from "@/components/ui/AsyncSection";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import RentTrackingButton from "@/components/domain/RentTrackingButton";
 import TenantKindTags from "@/components/domain/TenantKindTags";
 import { unitMixLabel } from "@/lib/domain/tenant";
 import { FLASH, routes, type Flash } from "@/lib/routes";
-import TenantLedgerTable from "./TenantLedgerTable";
-import TenantPeriodsGrid, { type TenantPeriodRow } from "./TenantPeriodsGrid";
 import LinkButton from "@/components/ui/Loading/LinkButton";
-import { DetailCardSkeleton } from "@/components/ui/Skeletons";
+import { DetailCardSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
 import TenantChangeHistory from "./TenantChangeHistory";
+import AccountStats, { ACCOUNT_STAT_CELL } from "./sections/AccountStats";
+import LedgerSection from "./sections/LedgerSection";
+import MonthsSection from "./sections/MonthsSection";
+import MoveOutAction from "./sections/MoveOutAction";
+import StopTrackingAction from "./sections/StopTrackingAction";
+
+// The page loads in sections (A12): it waits only for the profile (who, which
+// houses, which rents - and a 404 for a wrong id), then streams the account
+// (balance, months) and the ledger, each in its own boundary. Tenants with no
+// rent months to show (Govt rent paid direct) never start those calls.
 
 export default async function TenantPage({
   params,
@@ -35,29 +42,15 @@ export default async function TenantPage({
 }) {
   const { tenantId } = await params;
   const flash = await searchParams;
-  const {
-    tenant,
-    balance: summary,
-    periods,
-    ledger: ledgerRows,
-    tenantMessaging,
-    canStopRentTracking,
-  } = await serverApi.dashboard.tenants.detail(tenantId);
-
-  const thisMonth = currentMonthKey();
-  const periodRows: TenantPeriodRow[] = periods.map((p) => ({
-    ...p,
-    monthLabel: formatMonth(p.periodMonth),
-    notYetDue: p.periodMonth >= thisMonth,
-  }));
-  // Only months that have ended are owed (summarizeBalance); later ones are billed ahead.
-  const endedRows = periodRows.filter((p) => !p.notYetDue);
-  const paidMonths = endedRows.filter((p) => p.status === "paid").length;
+  const { tenant } = await serverApi.dashboard.tenants.detail(tenantId);
   const active = tenant.status === "active";
   const draft = tenant.status === "draft";
   // Government rent paid to the owner directly (0016): no months, no dues, no payments.
   const untracked = active && !tenant.rentTracked;
+  const account = untracked ? null : serverApi.dashboard.tenants.account(tenantId);
+  const ledger = untracked ? null : serverApi.dashboard.tenants.ledger(tenantId);
   const houseHistory = [...tenant.unitHistory].reverse();
+  const moveOut = { tenantId, tenantName: tenant.displayName, unitCodes: tenant.currentUnits.map((u) => u.unitCode) };
 
   return (
     <Stack spacing={2}>
@@ -76,14 +69,14 @@ export default async function TenantPage({
             <LinkButton href={routes.tenants.edit(tenantId)} variant="outlined" startIcon={<EditRoundedIcon />}>
               Edit
             </LinkButton>
-            {active || draft ? (
-              <MoveOutButton
-                tenantId={tenantId}
-                tenantName={tenant.displayName}
-                unitCodes={tenant.currentUnits.map((u) => u.unitCode)}
-                outstanding={summary.totalOutstanding}
-              />
-            ) : null}
+            {!(active || draft) ? null : account ? (
+              <AsyncSection title="Move out" fallback={null} silent>
+                <MoveOutAction account={account} {...moveOut} />
+              </AsyncSection>
+            ) : (
+              // Untracked: nothing is ever owed.
+              <MoveOutButton {...moveOut} outstanding={0} />
+            )}
             {draft || untracked ? null : (
               <LinkButton
                 href={routes.tenants.newPayment(tenantId)}
@@ -196,7 +189,11 @@ export default async function TenantPage({
                   : untracked
                     ? "Not tracked - paid to you directly"
                     : "Not billed yet"}
-                {canStopRentTracking ? <RentTrackingButton mode="stop" tenantId={tenantId} /> : null}
+                {account && tenant.tenantKind === "government" ? (
+                  <AsyncSection title="Stop tracking" fallback={null} silent>
+                    <StopTrackingAction tenantId={tenantId} account={account} />
+                  </AsyncSection>
+                ) : null}
                 {active && tenant.leaseStart && tenant.billingStart ? (
                   <CorrectPaidThroughButton
                     tenantId={tenantId}
@@ -208,38 +205,18 @@ export default async function TenantPage({
             </DetailList>
           </SectionCard>
         </Grid>
-        {untracked ? null : (
-          <>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <StatCard
-                title="Outstanding"
-                value={formatMoney(summary.totalOutstanding)}
-                caption={
-                  summary.notYetDue > 0
-                    ? `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))} · ${formatMoney(summary.notYetDue)} not due yet`
-                    : `To end of ${formatMonth(addMonthsToKey(thisMonth, -1))}`
-                }
-                badge={
-                  summary.totalOutstanding > 0
-                    ? { label: "To collect", tone: "warning" }
-                    : { label: "Settled", tone: "success" }
-                }
-              />
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <StatCard
-                title="Months overdue"
-                value={String(summary.overdueMonths)}
-                caption={`${paidMonths} of ${endedRows.length} ended month${endedRows.length === 1 ? "" : "s"} paid`}
-                badge={
-                  summary.overdueMonths > 0
-                    ? { label: "Follow up", tone: "danger" }
-                    : { label: "On track", tone: "success" }
-                }
-              />
-            </Grid>
-          </>
-        )}
+        {account ? (
+          <AsyncSection
+            title="Account"
+            fallback={[0, 1].map((i) => (
+              <Grid key={i} size={ACCOUNT_STAT_CELL}>
+                <StatCardSkeleton />
+              </Grid>
+            ))}
+          >
+            <AccountStats account={account} />
+          </AsyncSection>
+        ) : null}
       </Grid>
 
       <Grid container spacing={2} columns={12}>
@@ -269,16 +246,20 @@ export default async function TenantPage({
         </Grid>
       </Grid>
 
-      {untracked ? null : (
-        <>
-          <TenantPeriodsGrid rows={periodRows} />
-          <TenantLedgerTable rows={ledgerRows} tenantId={tenantId} tenantMessaging={tenantMessaging} />
-        </>
-      )}
+      {account ? (
+        <AsyncSection title="Months" fallback={<PanelSkeleton rows={6} />}>
+          <MonthsSection account={account} />
+        </AsyncSection>
+      ) : null}
+      {ledger ? (
+        <AsyncSection title="Ledger" fallback={<PanelSkeleton rows={6} />}>
+          <LedgerSection tenantId={tenantId} ledger={ledger} />
+        </AsyncSection>
+      ) : null}
 
-      <Suspense fallback={<DetailCardSkeleton rows={6} />}>
+      <AsyncSection title="Change history" fallback={<DetailCardSkeleton rows={6} />}>
         <TenantChangeHistory tenantId={tenantId} />
-      </Suspense>
+      </AsyncSection>
     </Stack>
   );
 }

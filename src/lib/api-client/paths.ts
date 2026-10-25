@@ -47,6 +47,8 @@ export const apiPaths = {
       new: "/api/dashboard/tenants/new",
       detail: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}`,
       edit: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/edit`,
+      account: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/account`,
+      ledger: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/ledger`,
       history: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/history`,
       moveOut: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out`,
       paidThrough: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/paid-through`,
