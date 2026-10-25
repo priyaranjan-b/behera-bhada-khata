@@ -40,7 +40,7 @@ export default async function DashboardPage({
   const attention = serverApi.dashboard.overview.attention();
   const portfolio = serverApi.dashboard.overview.portfolio({ paidDirect });
   const defaulters = serverApi.dashboard.defaulters();
-  const paidDirectState = serverApi.dashboard.overview.paidDirect({ paidDirect });
+  const paidDirectState = serverApi.dashboard.paidDirect({ paidDirect });
 
   return (
     <OverviewLayout

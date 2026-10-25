@@ -4,7 +4,8 @@ import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getAttention, getOverviewMonth, getOverviewTrend, getPaidDirectState, getPortfolio } = await import("@/server/services/overview");
+const { getAttention, getOverviewMonth, getOverviewTrend, getPortfolio } = await import("@/server/services/overview");
+const { getPaidDirectState } = await import("@/server/services/paidDirect");
 
 const ctx = { ownerId: OWNER_ID };
 const ASHA = "00000000-0000-4000-8000-000000000101";

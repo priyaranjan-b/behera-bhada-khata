@@ -10,12 +10,12 @@ import { listActivity, tenantHistory, unitHistory } from "@/server/services/audi
 import { getConfirmView } from "@/server/services/confirm";
 import { getBillingReport } from "@/server/services/billing";
 import { getDefaultersReport } from "@/server/services/dashboard";
+import { getPaidDirectState } from "@/server/services/paidDirect";
 import {
   getAttention,
   getHouseCounts,
   getOverviewMonth,
   getOverviewTrend,
-  getPaidDirectState,
   getPortfolio,
 } from "@/server/services/overview";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
@@ -55,8 +55,8 @@ const inProcessApi: ApiQueries = {
       houses: async () => getHouseCounts(await owner()),
       attention: async () => getAttention(await owner()),
       portfolio: async (options) => getPortfolio(await owner(), options),
-      paidDirect: async (options) => getPaidDirectState(await owner(), options),
     },
+    paidDirect: async (options) => getPaidDirectState(await owner(), options),
     defaulters: async () => getDefaultersReport(await owner()),
     billing: async (query) => getBillingReport(await owner(), query),
     activity: async (query) => listActivity(await owner(), query ?? {}),

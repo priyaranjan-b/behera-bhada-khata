@@ -73,9 +73,9 @@ export interface ApiQueries {
       houses(): Promise<HouseCounts>;
       attention(): Promise<AttentionItem[]>;
       portfolio(options?: { paidDirect?: PaidDirectView }): Promise<PortfolioFacts>;
-      /** For the "Include Govt paid direct" switch: are there any, and is the view showing them. */
-      paidDirect(options?: { paidDirect?: PaidDirectView }): Promise<PaidDirectState>;
     };
+    /** For the "Include Govt paid direct" switch (Overview, Billing): are there any, and is the view showing them. */
+    paidDirect(options?: { paidDirect?: PaidDirectView }): Promise<PaidDirectState>;
     /** Tenants behind on rent, most months behind first. */
     defaulters(): Promise<DefaultersReport>;
     /** Rent billed per tenant per month in a range, and the payments for it. */

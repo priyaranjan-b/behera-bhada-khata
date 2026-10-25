@@ -1,5 +1,5 @@
 import "server-only";
-import type { HouseCounts, OverviewMonth, OverviewTrend, PaidDirectState, PortfolioFacts } from "@/lib/contracts";
+import type { HouseCounts, OverviewMonth, OverviewTrend, PortfolioFacts } from "@/lib/contracts";
 import { currentMonthKey, monthKeyFromParam, yearMonthOf } from "@/lib/dates";
 import { buildBillingCollectionTrend, buildMonthlyReport } from "@/lib/domain/reports";
 import {
@@ -13,7 +13,6 @@ import { isVacant } from "@/lib/domain/houses";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import type { RentPeriod, Tenant } from "@/lib/types";
-import { paidDirectViewSchema } from "@/lib/validation";
 import { tenantMessagingEnabled } from "@/server/env";
 import type { OwnerContext } from "./context";
 import {
@@ -27,14 +26,14 @@ import {
   recentPeriods,
   tenantsList,
 } from "./loaders";
-import { billedTenantIds, groupPeriods, paidDirectPeriods, paidDirectTenants } from "./periods";
+import { showsPaidDirect } from "./paidDirect";
+import { billedTenantIds, groupPeriods, paidDirectPeriods } from "./periods";
 import { holdsUnit, placementOf, type Placements } from "./placements";
 
 // The Overview is several independent sections, each streamed into its own
 // card (A12). Shared reads come from ./loaders (cached per render); within a
 // section every read starts at once - nothing waits for a read it doesn't use.
 
-const showsPaidDirect = (options: { paidDirect?: unknown }) => paidDirectViewSchema.parse(options.paidDirect) === "show";
 
 /** Government rent paid direct (A11) for `months`, or none when hidden. */
 function directPeriods(
@@ -210,13 +209,3 @@ export async function getPortfolio(_ctx: OwnerContext, options: { paidDirect?: u
   };
 }
 
-/**
- * Whether there is government rent paid direct to show or hide (A11), for the
- * header switch: only the tenant list, so the switch doesn't wait on the figures.
- */
-export async function getPaidDirectState(
-  _ctx: OwnerContext,
-  options: { paidDirect?: unknown } = {}
-): Promise<PaidDirectState> {
-  return { available: paidDirectTenants(await tenantsList()).length > 0, shown: showsPaidDirect(options) };
-}
