@@ -145,6 +145,10 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
           "list tenant documents"
         );
       },
+      async tenantIdsWithDocuments() {
+        const rows = must(await db.from("tenant_documents").select("tenant_id"), "list tenants with documents");
+        return [...new Set(rows.map((r) => r.tenant_id))];
+      },
       async get(id) {
         return must(await db.from("tenant_documents").select("*").eq("id", id).maybeSingle(), "get tenant document");
       },

@@ -1,6 +1,7 @@
 import Grid from "@mui/material/Grid";
 import {
   ChartCardSkeleton,
+  DetailCardSkeleton,
   PageHeaderSkeleton,
   PageSkeleton,
   PanelSkeleton,
@@ -20,8 +21,27 @@ export default function OverviewLoading() {
           </Grid>
         ))}
       </Grid>
-      <ChartCardSkeleton />
-      <PanelSkeleton />
+      <Grid container spacing={2} columns={12}>
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <ChartCardSkeleton />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <DetailCardSkeleton rows={4} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <DetailCardSkeleton rows={5} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <DetailCardSkeleton rows={3} />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <ChartCardSkeleton height={220} />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <DetailCardSkeleton rows={5} />
+        </Grid>
+      </Grid>
+      <PanelSkeleton rows={5} />
     </PageSkeleton>
   );
 }

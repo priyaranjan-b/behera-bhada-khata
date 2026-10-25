@@ -119,6 +119,9 @@ export default function TenantStatusGrid({
         getRowId={(row) => row.tenantId}
         search={{ placeholder: "Search tenant…" }}
         noRowsLabel="No tenants match."
+        // A short list here: the Tenants and Defaulters pages have the full views.
+        pageSize={5}
+        pageSizeOptions={[5, 10, 25]}
         emptyState={emptyState}
         initialState={{
           sorting: { sortModel: [{ field: "totalOutstanding", sort: "desc" }] },

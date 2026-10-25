@@ -133,6 +133,14 @@ export const AGING_BUCKETS = [
 
 export type AgingBucketKey = (typeof AGING_BUCKETS)[number]["key"];
 
+/** Badge tone per age band: a month behind is a warning, more is serious. */
+export const AGING_BAND_TONE: Record<AgingBucketKey, "warning" | "danger"> = {
+  m1: "warning",
+  m2to3: "danger",
+  m4to6: "danger",
+  m7plus: "danger",
+};
+
 export function agingBucketOf(months: number): AgingBucketKey | null {
   return AGING_BUCKETS.find((b) => months >= b.min && months <= b.max)?.key ?? null;
 }

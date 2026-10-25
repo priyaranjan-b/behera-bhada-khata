@@ -8,22 +8,40 @@ import {
   buildMonthlyReport,
   compareAging,
 } from "@/lib/domain/reports";
+import { buildAttention, buildKindBreakdown, buildSiteCollection, rentReviewDue } from "@/lib/domain/overview";
 import { isVacant } from "@/lib/domain/houses";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
-import type { RentPeriod } from "@/lib/types";
+import type { RentPeriod, Tenant } from "@/lib/types";
+import { tenantMessagingEnabled } from "@/server/env";
 import { ownerDb } from "@/server/infra";
+import type { OwnerRepositories } from "@/server/ports";
 import type { OwnerContext } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { holdsUnit, loadPlacements, placementOf } from "./placements";
 
 const TREND_MONTHS = 6;
+/** How many defaulters the Overview lists (the Defaulters page has them all). */
+const TOP_DEFAULTERS = 5;
 
 /** `month` is yyyy-MM; anything else means the current month. */
 function parseMonth(month?: string | null): string {
   if (month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return `${month}-01`;
   return currentMonthKey();
 }
+
+function groupPeriods(periods: RentPeriod[]): Map<string, RentPeriod[]> {
+  const byTenant = new Map<string, RentPeriod[]>();
+  for (const period of periods) {
+    const list = byTenant.get(period.tenant_id) ?? [];
+    list.push(period);
+    byTenant.set(period.tenant_id, list);
+  }
+  return byTenant;
+}
+
+/** A house code's site: "AC-T1-G01" -> "AC". */
+const siteOf = (code: string) => code.split("-")[0];
 
 export async function getDashboardSummary(ctx: OwnerContext, month?: string | null): Promise<DashboardSummary> {
   const monthKey = parseMonth(month);
@@ -41,21 +59,17 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
   await ensureRentPeriodsFor([...billedIds]);
 
   const tenantIds = allTenants.map((t) => t.id);
-  const [periods, payments, adjustments, placements, units, occupancy] = await Promise.all([
+  const [periods, payments, adjustments, placements, units, occupancy, locations, withDocuments] = await Promise.all([
     db.rentPeriods.listForTenants(tenantIds, { openOrFrom: fromMonth }),
     db.payments.listForTenants(tenantIds, { status: "confirmed", fromDate: trendMonthKeys[0] }),
     db.adjustments.listForTenants(tenantIds, { status: "confirmed", fromDate: trendMonthKeys[0] }),
     loadPlacements(db, tenantIds),
     db.units.list(),
     db.occupancy.list(),
+    db.locations.list(),
+    db.tenantDocuments.tenantIdsWithDocuments(),
   ]);
-
-  const periodsByTenant = new Map<string, RentPeriod[]>();
-  for (const period of periods) {
-    const list = periodsByTenant.get(period.tenant_id) ?? [];
-    list.push(period);
-    periodsByTenant.set(period.tenant_id, list);
-  }
+  const periodsByTenant = groupPeriods(periods);
 
   // Current tenants, plus former ones who still owe - arrears don't vanish
   // when someone moves out.
@@ -75,6 +89,7 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
     monthKey,
     todayMonthKey
   );
+  const rowOf = new Map(report.rows.map((r) => [r.tenantId, r]));
 
   const trend = buildBillingCollectionTrend(
     periods,
@@ -91,28 +106,79 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
     vacant: inUse.filter((u) => isVacant({ isActive: u.is_active, occupied: held.has(u.unit_code) })).length,
   };
 
-  return { monthKey, report, trend, houses };
+  const sites = buildSiteCollection(
+    locations.map((l) => ({ code: l.location_code, name: l.name })),
+    report.rows.map((r) => ({ ...r, siteCodes: placementOf(placements, r.tenantId).unitCodes.map(siteOf) }))
+  );
+
+  const active = allTenants.filter((t) => t.status === "active");
+  const kinds = buildKindBreakdown(
+    allTenants
+      .filter((t) => t.status === "active" || rowOf.has(t.id))
+      .map((t) => {
+        const row = rowOf.get(t.id);
+        return {
+          kind: t.tenant_kind,
+          current: t.status === "active",
+          rentTracked: t.rent_tracked,
+          monthlyRent: placementOf(placements, t.id).monthlyRent,
+          monthDue: row?.monthDue ?? 0,
+          monthAllocated: row?.monthAllocated ?? 0,
+          totalOutstanding: row?.totalOutstanding ?? 0,
+          overdueMonths: row?.overdueMonths ?? 0,
+        };
+      })
+  );
+
+  const named = (list: Tenant[]) => list.map((t) => ({ tenantId: t.id, displayName: tenantDisplayName(t) }));
+  const hasDocuments = new Set(withDocuments);
+  const unacknowledged = new Set(payments.filter((p) => !p.acknowledged_at).map((p) => p.tenant_id));
+  const attention = buildAttention({
+    drafts: named(allTenants.filter((t) => t.status === "draft")),
+    noDocuments: named(active.filter((t) => !hasDocuments.has(t.id))),
+    // Acknowledging needs the tenant to get a link: pointless to chase while Twilio is off.
+    unacknowledged: tenantMessagingEnabled() ? named(allTenants.filter((t) => unacknowledged.has(t.id))) : [],
+    rentReview: named(
+      allTenants.filter(
+        (t) =>
+          billedIds.has(t.id) &&
+          rentReviewDue((placements.ratesByTenant.get(t.id) ?? []).map((r) => r.effective_month), todayMonthKey)
+      )
+    ),
+  });
+
+  const portfolio = {
+    rentRoll: round2([...billedIds].reduce((sum, id) => sum + placementOf(placements, id).monthlyRent, 0)),
+    depositsHeld: round2(
+      allTenants.filter((t) => t.status !== "inactive").reduce((sum, t) => sum + Number(t.deposit_amount ?? 0), 0)
+    ),
+    advancePaid: round2(
+      periods.filter((p) => p.period_month > todayMonthKey).reduce((sum, p) => sum + Number(p.amount_allocated), 0)
+    ),
+    paidDirectRent: round2(kinds.reduce((sum, k) => sum + k.paidDirectRent, 0)),
+  };
+
+  const defaulterList = await defaulterRows(db, allTenants, periodsByTenant, todayMonthKey);
+  const defaulters = {
+    top: defaulterList.slice(0, TOP_DEFAULTERS),
+    tenantCount: defaulterList.length,
+    totalOutstanding: round2(defaulterList.reduce((sum, r) => sum + r.totalOutstanding, 0)),
+    groups: agingGroups(defaulterList),
+  };
+
+  return { monthKey, report, trend, houses, defaulters, sites, kinds, attention, portfolio };
 }
 
 /**
- * Every tenant (current or moved out) with unpaid rent for a month that has
- * ended, most months behind first.
+ * Tenants (current or moved out) with unpaid rent for a month that has ended,
+ * most months behind first. `periodsByTenant` must hold at least every unpaid month.
  */
-export async function getDefaultersReport(_ctx: OwnerContext): Promise<DefaultersReport> {
-  const todayMonthKey = currentMonthKey();
-  const db = await ownerDb();
-  const allTenants = await db.tenants.list();
-  await ensureRentPeriodsFor(billedTenantIds(allTenants));
-
-  const periods = await db.rentPeriods.listForTenants(
-    allTenants.map((t) => t.id),
-    { openOnly: true }
-  );
-  const periodsByTenant = new Map<string, RentPeriod[]>();
-  for (const period of periods) {
-    periodsByTenant.set(period.tenant_id, [...(periodsByTenant.get(period.tenant_id) ?? []), period]);
-  }
-
+async function defaulterRows(
+  db: OwnerRepositories,
+  allTenants: Tenant[],
+  periodsByTenant: Map<string, RentPeriod[]>,
+  todayMonthKey: string
+): Promise<DefaulterRow[]> {
   const behind = allTenants
     .map((tenant) => ({ tenant, aging: agingOf(periodsByTenant.get(tenant.id) ?? [], todayMonthKey) }))
     .filter(({ aging }) => aging.overdueMonths > 0);
@@ -127,7 +193,7 @@ export async function getDefaultersReport(_ctx: OwnerContext): Promise<Defaulter
     if (!last || payment.payment_date > last) lastPaid.set(payment.tenant_id, payment.payment_date);
   }
 
-  const rows: DefaulterRow[] = behind
+  return behind
     .map(({ tenant, aging }) => {
       const placement = placementOf(placements, tenant.id);
       return {
@@ -144,6 +210,23 @@ export async function getDefaultersReport(_ctx: OwnerContext): Promise<Defaulter
       };
     })
     .sort(compareAging);
+}
+
+/**
+ * Every tenant (current or moved out) with unpaid rent for a month that has
+ * ended, most months behind first.
+ */
+export async function getDefaultersReport(_ctx: OwnerContext): Promise<DefaultersReport> {
+  const todayMonthKey = currentMonthKey();
+  const db = await ownerDb();
+  const allTenants = await db.tenants.list();
+  await ensureRentPeriodsFor(billedTenantIds(allTenants));
+
+  const periods = await db.rentPeriods.listForTenants(
+    allTenants.map((t) => t.id),
+    { openOnly: true }
+  );
+  const rows = await defaulterRows(db, allTenants, groupPeriods(periods), todayMonthKey);
 
   return {
     asOfMonth: addMonthsToKey(todayMonthKey, -1),

@@ -192,6 +192,7 @@ function build() {
     occupancy: { list: vi.fn(async () => occupancy) },
     tenantDocuments: {
       list: vi.fn(async (tenantId: string) => [...state.documents.values()].filter((d) => d.tenant_id === tenantId)),
+      tenantIdsWithDocuments: vi.fn(async () => [...new Set([...state.documents.values()].map((d) => d.tenant_id))]),
       get: vi.fn(async (id: string) => state.documents.get(id) ?? null),
       create: vi.fn(async (rows: Omit<TenantDocument, "id" | "created_at">[]) => {
         for (const row of rows) {

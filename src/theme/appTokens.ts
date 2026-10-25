@@ -37,3 +37,14 @@ export const cardShadows = {
     hover: "inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 4px rgba(0, 0, 0, 0.5), 0 22px 40px -12px rgba(0, 0, 0, 0.75)",
   },
 } as const;
+
+/**
+ * Categorical chart colours, one per tenant type in TENANT_KINDS order
+ * (individual, business, government). Slots 1-3 of the dataviz reference
+ * palette, checked with its validator against white and the dark paper:
+ * the light aqua is under 3:1, so charts using these carry labels and a table view.
+ */
+export const chartCategorical = {
+  light: ["#2a78d6", "#eb6834", "#1baf7a"],
+  dark: ["#3987e5", "#d95926", "#199e70"],
+} as const;

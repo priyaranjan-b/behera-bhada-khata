@@ -180,6 +180,8 @@ export interface OwnerRepositories {
   tenantDocuments: {
     /** Oldest first. */
     list(tenantId: string): Promise<TenantDocument[]>;
+    /** Every tenant with at least one document (Overview's "No documents on file"). */
+    tenantIdsWithDocuments(): Promise<string[]>;
     get(id: string): Promise<TenantDocument | null>;
     create(rows: Insert<"tenant_documents">[]): Promise<void>;
     /** False if no such document. */

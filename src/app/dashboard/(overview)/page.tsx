@@ -15,6 +15,12 @@ import BillingCollectionChart from "@/components/domain/BillingCollectionChart";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 import { EmptyState, PageHeader } from "@/components/ui/DataDisplay";
 import { InsetBox } from "@/components/ui";
+import NeedsAttentionCard from "@/components/domain/NeedsAttentionCard";
+import PortfolioCard from "@/components/domain/PortfolioCard";
+import SiteCollectionCard from "@/components/domain/SiteCollectionCard";
+import TenantTypesCard from "@/components/domain/TenantTypesCard";
+import TopDefaultersCard from "@/components/domain/TopDefaultersCard";
+import { collectionRateTone } from "@/lib/domain/overview";
 import TenantStatusGrid from "./TenantStatusGrid";
 
 /** Where the Expected / Collected cards jump to on this page. */
@@ -38,7 +44,8 @@ export default async function DashboardPage({
   searchParams: Promise<{ month?: string; show?: string }>;
 }) {
   const { month, show } = await searchParams;
-  const { monthKey, report, trend, houses } = await serverApi.dashboard.summary(month);
+  const { monthKey, report, trend, houses, defaulters, sites, kinds, attention, portfolio } =
+    await serverApi.dashboard.summary(month);
   const prevMonth = yearMonthOf(addMonthsToKey(monthKey, -1));
   const nextMonth = yearMonthOf(addMonthsToKey(monthKey, 1));
   const monthLabel = formatMonth(monthKey);
@@ -92,7 +99,7 @@ export default async function DashboardPage({
                 ? undefined
                 : {
                     label: `${collectionRate}%`,
-                    tone: collectionRate >= 90 ? "success" : collectionRate >= 60 ? "warning" : "danger",
+                    tone: collectionRateTone(collectionRate),
                   }
             }
             sparkline={sparklineFor(trend, "collected")}
@@ -132,7 +139,26 @@ export default async function DashboardPage({
         </Grid>
       </Grid>
 
-      <BillingCollectionChart data={trend} />
+      <Grid container spacing={2} columns={12}>
+        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0 }}>
+          <BillingCollectionChart data={trend} />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0 }}>
+          <NeedsAttentionCard items={attention} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+          <TopDefaultersCard defaulters={defaulters} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+          <SiteCollectionCard sites={sites} monthLabel={monthLabel} />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0 }}>
+          <TenantTypesCard kinds={kinds} monthLabel={monthLabel} />
+        </Grid>
+        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0 }}>
+          <PortfolioCard portfolio={portfolio} houses={houses} />
+        </Grid>
+      </Grid>
 
       <TenantStatusGrid
         key={`${monthKey}-${show ?? ""}`}

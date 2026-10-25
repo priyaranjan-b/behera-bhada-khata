@@ -4,6 +4,7 @@
 // which database sits behind the API.
 import type * as z from "zod";
 import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "@/lib/domain/reports";
+import type { AttentionItem, KindBreakdown, SiteCollection } from "@/lib/domain/overview";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
@@ -91,6 +92,25 @@ export interface DashboardSummary {
   trend: MonthlyTrendPoint[];
   /** In-use houses (retired ones left out) and how many have nobody in them today. */
   houses: { total: number; vacant: number };
+  /** Who's behind today (not the selected month): the worst few, and the aging bands of everyone. */
+  defaulters: { top: DefaulterRow[]; tenantCount: number; totalOutstanding: number; groups: AgingGroup[] };
+  /** The selected month per site. */
+  sites: SiteCollection[];
+  /** The selected month by tenant type. */
+  kinds: KindBreakdown[];
+  attention: AttentionItem[];
+  portfolio: PortfolioFacts;
+}
+
+export interface PortfolioFacts {
+  /** This month's combined rent of every billed tenant. */
+  rentRoll: number;
+  /** Security deposits of current and draft tenants. */
+  depositsHeld: number;
+  /** Paid towards months after this one. */
+  advancePaid: number;
+  /** Government agreement rent paid to the owner directly, not tracked (0016). */
+  paidDirectRent: number;
 }
 
 // ---- /api/dashboard/defaulters (tenants behind on rent, by months) -----------

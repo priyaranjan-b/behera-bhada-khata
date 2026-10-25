@@ -2,18 +2,11 @@ import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { formatMonth } from "@/lib/dates";
-import type { AgingBucketKey } from "@/lib/domain/reports";
+import { AGING_BAND_TONE } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
 import StatCard from "@/components/ui/StatCard";
-import { PageHeader, type BadgeTone } from "@/components/ui/DataDisplay";
+import { PageHeader } from "@/components/ui/DataDisplay";
 import DefaultersList from "./DefaultersList";
-
-const BAND_TONE: Record<AgingBucketKey, BadgeTone> = {
-  m1: "warning",
-  m2to3: "danger",
-  m4to6: "danger",
-  m7plus: "danger",
-};
 
 const tenants = (n: number) => `${n} tenant${n === 1 ? "" : "s"}`;
 
@@ -36,7 +29,7 @@ export default async function DefaultersPage() {
               caption={tenants(group.tenantCount)}
               badge={
                 group.tenantCount > 0
-                  ? { label: "Follow up", tone: BAND_TONE[group.key] }
+                  ? { label: "Follow up", tone: AGING_BAND_TONE[group.key] }
                   : { label: "None", tone: "success" }
               }
             />
