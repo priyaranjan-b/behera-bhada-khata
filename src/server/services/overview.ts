@@ -141,7 +141,8 @@ export async function getOverviewMonth(
           totalOutstanding: row?.totalOutstanding ?? 0,
           overdueMonths: row?.overdueMonths ?? 0,
         };
-      })
+      }),
+    { paidDirect: showPaidDirect }
   );
 
   const paidDirect = { available: paidDirectTenants(allTenants).length > 0, shown: showPaidDirect };

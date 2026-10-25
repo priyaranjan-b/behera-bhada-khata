@@ -74,7 +74,11 @@ export interface KindBreakdown {
   paidDirectRent: number;
 }
 
-/** Tenants, the month's billing and arrears by tenant type, every type listed. */
+/**
+ * Tenants, the month's billing and arrears by tenant type, every type listed.
+ * `paidDirect: false` (the "Include Govt paid direct" switch off, A11) leaves
+ * government rent paid direct out of the paid-direct figures.
+ */
 export function buildKindBreakdown(
   tenants: {
     kind: TenantKind;
@@ -85,12 +89,14 @@ export function buildKindBreakdown(
     monthAllocated: number;
     totalOutstanding: number;
     overdueMonths: number;
-  }[]
+  }[],
+  options: { paidDirect?: boolean } = {}
 ): KindBreakdown[] {
+  const { paidDirect = true } = options;
   return TENANT_KINDS.map((kind) => {
     const of = tenants.filter((t) => t.kind === kind);
     const sum = (pick: (t: (typeof of)[number]) => number) => round2(of.reduce((s, t) => s + pick(t), 0));
-    const direct = of.filter((t) => t.current && !t.rentTracked);
+    const direct = paidDirect ? of.filter((t) => t.current && !t.rentTracked) : [];
     return {
       kind,
       label: TENANT_KIND_LABELS[kind],

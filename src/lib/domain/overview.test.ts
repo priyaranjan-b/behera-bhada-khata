@@ -53,6 +53,15 @@ describe("buildKindBreakdown", () => {
     expect(result[1]).toMatchObject({ tenants: 2, expected: 10000, collected: 5000, outstanding: 14000, overdueTenants: 2 });
     expect(result[2]).toMatchObject({ tenants: 1, expected: 0, paidDirectTenants: 1, paidDirectRent: 20000 });
   });
+
+  it("leaves rent paid direct out when the view hides it, still counting the tenant", () => {
+    const govt = { kind: "government" as const, current: true, rentTracked: false, monthlyRent: 20000, monthDue: 0, monthAllocated: 0, totalOutstanding: 0, overdueMonths: 0 };
+    expect(buildKindBreakdown([govt], { paidDirect: false })[2]).toMatchObject({
+      tenants: 1,
+      paidDirectTenants: 0,
+      paidDirectRent: 0,
+    });
+  });
 });
 
 describe("rentReviewDue", () => {

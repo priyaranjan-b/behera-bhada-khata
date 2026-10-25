@@ -92,9 +92,13 @@ describe("Overview sections", () => {
       advancePaid: 5000,
       paidDirectRent: 0,
     });
-    expect((await getOverviewMonth(ctx, "2026-10", { paidDirect: "hide" })).paidDirect).toEqual({
-      available: true,
-      shown: false,
+    const hidden = await getOverviewMonth(ctx, "2026-10", { paidDirect: "hide" });
+    expect(hidden.paidDirect).toEqual({ available: true, shown: false });
+    // Tenant types follows the same switch.
+    expect(hidden.kinds.find((k) => k.kind === "government")).toMatchObject({ paidDirectTenants: 0, paidDirectRent: 0 });
+    expect((await getOverviewMonth(ctx, "2026-10")).kinds.find((k) => k.kind === "government")).toMatchObject({
+      paidDirectTenants: 1,
+      paidDirectRent: 11000,
     });
   });
 });

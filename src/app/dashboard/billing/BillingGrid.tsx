@@ -5,7 +5,10 @@ import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
-import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, {
+  moneyColumn,
+  type DataTableColDef,
+} from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
 import { StatusChip } from "@/components/domain/StatusChip";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
@@ -17,7 +20,13 @@ import { statusLabel } from "@/lib/domain/status";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 
-type ShowFilter = "all" | "unpaid" | "partly" | "paid" | "paidDirect" | "notDue";
+type ShowFilter =
+  | "all"
+  | "unpaid"
+  | "partly"
+  | "paid"
+  | "paidDirect"
+  | "notDue";
 
 const SHOW_OPTIONS: { value: ShowFilter; label: string }[] = [
   { value: "all", label: "All months" },
@@ -28,7 +37,10 @@ const SHOW_OPTIONS: { value: ShowFilter; label: string }[] = [
   { value: "notDue", label: "Not due yet" },
 ];
 
-const displayStatus = (row: BillingRow) => (row.paidDirect ? "paid_direct" : periodDisplayStatus(row.status, row.notYetDue));
+const displayStatus = (row: BillingRow) =>
+  row.paidDirect
+    ? "paid_direct"
+    : periodDisplayStatus(row.status, row.notYetDue);
 
 function matches(row: BillingRow, show: ShowFilter): boolean {
   const status = displayStatus(row);
@@ -62,7 +74,9 @@ const PAID_DIRECT_TEXT = "Paid to your bank directly";
 const receiptText = (row: BillingRow) =>
   row.paidDirect
     ? PAID_DIRECT_TEXT
-    : row.payments.map((p) => `${p.receiptNo ?? "—"} (${formatDateKey(p.paymentDate)})`).join(", ");
+    : row.payments
+        .map((p) => `${p.receiptNo ?? "—"} (${formatDateKey(p.paymentDate)})`)
+        .join(", ");
 
 const columns: DataTableColDef<BillingRow>[] = [
   {
@@ -78,7 +92,11 @@ const columns: DataTableColDef<BillingRow>[] = [
     flex: 1.3,
     minWidth: 200,
     renderCell: ({ row }) => (
-      <IdentityCell name={row.tenantName} caption={row.propertyName} href={routes.tenants.detail(row.tenantId)} />
+      <IdentityCell
+        name={row.tenantName}
+        caption={row.propertyName}
+        href={routes.tenants.detail(row.tenantId)}
+      />
     ),
   },
   moneyColumn<BillingRow>("amountDue", "Billed"),
@@ -93,7 +111,10 @@ const columns: DataTableColDef<BillingRow>[] = [
       const a = p1.api.getRow(p1.id) as BillingRow | null;
       const b = p2.api.getRow(p2.id) as BillingRow | null;
       if (!a || !b) return 0;
-      return STATUS_RANK[displayStatus(a)] - STATUS_RANK[displayStatus(b)] || a.balance - b.balance;
+      return (
+        STATUS_RANK[displayStatus(a)] - STATUS_RANK[displayStatus(b)] ||
+        a.balance - b.balance
+      );
     },
     renderCell: ({ row }) => <StatusChip status={displayStatus(row)} />,
   },
@@ -115,8 +136,16 @@ const columns: DataTableColDef<BillingRow>[] = [
       ) : (
         <Stack spacing={0.25} sx={{ py: 0.5 }}>
           {row.payments.map((p) => (
-            <Typography key={p.paymentId} variant="caption" component="div" noWrap>
-              <MuiLink href={apiHref(apiPaths.dashboard.payments.receipt(p.paymentId))} aria-label={`Receipt ${p.receiptNo ?? ""} for ${row.tenantName}`}>
+            <Typography
+              key={p.paymentId}
+              variant="caption"
+              component="div"
+              noWrap
+            >
+              <MuiLink
+                href={apiHref(apiPaths.dashboard.payments.receipt(p.paymentId))}
+                aria-label={`Receipt ${p.receiptNo ?? ""} for ${row.tenantName}`}
+              >
                 {p.receiptNo ?? "Receipt"}
               </MuiLink>
               {` · ${formatDateKey(p.paymentDate)} · ${paymentModeLabel(p.mode)} · ${formatMoney(p.amount)}`}
@@ -128,12 +157,29 @@ const columns: DataTableColDef<BillingRow>[] = [
 ];
 
 /** Every tenant's rent for each month in the range, with what paid it. */
-export default function BillingGrid({ rows, rangeLabel }: { rows: BillingRow[]; rangeLabel: string }) {
+export default function BillingGrid({
+  rows,
+  rangeLabel,
+}: {
+  rows: BillingRow[];
+  rangeLabel: string;
+}) {
   const [show, setShow] = useState<ShowFilter>("all");
-  const filtered = useMemo(() => rows.filter((row) => matches(row, show)), [rows, show]);
+  const filtered = useMemo(
+    () => rows.filter((row) => matches(row, show)),
+    [rows, show],
+  );
   const filters = useMemo(
-    () => [{ label: "Show", value: show, options: SHOW_OPTIONS, onChange: setShow, defaultValue: "all" as const }],
-    [show]
+    () => [
+      {
+        label: "Show",
+        value: show,
+        options: SHOW_OPTIONS,
+        onChange: setShow,
+        defaultValue: "all" as const,
+      },
+    ],
+    [show],
   );
 
   return (
@@ -155,7 +201,9 @@ export default function BillingGrid({ rows, rangeLabel }: { rows: BillingRow[]; 
           description="Rent months appear here once a tenant is billed for them."
         />
       }
-      initialState={{ sorting: { sortModel: [{ field: "status", sort: "desc" }] } }}
+      initialState={{
+        sorting: { sortModel: [{ field: "amountAllocated", sort: "desc" }] },
+      }}
     />
   );
 }
