@@ -13,30 +13,30 @@ export interface Crumb {
 }
 
 /**
- * Every page route under /dashboard and its breadcrumb label. `:id` matches
- * any dynamic segment. Add a line here when adding a page; URL prefixes with
- * no page of their own (e.g. /dashboard/payments) are skipped automatically.
+ * Every owner page and its breadcrumb label; "/" (the Overview) starts every
+ * trail. `:id` matches any dynamic segment. Add a line here when adding a
+ * page; URL prefixes with no page of their own (e.g. /payments) are skipped.
  */
 const ROUTE_LABELS: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/dashboard/properties": "Properties",
-  "/dashboard/properties/new": "New property",
-  "/dashboard/properties/:id": "Property",
-  "/dashboard/properties/:id/tenants/new": "New tenant",
-  "/dashboard/properties/:id/tenants/bulk": "Bulk upload",
-  "/dashboard/properties/:id/units/new": "Add house",
-  "/dashboard/tenants": "Tenants",
-  "/dashboard/tenants/new": "Add tenant",
-  "/dashboard/tenants/:id": "Tenant",
-  "/dashboard/tenants/:id/edit": "Edit",
-  "/dashboard/houses": "Houses",
-  "/dashboard/houses/new": "Add house",
-  "/dashboard/tenants/:id/payments/new": "Record payment",
-  "/dashboard/payments/:id/adjust": "Adjust payment",
-  "/dashboard/profile": "Profile",
-  "/dashboard/defaulters": "Defaulters",
-  "/dashboard/billing": "Billing",
-  "/dashboard/activity": "Activity",
+  "/": "Overview",
+  "/properties": "Properties",
+  "/properties/new": "New property",
+  "/properties/:id": "Property",
+  "/properties/:id/tenants/new": "New tenant",
+  "/properties/:id/tenants/bulk": "Bulk upload",
+  "/properties/:id/units/new": "Add house",
+  "/tenants": "Tenants",
+  "/tenants/new": "Add tenant",
+  "/tenants/:id": "Tenant",
+  "/tenants/:id/edit": "Edit",
+  "/houses": "Houses",
+  "/houses/new": "Add house",
+  "/tenants/:id/payments/new": "Record payment",
+  "/payments/:id/adjust": "Adjust payment",
+  "/profile": "Profile",
+  "/defaulters": "Defaulters",
+  "/billing": "Billing",
+  "/activity": "Activity",
 };
 
 const ROUTES = Object.entries(ROUTE_LABELS).map(([pattern, label]) => ({
@@ -66,7 +66,8 @@ function labelFor(segments: string[]): string | undefined {
 export function crumbsForPath(pathname: string): Crumb[] {
   const parts = pathname.split("/").filter(Boolean);
   const crumbs: Crumb[] = [];
-  for (let i = 1; i <= parts.length; i++) {
+  // i = 0 is "/" (the Overview), the root of every trail.
+  for (let i = 0; i <= parts.length; i++) {
     const label = labelFor(parts.slice(0, i));
     if (label) crumbs.push({ label, href: `/${parts.slice(0, i).join("/")}` });
   }

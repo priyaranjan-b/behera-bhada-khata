@@ -54,7 +54,8 @@ development, required in production.
   real names stay local, `statusLabel`, the custom Excel export
   (`exportValue`, MUI's is Premium-only), the per-tower monthly-rent split,
   the audit history screens and events (A10), Govt rent counted as paid
-  direct (A11), and the Overview streamed in sections (A12). Read it before changing
+  direct (A11), pages streamed in sections (A12), and owner pages without a
+  `/` prefix (A13). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -164,7 +165,7 @@ both together.
   name (landlord on receipts, name in the app shell), `signature_name` for
   whoever signs on their behalf, and a saved signature (`owner/...png`) that
   the payment and adjustment forms use unless you sign by hand - each record
-  gets its own copy. Edited on `/dashboard/profile`
+  gets its own copy. Edited on `/profile`
   (`src/server/services/profile.ts`).
 - **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
   agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,
@@ -177,7 +178,7 @@ both together.
   Nobody, not even the service role, can edit or delete it. Reads and the
   best-effort `recordEvent` are in `src/server/services/audit.ts`, the text
   in `src/lib/domain/audit.ts`; shown by `AuditTimeline` and
-  `/dashboard/activity` (A10). A new table with vital data gets the
+  `/activity` (A10). A new table with vital data gets the
   trigger (checklist in `docs/database-design.md`).
 - **Recorded = counted** (`0010_instant_confirmation.sql`, D20): both
   ledger tables are written as `status = 'confirmed'` and applied to
@@ -217,7 +218,7 @@ UI         src/app/** pages, src/components/**
              Client Components: api        (src/lib/api-client/index.ts, fetch)
 API        src/app/api/**/route.ts — thin: auth + JSON via src/server/http.ts,
              then one service call. The tree mirrors the pages:
-             app/dashboard/tenants/[tenantId]/page.tsx
+             app/(app)/tenants/[tenantId]/page.tsx
                ↔ app/api/dashboard/tenants/[tenantId]/route.ts
              Writes POST to the collection (…/tenants/[id]/payments); a
              page's reads are GETs under its path, one per logical section
@@ -260,7 +261,7 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
   RLS (`is_app_owner()`) via the session client, so another database must
   enforce the same check itself. Services take an `OwnerContext` (from
   `getOwnerContext()`) as proof the check ran; name it `_ctx` where unused.
-  Tower routes take the property code (`/dashboard/properties/AC-T1`);
+  Tower routes take the property code (`/properties/AC-T1`);
   services parse it with `propertyCodeSchema`, and a malformed code is a
   404.
   `systemDb()` is unscoped (service role) and only for flows that authorize
@@ -278,10 +279,18 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
 - Route protection is a `src/proxy.ts` file, not `middleware.ts` — **Next.js
   16 renamed Middleware to Proxy** (same mechanics, see
   `node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md`). It
-  redirects unauthenticated requests to `/dashboard/**` to `/login`, and
-  refreshes the session cookie (`src/server/adapters/supabase/proxy.ts`).
+  sends a signed-out visitor to `/login?next=…` for **every page except the
+  public ones** (`isProtectedPath` in `src/lib/routes.ts`: `/login`,
+  `/auth/*`, `/confirm/*` and `/api/*`, which answers 401 itself). It fails
+  closed, so a new page is protected without listing it. It also refreshes
+  the session cookie (`src/server/adapters/supabase/proxy.ts`).
+- **Owner pages have no URL prefix (A13).** They live in the `src/app/(app)/`
+  route group, which carries the shell layout but adds nothing to the URL:
+  `/` (Overview), `/tenants/…`, `/properties/…`, `/billing`. Old
+  `/dashboard/…` links get a permanent redirect (`next.config.ts`). The API
+  stays under `/api/dashboard/…`.
 - **Authorization happens in the data call, not the layout.**
-  `src/app/dashboard/layout.tsx` checks the session for the shell, but
+  `src/app/(app)/layout.tsx` checks the session for the shell, but
   layouts don't re-render on client navigation, so it is not a guard. What
   protects data is that every owner read/write goes through `serverApi` (its
   `owner()` → `getOwnerContext()`) or `ownerRoute`, which return 401 without
@@ -291,7 +300,7 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
 - Login is Supabase Auth, two ways on the `/login` tabs. **Password**:
   `POST /api/auth/password` (`signInWithPassword` in
   `src/server/services/auth.ts`) signs in, then signs a non-owner straight
-  back out; the owner sets the password on `/dashboard/profile`
+  back out; the owner sets the password on `/profile`
   (`changePassword`, `PASSWORD_LIMITS`). **Email magic link**: it lands on the `/auth/callback` page,
   which forwards `?code=` to `GET /api/auth/callback` (only a route handler
   can set cookies) or posts `#access_token` to `POST /api/auth/session`. The
@@ -472,14 +481,14 @@ Each of these was found broken somewhere; keep them when adding code.
   search icon in the mobile `AppNavbar`) loads `GET /api/dashboard/search`
   once per page and matches tenants (name, business) and houses (label,
   code) in the browser with `src/lib/domain/search.ts`.
-- The Overview (`/dashboard`) is streamed in sections (A12): one call per
+- The Overview (`/`) is streamed in sections (A12): one call per
   section (`serverApi.dashboard.overview.*`, `src/server/services/overview.ts`,
   shared reads through the `cache()` loaders in
   `src/server/services/loaders.ts`), each rendered by
   `sections/*.tsx` inside an `AsyncSection` (Suspense + per-card error
   boundary), placed by `OverviewLayout`; the placeholders are one map,
   `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`.
-- Defaulters (`/dashboard/defaulters`, `getDefaultersReport` in
+- Defaulters (`/defaulters`, `getDefaultersReport` in
   `src/server/services/dashboard.ts`): every tenant, moved-out ones too,
   with rent unpaid for an ended month, most months behind first. Aging
   (`agingOf`, `compareAging`, `agingGroups`, `AGING_BUCKETS` in

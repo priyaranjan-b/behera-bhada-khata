@@ -10,7 +10,7 @@ needs new data, run the `add-api-endpoint` skill first.
 
 ## File layout
 
-- **Page:** `src/app/dashboard/<route>/page.tsx` is an async Server Component.
+- **Page:** `src/app/(app)/<route>/page.tsx` is an async Server Component.
 - **Interactive parts:** forms, grids with state and buttons that mutate go
   in a sibling `"use client"` file, for example `PaymentForm.tsx` or
   `TenantLedgerTable.tsx`.
@@ -56,7 +56,7 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
   `PanelSkeleton` from `@/components/ui/Skeletons`), not a page-wide spinner,
   and, if it can fail independently, `error.tsx` (`EmptyState` + `retry`).
 - **A page of independent cards (a dashboard): stream it in sections (A12),**
-  as on the Overview (`src/app/dashboard/(overview)/`).
+  as on the Overview (`src/app/(app)/(overview)/`).
   - **Parts of a section:**
     - a data call: a service function and a GET, shaped for the section;
     - an async component in `sections/` taking promises;

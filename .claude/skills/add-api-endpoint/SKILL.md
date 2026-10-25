@@ -41,7 +41,7 @@ If your change adds a new design decision, or changes one, update
 ## 1. Pick the path (mirror the page tree)
 
 - A page's reads are **GETs under the page's own path in `/api`**:
-  `app/dashboard/tenants/[tenantId]/payments/new/page.tsx` →
+  `app/(app)/tenants/[tenantId]/payments/new/page.tsx` →
   `app/api/dashboard/tenants/[tenantId]/payments/new/route.ts`.
 - **Split them logically; never return everything the page needs in one
   big response.** One GET, service function and contract per logical
@@ -157,7 +157,7 @@ import { createPayment } from "@/server/services/payments";
 
 type Params = { tenantId: string };
 
-// POST from /dashboard/tenants/[tenantId]/payments/new
+// POST from /tenants/[tenantId]/payments/new
 export const POST = ownerRoute<Params>(async (ctx, request, { tenantId }) =>
   createPayment(ctx, tenantId, await readJson(request))
 );

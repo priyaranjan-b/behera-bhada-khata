@@ -22,6 +22,17 @@ const nextConfig: NextConfig = {
     "/api/dashboard/adjustments/*/receipt": ["./src/server/pdf/fonts/**/*"],
   },
 
+  // Every page used to live under /dashboard (/dashboard/tenants/…); now it is
+  // at the root (/tenants/…, the Overview at /). Old bookmarks and links keep
+  // working (A13). Redirects run before the proxy, so a signed-out visitor
+  // lands on /login?next=<new path>.
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/", permanent: true },
+      { source: "/dashboard/:path*", destination: "/:path*", permanent: true },
+    ];
+  },
+
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

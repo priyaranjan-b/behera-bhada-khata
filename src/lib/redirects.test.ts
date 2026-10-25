@@ -3,18 +3,18 @@ import { safeNext } from "./redirects";
 
 describe("safeNext", () => {
   it("allows same-site paths", () => {
-    expect(safeNext("/dashboard/tenants")).toBe("/dashboard/tenants");
-    expect(safeNext("/dashboard?month=2026-10")).toBe("/dashboard?month=2026-10");
+    expect(safeNext("/tenants")).toBe("/tenants");
+    expect(safeNext("/?month=2026-10")).toBe("/?month=2026-10");
   });
 
   it("falls back to the dashboard for anything else", () => {
-    expect(safeNext(undefined)).toBe("/dashboard");
-    expect(safeNext(null)).toBe("/dashboard");
-    expect(safeNext("")).toBe("/dashboard");
-    expect(safeNext("//evil.test")).toBe("/dashboard");
-    expect(safeNext("/\\evil.test")).toBe("/dashboard");
-    expect(safeNext("/\t/evil.test")).toBe("/dashboard");
-    expect(safeNext("https://evil.test")).toBe("/dashboard");
-    expect(safeNext("javascript:alert(1)")).toBe("/dashboard");
+    expect(safeNext(undefined)).toBe("/");
+    expect(safeNext(null)).toBe("/");
+    expect(safeNext("")).toBe("/");
+    expect(safeNext("//evil.test")).toBe("/");
+    expect(safeNext("/\\evil.test")).toBe("/");
+    expect(safeNext("/\t/evil.test")).toBe("/");
+    expect(safeNext("https://evil.test")).toBe("/");
+    expect(safeNext("javascript:alert(1)")).toBe("/");
   });
 });

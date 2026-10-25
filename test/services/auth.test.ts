@@ -53,15 +53,15 @@ describe("requestMagicLink", () => {
 });
 
 describe("signInWithPassword", () => {
-  const owner = { email: "Owner@Example.com", password: "correct-horse", next: "/dashboard/tenants" };
+  const owner = { email: "Owner@Example.com", password: "correct-horse", next: "/tenants" };
 
   it("signs the owner in and returns where to go", async () => {
-    expect(await signInWithPassword(owner, meta)).toEqual({ next: "/dashboard/tenants" });
+    expect(await signInWithPassword(owner, meta)).toEqual({ next: "/tenants" });
     expect(fakes.auth.signInWithPassword).toHaveBeenCalledWith("owner@example.com", "correct-horse");
   });
 
   it("never sends the owner to another site", async () => {
-    expect(await signInWithPassword({ ...owner, next: "https://evil.test" }, meta)).toEqual({ next: "/dashboard" });
+    expect(await signInWithPassword({ ...owner, next: "https://evil.test" }, meta)).toEqual({ next: "/" });
   });
 
   it("answers a wrong password and an email outside OWNER_EMAILS the same way", async () => {

@@ -56,7 +56,7 @@ optional, so nothing about money depends on Twilio. Adding the five
 link**. `POST /api/auth/password` → `signInWithPassword` in
 `src/server/services/auth.ts` (Supabase `signInWithPassword`, sets the same
 session cookies). The owner sets/changes the password on
-`/dashboard/profile` (`changePassword`). Limits: `PASSWORD_LIMITS`
+`/profile` (`changePassword`). Limits: `PASSWORD_LIMITS`
 (8–72; 72 is bcrypt's limit) in `src/lib/validation.ts`; rate limits
 `RATE_LIMITS.passwordPerEmail` (10/h) and `passwordPerIp` (30/h).
 
@@ -156,7 +156,7 @@ compression → extend `xlsx.ts` (or switch to a library then).
 
 **Decision.** `rentByProperty` (`src/server/services/placements.ts`) gives
 `PropertyCard.monthlyRent` and `LocationGroup.monthlyRent` (sum of its
-towers) on `/dashboard/properties`. It counts **current** tenancies only
+towers) on `/properties`. It counts **current** tenancies only
 (started on or before today and still holding the house), takes each
 tenant's rent in effect this month and splits it **evenly across the houses
 they occupy now**, then sums per tower (`round2`). A tower with no
@@ -184,7 +184,7 @@ three places and adds the events the database can't see.
 - **House → History dialog** (`UnitsGrid.tsx`): occupants with formatted
   dates, plus the house's own changes and every tenancy started or ended in
   it (`unit_code` on the log row).
-- **`/dashboard/activity`** (side menu "Activity"): everything, with a
+- **`/activity`** (side menu "Activity"): everything, with a
   "Show" filter by category (`AUDIT_CATEGORIES`), a date range, search and
   Excel download. Pages of `AUDIT_LIMITS.pageSize` (50) and "Load older
   changes" (keyset on `id`).
@@ -244,14 +244,14 @@ arrive every month. Rejected alternatives:
 
 ### A12 — The Overview streams in sections, one data call each
 
-**Decision.** `/dashboard` is a set of independent **sections**, each loaded
+**Decision.** The Overview (`/`) is a set of independent **sections**, each loaded
 by its own call and shown as soon as it is ready. A section has four parts:
 - **Data:** a service function and a GET under `/api/dashboard/overview/*`
   (`month`, `trend`, `houses`, `attention`, `portfolio`, and `paid-direct`
   for the header switch, which needs only the tenant list; the defaulters
   card reuses `/api/dashboard/defaulters`). These live in
   `src/server/services/overview.ts`.
-- **A section component** in `src/app/dashboard/(overview)/sections/`: an
+- **A section component** in `src/app/(app)/(overview)/sections/`: an
   async Server Component that awaits its promise(s) and renders the cards.
 - **A slot** in `OverviewLayout.tsx`, plus its placeholder in
   `OVERVIEW_SKELETONS` (`overviewSkeletons.tsx`). A placeholder is one of the
@@ -330,3 +330,42 @@ Trade-offs:
   so each endpoint reloads the base data.
 - Sections may read moments apart. That is fine for a dashboard. Never
   combine figures from two sections into one number.
+
+## URLs
+
+### A13 — Owner pages have no `/dashboard` prefix
+
+**Decision.** Every owner page is at the root:
+- the Overview is `/`;
+- the rest are `/tenants/…`, `/properties/…`, `/houses`, `/billing`,
+  `/defaulters`, `/activity` and `/profile`.
+
+How it's built:
+- **Folders:** the pages live in the `src/app/(app)/` route group. Its
+  layout carries the shell (menu, top bar, breadcrumbs), and the group adds
+  nothing to the URL.
+- **Links:** every link is built through `routes` (`src/lib/routes.ts`).
+  The menu tab (`tabForPath`) and the breadcrumbs (`ROUTE_LABELS`, rooted at
+  "Overview" on `/`) read the same paths.
+- **Sign-in:** the proxy protects every page except the public ones
+  (`isProtectedPath`: `/login`, `/auth/*`, `/confirm/*`, `/api/*`). It fails
+  closed, so a new page needs no entry to be protected. After sign-in,
+  `?next=` brings the visitor back to the same page, query included.
+- **Old links:** `next.config.ts` sends `/dashboard` and `/dashboard/:path*`
+  to the same path without the prefix with a permanent 308, query kept.
+  Redirects run before the proxy, so a signed-out old link lands on
+  `/login?next=<new path>`.
+- **The API keeps `/api/dashboard/…`.** Only the app calls it, and its tree
+  still mirrors the pages.
+
+**Why.**
+- `/dashboard` meant nothing: Properties, Tenants and Billing aren't part of
+  a dashboard, the Overview is.
+- The prefix lengthened every link and put "Dashboard ›" at the start of
+  every breadcrumb trail.
+- Protecting one prefix also meant a page placed outside it was public by
+  accident. The rule is now to protect everything but a short public list.
+
+**Rejected:** keeping `/dashboard` and only renaming the crumb. That hides
+the symptom, but the URLs are what the owner shares and bookmarks.
+

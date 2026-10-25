@@ -27,6 +27,7 @@ import {
 } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import type { PreferredChannel, TenantKind } from "@/lib/types";
+import { routes } from "@/lib/routes";
 
 type Mode =
   // propertyCode: the tower the form was opened from; omitted for the side-menu shortcut.
@@ -121,10 +122,10 @@ export default function TenantForm({
   // Months already due the moment this is saved (billing start .. this month).
   const monthsDueNow = billingStart ? monthsBetween(billingStart, addMonthsToKey(currentMonthKey(), 1)) : 0;
   const cancelHref = editing
-    ? `/dashboard/tenants/${editing.id}`
+    ? routes.tenants.detail(editing.id)
     : homeTower
-      ? `/dashboard/properties/${homeTower}`
-      : "/dashboard/tenants";
+      ? routes.properties.detail(homeTower)
+      : routes.tenants.list();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -194,7 +195,7 @@ export default function TenantForm({
             return;
           }
         }
-        router.push(`/dashboard/tenants/${mode.tenant.id}?saved=1`);
+        router.push(routes.tenants.detail(mode.tenant.id, { saved: "1" }));
       } else {
         const { id } = await api.dashboard.tenants.create({
           ...contact,
@@ -203,7 +204,7 @@ export default function TenantForm({
           paidThrough: paidThrough && !untracked ? monthKeyOf(paidThrough) : undefined,
           depositAmount: deposit ? Number(deposit) : undefined,
         });
-        router.push(`/dashboard/tenants/${id}?saved=1`);
+        router.push(routes.tenants.detail(id, { saved: "1" }));
       }
       router.refresh();
     } catch (err) {

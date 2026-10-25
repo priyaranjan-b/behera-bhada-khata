@@ -46,7 +46,7 @@ describe("searchSuggestions", () => {
 
   it("finds a tenant by name and by business, linking to the tenant page", () => {
     const [byName] = searchSuggestions(index, "kumar");
-    expect(byName).toMatchObject({ key: "tenant:t-ravi", primary: "Lotus Prints", href: "/dashboard/tenants/t-ravi" });
+    expect(byName).toMatchObject({ key: "tenant:t-ravi", primary: "Lotus Prints", href: "/tenants/t-ravi" });
     expect(byName.secondary).toBe("Ravi Kumar · AC-T1-103");
     expect(keys("lotus pr")[0]).toBe("tenant:t-ravi");
   });
@@ -58,7 +58,7 @@ describe("searchSuggestions", () => {
 
   it("finds houses by label, going to the occupant or the vacant house's tower", () => {
     const godowns = searchSuggestions(index, "GODOWN");
-    expect(godowns.map((s) => s.href)).toEqual(["/dashboard/properties/AC-T2", "/dashboard/tenants/t-draft"]);
+    expect(godowns.map((s) => s.href)).toEqual(["/properties/AC-T2", "/tenants/t-draft"]);
     expect(godowns[0].secondary).toBe("AC-T2-G01 · Vacant");
     expect(godowns[1].secondary).toBe("RM-TW-G02 · Occupied by Gopal");
     expect(keys("room")).toEqual(["unit:AC-T1-105"]);

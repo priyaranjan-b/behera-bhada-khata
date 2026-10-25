@@ -94,7 +94,7 @@ them directly; there is no surrogate uuid. The `prevent_key_change()` trigger
 rejects any update of a code, and foreign keys are `ON UPDATE RESTRICT`.
 
 **Why.** These are the codes the family already uses on paper and on
-receipts. They read well in URLs (`/dashboard/properties/AC-T1`) and need no
+receipts. They read well in URLs (`/properties/AC-T1`) and need no
 join for display. The one weakness of natural keys is renaming, so renaming
 the key is forbidden: change `name` instead.
 
