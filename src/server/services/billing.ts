@@ -1,50 +1,59 @@
 import "server-only";
-import type { BillingPayment, BillingReport, BillingRow } from "@/lib/contracts";
+import type { BillingPayment, BillingReceived, BillingReport, BillingRow } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf } from "@/lib/dates";
-import { billingTotals, isPaidDirect, monthsIn, resolveRange } from "@/lib/domain/billing";
+import { billingTotals, isPaidDirect, monthsIn, resolveRange, type MonthRange } from "@/lib/domain/billing";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import { BILLING_LIMITS, billingQuerySchema } from "@/lib/validation";
-import { ownerDb } from "@/server/infra";
 import { parseInput, type OwnerContext } from "./context";
-import { billedTenantIds, ensureRentPeriodsFor, paidDirectPeriods, paidDirectTenants } from "./periods";
-import { loadPlacements, placementOf } from "./placements";
+import { billedTenants, db, paymentsFrom, placements, tenantsList } from "./loaders";
+import { paidDirectPeriods } from "./periods";
+import { placementOf } from "./placements";
 
-/**
- * Rent billed per tenant per month over a range of months (default: this
- * month, the latest one that has fallen due), what was paid towards each
- * month and by which receipts, plus the cash received in those months.
- */
-export async function getBillingReport(_ctx: OwnerContext, query: unknown = {}): Promise<BillingReport> {
+// The Billing page loads in sections (A12): the months (rows + totals, one
+// set of rows) and the cash received in the range (a different query). Both
+// read through ./loaders, so in one render they share the tenant list,
+// placements and the range's payments. The paid-direct switch is its own
+// call (./paidDirect).
+
+/** `?from&to&paidDirect` -> the range (default: this month, the latest that has fallen due) and the view. */
+function parseQuery(query: unknown): { range: MonthRange; latestMonth: string; showPaidDirect: boolean } {
   const input = parseInput(billingQuerySchema, query ?? {});
   const latestMonth = currentMonthKey();
-  const range = resolveRange(input, latestMonth, BILLING_LIMITS.maxMonths);
+  return {
+    range: resolveRange(input, latestMonth, BILLING_LIMITS.maxMonths),
+    latestMonth,
+    showPaidDirect: input.paidDirect === "show",
+  };
+}
 
-  const db = await ownerDb();
-  const allTenants = await db.tenants.list();
-  await ensureRentPeriodsFor(billedTenantIds(allTenants));
-
-  const tenantIds = allTenants.map((t) => t.id);
-  const stored = await db.rentPeriods.listForTenants(tenantIds, { months: range });
-  const directTenants = paidDirectTenants(allTenants);
-  const shownTenants = [...new Set([...stored.map((p) => p.tenant_id), ...directTenants.map((t) => t.id)])];
-  const [allocations, payments, placements] = await Promise.all([
-    db.payments.listAllocationsForPeriods(stored.map((p) => p.id)),
-    db.payments.listForTenants(tenantIds, { status: "confirmed", fromDate: range.from }),
-    loadPlacements(db, shownTenants),
+/**
+ * Rent billed per tenant per month over a range of months, what was paid
+ * towards each month and by which receipts, and the range's totals.
+ */
+export async function getBillingReport(_ctx: OwnerContext, query: unknown = {}): Promise<BillingReport> {
+  const { range, latestMonth, showPaidDirect } = parseQuery(query);
+  const [allTenants, placement, rangePayments, repos] = await Promise.all([
+    billedTenants(),
+    placements(),
+    paymentsFrom(range.from),
+    db(),
   ]);
+  const stored = await repos.rentPeriods.listForTenants(
+    allTenants.map((t) => t.id),
+    { months: range }
+  );
+  const allocations = await repos.payments.listAllocationsForPeriods(stored.map((p) => p.id));
   // Government rent paid to the owner directly: billed and collected each month (A11).
-  const showPaidDirect = input.paidDirect === "show";
-  const direct = showPaidDirect ? paidDirectPeriods(allTenants, placements.ratesByTenant, monthsIn(range)) : [];
+  const direct = showPaidDirect ? paidDirectPeriods(allTenants, placement.ratesByTenant, monthsIn(range)) : [];
   const periods = [...stored, ...direct];
 
   // Payments made before the range can still have paid for its months (in
-  // advance); fetch just those, by id.
-  const known = new Map(payments.map((p) => [p.id, p]));
+  // advance); fetch just those, by id, together.
+  const known = new Map(rangePayments.map((p) => [p.id, p]));
   const earlier = [...new Set(allocations.map((a) => a.payment_id))].filter((id) => !known.has(id));
-  for (const id of earlier) {
-    const payment = await db.payments.get(id);
-    if (payment) known.set(id, payment);
+  for (const payment of await Promise.all(earlier.map((id) => repos.payments.get(id)))) {
+    if (payment) known.set(payment.id, payment);
   }
 
   const paymentsByPeriod = new Map<string, BillingPayment[]>();
@@ -65,15 +74,15 @@ export async function getBillingReport(_ctx: OwnerContext, query: unknown = {}):
   const tenantsById = new Map(allTenants.map((t) => [t.id, t]));
   const rows: BillingRow[] = periods.map((p) => {
     const tenant = tenantsById.get(p.tenant_id);
-    const placement = placementOf(placements, p.tenant_id);
+    const place = placementOf(placement, p.tenant_id);
     const amountDue = Number(p.amount_due);
     const amountAllocated = Number(p.amount_allocated);
     return {
       id: p.id,
       tenantId: p.tenant_id,
       tenantName: tenant ? tenantDisplayName(tenant) : "—",
-      propertyName: placement.propertyName,
-      unitCodes: placement.unitCodes,
+      propertyName: place.propertyName,
+      unitCodes: place.unitCodes,
       periodMonth: p.period_month,
       monthLabel: formatMonth(p.period_month),
       amountDue,
@@ -86,21 +95,27 @@ export async function getBillingReport(_ctx: OwnerContext, query: unknown = {}):
     };
   });
 
-  // Cash view: money that arrived in the range's calendar months.
+  return { from: range.from, to: range.to, latestMonth, rows, totals: billingTotals(rows) };
+}
+
+/**
+ * Cash view: money that arrived in the range's calendar months, whatever
+ * months it paid for - recorded payments, plus government rent paid direct
+ * for those months up to this one (A11) unless hidden.
+ */
+export async function getBillingReceived(_ctx: OwnerContext, query: unknown = {}): Promise<BillingReceived> {
+  const { range, latestMonth, showPaidDirect } = parseQuery(query);
+  const [allTenants, placement, rangePayments] = await Promise.all([
+    tenantsList(),
+    placements(),
+    paymentsFrom(range.from),
+  ]);
   const afterRange = addMonthsToKey(range.to, 1);
-  const inRange = payments.filter((p) => monthKeyOf(p.payment_date) < afterRange);
+  const inRange = rangePayments.filter((p) => monthKeyOf(p.payment_date) < afterRange);
+  const direct = showPaidDirect ? paidDirectPeriods(allTenants, placement.ratesByTenant, monthsIn(range)) : [];
   const paidDirect = round2(
     direct.filter((p) => p.period_month <= latestMonth).reduce((sum, p) => sum + Number(p.amount_allocated), 0)
   );
   const recorded = inRange.reduce((sum, p) => sum + Number(p.amount), 0);
-
-  return {
-    from: range.from,
-    to: range.to,
-    latestMonth,
-    rows,
-    totals: billingTotals(rows),
-    received: { amount: round2(recorded + paidDirect), payments: inRange.length, paidDirect },
-    paidDirect: { available: directTenants.length > 0, shown: showPaidDirect },
-  };
+  return { amount: round2(recorded + paidDirect), payments: inRange.length, paidDirect };
 }

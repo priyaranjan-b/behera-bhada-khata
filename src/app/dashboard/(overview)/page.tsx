@@ -13,7 +13,7 @@ import AttentionSection from "./sections/AttentionSection";
 import DefaultersSection from "./sections/DefaultersSection";
 import MonthStats from "./sections/MonthStats";
 import MonthTenantsSection from "./sections/MonthTenantsSection";
-import PaidDirectSwitch from "./sections/PaidDirectSwitch";
+import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
 import PortfolioSection from "./sections/PortfolioSection";
 import SitesSection from "./sections/SitesSection";
 import TenantTypesSection from "./sections/TenantTypesSection";

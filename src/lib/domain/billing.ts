@@ -1,4 +1,4 @@
-import { addMonthsToKey, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
+import { addMonthsToKey, isYearMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
 import { round2 } from "@/lib/money";
 import type { PeriodStatus } from "@/lib/types";
 
@@ -31,6 +31,23 @@ export function resolveRange(
   if (range.from > range.to) range = { from: range.to, to: range.from };
   if (rangeLength(range) > maxMonths) range = { from: range.from, to: addMonthsToKey(range.from, maxMonths - 1) };
   return range;
+}
+
+/**
+ * The range a page URL asks for (`?from=&to=`), as resolveRange but ignoring
+ * malformed values instead of failing: the Billing page shows its header and
+ * range straight from the URL, then asks the API for exactly this range.
+ */
+export function rangeFromParams(
+  params: { from?: string; to?: string },
+  defaultMonth: string,
+  maxMonths: number
+): MonthRange {
+  return resolveRange(
+    { from: isYearMonth(params.from) ? params.from : undefined, to: isYearMonth(params.to) ? params.to : undefined },
+    defaultMonth,
+    maxMonths
+  );
 }
 
 /** The same-length range just before (-1) or after (+1): what the ‹ › arrows open. */

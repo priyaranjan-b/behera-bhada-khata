@@ -1,18 +1,18 @@
 import Grid from "@mui/material/Grid";
-import { PageHeaderSkeleton, PageSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
+import { PageSkeleton } from "@/components/ui/Skeletons";
+import { BILLING_SKELETONS } from "./billingSkeletons";
+import { BILLING_STAT_CELL } from "./sections/BillingStats";
 
+// Same placeholders as each section's fallback in page.tsx.
 export default function BillingLoading() {
   return (
     <PageSkeleton label="Loading billing…">
-      <PageHeaderSkeleton action />
+      {BILLING_SKELETONS.header}
       <Grid container spacing={2} columns={12}>
-        {Array.from({ length: 4 }, (_, i) => (
-          <Grid key={i} size={{ xs: 6, lg: 3 }}>
-            <StatCardSkeleton />
-          </Grid>
-        ))}
+        {BILLING_SKELETONS.stats}
+        <Grid size={BILLING_STAT_CELL}>{BILLING_SKELETONS.received}</Grid>
       </Grid>
-      <PanelSkeleton />
+      {BILLING_SKELETONS.grid}
     </PageSkeleton>
   );
 }

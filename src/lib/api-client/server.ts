@@ -8,7 +8,7 @@ import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { listActivity, tenantHistory, unitHistory } from "@/server/services/audit";
 import { getConfirmView } from "@/server/services/confirm";
-import { getBillingReport } from "@/server/services/billing";
+import { getBillingReceived, getBillingReport } from "@/server/services/billing";
 import { getDefaultersReport } from "@/server/services/dashboard";
 import { getPaidDirectState } from "@/server/services/paidDirect";
 import {
@@ -66,6 +66,7 @@ const inProcessApi: ApiQueries = {
     paidDirect: async (options) => getPaidDirectState(await owner(), options),
     defaulters: async () => getDefaultersReport(await owner()),
     billing: async (query) => getBillingReport(await owner(), query),
+    billingReceived: async (query) => getBillingReceived(await owner(), query),
     activity: async (query) => listActivity(await owner(), query ?? {}),
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),

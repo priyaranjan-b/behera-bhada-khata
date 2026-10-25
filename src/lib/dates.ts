@@ -56,9 +56,14 @@ export function currentMonthKey(now: Date = new Date()): string {
   return monthKeyOf(todayKey(now));
 }
 
+/** Is `value` a yyyy-MM month, as in `?month=` and `<input type="month">`? */
+export function isYearMonth(value: string | null | undefined): value is string {
+  return Boolean(value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value));
+}
+
 /** Month key of a `?month=yyyy-MM` param; missing or malformed means the current month. */
 export function monthKeyFromParam(month: string | null | undefined, now: Date = new Date()): string {
-  return month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? monthKeyOf(month) : currentMonthKey(now);
+  return isYearMonth(month) ? monthKeyOf(month) : currentMonthKey(now);
 }
 
 /** Month key `months` months after (or before, if negative) the given one. */

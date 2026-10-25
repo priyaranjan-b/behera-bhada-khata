@@ -66,6 +66,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       paidDirect: (options = {}) => get(withQuery(p.dashboard.paidDirect, { paidDirect: options.paidDirect })),
       defaulters: () => get(p.dashboard.defaulters),
       billing: (query = {}) => get(withQuery(p.dashboard.billing, { ...query })),
+      billingReceived: (query = {}) => get(withQuery(p.dashboard.billingReceived, { ...query })),
       activity: (query = {}) => get(withQuery(p.dashboard.activity, { ...query })),
       search: () => get(p.dashboard.search),
       profile: () => get(p.dashboard.profile),

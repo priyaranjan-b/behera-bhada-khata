@@ -24,6 +24,7 @@ export const apiPaths = {
     defaulters: "/api/dashboard/defaulters",
     paidDirect: "/api/dashboard/paid-direct",
     billing: "/api/dashboard/billing",
+    billingReceived: "/api/dashboard/billing/received",
     activity: "/api/dashboard/activity",
     search: "/api/dashboard/search",
     profile: "/api/dashboard/profile",

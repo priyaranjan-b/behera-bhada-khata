@@ -3,7 +3,7 @@ import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getBillingReport } = await import("@/server/services/billing");
+const { getBillingReceived, getBillingReport } = await import("@/server/services/billing");
 
 const ctx = { ownerId: OWNER_ID };
 
@@ -35,7 +35,7 @@ describe("getBillingReport", () => {
       payments: [{ paymentId: "00000000-0000-4000-8000-000000000201", paymentDate: "2026-03-05", mode: "upi", amount: 5000 }],
     });
     expect(report.totals).toMatchObject({ billed: 5000 });
-    expect(report.received).toEqual({ amount: 5000, payments: 1, paidDirect: 0 });
+    expect(await getBillingReceived(ctx, { from: "2026-03", to: "2026-03" })).toEqual({ amount: 5000, payments: 1, paidDirect: 0 });
   });
 
   it("counts government rent paid direct as billed and collected, never owed", async () => {
@@ -57,20 +57,47 @@ describe("getBillingReport", () => {
       ["Post Office", "2026-10-01", 5300, 5300, true],
     ]);
     expect(report.totals).toMatchObject({ billed: 10600, collected: 10600, balance: 0, overdue: 0 });
-    expect(report.received).toEqual({ amount: 10600, payments: 0, paidDirect: 10600 });
-    expect(report.paidDirect).toEqual({ available: true, shown: true });
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10" })).toEqual({
+      amount: 10600,
+      payments: 0,
+      paidDirect: 10600,
+    });
 
     // The "Include Govt paid direct" switch off: only rent the owner collects.
     const hidden = await getBillingReport(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" });
     expect(hidden.rows).toEqual([]);
     expect(hidden.totals.billed).toBe(0);
-    expect(hidden.received).toEqual({ amount: 0, payments: 0, paidDirect: 0 });
-    expect(hidden.paidDirect).toEqual({ available: true, shown: false });
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" })).toEqual({
+      amount: 0,
+      payments: 0,
+      paidDirect: 0,
+    });
   });
 
   it("swaps a reversed range and rejects a malformed month", async () => {
     const report = await getBillingReport(ctx, { from: "2026-06", to: "2026-03" });
     expect([report.from, report.to]).toEqual(["2026-03-01", "2026-06-01"]);
     await expect(getBillingReport(ctx, { from: "March" })).rejects.toMatchObject({ status: 400 });
+    await expect(getBillingReceived(ctx, { from: "March" })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("fetches payments from before the range that paid its months together, by id", async () => {
+    const EARLY = "00000000-0000-4000-8000-000000000209";
+    fakes.owner.payments.listAllocationsForPeriods.mockResolvedValue([
+      { id: 1, payment_id: EARLY, rent_period_id: "p1", amount_allocated: "5000.00" },
+      { id: 2, payment_id: "00000000-0000-4000-8000-000000000210", rent_period_id: "p1", amount_allocated: "0.00" },
+    ] as never);
+    fakes.owner.payments.listForTenants.mockResolvedValue([]);
+    let inFlight = 0;
+    let mostAtOnce = 0;
+    fakes.owner.payments.get.mockImplementation(async () => {
+      mostAtOnce = Math.max(mostAtOnce, ++inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      inFlight--;
+      return null;
+    });
+    await getBillingReport(ctx, { from: "2026-03", to: "2026-03" });
+    expect(fakes.owner.payments.get).toHaveBeenCalledTimes(2);
+    expect(mostAtOnce).toBe(2);
   });
 });

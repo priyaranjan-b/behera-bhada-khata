@@ -54,14 +54,17 @@ export const periodsFrom = cache(async (fromMonth: string): Promise<RentPeriod[]
 /** Unpaid rent months plus the recent window: what the Overview's sections and Defaulters share. */
 export const recentPeriods = (): Promise<RentPeriod[]> => periodsFrom(recentMonthKeys()[0]);
 
-/** Confirmed payments dated in the recent window. */
-export const recentPayments = cache(async () => {
+/** Confirmed payments dated on or after `fromDate` (yyyy-MM-dd). */
+export const paymentsFrom = cache(async (fromDate: string) => {
   const [tenants, repos] = await Promise.all([tenantsList(), db()]);
   return repos.payments.listForTenants(
     tenants.map((t) => t.id),
-    { status: "confirmed", fromDate: recentMonthKeys()[0] }
+    { status: "confirmed", fromDate }
   );
 });
+
+/** Confirmed payments dated in the recent window. */
+export const recentPayments = () => paymentsFrom(recentMonthKeys()[0]);
 
 /** Confirmed adjustments dated in the recent window. */
 export const recentAdjustments = cache(async () => {

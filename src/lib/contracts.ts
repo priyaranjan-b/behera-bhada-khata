@@ -171,13 +171,18 @@ export interface BillingReport {
   latestMonth: string;
   rows: BillingRow[];
   totals: BillingTotals;
-  /**
-   * Money received in the range's calendar months, whatever months it paid
-   * for (cash view): recorded payments, plus government rent paid direct for
-   * those months up to this one.
-   */
-  received: { amount: number; payments: number; paidDirect: number };
-  paidDirect: PaidDirectState;
+}
+
+/**
+ * GET /api/dashboard/billing/received: money received in the range's
+ * calendar months, whatever months it paid for (cash view) - recorded
+ * payments, plus government rent paid direct for those months up to this one.
+ */
+export interface BillingReceived {
+  amount: number;
+  /** How many recorded payments. */
+  payments: number;
+  paidDirect: number;
 }
 
 export type BillingQuery = z.input<typeof billingQuerySchema>;

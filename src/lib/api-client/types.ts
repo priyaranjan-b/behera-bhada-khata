@@ -2,6 +2,7 @@ import type { AttentionItem } from "@/lib/domain/overview";
 import type { PaidDirectView } from "@/lib/types";
 import type {
   BillingQuery,
+  BillingReceived,
   BillingReport,
   ActivityQuery,
   AuditPage,
@@ -82,6 +83,8 @@ export interface ApiQueries {
     defaulters(): Promise<DefaultersReport>;
     /** Rent billed per tenant per month in a range, and the payments for it. */
     billing(query?: BillingQuery): Promise<BillingReport>;
+    /** Cash received in the same range (its own section of the Billing page, A12). */
+    billingReceived(query?: BillingQuery): Promise<BillingReceived>;
     /** Everything that changed, newest first (audit_log, 0015). */
     activity(query?: ActivityQuery): Promise<AuditPage>;
     /** Top-bar search index (tenants and houses). */
