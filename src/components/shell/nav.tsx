@@ -6,6 +6,7 @@ import HomeWorkRoundedIcon from "@mui/icons-material/HomeWorkRounded";
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
 import AddHomeWorkRoundedIcon from "@mui/icons-material/AddHomeWorkRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import { routes } from "@/lib/routes";
 
 export type AppTab =
@@ -14,6 +15,7 @@ export type AppTab =
   | "houses"
   | "tenants"
   | "defaulters"
+  | "billing"
   | "activity"
   | "addTenant"
   | "addHouse";
@@ -23,6 +25,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
   { tab: "properties", href: routes.properties.list, label: "Properties", icon: <ApartmentRoundedIcon /> },
   { tab: "houses", href: routes.houses.list(), label: "Houses", icon: <HomeWorkRoundedIcon /> },
   { tab: "tenants", href: routes.tenants.list(), label: "Tenants", icon: <PeopleRoundedIcon /> },
+  { tab: "billing", href: routes.billing(), label: "Billing", icon: <ReceiptLongRoundedIcon /> },
   { tab: "defaulters", href: routes.defaulters, label: "Defaulters", icon: <PendingActionsRoundedIcon /> },
   { tab: "activity", href: routes.activity, label: "Activity", icon: <HistoryRoundedIcon /> },
 ];

@@ -219,6 +219,7 @@ function build() {
       get: vi.fn(async (id: string) => state.payments.get(id) ?? null),
       create: vi.fn(async () => undefined),
       listAllocations: vi.fn(async () => [allocation]),
+      listAllocationsForPeriods: vi.fn(async (ids: string[]) => (ids.includes(allocation.rent_period_id) ? [allocation] : [])),
       listProofs: vi.fn(async (ids: string[]) => [...state.proofs.values()].filter((p) => ids.includes(p.payment_id))),
       getProof: vi.fn(async (id: string) => state.proofs.get(id) ?? null),
       rotateToken: vi.fn(async (id: string) => !state.payments.get(id)?.acknowledged_at),

@@ -4,6 +4,7 @@ import type { GridColDef } from "@mui/x-data-grid";
 import DataTable, { moneyColumn } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/domain/StatusChip";
 import type { TenantPeriod } from "@/lib/contracts";
+import { periodDisplayStatus } from "@/lib/domain/billing";
 import { statusLabel } from "@/lib/domain/status";
 
 export interface TenantPeriodRow extends TenantPeriod {
@@ -12,9 +13,7 @@ export interface TenantPeriodRow extends TenantPeriod {
   notYetDue: boolean;
 }
 
-function periodStatus(row: TenantPeriodRow): string {
-  return row.notYetDue && row.status !== "paid" ? "not_due_yet" : row.status;
-}
+const periodStatus = (row: TenantPeriodRow) => periodDisplayStatus(row.status, row.notYetDue);
 
 const columns: GridColDef<TenantPeriodRow>[] = [
   {

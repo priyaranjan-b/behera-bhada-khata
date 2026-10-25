@@ -53,7 +53,8 @@ development, required in production.
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
   real names stay local, `statusLabel`, the custom Excel export
   (`exportValue`, MUI's is Premium-only), the per-tower monthly-rent split,
-  and the audit history screens and events (A10). Read it before changing
+  the audit history screens and events (A10), and Govt rent counted as paid
+  direct (A11). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -107,7 +108,9 @@ both together.
   houses, but has no `billing_start`, no rent months and no Record payment.
   "Start tracking rent" (`start_rent_tracking`) bills it from the month
   after "paid up to"; `stop_rent_tracking` undoes that until a payment
-  exists. "Billed" in JS is `isRentTracked` / `billedTenantIds`.
+  exists. "Billed" in JS is `isRentTracked` / `billedTenantIds`. Their
+  agreement rent still counts as billed and collected every month
+  (`paidDirectPeriods`, computed and never stored; A11).
 - **Security deposit** (`tenants.deposit_amount`, optional): set when
   onboarding or while a draft, then frozen by a trigger once the tenant is
   active (D18).

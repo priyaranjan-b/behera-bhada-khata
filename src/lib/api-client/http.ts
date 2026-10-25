@@ -56,8 +56,9 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       signOut: () => post(p.auth.signOut),
     },
     dashboard: {
-      summary: (month) => get(month ? `${p.dashboard.summary}?month=${encodeURIComponent(month)}` : p.dashboard.summary),
+      summary: (month, options = {}) => get(withQuery(p.dashboard.summary, { month, paidDirect: options.paidDirect })),
       defaulters: () => get(p.dashboard.defaulters),
+      billing: (query = {}) => get(withQuery(p.dashboard.billing, { ...query })),
       activity: (query = {}) => get(withQuery(p.dashboard.activity, { ...query })),
       search: () => get(p.dashboard.search),
       profile: () => get(p.dashboard.profile),

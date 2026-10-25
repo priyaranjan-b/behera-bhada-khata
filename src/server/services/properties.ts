@@ -15,7 +15,7 @@ import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
 import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, withParams, type OwnerContext } from "./context";
-import { billedTenantIds } from "./periods";
+import { billedTenantIds, paidDirectTenants } from "./periods";
 import { availableUnits, holdsUnit, loadPlacements, placementOf, rentByProperty } from "./placements";
 
 function toHeader(property: Property, locations: Location[]): PropertyHeader {
@@ -53,8 +53,8 @@ export async function listProperties(_ctx: OwnerContext): Promise<LocationGroup[
   ]);
   const today = todayKey();
   const held = new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.unit_code));
-  // Rent paid to the owner directly (untracked government tenants, 0016) isn't expected here.
-  const billed = new Set(billedTenantIds(tenants));
+  // Rent from current tenants, government rent paid to the owner directly included (A11).
+  const billed = new Set([...billedTenantIds(tenants), ...paidDirectTenants(tenants).map((t) => t.id)]);
   const tenantIds = [
     ...new Set(occupancy.filter((o) => holdsUnit(o, today) && billed.has(o.tenant_id)).map((o) => o.tenant_id)),
   ];

@@ -2,6 +2,7 @@ import * as z from "zod";
 import { isDateKey } from "@/lib/dates";
 import { AUDIT_CATEGORIES } from "@/lib/domain/audit";
 import {
+  PAID_DIRECT_VIEWS,
   PAYMENT_MODES,
   PREFERRED_CHANNELS,
   RECORD_TYPES,
@@ -360,3 +361,20 @@ export const activityQuerySchema = auditPageSchema
     to: dateKeySchema.optional(),
   })
   .refine((q) => !q.from || !q.to || q.from <= q.to, "The start date must be on or before the end date");
+
+// ---- Billing ------------------------------------------------------------------
+
+/** The Billing page shows at most this many months at once. */
+export const BILLING_LIMITS = { maxMonths: 24 } as const;
+
+/** Include government rent paid direct (A11)? Missing or unknown = shown. */
+export const paidDirectViewSchema = z.enum(PAID_DIRECT_VIEWS).catch("show").default("show");
+
+const yearMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month (yyyy-MM)");
+
+/** `?from=yyyy-MM&to=yyyy-MM` on /dashboard/billing; either may be missing (defaults in the service). */
+export const billingQuerySchema = z.object({
+  from: yearMonthSchema.optional(),
+  to: yearMonthSchema.optional(),
+  paidDirect: paidDirectViewSchema,
+});

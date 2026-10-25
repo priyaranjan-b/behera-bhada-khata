@@ -15,6 +15,7 @@ function tabForPath(pathname: string): AppTab | undefined {
   if (pathname.startsWith("/dashboard/houses")) return "houses";
   if (pathname.startsWith("/dashboard/tenants")) return "tenants";
   if (pathname.startsWith("/dashboard/defaulters")) return "defaulters";
+  if (pathname.startsWith("/dashboard/billing")) return "billing";
   if (pathname.startsWith("/dashboard/activity")) return "activity";
   return undefined;
 }

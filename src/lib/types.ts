@@ -17,6 +17,9 @@ export type TenantStatus = (typeof TENANT_STATUSES)[number];
 /** Who the tenant is (0016); only a government tenant may skip the phone or rent tracking. */
 export const TENANT_KINDS = ["individual", "business", "government"] as const;
 export type TenantKind = (typeof TENANT_KINDS)[number];
+/** Whether reports include government rent paid to the owner directly (A11). */
+export const PAID_DIRECT_VIEWS = ["show", "hide"] as const;
+export type PaidDirectView = (typeof PAID_DIRECT_VIEWS)[number];
 /** The two kinds of ledger record; each has its own receipt and confirm link. */
 export const RECORD_TYPES = ["payment", "adjustment"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];

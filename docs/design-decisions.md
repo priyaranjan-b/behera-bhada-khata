@@ -160,8 +160,8 @@ towers) on `/dashboard/properties`. It counts **current** tenancies only
 (started on or before today and still holding the house), takes each
 tenant's rent in effect this month and splits it **evenly across the houses
 they occupy now**, then sums per tower (`round2`). A tower with no
-occupants shows "—". Government tenants whose rent isn't tracked (D26) are left
-out: that rent goes to the owner's bank, not through the app.
+occupants shows "—". Government rent paid to the owner directly counts too
+(A11).
 
 **Why.** Billing is per tenant, not per house (one combined rent covers all
 of a tenant's houses), so there is no per-house rent in the data. An even
@@ -207,3 +207,35 @@ three places and adds the events the database can't see.
 what rent was fixed, and for any other vital change to be kept. D7/D8
 already held the dated facts; what was missing was *when it was entered, by
 whom, and what it was before*.
+
+---
+
+## Billing
+
+### A11 — Government rent paid direct counts as billed and collected
+
+**Decision.** A government tenant whose rent isn't tracked (D26) pays the
+owner's bank on time every month. Its agreement rent counts as **billed and
+collected** for each month it holds its houses:
+- **Which months:** from the lease month to the move-out month, at the rent
+  in effect, never past the rent-month horizon.
+- **How:** `paidDirectPeriods` (`src/server/services/periods.ts`, rules in
+  `paidDirectMonths`, `src/lib/domain/billing.ts`) computes rent months that
+  are already paid in full. Their ids come from `paidDirectId()`, so nothing
+  mistakes them for ledger rows.
+- **Where they're added:**
+  - the Billing page (rows marked "Paid direct", Received);
+  - the Overview: Expected/Collected, the billing chart, collection by site,
+    tenant types, rent roll;
+  - a tower's monthly rent (A9).
+- **Never:** a row in `rent_periods`, a payment, arrears or Defaulters.
+  Tracking it like any other tenant is still "Start tracking rent" (D26).
+
+**Why.** The owner wanted this rent visible in the totals because it does
+arrive every month. Rejected alternatives:
+- **Storing a month and a payment each month** would mean entering
+  bank-credit records nobody needs, or a job writing fake ones into the
+  append-only ledger (D4).
+- **Leaving it out** made rent roll and collection understate what the
+  property earns.
+

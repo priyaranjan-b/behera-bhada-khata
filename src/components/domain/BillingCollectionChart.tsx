@@ -18,11 +18,19 @@ import { collectionRateTone } from "@/lib/domain/overview";
 import { APP_LOCALE } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { StatusBadge } from "@/components/ui/DataDisplay";
+import LinkButton from "@/components/ui/Loading/LinkButton";
 
 const compact = new Intl.NumberFormat(APP_LOCALE, { notation: "compact", maximumFractionDigits: 1 });
 
 /** Billed vs collected per month (template PageViewsBarChart look), with a table view for screen readers. */
-export default function BillingCollectionChart({ data }: { data: MonthlyTrendPoint[] }) {
+export default function BillingCollectionChart({
+  data,
+  href,
+}: {
+  data: MonthlyTrendPoint[];
+  /** The Billing page for the same months. */
+  href?: string;
+}) {
   const theme = useTheme();
   const [showTable, setShowTable] = useState(false);
   if (data.length === 0) return null;
@@ -39,9 +47,16 @@ export default function BillingCollectionChart({ data }: { data: MonthlyTrendPoi
           <Typography component="h2" variant="subtitle2" gutterBottom>
             Billing vs collection
           </Typography>
-          <Button size="small" variant="text" onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
-            {showTable ? "Show chart" : "View as table"}
-          </Button>
+          <Stack direction="row" spacing={0.5}>
+            <Button size="small" variant="text" onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
+              {showTable ? "Show chart" : "View as table"}
+            </Button>
+            {href ? (
+              <LinkButton href={href} size="small" variant="text">
+                Open billing
+              </LinkButton>
+            ) : null}
+          </Stack>
         </Stack>
         <Stack>
           <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>

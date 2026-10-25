@@ -196,7 +196,8 @@ describe("government tenants (0016)", () => {
 
   it("an untracked tenant gets no rent months and can start tracking from a month", async () => {
     fakes.state.tenants.set(GOVT_ID, tenant({ id: GOVT_ID, tenant_kind: "government", rent_tracked: false, billing_start: null }));
-    await listTenants(ctx);
+    const rows = await listTenants(ctx);
+    expect(rows.find((r) => r.tenantId === "00000000-0000-4000-8000-000000000101")?.monthlyRent).toBe(5000);
     expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000101"], expect.any(String));
 
     await startRentTracking(ctx, GOVT_ID, { monthlyRentAmount: 20000, paidThrough: "2026-02" });

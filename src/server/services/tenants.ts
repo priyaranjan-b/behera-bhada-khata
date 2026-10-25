@@ -77,6 +77,7 @@ export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]
       businessName: tenant.business_name,
       unitMix: placement.unitMix,
       unitCodes: placement.unitCodes,
+      monthlyRent: placement.monthlyRent,
       phone: tenant.phone,
       propertyName: placement.propertyName,
       locationName: locationCodes.map((c) => locationName.get(c) ?? c).join(", "),

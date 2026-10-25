@@ -8,6 +8,8 @@ const TONE_BY_STATUS: Record<string, BadgeTone> = {
   confirmed: "success",
   // A month that hasn't ended yet: billed ahead, not owed (summarizeBalance).
   not_due_yet: "neutral",
+  // Government rent paid to the owner's bank directly (A11).
+  paid_direct: "success",
 };
 
 export function StatusChip({ status }: { status: string }) {

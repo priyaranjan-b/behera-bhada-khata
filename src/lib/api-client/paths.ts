@@ -16,6 +16,7 @@ export const apiPaths = {
   dashboard: {
     summary: "/api/dashboard",
     defaulters: "/api/dashboard/defaulters",
+    billing: "/api/dashboard/billing",
     activity: "/api/dashboard/activity",
     search: "/api/dashboard/search",
     profile: "/api/dashboard/profile",

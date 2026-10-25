@@ -223,9 +223,13 @@ export interface OwnerRepositories {
      * Ordered by period_month ascending. `openOnly`: only periods with
      * something still owed. `openOrFrom` (a month key): those, plus every
      * period from that month on - what a dashboard needs, without loading
-     * years of settled history.
+     * years of settled history. `months` (month keys, inclusive): only the
+     * periods billed in that range.
      */
-    listForTenants(tenantIds: string[], filter?: { openOnly?: boolean; openOrFrom?: string }): Promise<RentPeriod[]>;
+    listForTenants(
+      tenantIds: string[],
+      filter?: { openOnly?: boolean; openOrFrom?: string; months?: { from: string; to: string } }
+    ): Promise<RentPeriod[]>;
     listByIds(ids: string[]): Promise<RentPeriod[]>;
   };
   payments: {
@@ -240,6 +244,8 @@ export interface OwnerRepositories {
      */
     create(payment: NewPayment, allocations: NewAllocation[], proofs?: NewPaymentProof[]): Promise<void>;
     listAllocations(paymentId: string): Promise<PaymentAllocation[]>;
+    /** What each payment put towards these rent months (the Billing page's receipts per month). */
+    listAllocationsForPeriods(periodIds: string[]): Promise<PaymentAllocation[]>;
     /** Proof files of these payments, in the order they were attached. */
     listProofs(paymentIds: string[]): Promise<PaymentProof[]>;
     getProof(proofId: string): Promise<PaymentProof | null>;

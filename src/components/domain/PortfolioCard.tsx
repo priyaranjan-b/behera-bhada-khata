@@ -22,7 +22,7 @@ export default function PortfolioCard({
         <DetailRow label="Deposits held">{formatMoney(portfolio.depositsHeld)}</DetailRow>
         <DetailRow label="Rent paid in advance">{formatMoney(portfolio.advancePaid)}</DetailRow>
         {portfolio.paidDirectRent > 0 ? (
-          <DetailRow label="Govt rent paid direct">{`${formatMoney(portfolio.paidDirectRent)} / month`}</DetailRow>
+          <DetailRow label="of which Govt, paid direct">{`${formatMoney(portfolio.paidDirectRent)} / month`}</DetailRow>
         ) : null}
       </DetailList>
     </SectionCard>

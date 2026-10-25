@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { GridInitialState } from "@mui/x-data-grid";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlineOutlined";
-import DataTable, { type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { UnitCell } from "@/components/ui";
 import { formatMoney } from "@/lib/money";
@@ -89,6 +89,10 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
     exportValue: (row) => row.unitCodes.join(", "),
     renderCell: ({ row }) => <UnitCell unitMix={row.unitMix} unitCodes={row.unitCodes} />,
   },
+  moneyColumn<TenantSearchRow>("monthlyRent", "Monthly rent", {
+    minWidth: 130,
+    valueFormatter: (value: number) => (value > 0 ? formatMoney(value) : "—"),
+  }),
   {
     field: "totalOutstanding",
     headerName: "Outstanding",

@@ -35,6 +35,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/dashboard/payments/:id/adjust": "Adjust payment",
   "/dashboard/profile": "Profile",
   "/dashboard/defaulters": "Defaulters",
+  "/dashboard/billing": "Billing",
   "/dashboard/activity": "Activity",
 };
 

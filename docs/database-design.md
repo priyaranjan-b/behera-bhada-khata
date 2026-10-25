@@ -585,8 +585,9 @@ only while untracked (`tenants_active_has_billing_start`).
 - `ensure_rent_periods` also checks `rent_tracked`, so it has no rent
   months, no dues and nothing in Defaulters.
 - Its rent rate is optional: the agreement rent, from the lease month.
-- The app hides Record payment and leaves its rent out of a tower's monthly
-  rent (A9).
+- The app hides Record payment. In the totals, its rent counts as billed and
+  collected each month without being stored (A11 in
+  `docs/design-decisions.md`).
 
 Where `rent_tracked` is set and changed:
 - `create_tenant` and `update_tenant` (when completing a draft) set it at

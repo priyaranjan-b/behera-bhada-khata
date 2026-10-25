@@ -8,6 +8,7 @@ import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { listActivity, tenantHistory, unitHistory } from "@/server/services/audit";
 import { getConfirmView } from "@/server/services/confirm";
+import { getBillingReport } from "@/server/services/billing";
 import { getDashboardSummary, getDefaultersReport } from "@/server/services/dashboard";
 import { getAdjustPaymentForm, getNewPaymentForm } from "@/server/services/payments";
 import {
@@ -40,8 +41,9 @@ const inProcessApi: ApiQueries = {
     loginOptions: async () => getLoginOptions(),
   },
   dashboard: {
-    summary: async (month) => getDashboardSummary(await owner(), month),
+    summary: async (month, options) => getDashboardSummary(await owner(), month, options),
     defaulters: async () => getDefaultersReport(await owner()),
+    billing: async (query) => getBillingReport(await owner(), query),
     activity: async (query) => listActivity(await owner(), query ?? {}),
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),

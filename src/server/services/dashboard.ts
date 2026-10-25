@@ -14,10 +14,11 @@ import { tenantDisplayName } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import type { RentPeriod, Tenant } from "@/lib/types";
 import { tenantMessagingEnabled } from "@/server/env";
+import { paidDirectViewSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
 import type { OwnerContext } from "./context";
-import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
+import { billedTenantIds, ensureRentPeriodsFor, paidDirectPeriods, paidDirectTenants } from "./periods";
 import { holdsUnit, loadPlacements, placementOf } from "./placements";
 
 const TREND_MONTHS = 6;
@@ -43,8 +44,13 @@ function groupPeriods(periods: RentPeriod[]): Map<string, RentPeriod[]> {
 /** A house code's site: "AC-T1-G01" -> "AC". */
 const siteOf = (code: string) => code.split("-")[0];
 
-export async function getDashboardSummary(ctx: OwnerContext, month?: string | null): Promise<DashboardSummary> {
+export async function getDashboardSummary(
+  ctx: OwnerContext,
+  month?: string | null,
+  options: { paidDirect?: unknown } = {}
+): Promise<DashboardSummary> {
   const monthKey = parseMonth(month);
+  const showPaidDirect = paidDirectViewSchema.parse(options.paidDirect) === "show";
   const todayMonthKey = currentMonthKey();
   const trendMonthKeys = Array.from({ length: TREND_MONTHS }, (_, i) =>
     addMonthsToKey(todayMonthKey, i - (TREND_MONTHS - 1))
@@ -59,7 +65,7 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
   await ensureRentPeriodsFor([...billedIds]);
 
   const tenantIds = allTenants.map((t) => t.id);
-  const [periods, payments, adjustments, placements, units, occupancy, locations, withDocuments] = await Promise.all([
+  const [stored, recordedPayments, adjustments, placements, units, occupancy, locations, withDocuments] = await Promise.all([
     db.rentPeriods.listForTenants(tenantIds, { openOrFrom: fromMonth }),
     db.payments.listForTenants(tenantIds, { status: "confirmed", fromDate: trendMonthKeys[0] }),
     db.adjustments.listForTenants(tenantIds, { status: "confirmed", fromDate: trendMonthKeys[0] }),
@@ -69,6 +75,19 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
     db.locations.list(),
     db.tenantDocuments.tenantIdsWithDocuments(),
   ]);
+  // Government rent paid to the owner directly counts as billed and collected
+  // each month (A11): computed months, plus their money in the cash trend.
+  const direct = showPaidDirect
+    ? paidDirectPeriods(allTenants, placements.ratesByTenant, [...new Set([monthKey, ...trendMonthKeys])])
+    : [];
+  const directIds = new Set(direct.map((p) => p.tenant_id));
+  const periods = [...stored, ...direct];
+  const payments = [
+    ...recordedPayments,
+    ...direct
+      .filter((p) => p.period_month <= todayMonthKey)
+      .map((p) => ({ amount: p.amount_allocated, payment_date: p.period_month })),
+  ];
   const periodsByTenant = groupPeriods(periods);
 
   // Current tenants, plus former ones who still owe - arrears don't vanish
@@ -76,7 +95,7 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
   const owes = (id: string) =>
     (periodsByTenant.get(id) ?? []).some((p) => Number(p.amount_due) > Number(p.amount_allocated));
   // Drafts and untracked government tenants (0016) aren't billed, so they never owe.
-  const tenants = allTenants.filter((t) => billedIds.has(t.id) || owes(t.id));
+  const tenants = allTenants.filter((t) => billedIds.has(t.id) || directIds.has(t.id) || owes(t.id));
 
   const report = buildMonthlyReport(
     tenants.map((t) => ({
@@ -132,7 +151,7 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
 
   const named = (list: Tenant[]) => list.map((t) => ({ tenantId: t.id, displayName: tenantDisplayName(t) }));
   const hasDocuments = new Set(withDocuments);
-  const unacknowledged = new Set(payments.filter((p) => !p.acknowledged_at).map((p) => p.tenant_id));
+  const unacknowledged = new Set(recordedPayments.filter((p) => !p.acknowledged_at).map((p) => p.tenant_id));
   const attention = buildAttention({
     drafts: named(allTenants.filter((t) => t.status === "draft")),
     noDocuments: named(active.filter((t) => !hasDocuments.has(t.id))),
@@ -148,14 +167,19 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
   });
 
   const portfolio = {
-    rentRoll: round2([...billedIds].reduce((sum, id) => sum + placementOf(placements, id).monthlyRent, 0)),
+    // Everyone who pays rent now, government rent paid direct included.
+    rentRoll: round2(
+      allTenants
+        .filter((t) => t.status === "active" && (billedIds.has(t.id) || (showPaidDirect && !t.rent_tracked)))
+        .reduce((sum, t) => sum + placementOf(placements, t.id).monthlyRent, 0)
+    ),
     depositsHeld: round2(
       allTenants.filter((t) => t.status !== "inactive").reduce((sum, t) => sum + Number(t.deposit_amount ?? 0), 0)
     ),
     advancePaid: round2(
-      periods.filter((p) => p.period_month > todayMonthKey).reduce((sum, p) => sum + Number(p.amount_allocated), 0)
+      stored.filter((p) => p.period_month > todayMonthKey).reduce((sum, p) => sum + Number(p.amount_allocated), 0)
     ),
-    paidDirectRent: round2(kinds.reduce((sum, k) => sum + k.paidDirectRent, 0)),
+    paidDirectRent: showPaidDirect ? round2(kinds.reduce((sum, k) => sum + k.paidDirectRent, 0)) : 0,
   };
 
   const defaulterList = await defaulterRows(db, allTenants, periodsByTenant, todayMonthKey);
@@ -166,7 +190,8 @@ export async function getDashboardSummary(ctx: OwnerContext, month?: string | nu
     groups: agingGroups(defaulterList),
   };
 
-  return { monthKey, report, trend, houses, defaulters, sites, kinds, attention, portfolio };
+  const paidDirect = { available: paidDirectTenants(allTenants).length > 0, shown: showPaidDirect };
+  return { monthKey, report, trend, houses, defaulters, sites, kinds, attention, portfolio, paidDirect };
 }
 
 /**

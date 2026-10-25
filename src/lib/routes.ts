@@ -44,6 +44,8 @@ export const routes = {
   /** `month` is `yyyy-MM` (see monthParam in src/lib/dates.ts). */
   dashboard: (query?: { month?: string; show?: string }, hash?: string) => withQuery("/dashboard", query, hash),
   defaulters: "/dashboard/defaulters",
+  /** `from`/`to` are `yyyy-MM`; none = this month. */
+  billing: (query?: { from?: string; to?: string }) => withQuery("/dashboard/billing", query),
   activity: "/dashboard/activity",
   profile: (flash?: Flash) => withQuery("/dashboard/profile", flash),
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),

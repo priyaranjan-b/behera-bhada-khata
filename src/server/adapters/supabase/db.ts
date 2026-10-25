@@ -271,6 +271,7 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
               let query = q.in("tenant_id", ids);
               if (filter.openOnly) query = query.neq("status", "paid");
               else if (filter.openOrFrom) query = query.or(`status.neq.paid,period_month.gte.${filter.openOrFrom}`);
+              if (filter.months) query = query.gte("period_month", filter.months.from).lte("period_month", filter.months.to);
               return query;
             })
           )
@@ -325,6 +326,17 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
           await db.from("payment_allocations").select("*").eq("payment_id", paymentId),
           "list payment allocations"
         );
+      },
+      async listAllocationsForPeriods(periodIds) {
+        const batches = await Promise.all(
+          chunk(periodIds).map(async (ids) =>
+            must(
+              await db.from("payment_allocations").select("*").in("rent_period_id", ids),
+              "list allocations for months"
+            )
+          )
+        );
+        return batches.flat();
       },
       async listProofs(paymentIds) {
         const batches = await Promise.all(

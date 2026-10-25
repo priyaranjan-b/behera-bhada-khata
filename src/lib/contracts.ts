@@ -5,6 +5,7 @@
 import type * as z from "zod";
 import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "@/lib/domain/reports";
 import type { AttentionItem, KindBreakdown, SiteCollection } from "@/lib/domain/overview";
+import type { BillingTotals } from "@/lib/domain/billing";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
@@ -12,6 +13,7 @@ import type { AuditCategory } from "@/lib/domain/audit";
 import type {
   AuditAction,
   AuditActorKind,
+  PaymentMode,
   PeriodStatus,
   PreferredChannel,
   RecordType,
@@ -30,6 +32,7 @@ import type {
   moveOutSchema,
   correctPaidThroughSchema,
   startRentTrackingSchema,
+  billingQuerySchema,
   ownerProfileSchema,
   updateTenantSchema,
 } from "@/lib/validation";
@@ -100,18 +103,80 @@ export interface DashboardSummary {
   kinds: KindBreakdown[];
   attention: AttentionItem[];
   portfolio: PortfolioFacts;
+  paidDirect: PaidDirectState;
+}
+
+/** Government rent paid direct (A11): whether any exists, and whether this report includes it. */
+export interface PaidDirectState {
+  available: boolean;
+  shown: boolean;
 }
 
 export interface PortfolioFacts {
-  /** This month's combined rent of every billed tenant. */
+  /** This month's combined rent of every current tenant, government rent paid direct included. */
   rentRoll: number;
   /** Security deposits of current and draft tenants. */
   depositsHeld: number;
   /** Paid towards months after this one. */
   advancePaid: number;
-  /** Government agreement rent paid to the owner directly, not tracked (0016). */
+  /** The part of the rent roll that is government rent paid to the owner directly (A11). */
   paidDirectRent: number;
 }
+
+// ---- /api/dashboard/billing (rent billed per month, and what paid it) ------
+
+export interface BillingPayment {
+  paymentId: string;
+  receiptNo: string | null;
+  /** yyyy-MM-dd */
+  paymentDate: string;
+  mode: PaymentMode;
+  /** The part of the payment that went to this month. */
+  amount: number;
+}
+
+/** One tenant's rent for one month. */
+export interface BillingRow {
+  /** The rent month's id. */
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  propertyName: string;
+  unitCodes: string[];
+  /** yyyy-MM-01 */
+  periodMonth: string;
+  /** "October 2026", formatted on the server so it matches at hydration. */
+  monthLabel: string;
+  amountDue: number;
+  amountAllocated: number;
+  balance: number;
+  status: PeriodStatus;
+  /** This month or later: billed ahead, not owed yet. */
+  notYetDue: boolean;
+  /** Payments that went to this month, oldest first. */
+  payments: BillingPayment[];
+  /** Government rent paid to the owner directly (0016): counted as billed and collected, no payment record. */
+  paidDirect: boolean;
+}
+
+export interface BillingReport {
+  /** The range shown, month keys (both ends included). */
+  from: string;
+  to: string;
+  /** The month the page opens on: the latest month that has fallen due (this month). */
+  latestMonth: string;
+  rows: BillingRow[];
+  totals: BillingTotals;
+  /**
+   * Money received in the range's calendar months, whatever months it paid
+   * for (cash view): recorded payments, plus government rent paid direct for
+   * those months up to this one.
+   */
+  received: { amount: number; payments: number; paidDirect: number };
+  paidDirect: PaidDirectState;
+}
+
+export type BillingQuery = z.input<typeof billingQuerySchema>;
 
 // ---- /api/dashboard/defaulters (tenants behind on rent, by months) -----------
 
@@ -294,6 +359,8 @@ export interface TenantSearchRow {
   unitMix: UnitMix | null;
   /** Current houses (last houses, for a tenant who moved out). */
   unitCodes: string[];
+  /** Combined rent in effect now (the last rent after a move-out); 0 when none is set (drafts). */
+  monthlyRent: number;
   phone: string | null;
   propertyName: string;
   locationName: string;

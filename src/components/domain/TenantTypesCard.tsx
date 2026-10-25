@@ -88,7 +88,7 @@ export default function TenantTypesCard({ kinds, monthLabel }: { kinds: KindBrea
       <SectionCard
         title="Tenant types"
         caption={
-          paidDirect > 0 ? `Government rent paid to you directly (not tracked): ${formatMoney(paidDirect)} / month` : undefined
+          paidDirect > 0 ? `Includes Government rent paid to you directly: ${formatMoney(paidDirect)} / month` : undefined
         }
         action={
           <Button size="small" variant="text" onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
