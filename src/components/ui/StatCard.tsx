@@ -25,7 +25,11 @@ function AreaGradient({ color, id }: { color: string; id: string }) {
   );
 }
 
-/** Template StatCard: title, big value, a badge, and an optional sparkline. */
+/**
+ * Template StatCard: title, big value, a badge, and an optional sparkline.
+ * Compact on phones, where pages lay them out two per row: a smaller value
+ * with the badge under it, and no sparkline (it would be too narrow to read).
+ */
 export default function StatCard({
   title,
   value,
@@ -59,8 +63,11 @@ export default function StatCard({
         </Typography>
         <Stack sx={{ justifyContent: "space-between", flexGrow: 1, gap: 1 }}>
           <Stack>
-            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}>
-              <Typography variant="h4" component="p" noWrap>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 0.5, sm: 1 } }}
+            >
+              <Typography variant="h4" component="p" noWrap sx={{ typography: { xs: "h6", sm: "h4" }, maxWidth: "100%" }}>
                 {value}
               </Typography>
               {badge && <StatusBadge tone={badge.tone} label={badge.label} />}
@@ -71,7 +78,7 @@ export default function StatCard({
               </Typography>
             )}
           </Stack>
-          <Box sx={{ width: "100%", height: 50 }}>
+          <Box sx={{ width: "100%", height: 50, display: { xs: "none", sm: "block" } }}>
             {sparkline && chartColor && (
               <SparkLineChart
                 color={chartColor}

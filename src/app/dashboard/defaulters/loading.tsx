@@ -7,7 +7,7 @@ export default function DefaultersLoading() {
       <PageHeaderSkeleton />
       <Grid container spacing={2} columns={12}>
         {Array.from({ length: 4 }, (_, i) => (
-          <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid key={i} size={{ xs: 6, lg: 3 }}>
             <StatCardSkeleton />
           </Grid>
         ))}

@@ -79,7 +79,7 @@ export default async function DashboardPage({
       />
 
       <Grid container spacing={2} columns={12}>
-        <Grid size={{ xs: 12, sm: 6, lg: "grow" }}>
+        <Grid size={{ xs: 6, lg: "grow" }}>
           <StatCard
             title="Expected"
             value={formatMoney(report.expected)}
@@ -89,7 +89,7 @@ export default async function DashboardPage({
             href={monthTable("due")}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: "grow" }}>
+        <Grid size={{ xs: 6, lg: "grow" }}>
           <StatCard
             title="Collected"
             value={formatMoney(report.collected)}
@@ -106,7 +106,7 @@ export default async function DashboardPage({
             href={monthTable("collected")}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: "grow" }}>
+        <Grid size={{ xs: 6, lg: "grow" }}>
           <StatCard
             title="Outstanding"
             value={formatMoney(report.outstanding)}
@@ -115,7 +115,7 @@ export default async function DashboardPage({
             href={routes.defaulters}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: "grow" }}>
+        <Grid size={{ xs: 6, lg: "grow" }}>
           <StatCard
             title="Tenants overdue"
             value={String(report.overdueTenantCount)}
@@ -128,7 +128,7 @@ export default async function DashboardPage({
             }
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: "grow" }}>
+        <Grid size={{ xs: 6, lg: "grow" }}>
           <StatCard
             title="Vacant houses"
             value={String(houses.vacant)}

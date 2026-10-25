@@ -210,7 +210,7 @@ export default async function TenantPage({
         </Grid>
         {untracked ? null : (
           <>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
                 title="Outstanding"
                 value={formatMoney(summary.totalOutstanding)}
@@ -226,7 +226,7 @@ export default async function TenantPage({
                 }
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <StatCard
                 title="Months overdue"
                 value={String(summary.overdueMonths)}

@@ -49,8 +49,11 @@ export function StatCardSkeleton() {
         </Typography>
         <Stack sx={{ gap: 1 }}>
           <Stack>
-            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}>
-              <Typography variant="h4" sx={{ flexGrow: 1 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 0.5, sm: 1 } }}
+            >
+              <Typography variant="h4" sx={{ flexGrow: 1, width: "100%", typography: { xs: "h6", sm: "h4" } }}>
                 <Skeleton width="60%" />
               </Typography>
               <Skeleton variant="rounded" width={64} height={24} />
@@ -59,7 +62,7 @@ export function StatCardSkeleton() {
               <Skeleton width="70%" />
             </Typography>
           </Stack>
-          <Skeleton variant="rounded" height={50} />
+          <Skeleton variant="rounded" height={50} sx={{ display: { xs: "none", sm: "block" } }} />
         </Stack>
       </CardContent>
     </AppCard>

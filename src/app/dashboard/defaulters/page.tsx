@@ -22,7 +22,7 @@ export default async function DefaultersPage() {
 
       <Grid container spacing={2} columns={12}>
         {report.groups.map((group) => (
-          <Grid key={group.key} size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid key={group.key} size={{ xs: 6, lg: 3 }}>
             <StatCard
               title={`${group.label} behind`}
               value={formatMoney(group.outstanding)}

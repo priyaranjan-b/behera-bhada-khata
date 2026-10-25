@@ -31,7 +31,7 @@ function Donut({ kinds, measure }: { kinds: KindBreakdown[]; measure: Measure })
   const total = kinds.reduce((sum, k) => sum + measure.value(k), 0);
   return (
     <Stack spacing={0.5} sx={{ alignItems: "center", minWidth: 0 }}>
-      <Typography variant="body2" color="textSecondary">
+      <Typography variant="body2" color="textSecondary" align="center">
         {measure.title}
       </Typography>
       {total > 0 ? (
@@ -39,20 +39,20 @@ function Donut({ kinds, measure }: { kinds: KindBreakdown[]; measure: Measure })
           series={[
             {
               data: kinds.map((k, i) => ({ id: k.kind, value: measure.value(k), label: k.label, color: seriesVar(i) })),
-              innerRadius: 44,
-              outerRadius: 72,
+              innerRadius: 34,
+              outerRadius: 56,
               paddingAngle: 2,
               cornerRadius: 4,
               valueFormatter: (item) => measure.format(item.value),
             },
           ]}
-          width={160}
-          height={160}
+          width={124}
+          height={124}
           hideLegend
           margin={{ top: 4, bottom: 4, left: 4, right: 4 }}
         />
       ) : (
-        <Box sx={{ height: 160, display: "grid", placeItems: "center" }}>
+        <Box sx={{ height: 124, display: "grid", placeItems: "center" }}>
           <Typography variant="body2" color="textSecondary">
             None
           </Typography>
@@ -126,7 +126,7 @@ export default function TenantTypesCard({ kinds, monthLabel }: { kinds: KindBrea
           <Stack spacing={2}>
             <Grid container spacing={1} columns={12}>
               {measures.map((m) => (
-                <Grid key={m.key} size={{ xs: 12, sm: 4 }} sx={{ minWidth: 0 }}>
+                <Grid key={m.key} size={4} sx={{ minWidth: 0 }}>
                   <Donut kinds={kinds} measure={m} />
                 </Grid>
               ))}
