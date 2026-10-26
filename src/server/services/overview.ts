@@ -48,7 +48,7 @@ function directPeriods(
 /** A house code's site: "AC-T1-G01" -> "AC". */
 const siteOf = (code: string) => code.split("-")[0];
 
-/** The selected month (`yyyy-MM`, default this month): per tenant, per site, per tenant type. */
+/** The selected month (`yyyy-MM`, default last month): per tenant, per site, per tenant type. */
 export async function getOverviewMonth(
   _ctx: OwnerContext,
   month?: string | null,

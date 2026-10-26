@@ -61,9 +61,17 @@ export function isYearMonth(value: string | null | undefined): value is string {
   return Boolean(value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value));
 }
 
-/** Month key of a `?month=yyyy-MM` param; missing or malformed means the current month. */
+/**
+ * First of last month in the app time zone: the month reports (Overview,
+ * Billing) open on, being the latest one that has ended and fallen due.
+ */
+export function lastMonthKey(now: Date = new Date()): string {
+  return addMonthsToKey(currentMonthKey(now), -1);
+}
+
+/** Month key of a `?month=yyyy-MM` param; missing or malformed means last month. */
 export function monthKeyFromParam(month: string | null | undefined, now: Date = new Date()): string {
-  return isYearMonth(month) ? monthKeyOf(month) : currentMonthKey(now);
+  return isYearMonth(month) ? monthKeyOf(month) : lastMonthKey(now);
 }
 
 /** Month key `months` months after (or before, if negative) the given one. */

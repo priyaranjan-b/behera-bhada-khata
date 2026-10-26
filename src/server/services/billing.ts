@@ -1,6 +1,6 @@
 import "server-only";
 import type { BillingPage, BillingReceived, BillingRow, BillingTotalsView } from "@/lib/contracts";
-import { addMonthsToKey, currentMonthKey, monthKeyOf } from "@/lib/dates";
+import { addMonthsToKey, currentMonthKey, lastMonthKey, monthKeyOf } from "@/lib/dates";
 import { monthsIn, resolveRange, type MonthRange } from "@/lib/domain/billing";
 import { round2 } from "@/lib/money";
 import { BILLING_LIMITS, billingPageQuerySchema, billingQuerySchema } from "@/lib/validation";
@@ -13,12 +13,13 @@ import { paidDirectPeriods } from "./periods";
 // the range (a different query). The paid-direct switch is its own call
 // (./paidDirect).
 
-/** `?from&to&paidDirect` -> the range (default: this month, the latest that has fallen due) and the view. */
+/** `?from&to&paidDirect` -> the range (default: last month, the latest that has ended) and the view. */
 function parseQuery(query: unknown): { range: MonthRange; latestMonth: string; showPaidDirect: boolean } {
   const input = parseInput(billingQuerySchema, query ?? {});
+  // Paid-direct rent counts as received up to this month (A11).
   const latestMonth = currentMonthKey();
   return {
-    range: resolveRange(input, latestMonth, BILLING_LIMITS.maxMonths),
+    range: resolveRange(input, lastMonthKey(), BILLING_LIMITS.maxMonths),
     latestMonth,
     showPaidDirect: input.paidDirect === "show",
   };
@@ -42,7 +43,7 @@ const FILTER_COLUMNS = { periodMonth: "month", tenantName: "tenant", status: "st
  */
 export async function getBillingPage(_ctx: OwnerContext, query: unknown = {}): Promise<BillingPage> {
   const input = parseInput(billingPageQuerySchema, query ?? {});
-  const range = resolveRange(input, currentMonthKey(), BILLING_LIMITS.maxMonths);
+  const range = resolveRange(input, lastMonthKey(), BILLING_LIMITS.maxMonths);
   // Months exist before they're read: the same top-up every billing read does.
   const [, repos] = await Promise.all([billedTenants(), db()]);
   const result = await repos.billing.page({

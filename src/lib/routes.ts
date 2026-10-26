@@ -53,7 +53,7 @@ export const routes = {
   dashboard: (query?: { month?: string; show?: string; paidDirect?: "show" }, hash?: string) =>
     withQuery("/", query, hash),
   defaulters: "/defaulters",
-  /** `from`/`to` are `yyyy-MM`; none = this month. */
+  /** `from`/`to` are `yyyy-MM`; none = last month. */
   billing: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/billing", query),
   activity: "/activity",
   profile: (flash?: Flash) => withQuery("/profile", flash),

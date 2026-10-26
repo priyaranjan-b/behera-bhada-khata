@@ -18,12 +18,12 @@ describe("Billing", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("defaults to this month and asks the database for one page, as database columns", async () => {
+  it("defaults to last month and asks the database for one page, as database columns", async () => {
     const page = await getBillingPage(ctx);
-    expect(page).toMatchObject({ from: "2026-10-01", to: "2026-10-01", total: 1, all: 1, page: 0 });
+    expect(page).toMatchObject({ from: "2026-09-01", to: "2026-09-01", total: 1, all: 1, page: 0 });
     expect(fakes.owner.billing.page).toHaveBeenLastCalledWith({
-      from: "2026-10-01",
-      to: "2026-10-01",
+      from: "2026-09-01",
+      to: "2026-09-01",
       paidDirect: false, // off unless the page asks for it (A11)
       show: "all",
       search: undefined,

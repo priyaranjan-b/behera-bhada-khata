@@ -6,6 +6,7 @@ import {
   formatDateKey,
   formatMonth,
   isDateKey,
+  lastMonthKey,
   monthKeyFromParam,
   monthKeyOf,
   monthsBetween,
@@ -52,12 +53,19 @@ describe("month helpers", () => {
     expect(monthKeyOf(yearMonthOf("2026-10-24"))).toBe("2026-10-01");
   });
 
-  it("reads a ?month= param, falling back to the current month", () => {
+  it("reads a ?month= param, falling back to last month", () => {
     const now = new Date("2026-10-15T06:00:00Z");
     expect(monthKeyFromParam("2026-07", now)).toBe("2026-07-01");
-    expect(monthKeyFromParam(undefined, now)).toBe("2026-10-01");
-    expect(monthKeyFromParam("2026-13", now)).toBe("2026-10-01");
-    expect(monthKeyFromParam("2026-07-01", now)).toBe("2026-10-01");
+    expect(monthKeyFromParam(undefined, now)).toBe("2026-09-01");
+    expect(monthKeyFromParam("2026-13", now)).toBe("2026-09-01");
+    expect(monthKeyFromParam("2026-07-01", now)).toBe("2026-09-01");
+  });
+
+  it("gives last month in the app time zone, across a year end", () => {
+    expect(lastMonthKey(new Date("2026-10-15T06:00:00Z"))).toBe("2026-09-01");
+    // 1 Jan 00:30 in Kolkata is still 31 Dec in UTC.
+    expect(lastMonthKey(new Date("2025-12-31T19:00:00Z"))).toBe("2025-12-01");
+    expect(lastMonthKey(new Date("2026-01-10T06:00:00Z"))).toBe("2025-12-01");
   });
 
   it("counts whole months between month keys", () => {

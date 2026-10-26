@@ -64,8 +64,8 @@ describe("Overview sections", () => {
     expect(fakes.owner.rentPeriods.listForTenants).not.toHaveBeenCalled();
   });
 
-  it("month: a malformed ?month= means the current month", async () => {
-    expect((await getOverviewMonth(ctx, "2026-13")).monthKey).toBe("2026-10-01");
+  it("month: a malformed ?month= means last month", async () => {
+    expect((await getOverviewMonth(ctx, "2026-13")).monthKey).toBe("2026-09-01");
   });
 
   it("trend: ends this month, six months long", async () => {

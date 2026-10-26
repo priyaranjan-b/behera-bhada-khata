@@ -1,7 +1,7 @@
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
-import { currentMonthKey, formatMonth, yearMonthOf } from "@/lib/dates";
+import { formatMonth, lastMonthKey, yearMonthOf } from "@/lib/dates";
 import { rangeFromParams, rangeLength, rangeQuery, shiftRange } from "@/lib/domain/billing";
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
@@ -28,7 +28,7 @@ export default async function BillingPage({
 }) {
   const params = await searchParams;
   const paidDirect = paidDirectViewOf(params.paidDirect);
-  const range = rangeFromParams(params, currentMonthKey(), BILLING_LIMITS.maxMonths);
+  const range = rangeFromParams(params, lastMonthKey(), BILLING_LIMITS.maxMonths);
   const query = { ...rangeQuery(range), paidDirect };
   const totals = serverApi.dashboard.billingTotals(query);
   const grid = serverApi.dashboard.billing(query);
