@@ -2,6 +2,7 @@
 // Kept separate from the copied template files so those stay easy to re-sync;
 // index.ts merges these per component (variants are appended, not replaced).
 import { alpha, type Components, type Theme } from "@mui/material/styles";
+import { alertClasses } from "@mui/material/Alert";
 import { chipClasses } from "@mui/material/Chip";
 import { brand, gray, orange, red } from "../themePrimitives";
 import { cardShadows, lightSurfaces, slate } from "../appTokens";
@@ -209,6 +210,34 @@ export const appCustomizations: Components<Theme> = {
             "&:hover": { borderColor: red[500], backgroundColor: alpha(red[800], 0.6) },
             "&:active": { backgroundColor: alpha(red[800], 0.8) },
           }),
+        }),
+      },
+    ],
+  },
+  MuiAlert: {
+    variants: [
+      // An alert with an action button (Start tracking rent): the button keeps
+      // its label on one line, and on phones it drops below the message,
+      // lined up with the text, instead of squeezing it into a sliver.
+      {
+        props: {},
+        style: ({ theme }) => ({
+          [`& .${alertClasses.action}`]: {
+            flexShrink: 0,
+            alignItems: "center",
+            "& .MuiButton-root": { whiteSpace: "nowrap" },
+          },
+          [theme.breakpoints.down("sm")]: {
+            flexWrap: "wrap",
+            [`& .${alertClasses.message}`]: { flex: "1 1 0", minWidth: 0 },
+            [`& .${alertClasses.action}`]: {
+              flexBasis: "100%",
+              justifyContent: "flex-start",
+              margin: 0,
+              // Icon (22px) + its gap (12px): starts under the message text.
+              padding: theme.spacing(0, 0, 1, "34px"),
+            },
+          },
         }),
       },
     ],

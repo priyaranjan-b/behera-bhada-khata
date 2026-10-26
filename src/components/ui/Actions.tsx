@@ -9,9 +9,9 @@ import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 /**
  * Button group: a row from `sm`. On phones, `phone="stack"` stacks every
- * button full width; `phone="primaryOnTop"` puts the last button (the
- * primary, right-most on desktop) full width on top and pairs the rest two
- * to a row below it.
+ * button full width; `phone="primaryOnTop"` pairs the buttons two to a row,
+ * and when one is left over it is the last (the primary, right-most on
+ * desktop), which goes full width on top.
  */
 export function ActionStack({
   align = "end",
@@ -31,7 +31,9 @@ export function ActionStack({
           gap: 1.5,
           justifyContent: align === "end" ? "flex-end" : "flex-start",
           width: { xs: "100%", sm: "auto" },
-          "& > :last-child": { gridColumn: "1 / -1", order: { xs: -1, sm: 0 } },
+          // Only an odd one out is the primary: with two buttons (no Record
+          // payment, e.g. a Govt tenant paying direct) they share the row.
+          "& > :last-child:nth-child(odd)": { gridColumn: "1 / -1", order: { xs: -1, sm: 0 } },
           "& > *": { width: { xs: "100%", sm: "auto" } },
         }}
       >
