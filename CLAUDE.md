@@ -56,8 +56,10 @@ development, required in production.
   the audit history screens and events (A10), Govt rent counted as paid
   direct (A11), pages streamed in sections (A12), owner pages without a
   `/` prefix (A13), history tables paged in the database (A14), which
-  tables page in the database vs the browser (A15), and record pages in
-  lazy tabs by data source (A16). Read it before changing
+  tables page in the database vs the browser (A15), record pages in
+  lazy tabs by data source (A16), and the abuse limits: owner API rate
+  limit, client IP from the last `x-forwarded-for` hop, statement timeouts
+  (A17). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -347,6 +349,8 @@ until the tenant-signed copy exists.
   OFL) because the standard PDF fonts can't encode `₹` or Odia; they're
   traced into the route via `outputFileTracingIncludes` in `next.config.ts`
   — a new route that renders PDFs must be added there.
+- Every owner API call is rate limited in `ownerRoute`/`ownerLinkRoute`
+  (`enforceOwnerRateLimit`, A17).
 - Public endpoints that cost money or send email (OTP send, confirm, magic
   link) call `enforceRateLimits` (`src/server/services/context.ts`, backed by
   the `rate_limits` table); their routes pass `requestMeta(request)` for the

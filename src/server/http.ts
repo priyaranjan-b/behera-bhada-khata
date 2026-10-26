@@ -5,6 +5,7 @@ import { routes } from "@/lib/routes";
 import { env } from "@/server/env";
 import { auth } from "@/server/infra";
 import { getOwnerContext } from "@/server/services/auth";
+import { enforceOwnerRateLimit } from "@/server/services/context";
 import { secretsEqual } from "@/server/token";
 import type { OwnerContext, RequestMeta, UploadedFile } from "@/server/services/context";
 
@@ -67,11 +68,13 @@ export async function readJsonWithFiles(
 }
 
 /**
- * Client IP for rate limiting. On Vercel (and most proxies) the first
- * x-forwarded-for hop is the client; elsewhere it's whatever the proxy says.
+ * Client IP for rate limiting (A17). The last x-forwarded-for hop is the one
+ * our own proxy added: Vercel overwrites the header with just the client, and
+ * a proxy that appends puts the address it saw last. Earlier hops come from
+ * the client and are never trusted, so they can't dodge the per-IP limits.
  */
 export function requestMeta(request: Request): RequestMeta {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
   return { ip: forwarded || request.headers.get("x-real-ip") || "unknown" };
 }
 
@@ -88,11 +91,15 @@ export function publicRoute<P = Record<string, never>>(
   };
 }
 
-/** Endpoint for the app owner; 401 without a session, 403 for any other account. */
+/** Endpoint for the app owner; 401 without a session, 403 for any other account, 429 past the owner's rate limit. */
 export function ownerRoute<P = Record<string, never>>(
   handler: (ctx: OwnerContext, request: Request, params: P) => Promise<Result>
 ) {
-  return publicRoute<P>(async (request, params) => handler(await getOwnerContext(), request, params));
+  return publicRoute<P>(async (request, params) => {
+    const ctx = await getOwnerContext();
+    await enforceOwnerRateLimit(ctx);
+    return handler(ctx, request, params);
+  });
 }
 
 /** Like ownerRoute, for URLs opened directly in the browser: no session -> the login page. */
@@ -103,7 +110,9 @@ export function ownerLinkRoute<P = Record<string, never>>(
     const session = await auth.getSession();
     if (!session) return NextResponse.redirect(new URL(routes.login(), request.url));
     if (!session.isOwner) return NextResponse.redirect(new URL(routes.login({ error: "owner" }), request.url));
-    return handler({ ownerId: session.userId, email: session.email }, request, params);
+    const ctx = { ownerId: session.userId, email: session.email };
+    await enforceOwnerRateLimit(ctx);
+    return handler(ctx, request, params);
   });
 }
 

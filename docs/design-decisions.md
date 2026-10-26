@@ -513,3 +513,43 @@ blocks rendering.
 **Apply it** to any record page with several growing tables: keep what the
 common task needs above the tabs and give each data source a tab. A page of
 independent cards (the Overview) still streams in sections (A12).
+
+### A17 — Abuse limits on every layer: owner API, client IP, query time
+
+**Decision.** Three limits, each cheap, so a stolen session, a runaway
+script or someone calling Supabase directly can't wear the app down:
+
+- **Owner API rate limit.** `ownerRoute` and `ownerLinkRoute`
+  (`src/server/http.ts`) count every owner API call in the existing
+  `rate_limits` table (`enforceOwnerRateLimit` in
+  `src/server/services/context.ts`): `RATE_LIMITS.ownerApiPerMinute`, 300
+  per minute per owner, then 429. The screens send a handful of calls per
+  view, so only abuse reaches it. Pages rendered on the server call services
+  in-process (`serverApi`) and aren't counted: they are already behind the
+  session and one render is a bounded set of reads.
+- **Client IP from the last `x-forwarded-for` hop** (`requestMeta`). Vercel
+  overwrites the header with just the client; a proxy that appends puts the
+  address it saw last. Earlier hops are whatever the client sent, so using
+  the first one let anyone dodge the per-IP limits on login, OTP and
+  confirm. Behind more than one proxy (e.g. Cloudflare in front of Vercel),
+  revisit this.
+- **Statement timeouts** (`0023_statement_timeouts.sql`): `authenticated`
+  5s, `anon` 3s. The publishable key is public, so anyone can call PostgREST
+  directly; RLS gives them nothing, but a slow query still costs the
+  database.
+
+**Not done here (yet).**
+- A full Content-Security-Policy (`script-src` with nonces). Next.js nonces
+  make every page dynamic and MUI's Emotion styles need the nonce too; worth
+  its own change and a browser check of every page. `next.config.ts` sets
+  the framing/base/object/form-action parts today.
+- Edge rate limiting for page loads (`/login`, `/confirm/*`): Vercel
+  Firewall rules, configured in the dashboard, not in code.
+- Reads still call `ensure_rent_periods` (an idempotent insert). Fine at this
+  size; the first thing to cache under heavy load.
+
+**Why.** A security review of the data path (page → API → service → port →
+adapter → PostgREST → RLS) found injection and data-access risk low (bound
+parameters, whitelisted sort/filter columns, `like_escape`, RLS on every
+table, explicit grants), but nothing limited authenticated calls or query
+time, and the IP used for public limits could be spoofed.

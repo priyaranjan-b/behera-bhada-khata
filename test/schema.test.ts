@@ -1984,3 +1984,15 @@ describe("tenant_account_summary (0022)", () => {
     expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]))).toBe("BBK09");
   });
 });
+
+describe("statement timeouts (0023)", () => {
+  it("caps how long one query from the API roles may run", async () => {
+    const { rows } = await db.query<{ rolname: string; rolconfig: string[] }>(
+      `select rolname, rolconfig from pg_roles where rolname in ('anon', 'authenticated') order by rolname`
+    );
+    expect(rows).toEqual([
+      { rolname: "anon", rolconfig: ["statement_timeout=3s"] },
+      { rolname: "authenticated", rolconfig: ["statement_timeout=5s"] },
+    ]);
+  });
+});

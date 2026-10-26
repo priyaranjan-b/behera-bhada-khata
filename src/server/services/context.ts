@@ -57,14 +57,18 @@ export async function enforceRateLimits(limits: RateLimit[]): Promise<void> {
   if (allowed.includes(false)) throw new ApiError(429, "Too many attempts. Please wait a while and try again.");
 }
 
-export const HOUR = 60 * 60;
+export const MINUTE = 60;
+export const HOUR = 60 * MINUTE;
 
 /**
- * Every rate limit in one table, per hour. A route that costs money or sends
- * email counts one hit per record/email and one per IP:
+ * Every rate limit in one table. A route that costs money or sends email
+ * counts one hit per record/email and one per IP:
  * `{ key: \`otp:ip:${ip}\`, ...RATE_LIMITS.otpPerIp }`.
  */
 export const RATE_LIMITS = {
+  // Every owner API call (A17): far above what the screens send, so only a
+  // runaway script or a stolen session hits it.
+  ownerApiPerMinute: { limit: 300, windowSeconds: MINUTE },
   magicLinkPerEmail: { limit: 5, windowSeconds: HOUR },
   magicLinkPerIp: { limit: 20, windowSeconds: HOUR },
   passwordPerEmail: { limit: 10, windowSeconds: HOUR },
@@ -74,6 +78,11 @@ export const RATE_LIMITS = {
   confirmPerRecord: { limit: 10, windowSeconds: HOUR },
   confirmPerIp: { limit: 30, windowSeconds: HOUR },
 } as const;
+
+/** Counts one owner API call against the owner's per-minute budget; 429 when it runs out (A17). */
+export async function enforceOwnerRateLimit(ctx: OwnerContext): Promise<void> {
+  await enforceRateLimits([{ key: `owner:${ctx.ownerId}`, ...RATE_LIMITS.ownerApiPerMinute }]);
+}
 
 /** Lifetime of a signed storage URL handed to the browser (documents, proofs, signatures, receipts). */
 export const SIGNED_URL_SECONDS = 5 * 60;
