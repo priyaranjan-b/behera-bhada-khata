@@ -1,10 +1,9 @@
-import { cookies } from "next/headers";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { currentMonthKey, formatMonth, yearMonthOf } from "@/lib/dates";
 import { rangeFromParams, rangeLength, rangeQuery, shiftRange } from "@/lib/domain/billing";
-import { PAID_DIRECT_COOKIE, paidDirectViewOf } from "@/lib/preferences";
+import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
 import { BILLING_LIMITS } from "@/lib/validation";
 import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
@@ -19,14 +18,20 @@ import BillingStats, { BILLING_STAT_CELL } from "./sections/BillingStats";
 import ReceivedStat from "./sections/ReceivedStat";
 
 // The page loads in sections (A12): the range comes straight from the URL, so
-// the header, the range form and the switch render at once; the months (grid
-// and totals) and the cash received stream in on their own calls.
-export default async function BillingPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+// the header, the range form and the switch render at once; the totals, the
+// grid (one page at a time, paged in SQL, A15) and the cash received stream
+// in on their own calls.
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string; paidDirect?: string }>;
+}) {
   const params = await searchParams;
-  const paidDirect = paidDirectViewOf((await cookies()).get(PAID_DIRECT_COOKIE)?.value);
+  const paidDirect = paidDirectViewOf(params.paidDirect);
   const range = rangeFromParams(params, currentMonthKey(), BILLING_LIMITS.maxMonths);
   const query = { ...rangeQuery(range), paidDirect };
-  const report = serverApi.dashboard.billing(query);
+  const totals = serverApi.dashboard.billingTotals(query);
+  const grid = serverApi.dashboard.billing(query);
   const received = serverApi.dashboard.billingReceived(query);
   const paidDirectState = serverApi.dashboard.paidDirect({ paidDirect });
 
@@ -48,18 +53,23 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             <PeriodSwitcher
               label={rangeLabel}
               unit={months === 1 ? "month" : `${months} months`}
-              prevHref={routes.billing(rangeQuery(shiftRange(range, -1)))}
-              nextHref={routes.billing(rangeQuery(shiftRange(range, 1)))}
+              prevHref={routes.billing({ ...rangeQuery(shiftRange(range, -1)), ...paidDirectQuery(paidDirect) })}
+              nextHref={routes.billing({ ...rangeQuery(shiftRange(range, 1)), ...paidDirectQuery(paidDirect) })}
             />
           </ActionStack>
         }
       />
       {/* Remount on a new range so the inputs show it. */}
-      <BillingRangeForm key={`${range.from}-${range.to}`} from={yearMonthOf(range.from)} to={yearMonthOf(range.to)} />
+      <BillingRangeForm
+        key={`${range.from}-${range.to}`}
+        from={yearMonthOf(range.from)}
+        to={yearMonthOf(range.to)}
+        paidDirect={paidDirect}
+      />
 
       <Grid container spacing={2} columns={12}>
         <AsyncSection key={view} title="Billing totals" fallback={SKELETON.stats}>
-          <BillingStats report={report} rangeLabel={rangeLabel} />
+          <BillingStats totals={totals} rangeLabel={rangeLabel} />
         </AsyncSection>
         <Grid size={BILLING_STAT_CELL}>
           <AsyncSection key={view} title="Received" fallback={SKELETON.received}>
@@ -69,7 +79,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </Grid>
 
       <AsyncSection key={view} title="Billing" fallback={SKELETON.grid}>
-        <BillingGridSection report={report} rangeLabel={rangeLabel} />
+        <BillingGridSection grid={grid} query={query} rangeLabel={rangeLabel} />
       </AsyncSection>
     </Stack>
   );

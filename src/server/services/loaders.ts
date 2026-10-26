@@ -88,25 +88,6 @@ export const tenantPlacements = cache(async (tenantId: string): Promise<Placemen
   return loadPlacements(await db(), [tenantId]);
 });
 
-/** Every rent month of the tenant, after topping them up if the tenant is billed. */
-export const tenantRentMonths = cache(async (tenantId: string): Promise<RentPeriod[]> => {
-  const tenant = await tenantById(tenantId);
-  await ensureRentPeriodsFor(billedTenantIds([tenant]));
-  return (await db()).rentPeriods.listForTenants([tenantId]);
-});
-
-/** Every payment of the tenant. */
-export const tenantPayments = cache(async (tenantId: string) => {
-  requireId(tenantId, "Tenant");
-  return (await db()).payments.listForTenants([tenantId]);
-});
-
-/** Every adjustment of the tenant. */
-export const tenantAdjustments = cache(async (tenantId: string) => {
-  requireId(tenantId, "Tenant");
-  return (await db()).adjustments.listForTenants([tenantId]);
-});
-
 // ---- One tower (the tower page's sections) -----------------------------------
 
 /** Every site. */

@@ -82,26 +82,6 @@ export interface BillingTotals {
   collectionRate: number | null;
 }
 
-export function billingTotals(
-  rows: { amountDue: number; amountAllocated: number; notYetDue: boolean }[]
-): BillingTotals {
-  let billed = 0;
-  let collected = 0;
-  let overdue = 0;
-  for (const r of rows) {
-    billed += r.amountDue;
-    collected += r.amountAllocated;
-    if (!r.notYetDue) overdue += Math.max(0, r.amountDue - r.amountAllocated);
-  }
-  return {
-    billed: round2(billed),
-    collected: round2(collected),
-    balance: round2(Math.max(0, billed - collected)),
-    overdue: round2(overdue),
-    collectionRate: billed > 0 ? Math.round((collected / billed) * 100) : null,
-  };
-}
-
 // ---- Rent paid to the owner directly (government agreements, 0016) -------------
 //
 // A government tenant whose rent isn't tracked pays the owner's bank on time
@@ -114,10 +94,6 @@ const PAID_DIRECT_PREFIX = "paid-direct:";
 /** Id of a computed paid-direct month, so it can never clash with a rent_periods uuid. */
 export function paidDirectId(tenantId: string, monthKey: string): string {
   return `${PAID_DIRECT_PREFIX}${tenantId}:${monthKey}`;
-}
-
-export function isPaidDirect(periodId: string): boolean {
-  return periodId.startsWith(PAID_DIRECT_PREFIX);
 }
 
 /** Every month key from `from` to `to`, both included. */
@@ -149,3 +125,32 @@ export function paidDirectMonths(
     })
     .filter((m) => m.amount > 0);
 }
+
+// A tenant's Months table (A15): its "Show" choices and what it sorts and
+// filters, done by tenant_months_page() in SQL.
+export const TENANT_MONTH_SHOWS = ["all", "unpaid", "partly", "paid", "notDue"] as const;
+export type TenantMonthShow = (typeof TENANT_MONTH_SHOWS)[number];
+export const TENANT_MONTH_SHOW_OPTIONS: { value: TenantMonthShow; label: string }[] = [
+  { value: "all", label: "All months" },
+  { value: "unpaid", label: "Unpaid (overdue)" },
+  { value: "partly", label: "Partly paid" },
+  { value: "paid", label: "Paid" },
+  { value: "notDue", label: "Not due yet" },
+];
+export const TENANT_MONTH_SORT_FIELDS = ["periodMonth", "amountDue", "amountAllocated", "status"] as const;
+export const TENANT_MONTH_FILTER_FIELDS = ["periodMonth", "status"] as const;
+
+// The Billing grid (A15): its "Show" choices and what it sorts and filters,
+// done by billing_page() in SQL.
+export const BILLING_SHOWS = ["all", "unpaid", "partly", "paid", "paidDirect", "notDue"] as const;
+export type BillingShow = (typeof BILLING_SHOWS)[number];
+export const BILLING_SHOW_OPTIONS: { value: BillingShow; label: string }[] = [
+  { value: "all", label: "All months" },
+  { value: "unpaid", label: "Unpaid (overdue)" },
+  { value: "partly", label: "Partly paid" },
+  { value: "paid", label: "Paid" },
+  { value: "paidDirect", label: "Govt - paid direct" },
+  { value: "notDue", label: "Not due yet" },
+];
+export const BILLING_SORT_FIELDS = ["periodMonth", "tenantName", "amountDue", "amountAllocated", "balance", "status"] as const;
+export const BILLING_FILTER_FIELDS = ["periodMonth", "tenantName", "status", "payments"] as const;

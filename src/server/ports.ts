@@ -5,11 +5,17 @@
 // new adapter that satisfies these interfaces - services and route handlers
 // stay as they are.
 import type {
+  TenantAccountSummaryDb,
   Adjustment,
   AppAuditAction,
   AuditAction,
   AuditActorKind,
   AuditLogEntry,
+  AuditTextColumn,
+  TenantLedgerDbRow,
+  BillingDbRow,
+  BillingTotalsDb,
+  TenantMonthDbRow,
   AdjustmentAllocation,
   Database,
   LedgerStatus,
@@ -31,6 +37,8 @@ import type {
   UnitOccupancy,
   UnitType,
 } from "@/lib/types";
+import type { FilterLogic, GridTextOperator, SortDirection } from "@/lib/domain/gridQuery";
+import type { BillingShow, TenantMonthShow } from "@/lib/domain/billing";
 import type { Session } from "@/lib/contracts";
 
 type Insert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];
@@ -134,6 +142,90 @@ export interface AuditFilter {
   limit: number;
 }
 
+/** One page of a table paged in SQL (A15). */
+export interface DbPage<R> {
+  rows: R[];
+  /** Rows matching the filter, across all pages. */
+  total: number;
+  /** All rows before the filter. */
+  all: number;
+  /** The page returned: the last one when the asked-for page is past the end. */
+  page: number;
+}
+
+/** One page of a tenant's rent months, run by tenant_months_page (0019, A15). */
+export interface TenantMonthsFilter {
+  tenantId: string;
+  show: TenantMonthShow;
+  search?: string;
+  filters: { field: "month" | "status"; operator: GridTextOperator; value?: string }[];
+  logic: FilterLogic;
+  sort: "period_month" | "amount_due" | "amount_allocated" | "status";
+  dir: SortDirection;
+  page: number;
+  pageSize: number;
+}
+
+/** One page of the Billing grid, run by billing_page (0021, A15). */
+export interface BillingFilter {
+  /** Month keys, both included. */
+  from: string;
+  to: string;
+  paidDirect: boolean;
+  show: BillingShow;
+  search?: string;
+  filters: { field: "month" | "tenant" | "status" | "payments"; operator: GridTextOperator; value?: string }[];
+  logic: FilterLogic;
+  sort: "period_month" | "tenant_name" | "amount_due" | "amount_allocated" | "balance" | "status";
+  dir: SortDirection;
+  page: number;
+  pageSize: number;
+}
+
+/** One page of a tenant's ledger, run by tenant_ledger_page (0020, A15). */
+export interface TenantLedgerFilter {
+  tenantId: string;
+  /** yyyy-MM-dd, inclusive. */
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
+  filters: { field: "date" | "description" | "status"; operator: GridTextOperator; value?: string }[];
+  logic: FilterLogic;
+  sort: "date" | "description" | "status" | "debit" | "credit" | "balance";
+  dir: SortDirection;
+  page: number;
+  pageSize: number;
+}
+
+/** One page of history, run by audit_history_page (0018, A14). */
+export interface AuditHistoryFilter {
+  /** One tenant's history; none = every change (Activity). */
+  tenantId?: string;
+  actions?: readonly AuditAction[];
+  /** yyyy-MM-dd, inclusive, in the app time zone. */
+  fromDate?: string;
+  toDate?: string;
+  /** Words that must each appear in who, what, tenant, house or details. */
+  search?: string;
+  filters: { field: AuditTextColumn; operator: GridTextOperator; value?: string }[];
+  logic: FilterLogic;
+  sort: "at" | Exclude<AuditTextColumn, "details">;
+  dir: SortDirection;
+  /** 0-based. */
+  page: number;
+  pageSize: number;
+}
+
+export interface AuditHistoryPage {
+  rows: AuditLogEntry[];
+  /** Rows matching the filter, across all pages. */
+  total: number;
+  /** All of the tenant's rows, or the whole log's. */
+  all: number;
+  /** The page returned: the last one when the asked-for page is past the end. */
+  page: number;
+}
+
 /** An app-level event for log_event (0015). Never a secret, OTP, signature or raw IP. */
 export interface AuditEvent {
   action: AppAuditAction;
@@ -149,6 +241,7 @@ export interface OwnerRepositories {
   /** History of every change (0015): read-only, plus the owner's own app events. */
   audit: {
     list(filter: AuditFilter): Promise<AuditLogEntry[]>;
+    historyPage(filter: AuditHistoryFilter): Promise<AuditHistoryPage>;
     log(event: AuditEvent): Promise<void>;
   };
   /** The owner's name (0013): one row. */
@@ -217,6 +310,8 @@ export interface OwnerRepositories {
     startRentTracking(id: string, monthlyRent: number | null, paidThrough: string | null): Promise<string>;
     /** Undoes startRentTracking; 409 once a payment or adjustment is recorded. */
     stopRentTracking(id: string): Promise<void>;
+    /** The tenant's balance figures and whether tracking can stop, aggregated in SQL (0022). */
+    accountSummary(id: string): Promise<TenantAccountSummaryDb>;
   };
   rentPeriods: {
     /**
@@ -231,6 +326,17 @@ export interface OwnerRepositories {
       filter?: { openOnly?: boolean; openOrFrom?: string; months?: { from: string; to: string } }
     ): Promise<RentPeriod[]>;
     listByIds(ids: string[]): Promise<RentPeriod[]>;
+    page(filter: TenantMonthsFilter): Promise<DbPage<TenantMonthDbRow>>;
+  };
+  billing: {
+    /** Tenants × months in the range (plus paid-direct months), one page. */
+    page(filter: BillingFilter): Promise<DbPage<BillingDbRow>>;
+    /** The range's totals: billed, collected, balance, overdue, rate, tenants. */
+    totals(range: { from: string; to: string; paidDirect: boolean }): Promise<BillingTotalsDb>;
+  };
+  ledger: {
+    /** Charges, payments and adjustments with the all-time running balance, one page. */
+    page(filter: TenantLedgerFilter): Promise<DbPage<TenantLedgerDbRow>>;
   };
   payments: {
     /** `fromDate` (yyyy-MM-dd): only payments dated on or after it. */

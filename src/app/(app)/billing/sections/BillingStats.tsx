@@ -1,5 +1,5 @@
 import Grid from "@mui/material/Grid";
-import type { BillingReport } from "@/lib/contracts";
+import type { BillingTotalsView } from "@/lib/contracts";
 import { collectionRateTone } from "@/lib/domain/overview";
 import { formatMoney } from "@/lib/money";
 import StatCard from "@/components/ui/StatCard";
@@ -8,9 +8,15 @@ import StatCard from "@/components/ui/StatCard";
 export const BILLING_STAT_CELL = { xs: 6, lg: 3 } as const;
 
 /** Billing: Billed, Collected and Balance for the range - three grid cells. */
-export default async function BillingStats({ report, rangeLabel }: { report: Promise<BillingReport>; rangeLabel: string }) {
-  const { totals, rows } = await report;
-  const tenantCount = new Set(rows.map((r) => r.tenantId)).size;
+export default async function BillingStats({
+  totals: totalsPromise,
+  rangeLabel,
+}: {
+  totals: Promise<BillingTotalsView>;
+  rangeLabel: string;
+}) {
+  const totals = await totalsPromise;
+  const tenantCount = totals.tenants;
   return (
     <>
       <Grid size={BILLING_STAT_CELL}>

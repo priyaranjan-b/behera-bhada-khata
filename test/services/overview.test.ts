@@ -41,7 +41,7 @@ describe("Overview sections", () => {
   afterEach(() => vi.useRealTimers());
 
   it("month: tops up only billed tenants, then splits the month by site and tenant type", async () => {
-    const month = await getOverviewMonth(ctx, "2026-10");
+    const month = await getOverviewMonth(ctx, "2026-10", { paidDirect: "show" });
 
     expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith([ASHA], expect.any(String));
     expect(month.monthKey).toBe("2026-10-01");
@@ -55,9 +55,10 @@ describe("Overview sections", () => {
     ]);
   });
 
-  it("paid-direct switch: available when a Govt tenant pays direct, shown unless hidden", async () => {
-    expect(await getPaidDirectState(ctx)).toEqual({ available: true, shown: true });
-    expect(await getPaidDirectState(ctx, { paidDirect: "hide" })).toEqual({ available: true, shown: false });
+  it("paid-direct switch: available when a Govt tenant pays direct, off unless shown", async () => {
+    expect(await getPaidDirectState(ctx)).toEqual({ available: true, shown: false });
+    expect(await getPaidDirectState(ctx, { paidDirect: "junk" })).toEqual({ available: true, shown: false });
+    expect(await getPaidDirectState(ctx, { paidDirect: "show" })).toEqual({ available: true, shown: true });
     // It needs only the tenant list: no rent-month top-up, no rent months.
     expect(fakes.system.rentPeriods.ensure).not.toHaveBeenCalled();
     expect(fakes.owner.rentPeriods.listForTenants).not.toHaveBeenCalled();
@@ -93,7 +94,13 @@ describe("Overview sections", () => {
     });
     fakes.owner.rentRates.listForTenants.mockResolvedValue([rate(ASHA, "5000.00", 1), rate(GOVT, "11000.00", 2)]);
 
-    expect(await getPortfolio(ctx)).toEqual({ rentRoll: 16000, depositsHeld: 12000, advancePaid: 5000, paidDirectRent: 11000 });
+    expect(await getPortfolio(ctx, { paidDirect: "show" })).toEqual({
+      rentRoll: 16000,
+      depositsHeld: 12000,
+      advancePaid: 5000,
+      paidDirectRent: 11000,
+    });
+    expect(await getPortfolio(ctx)).toEqual(await getPortfolio(ctx, { paidDirect: "hide" })); // the default
     expect(await getPortfolio(ctx, { paidDirect: "hide" })).toEqual({
       rentRoll: 5000,
       depositsHeld: 12000,
@@ -103,7 +110,7 @@ describe("Overview sections", () => {
     const hidden = await getOverviewMonth(ctx, "2026-10", { paidDirect: "hide" });
     // Tenant types follows the same switch.
     expect(hidden.kinds.find((k) => k.kind === "government")).toMatchObject({ paidDirectTenants: 0, paidDirectRent: 0 });
-    expect((await getOverviewMonth(ctx, "2026-10")).kinds.find((k) => k.kind === "government")).toMatchObject({
+    expect((await getOverviewMonth(ctx, "2026-10", { paidDirect: "show" })).kinds.find((k) => k.kind === "government")).toMatchObject({
       paidDirectTenants: 1,
       paidDirectRent: 11000,
     });

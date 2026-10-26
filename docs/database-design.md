@@ -50,6 +50,11 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0012_receipt_numbers.sql` | receipt numbers: `payments.receipt_no` (2026/10/001), `adjustments.receipt_no` (ADJ/2026/10/001), `receipt_counters` |
 | `0015_audit_log.sql` | `audit_log` written by `audit_row_change()` triggers and `log_event()`; `recorded_by` on payments, adjustments, documents, tenancies and rent rates |
 | `0016_government_tenants.sql` | `tenants.tenant_kind` and `rent_tracked`: government tenants whose rent goes to the owner directly (no months until `start_rent_tracking`) |
+| `0017_audit_text.sql` | `audit_log.title` / `details` / `actor_name`: the history's text, written on insert by `audit_describe()` (D27); `tenant_history_page()` for the tenant's Change history (A14) |
+| `0018_audit_history_page.sql` | `audit_history_page()` replaces `tenant_history_page()`: the tenant is optional (Activity), and the tenant's name is searchable, filterable and sortable (A14) |
+| `0019_tenant_months_page.sql` | grid helpers (`grid_check`, `grid_row_matches`, ...), `period_display_status()`, `tenant_months_page()` for a tenant's Months (D28) |
+| `0020_tenant_ledger_page.sql` | `tenant_ledger_page()`: a tenant's journal and running balance, built and paged in SQL; replaces `buildTenantLedger` (D28) |
+| `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -532,7 +537,8 @@ of everything that changes in place, plus a few app events.
   `tenant.activated`, one that moves `billing_start` is
   `billing_start.corrected`, a tenancy getting an `end_date` is
   `tenancy.ended`, `acknowledged_at` is `payment.acknowledged`. The list is
-  `AUDIT_ACTIONS` in `src/lib/types.ts`; labels in `src/lib/domain/audit.ts`.
+  `AUDIT_ACTIONS` in `src/lib/types.ts`; labels in `src/lib/domain/audit.ts`
+  and, for the stored text, `audit_action_label` in SQL (D27).
 - **One change, many rows.** `tx_id` (`txid_current()`) groups what one
   function call did: a move-out, the tenancies it ended and the months it
   dropped share it, and the timeline shows them together. No existing
@@ -618,6 +624,129 @@ in the months, which `ensure_rent_periods` would refill from `billing_start`.
 Supporting that would need a billing-end column for an event that hasn't
 happened.
 
+### D27 — Audit rows store the text the history shows
+
+**Decision (0017).** `audit_log` has three more columns, written once when
+the row is inserted and never changed:
+- **`title`**: what happened ("Rent changed", "Link not delivered to tenant");
+- **`details`**: the changed values as shown, lines joined with " · "
+  ("Monthly rent: ₹6,000.00 → ₹6,500.00");
+- **`actor_name`**: the owner's name from `owner_profile` ("Owner" before a
+  profile exists), or Tenant / System / Not signed in.
+
+How it's built:
+- **A `BEFORE INSERT` trigger** (`audit_log_fill_text`) fills them with
+  `audit_describe(action, changes, context)` and `audit_actor_name(kind)`. So
+  both writers (`audit_row_change` and `log_event`) get the text without
+  changing.
+- **The text rules live in SQL:**
+  - `audit_action_label`;
+  - the column list, with each column's label and format, in
+    `audit_describe`;
+  - `audit_value` for enum labels and floors;
+  - `audit_money`, `audit_date`, `audit_month` and `audit_datetime`.
+  They produce exactly what the app's formatters do (en-IN, Asia/Kolkata:
+  `₹12,34,567.50`, `5 Sept 2026`, `26 Oct 2026, 6:50 pm IST`).
+  `test/schema.test.ts` compares them with `formatMoney`, `formatDateKey`,
+  `formatDateTime`, `auditActionLabel` and the label maps in `src/lib/domain/`,
+  so the two can't drift silently.
+- **Backfill:** 0017 filled the existing rows, with the immutability trigger
+  off for that one statement. It used the owner's name as it was then.
+- **Reads are plain.** The app shows `title` / `details` / `actor_name` as
+  stored; nothing rebuilds the text. `audit_history_page()` (0018, security
+  invoker, so RLS applies) is one query over these columns, plus the
+  tenant's current name joined from `tenants`, for the Activity page and a
+  tenant's Change history (A14 in `docs/design-decisions.md`):
+  - search: every word in who / what / tenant / house / details, `%` and
+    `_` literal;
+  - the grid's text filters, combined with and / or;
+  - sort by when / who / what / tenant / house;
+  - "Show" (actions) and the From/To days;
+  - one page, with the matching and total counts.
+
+**Why.**
+- Built on every read, the text couldn't be searched, sorted or paged by
+  the database, so the app had to load a tenant's whole history to search it.
+- An audit log should show what was true when the change happened. A label
+  or a name changed later now leaves old rows as they were written.
+
+**Rejected:** writing the text from the app. Most rows come from table
+triggers inside the SQL functions, where the app has no hook, and the log
+can't be updated afterwards.
+
+### D28 — Growing tables are built, paged and searched in SQL
+
+**Decision (0019-0021).** The tables whose rows grow every month each have
+one `security invoker` SQL function. Each returns
+`{rows, total, all, page}` for one page, after "Show", search, the grid's
+text filters and sort (A15 in `docs/design-decisions.md`):
+
+| Function | Table | Rows |
+|---|---|---|
+| `tenant_months_page` (0019) | tenant Months | `rent_periods` with the shown status (`period_display_status`) and month label |
+| `tenant_ledger_page` (0020) | tenant Ledger | charges, payments and adjustments in one journal, with the running balance |
+| `billing_page` + `billing_totals` (0021) | Billing grid and its stat cards | stored months in the range, plus government paid-direct months (A11), with tower, houses and "Paid by" |
+
+How they're built:
+- **Shared helpers (0019):** `grid_check` (refuses unknown sorts, fields,
+  operators and page sizes with `BBK00`), `grid_words`, `grid_active_filters`
+  and `grid_row_matches`. Each row is passed as `{field: shown text}`, and
+  the search and filters run on that text (`like_escape` and
+  `audit_text_matches` from 0017 are reused). Also `app_current_month()`,
+  `status_label()` and `period_display_status()`.
+- **The ledger replaces `buildTenantLedger`** (deleted) with the same rules:
+  - "upcoming" charges for this month and later;
+  - adjustments dated their Asia/Kolkata confirmation day, a negative
+    delta being a debit;
+  - the balance skips pending and upcoming rows.
+
+  The journal order is date, type, when recorded, then id. This replaces
+  JS's database order for same-day, same-type rows. The balance is a window
+  sum over the tenant's whole ledger, worked out before filtering and
+  paging, so every page and date filter shows the all-time balance. Only
+  the page's payments have their proofs read.
+- **Billing ports `getBillingReport` and `billingTotals`** (both removed):
+  - **Rows:** every stored month in the range.
+  - **Tower and houses:** the tenant's current houses, or the last ones
+    after a move-out (`tenant_placement_now`, as `currentTenancies`).
+  - **"Paid by":** the confirmed payments allocated to the month, in one
+    join. This removes the old one-query-per-earlier-payment fetch and the
+    unbounded payments read.
+  - **Paid-direct months:** generated as `paidDirectMonths` does. The JS
+    stays for the Overview and the Received card, and a schema test checks
+    the two agree, including the two-months-ahead limit.
+  - **Index:** `rent_periods (period_month)` serves the range.
+- **Labels:** the SQL text matches what the app showed (month labels,
+  `Payment received (cash)`, statuses). The schema tests pin it, and a
+  before/after comparison on the live data matched for Months.
+
+**Why.** These tables gain rows every month. Loading them whole made every
+page slower over time, and paging in the browser limited search, sort and
+export to what was loaded.
+
+### D29 — Stat cards are aggregates in SQL
+
+**Decision.** A page's figures (totals, counts, yes/no flags) come from one
+`stable security invoker` SQL function that returns a `jsonb` object with
+just those numbers. Never load the history into JS to add it up.
+- **Examples:** `tenant_account_summary(tenant)` (0022) for the tenant page's
+  Outstanding, Months overdue, "N of M ended months paid", Move out's amount
+  owed and "Stop tracking"; `billing_totals` (0021) for the Billing cards.
+- **Same rules as the JS.** Where a pure helper in `src/lib/domain/` still
+  computes the same figure elsewhere (`summarizeBalance` for the Overview and
+  Defaulters), a schema test checks the SQL and the JS agree on the same
+  rows.
+- **Months billed ahead:** the service still calls `ensure_rent_periods`
+  first, so "not due yet" counts the months created ahead.
+- **Security invoker,** so RLS decides what is counted: a non-owner gets
+  zeros. A rule that a `security definer` write enforces (stop tracking:
+  `has_allocations_from`, not executable by the owner) is spelled out again
+  in the aggregate, and the write keeps enforcing it.
+
+**Why.** The tenant page read every rent month, payment and adjustment of
+the tenant on each visit to show two cards. That cost grew with the
+tenant's age; one aggregate returns one row however long the history is.
+
 ---
 
 ## 3. Checklists
@@ -636,8 +765,10 @@ happened.
    schema tests: the owner can, a non-owner sees nothing.
 6. If it holds data worth a history (people, money, places, files), attach
    `audit_row_change('<entity>')` after insert/update/delete (D25), add any
-   new action to `AUDIT_ACTIONS` with a label in `src/lib/domain/audit.ts`,
-   add its columns to `FIELDS` there, and skip secrets and paths in the trigger.
+   new action to `AUDIT_ACTIONS` with a label in `src/lib/domain/audit.ts`
+   and the same label in `audit_action_label()`, add its columns (label and
+   format) to the list in `audit_describe()` (D27, both by `create or replace`
+   in a new migration), and skip secrets and paths in the trigger.
 
 **Adding a write that touches money or several rows**
 1. Write it as one plpgsql function. Check its invariants, raising `BBK00`,
@@ -653,6 +784,17 @@ happened.
 6. Nothing to add for the audit log: the tables' triggers record what the
    function changed, grouped by `tx_id` (D25). Add an audit schema test if
    the change should read as a new kind of action.
+
+**Adding figures for a page (totals, counts, flags)**
+1. One `stable security invoker` SQL function returning `jsonb` with just the
+   figures (D29). Use `app_current_month()` for "ended" vs "not due yet".
+2. Revoke from `public, anon, authenticated`, then grant to `authenticated`,
+   also on each helper it calls.
+3. Add it to `Functions` with a `…Db` return type in `types.ts`, and call it
+   via `db.rpc()` wrapped in `must` in the adapter.
+4. Add schema tests: the figures on known rows, the empty case, a non-owner
+   gets zeros, `anon` gets `42501`, and agreement with any JS helper that
+   computes the same figure.
 
 **Changing history** (`tenant_units`, `tenant_rent_rates`, the ledger)
 - Don't. Add a row or close an open one through the existing functions; if a

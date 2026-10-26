@@ -25,6 +25,33 @@ export const toolbarIconButtonSx = {
 };
 
 /** The "Clean SaaS" table: tinted header band, zebra rows, hover edge, compact footer. */
+/**
+ * The grid's column filter panel. Its form is one ~600px row (delete,
+ * And/Or, column, operator, value), which on a phone scrolled sideways
+ * across the screen; there each filter stacks instead: delete on the left,
+ * the inputs full width beside it, the panel as wide as the screen allows.
+ */
+export const filterPanelSx = (theme: Theme) => ({
+  [theme.breakpoints.down("sm")]: {
+    width: `calc(100vw - ${theme.spacing(2)})`,
+    [`& .${gridClasses.filterForm}`]: {
+      display: "grid",
+      gridTemplateColumns: "auto minmax(0, 1fr)",
+      columnGap: 1,
+      rowGap: 1.5,
+      px: 1.5,
+    },
+    [`& .${gridClasses.filterForm} + .${gridClasses.filterForm}`]: {
+      borderTop: 1,
+      borderColor: "divider",
+      pt: 1.5,
+    },
+    [`& .${gridClasses.filterFormDeleteIcon}`]: { gridColumn: 1, gridRow: "1 / span 4", alignSelf: "start" },
+    [`& .${gridClasses.filterFormLogicOperatorInput}, & .${gridClasses.filterFormColumnInput}, & .${gridClasses.filterFormOperatorInput}, & .${gridClasses.filterFormValueInput}`]:
+      { gridColumn: 2, width: "100%", minWidth: 0 },
+  },
+});
+
 export const dataTableSx = (theme: Theme) => ({
   border: 0,
   borderRadius: 0,

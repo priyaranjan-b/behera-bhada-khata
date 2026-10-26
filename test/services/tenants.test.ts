@@ -11,6 +11,7 @@ const {
   getTenantAccount,
   getTenantDetail,
   getTenantLedger,
+  getTenantMonths,
   listTenants,
   moveOutTenant,
   startRentTracking,
@@ -222,12 +223,110 @@ describe("government tenants (0016)", () => {
     await expect(stopRentTracking(ctx, "nobody")).rejects.toMatchObject({ status: 404 });
   });
 
-  it("offers to stop tracking only for a government tenant with nothing recorded", async () => {
-    fakes.state.tenants.set(GOVT_ID, tenant({ id: GOVT_ID, tenant_kind: "government" }));
-    expect((await getTenantAccount(ctx, GOVT_ID)).canStopRentTracking).toBe(false); // a payment is recorded
-    fakes.state.payments.clear();
-    expect((await getTenantAccount(ctx, GOVT_ID)).canStopRentTracking).toBe(true);
-    expect((await getTenantAccount(ctx, "00000000-0000-4000-8000-000000000101")).canStopRentTracking).toBe(false);
+  it("reads the account as one SQL aggregate, after topping the months up, never the full history (D29)", async () => {
+    fakes.owner.tenants.accountSummary.mockResolvedValueOnce({
+      total_outstanding: "12500.50" as unknown as number, // numeric arrives as text from PostgREST
+      overdue_months: 2,
+      not_yet_due: 5000,
+      ended_months: 13,
+      paid_ended_months: 11,
+      can_stop_rent_tracking: true,
+    });
+    const account = await getTenantAccount(ctx, "00000000-0000-4000-8000-000000000101");
+    expect(account).toEqual({
+      balance: { totalOutstanding: 12500.5, overdueMonths: 2, notYetDue: 5000 },
+      endedMonths: 13,
+      paidEndedMonths: 11,
+      canStopRentTracking: true,
+    });
+    expect(fakes.owner.tenants.accountSummary).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101");
+    expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000101"], expect.any(String));
+    expect(fakes.owner.rentPeriods.listForTenants).not.toHaveBeenCalled();
+    expect(fakes.owner.payments.listForTenants).not.toHaveBeenCalled();
+    expect(fakes.owner.adjustments.listForTenants).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Months table (A15)", () => {
+  it("asks the database for one page of months, as database columns, after topping the months up", async () => {
+    const page = await getTenantMonths(ctx, "00000000-0000-4000-8000-000000000101", {
+      show: "unpaid",
+      q: " march ",
+      sort: "amountAllocated",
+      dir: "asc",
+      filters: JSON.stringify([{ field: "periodMonth", operator: "contains", value: "2026" }]),
+      pageSize: "25",
+    });
+    expect(fakes.owner.rentPeriods.page).toHaveBeenLastCalledWith({
+      tenantId: "00000000-0000-4000-8000-000000000101",
+      show: "unpaid",
+      search: "march",
+      filters: [{ field: "month", operator: "contains", value: "2026" }],
+      logic: "and",
+      sort: "amount_allocated",
+      dir: "asc",
+      page: 0,
+      pageSize: 25,
+    });
+    expect(page).toEqual({
+      rows: [
+        {
+          id: "period-mar",
+          periodMonth: "2026-03-01",
+          amountDue: 5000,
+          amountAllocated: 0,
+          status: "pending",
+          displayStatus: "pending",
+          monthLabel: "March 2026",
+        },
+      ],
+      total: 1,
+      all: 1,
+      page: 0,
+    });
+  });
+
+  it("rejects a bad query and 404s a bad tenant id", async () => {
+    const id = "00000000-0000-4000-8000-000000000101";
+    await expect(getTenantMonths(ctx, id, { show: "everything" })).rejects.toMatchObject({ status: 400 });
+    await expect(getTenantMonths(ctx, id, { sort: "id" })).rejects.toMatchObject({ status: 400 });
+    await expect(getTenantMonths(ctx, "not-a-uuid", {})).rejects.toMatchObject({ status: 404 });
+    expect(fakes.owner.rentPeriods.page).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Ledger table (A15)", () => {
+  it("asks the database for one page of the ledger and attaches only that page's proofs", async () => {
+    const id = "00000000-0000-4000-8000-000000000101";
+    const view = await getTenantLedger(ctx, id, {
+      from: "2026-03-01",
+      to: "2026-03-31",
+      q: "neft",
+      sort: "balance",
+      filters: JSON.stringify([{ field: "status", operator: "equals", value: "Confirmed" }]),
+    });
+    expect(fakes.owner.ledger.page).toHaveBeenLastCalledWith({
+      tenantId: id,
+      fromDate: "2026-03-01",
+      toDate: "2026-03-31",
+      search: "neft",
+      filters: [{ field: "status", operator: "equals", value: "Confirmed" }],
+      logic: "and",
+      sort: "balance",
+      dir: "desc",
+      page: 0,
+      pageSize: 10,
+    });
+    expect(view).toMatchObject({ total: view.rows.length, page: 0, tenantMessaging: true });
+    const pageIds = view.rows.map((r) => r.refId);
+    for (const call of fakes.owner.payments.listProofs.mock.calls) expect(call[0]).toEqual(pageIds);
+  });
+
+  it("rejects a reversed range or an unknown sort, and 404s a bad tenant id", async () => {
+    const id = "00000000-0000-4000-8000-000000000101";
+    await expect(getTenantLedger(ctx, id, { from: "2026-04-01", to: "2026-03-01" })).rejects.toMatchObject({ status: 400 });
+    await expect(getTenantLedger(ctx, id, { sort: "refId" })).rejects.toMatchObject({ status: 400 });
+    expect(fakes.owner.ledger.page).not.toHaveBeenCalled();
   });
 });
 
@@ -235,7 +334,7 @@ describe("path ids", () => {
   it("404s a malformed tenant id before it reaches the database", async () => {
     await expect(getTenantDetail(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
     await expect(getTenantAccount(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
-    await expect(getTenantLedger(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
+    await expect(getTenantLedger(ctx, "not-a-uuid", {})).rejects.toMatchObject({ status: 404 });
     await expect(moveOutTenant(ctx, "1; drop", { moveOutDate: "2026-10-01" })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.get).not.toHaveBeenCalled();
   });

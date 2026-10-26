@@ -12,19 +12,10 @@ import Link from "@/components/ui/Link";
 import { EmptyState } from "@/components/ui/DataDisplay";
 import { Loader, LoadingButton } from "@/components/ui/Loading";
 import { api, errorMessage } from "@/lib/api-client";
-import type { AuditEntry, AuditPage } from "@/lib/contracts";
+import type { AuditEntry } from "@/lib/contracts";
 import { formatDateTime } from "@/lib/dates";
-import { describeAuditEntry } from "@/lib/domain/audit";
 import { routes } from "@/lib/routes";
 
-/** Whose history: a tenant's (tenant page) or a house's (house History dialog). */
-export type AuditSource = { kind: "tenant"; tenantId: string } | { kind: "unit"; unitCode: string };
-
-function fetchPage(source: AuditSource, before?: number): Promise<AuditPage> {
-  return source.kind === "tenant"
-    ? api.dashboard.tenants.history(source.tenantId, before)
-    : api.dashboard.houses.history(source.unitCode, before);
-}
 
 /** Consecutive entries written in one transaction are one change (a move-out and the months it dropped). */
 function groupByChange(entries: AuditEntry[]): AuditEntry[][] {
@@ -38,29 +29,24 @@ function groupByChange(entries: AuditEntry[]): AuditEntry[][] {
 }
 
 /**
- * A history timeline from audit_log, newest first, with "Show older". Pass
- * `initial` when the page already loaded the first page; without it, it
- * loads on mount (dialogs). `showTenant` links each change to its tenant.
+ * A history timeline from audit_log, newest first, with "Show older"; loads
+ * on mount (the house History dialog). `showTenant` links each change to its tenant.
  */
 export default function AuditTimeline({
-  source,
-  initial,
+  unitCode,
   showTenant = false,
 }: {
-  source: AuditSource;
-  initial?: AuditPage;
+  unitCode: string;
   showTenant?: boolean;
 }) {
-  const [entries, setEntries] = useState<AuditEntry[] | null>(initial?.entries ?? null);
-  const [nextBefore, setNextBefore] = useState<number | null>(initial?.nextBefore ?? null);
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [nextBefore, setNextBefore] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const groups = useMemo(() => groupByChange(entries ?? []), [entries]);
 
-  const sourceKey = source.kind === "tenant" ? source.tenantId : source.unitCode;
   useEffect(() => {
-    if (initial) return;
     let cancelled = false;
-    fetchPage(source)
+    api.dashboard.houses.history(unitCode)
       .then((page) => {
         if (cancelled) return;
         setEntries(page.entries);
@@ -70,14 +56,12 @@ export default function AuditTimeline({
     return () => {
       cancelled = true;
     };
-    // Reload only when the tenant or house changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source.kind, sourceKey]);
+  }, [unitCode]);
 
   async function showOlder() {
     if (nextBefore === null) return;
     try {
-      const page = await fetchPage(source, nextBefore);
+      const page = await api.dashboard.houses.history(unitCode, nextBefore);
       setEntries((current) => [...(current ?? []), ...page.entries]);
       setNextBefore(page.nextBefore);
     } catch (err) {
@@ -123,11 +107,10 @@ export default function AuditTimeline({
 }
 
 function ChangeItem({ entry, showTenant }: { entry: AuditEntry; showTenant: boolean }) {
-  const { title, lines } = describeAuditEntry(entry);
   return (
     <Box>
       <Typography variant="subtitle2" component="p">
-        {title}
+        {entry.title}
         {showTenant && entry.tenantId && entry.tenantName ? (
           <>
             {" · "}
@@ -137,11 +120,11 @@ function ChangeItem({ entry, showTenant }: { entry: AuditEntry; showTenant: bool
           </>
         ) : null}
       </Typography>
-      {lines.map((line) => (
-        <Typography key={line} variant="body2" color="textSecondary">
-          {line}
+      {entry.details ? (
+        <Typography variant="body2" color="textSecondary">
+          {entry.details}
         </Typography>
-      ))}
+      ) : null}
     </Box>
   );
 }

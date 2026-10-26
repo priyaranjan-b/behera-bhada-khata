@@ -10,7 +10,7 @@ import { DataTableContext, type DataTableConfig, type DataTableFilter, type Data
 import DataTableToolbar from "./DataTableToolbar";
 import DataTablePagination from "./DataTablePagination";
 import DataTableNoResults from "./DataTableNoResults";
-import { dataTableSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
+import { dataTableSx, filterPanelSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
 
 const SLOTS = {
   toolbar: DataTableToolbar,
@@ -23,19 +23,24 @@ export type DataTableProps<R extends GridValidRowModel> = Omit<DataGridProps<R>,
   /** Heading in the toolbar row; also labels the table for screen readers. */
   title?: string;
   subtitle?: React.ReactNode;
-  /** Row count before the caller's own filters (default `rows.length`); the chip reads "visible of total". */
+  /**
+   * Row count before the caller's own filters (default `rows.length`); the chip reads "visible of total".
+   * With `paginationMode="server"`, pass `rowCount` (rows matching the query) and this (all rows).
+   */
   totalCount?: number;
   /** "Show: …" selects in the toolbar row. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each filter has its own value union
   filters?: DataTableFilter<any>[];
   /** Custom inputs placed before the search box (e.g. a date range). */
   toolbarExtra?: React.ReactNode;
+  /** `toolbarExtra` narrows the rows (e.g. a date is set): counted on the phone filter button's badge. */
+  toolbarExtraActive?: boolean;
   /** Quick search over every column. Default: on when there are more than 8 rows. */
   search?: boolean | DataTableSearch;
   columnsButton?: boolean;
   filterButton?: boolean;
   exportCsv?: boolean;
-  /** "Download Excel" button: the rows and columns as shown, all pages. @default true */
+  /** "Download Excel" button: the rows and columns as shown, all pages (just this page when paged on the server). @default true */
   exportExcel?: boolean;
   /** Rows per page. @default 10 */
   pageSize?: number;
@@ -54,6 +59,9 @@ export type DataTableProps<R extends GridValidRowModel> = Omit<DataGridProps<R>,
  * The app's table: MUI X Data Grid with one compact toolbar row (title,
  * count, "Show" filters, search, filter and columns), a tinted header band,
  * zebra rows and numbered pagination (10 rows a page).
+ * `paginationMode="server"` also sorts and filters on the server: the caller
+ * passes one page of `rows`, `rowCount`, and handles the model changes
+ * (models → query params: serverQuery.ts).
  * Column definitions (renderCell etc.) must live in a client component, so
  * server pages pass plain rows to a small "*Grid.tsx" client file.
  */
@@ -63,6 +71,7 @@ export default function DataTable<R extends GridValidRowModel>({
   totalCount,
   filters = [],
   toolbarExtra,
+  toolbarExtraActive = false,
   search,
   columnsButton = true,
   filterButton = true,
@@ -82,7 +91,8 @@ export default function DataTable<R extends GridValidRowModel>({
   ...props
 }: DataTableProps<R>) {
   const titleId = useId();
-  const rowCount = props.rows?.length ?? 0;
+  const server = props.paginationMode === "server";
+  const rowCount = server ? (props.rowCount ?? 0) : (props.rows?.length ?? 0);
   const total = totalCount ?? rowCount;
   const searchConfig: DataTableSearch | false =
     search === undefined ? (total > 8 ? {} : false) : search === true ? {} : search || false;
@@ -92,8 +102,10 @@ export default function DataTable<R extends GridValidRowModel>({
     titleId,
     subtitle,
     totalCount: total,
+    matchingCount: server ? rowCount : undefined,
     filters,
     toolbarExtra,
+    toolbarExtraActive,
     search: searchConfig,
     columnsButton,
     filterButton,
@@ -109,7 +121,8 @@ export default function DataTable<R extends GridValidRowModel>({
   const hideFooter = rowCount <= Math.min(pageSize, ...pageSizeOptions);
 
   const body =
-    total === 0 && emptyState ? (
+    // Not while loading: a table that loads its own first page (useServerGrid) starts at 0.
+    total === 0 && emptyState && !props.loading ? (
       <>
         {title ? (
           <Box sx={{ px: 2, pt: 2 }}>
@@ -144,10 +157,15 @@ export default function DataTable<R extends GridValidRowModel>({
           }
           showToolbar={showToolbar}
           {...(title ? { "aria-labelledby": titleId } : { "aria-label": label })}
+          {...(server ? { sortingMode: "server", filterMode: "server" } : {})}
           {...props}
           slots={SLOTS}
           initialState={{ ...initialState, pagination: { paginationModel: { pageSize }, ...initialState?.pagination } }}
-          slotProps={{ loadingOverlay: { variant: "skeleton", noRowsVariant: "skeleton" }, ...slotProps }}
+          slotProps={{
+            loadingOverlay: { variant: "skeleton", noRowsVariant: "skeleton" },
+            filterPanel: { sx: filterPanelSx },
+            ...slotProps,
+          }}
           sx={[dataTableSx, ...(Array.isArray(sx) ? sx : [sx])]}
         />
       </DataTableContext.Provider>

@@ -3,11 +3,14 @@ import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getBillingReceived, getBillingReport } = await import("@/server/services/billing");
+const { getBillingPage, getBillingReceived, getBillingTotals } = await import("@/server/services/billing");
 
 const ctx = { ownerId: OWNER_ID };
 
-describe("getBillingReport", () => {
+// The grid and the totals run in SQL (billing_page / billing_totals, 0021):
+// their rules are covered in test/schema.test.ts. Here: the range, the query
+// mapping, the shapes, and the cash received.
+describe("Billing", () => {
   beforeEach(() => {
     resetFakes();
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -15,30 +18,84 @@ describe("getBillingReport", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("defaults to this month, the latest billing period", async () => {
-    const report = await getBillingReport(ctx);
-    expect(report).toMatchObject({ from: "2026-10-01", to: "2026-10-01", latestMonth: "2026-10-01" });
-    expect(fakes.owner.rentPeriods.listForTenants).toHaveBeenCalledWith(expect.any(Array), {
-      months: { from: "2026-10-01", to: "2026-10-01" },
+  it("defaults to this month and asks the database for one page, as database columns", async () => {
+    const page = await getBillingPage(ctx);
+    expect(page).toMatchObject({ from: "2026-10-01", to: "2026-10-01", total: 1, all: 1, page: 0 });
+    expect(fakes.owner.billing.page).toHaveBeenLastCalledWith({
+      from: "2026-10-01",
+      to: "2026-10-01",
+      paidDirect: false, // off unless the page asks for it (A11)
+      show: "all",
+      search: undefined,
+      filters: [],
+      logic: "and",
+      sort: "amount_allocated",
+      dir: "desc",
+      page: 0,
+      pageSize: 10,
+    });
+
+    await getBillingPage(ctx, {
+      from: "2026-03",
+      to: "2026-05",
+      paidDirect: "hide",
+      show: "unpaid",
+      q: "asha",
+      sort: "status",
+      dir: "asc",
+      filters: JSON.stringify([{ field: "payments", operator: "contains", value: "2026/03" }]),
+      page: "2",
+      pageSize: "25",
+    });
+    expect(fakes.owner.billing.page).toHaveBeenLastCalledWith({
+      from: "2026-03-01",
+      to: "2026-05-01",
+      paidDirect: false,
+      show: "unpaid",
+      search: "asha",
+      filters: [{ field: "payments", operator: "contains", value: "2026/03" }],
+      logic: "and",
+      sort: "status",
+      dir: "asc",
+      page: 2,
+      pageSize: 25,
     });
   });
 
-  it("lists each tenant's month with the receipts that paid it, and the cash received in the range", async () => {
-    const report = await getBillingReport(ctx, { from: "2026-03", to: "2026-03" });
-    expect(report.rows).toHaveLength(1);
-    expect(report.rows[0]).toMatchObject({
+  it("returns each month with the receipts that paid it, and the range's totals", async () => {
+    const page = await getBillingPage(ctx, { from: "2026-03", to: "2026-03" });
+    expect(page.rows[0]).toEqual({
+      id: "period-mar",
+      tenantId: "00000000-0000-4000-8000-000000000101",
       tenantName: "Asha",
+      propertyName: "Tower 1",
+      unitCodes: ["AC-T1-G01"],
       periodMonth: "2026-03-01",
       monthLabel: "March 2026",
       amountDue: 5000,
+      amountAllocated: 5000,
+      balance: 0,
+      status: "paid",
       notYetDue: false,
-      payments: [{ paymentId: "00000000-0000-4000-8000-000000000201", paymentDate: "2026-03-05", mode: "upi", amount: 5000 }],
+      payments: [
+        { paymentId: "00000000-0000-4000-8000-000000000201", receiptNo: "2026/03/001", paymentDate: "2026-03-05", mode: "upi", amount: 5000 },
+      ],
+      paidDirect: false,
     });
-    expect(report.totals).toMatchObject({ billed: 5000 });
-    expect(await getBillingReceived(ctx, { from: "2026-03", to: "2026-03" })).toEqual({ amount: 5000, payments: 1, paidDirect: 0 });
+    expect(await getBillingTotals(ctx, { from: "2026-03", to: "2026-03", paidDirect: "hide" })).toEqual({
+      billed: 5000,
+      collected: 5000,
+      balance: 0,
+      overdue: 0,
+      collectionRate: 100,
+      tenants: 1,
+    });
+    expect(fakes.owner.billing.totals).toHaveBeenLastCalledWith({ from: "2026-03-01", to: "2026-03-01", paidDirect: false });
   });
 
-  it("counts government rent paid direct as billed and collected, never owed", async () => {
+  it("counts the cash received in the range, government rent paid direct only when shown", async () => {
+    expect(await getBillingReceived(ctx, { from: "2026-03", to: "2026-03" })).toEqual({ amount: 5000, payments: 1, paidDirect: 0 });
+
     const GOVT = "00000000-0000-4000-8000-000000000102";
     fakes.owner.tenants.list.mockResolvedValue([
       tenant(),
@@ -47,57 +104,23 @@ describe("getBillingReport", () => {
     fakes.owner.rentRates.listForTenants.mockResolvedValue([
       { id: 9, tenant_id: GOVT, effective_month: "2022-01-01", monthly_amount: "5300.00", created_at: "", recorded_by: null },
     ]);
-    fakes.owner.rentPeriods.listForTenants.mockResolvedValue([]);
     fakes.owner.payments.listForTenants.mockResolvedValue([]);
-
-    const report = await getBillingReport(ctx, { from: "2026-09", to: "2026-10" });
-
-    expect(report.rows.map((r) => [r.tenantName, r.periodMonth, r.amountDue, r.amountAllocated, r.paidDirect])).toEqual([
-      ["Post Office", "2026-09-01", 5300, 5300, true],
-      ["Post Office", "2026-10-01", 5300, 5300, true],
-    ]);
-    expect(report.totals).toMatchObject({ billed: 10600, collected: 10600, balance: 0, overdue: 0 });
-    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10" })).toEqual({
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "show" })).toEqual({
       amount: 10600,
       payments: 0,
       paidDirect: 10600,
     });
-
-    // The "Include Govt paid direct" switch off: only rent the owner collects.
-    const hidden = await getBillingReport(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" });
-    expect(hidden.rows).toEqual([]);
-    expect(hidden.totals.billed).toBe(0);
-    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" })).toEqual({
-      amount: 0,
-      payments: 0,
-      paidDirect: 0,
-    });
+    const hidden = { amount: 0, payments: 0, paidDirect: 0 };
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" })).toEqual(hidden);
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10" })).toEqual(hidden); // the default
   });
 
-  it("swaps a reversed range and rejects a malformed month", async () => {
-    const report = await getBillingReport(ctx, { from: "2026-06", to: "2026-03" });
-    expect([report.from, report.to]).toEqual(["2026-03-01", "2026-06-01"]);
-    await expect(getBillingReport(ctx, { from: "March" })).rejects.toMatchObject({ status: 400 });
+  it("swaps a reversed range and rejects a malformed month or query", async () => {
+    expect(await getBillingPage(ctx, { from: "2026-06", to: "2026-03" })).toMatchObject({ from: "2026-03-01", to: "2026-06-01" });
+    await expect(getBillingPage(ctx, { from: "March" })).rejects.toMatchObject({ status: 400 });
+    await expect(getBillingPage(ctx, { show: "owed" })).rejects.toMatchObject({ status: 400 });
+    await expect(getBillingPage(ctx, { sort: "id" })).rejects.toMatchObject({ status: 400 });
+    await expect(getBillingTotals(ctx, { from: "March" })).rejects.toMatchObject({ status: 400 });
     await expect(getBillingReceived(ctx, { from: "March" })).rejects.toMatchObject({ status: 400 });
-  });
-
-  it("fetches payments from before the range that paid its months together, by id", async () => {
-    const EARLY = "00000000-0000-4000-8000-000000000209";
-    fakes.owner.payments.listAllocationsForPeriods.mockResolvedValue([
-      { id: 1, payment_id: EARLY, rent_period_id: "p1", amount_allocated: "5000.00" },
-      { id: 2, payment_id: "00000000-0000-4000-8000-000000000210", rent_period_id: "p1", amount_allocated: "0.00" },
-    ] as never);
-    fakes.owner.payments.listForTenants.mockResolvedValue([]);
-    let inFlight = 0;
-    let mostAtOnce = 0;
-    fakes.owner.payments.get.mockImplementation(async () => {
-      mostAtOnce = Math.max(mostAtOnce, ++inFlight);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      inFlight--;
-      return null;
-    });
-    await getBillingReport(ctx, { from: "2026-03", to: "2026-03" });
-    expect(fakes.owner.payments.get).toHaveBeenCalledTimes(2);
-    expect(mostAtOnce).toBe(2);
   });
 });

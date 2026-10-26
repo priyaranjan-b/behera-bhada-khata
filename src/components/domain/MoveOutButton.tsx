@@ -21,18 +21,21 @@ import LoadingButton from "@/components/ui/Loading/LoadingButton";
 /**
  * Ends all of a tenant's houses on a date. Their ledger stays: dues up to the
  * move-out month remain to be collected, and the houses become free for the
- * next tenant from the following day.
+ * next tenant from the following day. `disabled` is its placeholder while
+ * the amount still owed (shown in the confirm text) loads.
  */
 export default function MoveOutButton({
   tenantId,
   tenantName,
   unitCodes,
   outstanding,
+  disabled = false,
 }: {
   tenantId: string;
   tenantName: string;
   unitCodes: string[];
   outstanding: number;
+  disabled?: boolean;
 }) {
   const router = useAppRouter();
   const [open, setOpen] = useState(false);
@@ -57,7 +60,13 @@ export default function MoveOutButton({
 
   return (
     <>
-      <Button variant="outlined" color="error" startIcon={<LogoutRoundedIcon />} onClick={() => setOpen(true)}>
+      <Button
+        variant="outlined"
+        color="error"
+        startIcon={<LogoutRoundedIcon />}
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+      >
         Move out
       </Button>
       <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">

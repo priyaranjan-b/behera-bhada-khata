@@ -27,7 +27,7 @@ export default function ResendButton({
       () => ({ error: "1" })
     );
     setBusy(false);
-    router.push(routes.tenants.detail(tenantId, flash));
+    router.push(routes.tenants.detail(tenantId, { ...flash, tab: "ledger" }));
     router.refresh();
   }
 

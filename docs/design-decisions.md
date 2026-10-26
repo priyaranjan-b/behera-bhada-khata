@@ -178,22 +178,25 @@ rent, not money collected.
 **Decision.** The database records every change (D25); the app shows it in
 three places and adds the events the database can't see.
 
-- **Tenant page → "Change history"** (`TenantChangeHistory.tsx`, streamed
-  in with `Suspense` so the page doesn't wait): details, houses, rent,
-  months, payments, documents and links sent, newest first.
+- **Tenant page → "Change history" tab** (loaded when the tab first opens,
+  A16): details, houses, rent,
+  months, payments, documents and links sent. A table paged in the database
+  (`AuditHistoryTable`, A14).
 - **House → History dialog** (`UnitsGrid.tsx`): occupants with formatted
   dates, plus the house's own changes and every tenancy started or ended in
   it (`unit_code` on the log row).
-- **`/activity`** (side menu "Activity"): everything, with a
-  "Show" filter by category (`AUDIT_CATEGORIES`), a date range, search and
-  Excel download. Pages of `AUDIT_LIMITS.pageSize` (50) and "Load older
-  changes" (keyset on `id`).
-- `AuditTimeline` (`src/components/domain/`) is the one timeline. It groups
-  the entries of one transaction (`txId`) under one time + actor heading.
-- **Text** comes only from `describeAuditEntry` (`src/lib/domain/audit.ts`):
-  an action label, then "Field: old → new" for edits or "Field: value" for
-  new or removed rows, every value through the app's formatters and label
-  maps. A column not in its `FIELDS` list is never shown.
+- **`/activity`** (side menu "Activity"): everything, in the same
+  `AuditHistoryTable` as the tenant page, with the tenant too: "Show" by
+  category (`AUDIT_CATEGORIES`), a date range, search, sort, column filters,
+  page numbers and rows per page, all done in the database (A14). Excel
+  downloads the page on screen.
+- `AuditTimeline` (`src/components/domain/`) is the house dialog's
+  timeline, 50 at a time with "Show older" (keyset on `id`). It groups the
+  entries of one transaction (`txId`) under one time + actor heading.
+- **Text** is stored with each row when it is written (`title`, `details`,
+  `actor_name`; D27): an action label, then "Field: old → new" for edits
+  or "Field: value" for new or removed rows, every value formatted as the
+  app does. A column not in `audit_describe()`'s list is never shown.
 - **App events:** each link sent to a tenant (`notifyTenant`, delivered or
   not, never the text), each receipt download, sign-ins (password and email
   link), failed password sign-ins (the reason, whether the email was an
@@ -230,6 +233,13 @@ collected** for each month it holds its houses:
   - a tower's monthly rent (A9).
 - **Never:** a row in `rent_periods`, a payment, arrears or Defaulters.
   Tracking it like any other tenant is still "Start tracking rent" (D26).
+- **Off by default, every visit.** On the Overview and Billing it counts only
+  while "Include Govt paid direct" is switched on. The switch sets
+  `?paidDirect=show` on the page's URL (`PAID_DIRECT_PARAM`,
+  `paidDirectViewOf` in `src/lib/preferences.ts`), and month and range links
+  on the page keep it (`paidDirectQuery`). Nothing is remembered: opening the
+  page again starts off. The API default is "hide" too
+  (`paidDirectViewSchema`). This replaced a one-year cookie that kept it on.
 
 **Why.** The owner wanted this rent visible in the totals because it does
 arrive every month. Rejected alternatives:
@@ -369,3 +379,137 @@ How it's built:
 **Rejected:** keeping `/dashboard` and only renaming the crumb. That hides
 the symptom, but the URLs are what the owner shares and bookmarks.
 
+
+## Tables
+
+### A14 — History tables page, sort and search in the database
+
+**Decision.** The Activity page and the Change history table on a tenant's
+page are one component, `AuditHistoryTable`
+(`src/components/domain/AuditHistoryTable.tsx`, `source` = all or one
+tenant). It sends its page, rows per page (10, 25, 50, 100; `GRID_LIMITS`),
+sort, search, column filters, "Show" and From/To dates to
+`GET /api/dashboard/activity` or `GET …/tenants/[id]/history`. It gets back
+one page plus the counts (`AuditTablePage`: `total` matching, `all` for the
+tenant or the whole log). Excel downloads the page on screen. There is no
+"Load older changes": the page numbers cover the whole history.
+
+How it's built:
+- **Grid:** `DataTable` with `paginationMode="server"` also sets sorting and
+  filtering to server mode and counts with `rowCount`. The table turns the
+  MUI models into query params with `toGridQueryParams`
+  (`src/components/ui/DataTable/serverQuery.ts`). Server-side text columns
+  offer only `SERVER_TEXT_OPERATORS`.
+- **Query:** `AuditTableQuery` = `GridQueryParams`
+  (`src/lib/domain/gridQuery.ts`) + Show and dates, validated by
+  `auditTableQuerySchema` (`gridQuerySchema` in `src/lib/validation.ts`).
+  It checks every field, operator and page size.
+- **Service:** `listActivity` / `tenantHistory` share one `historyPage`,
+  which maps the table's fields to columns and makes one repository call,
+  `audit.historyPage`.
+- **Database:** `audit_history_page()` (0018) does the search, filters,
+  sort and paging in one SQL query over the text stored with each change
+  (D27 in `docs/database-design.md`). The tenant is optional, and the
+  tenant's current name is joined in so it can be searched, filtered and
+  sorted. What the database doesn't match isn't shown, and nothing is
+  rebuilt or re-filtered in the app.
+
+**Why.**
+- Paging 50 rows in the browser made a long history look shorter than it
+  is: page count, search and download covered only what had been loaded.
+- With the text stored, the database can do all of it. A first version
+  loaded the tenant's whole history and searched it in JS. That was
+  replaced because it read every row on every request and kept a second
+  copy of the query logic.
+
+The house History dialog keeps its timeline with "Show older" (`before`,
+50 at a time): it shows a handful of changes, grouped by `tx_id`.
+
+### A15 — Lists that grow every month page in the database; master data pages in the browser
+
+**Decision.** Which way a table pages depends on how its rows grow:
+- **Grows with time → server-side** (`paginationMode="server"`, an SQL
+  `…_page()` function, A14's pattern). This covers history, payments and
+  adjustments, rent months, and anything tenants × months. Done:
+  Activity and a tenant's Change history (`audit_history_page`), the
+  tenant's Months (`tenant_months_page`) and Ledger (`tenant_ledger_page`),
+  and Billing (`billing_page` + `billing_totals`); D28 in
+  `docs/database-design.md`. The client side of each is the kit hook
+  `useServerGrid`.
+- **Fixed by master data → client-side** (the service returns every row).
+  This covers tenants, houses, towers, sites, and one-row-per-tenant
+  reports (Overview status, Defaulters), and the bulk-upload preview.
+  Some of these still read growing data behind a fixed-size table, worth
+  trimming when touched:
+  - Defaulters reads every payment of the tenants behind, for their last
+    payment date;
+  - `/houses` sends each house's full occupancy history;
+  - the tenant account reads all payments and adjustments for
+    `canStopRentTracking`.
+
+The recipe is in the skills: `add-api-endpoint` ("A list that grows") for
+the data side, `build-dashboard-page` ("Client-side or server-side
+table?") for the grid.
+
+**Why.**
+- A growing list loaded whole gets slower every month.
+- A list loaded in chunks ("Load older") makes page numbers, search and
+  export cover only part of it.
+- Master data stays in the hundreds, and paging it in the browser keeps
+  search, sort and Excel instant without a query per keystroke.
+
+### A16 — Record pages split into tabs by data source; tabs load when opened
+
+**Decision.** The tenant page (`/tenants/[id]`) keeps the header (Edit,
+Move out, Record payment), alerts and the two account stats above the fold,
+and puts everything else in `PageTabs` (`src/components/ui/PageTabs.tsx`),
+one tab per data source:
+
+| Tab | Data | Loaded |
+|---|---|---|
+| Details (default) | the profile (`…/[id]`): details, house and rent history | with the page |
+| Ledger | `…/ledger` | when first opened |
+| Months | `…/months` | when first opened |
+| Change history | `…/history` | when first opened |
+
+A Govt tenant paying direct has only Details and Change history.
+
+On phones the tab row is a full-width "Section" select. A table inside a
+tab drops its own title there (`InTabsContext`): the select already names
+it. The header puts Record payment full width on top, with Edit | Move out
+sharing a row below (`ActionStack phone="primaryOnTop"`).
+
+- **Lazy and kept.** A tab mounts the first time it is opened and stays
+  mounted (hidden) after that. Its rows, page, sort and filters survive
+  switching tabs with no new request: the kept component *is* the cache.
+  `useMemo` couldn't do this, because it dies with the component.
+- **Fresh after a write.** Every write already ends in `router.refresh()`
+  or a redirect back. The page passes `version` (a token per server render),
+  `PageTabs` keys the kept tabs by it, and only the open tab reloads.
+- **`?tab=`** (`TAB_PARAM`, `TENANT_TABS` in `src/lib/routes.ts`) is
+  written with `history.replaceState` (no server round trip), so a reload or
+  link reopens the tab. Recording, adjusting or resending a link returns to
+  `tab=ledger` (`recordedFlash`, `ResendButton`).
+- **Tables load themselves.** `useServerGrid` takes `empty` instead of
+  `initial` and fetches the first page on mount. `DataTable`'s skeleton
+  loading overlay draws the real toolbar and columns meanwhile, so a tab
+  needs no Suspense or fallback. Pages that render the first page on the
+  server (Billing, Activity) still pass `initial`.
+- **Skeletons live with their component.** A data component that renders
+  several cells exports `<Name>Skeleton` from its own file (e.g.
+  `AccountStatsSkeleton`), built from the kit primitives in `Skeletons.tsx`.
+  The page's fallback and the `(profile)/loading.tsx` both use it.
+- The account read returns figures, not rows: one SQL aggregate,
+  `tenant_account_summary` (0022, D29), gives the balance, the ended and
+  paid month counts and whether tracking can stop. The page no longer reads
+  any tenant's full months, payments or adjustments; those are in their
+  tabs, one page at a time.
+
+**Why.** Most visits are "open tenant → Record payment". The page used to
+start five reads (profile, account, months, ledger, history) on every load
+and scroll through all of them. It now starts two, and only the profile
+blocks rendering.
+
+**Apply it** to any record page with several growing tables: keep what the
+common task needs above the tabs and give each data source a tab. A page of
+independent cards (the Overview) still streams in sections (A12).

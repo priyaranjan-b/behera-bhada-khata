@@ -25,6 +25,13 @@ export type Flash = Partial<Record<FlashKey, string>>;
 
 type Query = Record<string, string | number | undefined>;
 
+/** Query param of the open tab on a page with `PageTabs` (A16); the first tab leaves it out. */
+export const TAB_PARAM = "tab";
+
+/** The tenant page's tabs (A16), first = the default. */
+export const TENANT_TABS = ["details", "ledger", "months", "history"] as const;
+export type TenantTab = (typeof TENANT_TABS)[number];
+
 /** `path` plus the defined query params (and an optional `#hash`). Also builds API query strings. */
 export function withQuery(path: string, query?: Query, hash?: string): string {
   const params = new URLSearchParams();
@@ -42,10 +49,12 @@ export const routes = {
   /** The Overview: where sign-in lands and where a bad `next` falls back to. */
   home: "/",
   /** The Overview for a month; `month` is `yyyy-MM` (see monthKeyFromParam in src/lib/dates.ts). */
-  dashboard: (query?: { month?: string; show?: string }, hash?: string) => withQuery("/", query, hash),
+  /** `paidDirect: "show"` keeps "Include Govt paid direct" on (A11); off when left out. */
+  dashboard: (query?: { month?: string; show?: string; paidDirect?: "show" }, hash?: string) =>
+    withQuery("/", query, hash),
   defaulters: "/defaulters",
   /** `from`/`to` are `yyyy-MM`; none = this month. */
-  billing: (query?: { from?: string; to?: string }) => withQuery("/billing", query),
+  billing: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/billing", query),
   activity: "/activity",
   profile: (flash?: Flash) => withQuery("/profile", flash),
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
@@ -64,7 +73,8 @@ export const routes = {
   tenants: {
     list: (query?: { show?: string }) => withQuery("/tenants", query),
     new: "/tenants/new",
-    detail: (id: string, flash?: Flash) => withQuery(`/tenants/${e(id)}`, flash),
+    /** `tab` opens that tab, e.g. the ledger after recording a payment. */
+    detail: (id: string, query?: Flash & { [TAB_PARAM]?: TenantTab }) => withQuery(`/tenants/${e(id)}`, query),
     edit: (id: string) => `/tenants/${e(id)}/edit`,
     newPayment: (id: string) => `/tenants/${e(id)}/payments/new`,
   },

@@ -8,7 +8,7 @@ import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { listActivity, tenantHistory, unitHistory } from "@/server/services/audit";
 import { getConfirmView } from "@/server/services/confirm";
-import { getBillingReceived, getBillingReport } from "@/server/services/billing";
+import { getBillingPage, getBillingReceived, getBillingTotals } from "@/server/services/billing";
 import { getDefaultersReport } from "@/server/services/dashboard";
 import { getPaidDirectState } from "@/server/services/paidDirect";
 import {
@@ -35,6 +35,7 @@ import {
   getAnyTowerTenantForm,
   getEditTenantForm,
   getTenantAccount,
+  getTenantMonths,
   getTenantDetail,
   getTenantLedger,
   listTenants,
@@ -66,7 +67,8 @@ const inProcessApi: ApiQueries = {
     },
     paidDirect: async (options) => getPaidDirectState(await owner(), options),
     defaulters: async () => getDefaultersReport(await owner()),
-    billing: async (query) => getBillingReport(await owner(), query),
+    billing: async (query) => getBillingPage(await owner(), query),
+    billingTotals: async (query) => getBillingTotals(await owner(), query),
     billingReceived: async (query) => getBillingReceived(await owner(), query),
     activity: async (query) => listActivity(await owner(), query ?? {}),
     search: async () => getSearchIndex(await owner()),
@@ -91,9 +93,10 @@ const inProcessApi: ApiQueries = {
       newForm: async () => getAnyTowerTenantForm(await owner()),
       detail: async (id) => getTenantDetail(await owner(), id),
       account: async (id) => getTenantAccount(await owner(), id),
-      ledger: async (id) => getTenantLedger(await owner(), id),
+      months: async (id, query) => getTenantMonths(await owner(), id, query ?? {}),
+      ledger: async (id, query) => getTenantLedger(await owner(), id, query ?? {}),
       edit: async (id) => getEditTenantForm(await owner(), id),
-      history: async (id, before) => tenantHistory(await owner(), id, { before }),
+      history: async (id, query) => tenantHistory(await owner(), id, query ?? {}),
       newPayment: async (id) => getNewPaymentForm(await owner(), id),
     },
     payments: {

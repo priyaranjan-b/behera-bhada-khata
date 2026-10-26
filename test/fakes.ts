@@ -4,7 +4,8 @@
 // and call resetFakes() in beforeEach. Services read the bindings at call
 // time, so the getters below always hand out the current fakes.
 import { vi } from "vitest";
-import type { AuditEvent, AuditFilter } from "@/server/ports";
+import type { AuditEvent, AuditFilter, AuditHistoryFilter } from "@/server/ports";
+import { auditActionLabel } from "@/lib/domain/audit";
 import type {
   Adjustment,
   AuditLogEntry,
@@ -156,6 +157,10 @@ function build() {
       property_code: null,
       changes: {},
       context: event.context ?? {},
+      // The database writes the real text (0017); test/schema.test.ts covers it.
+      title: auditActionLabel(event.action),
+      details: "",
+      actor_name: actorKind === "owner" ? "Ramesh Sahu" : "System",
     });
   }
 
@@ -174,6 +179,24 @@ function build() {
           )
           .slice(0, f.limit)
       ),
+      // audit_history_page, simplified: tenant, actions, search, newest first, one page.
+      // Its full SQL behaviour is in test/schema.test.ts.
+      historyPage: vi.fn(async (f: AuditHistoryFilter) => {
+        const all = [...state.audit].reverse().filter((e) => !f.tenantId || e.tenant_id === f.tenantId);
+        const words = (f.search ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+        const matching = all.filter(
+          (e) =>
+            (!f.actions || f.actions.includes(e.action)) &&
+            words.every((w) => [e.actor_name, e.title, e.unit_code, e.details].join("\n").toLowerCase().includes(w))
+        );
+        const page = Math.min(f.page, Math.max(0, Math.ceil(matching.length / f.pageSize) - 1));
+        return {
+          rows: matching.slice(page * f.pageSize, (page + 1) * f.pageSize),
+          total: matching.length,
+          all: all.length,
+          page,
+        };
+      }),
       log: vi.fn(async (event: AuditEvent) => logAudit(event, "owner", OWNER_ID)),
     },
     ownerProfile: {
@@ -212,8 +235,98 @@ function build() {
       correctPaidThrough: vi.fn(async (_id: string, paidThrough: string) => paidThrough),
       startRentTracking: vi.fn(async () => "2026-03-01"),
       stopRentTracking: vi.fn(async () => undefined),
+      accountSummary: vi.fn(async () => ({
+        total_outstanding: 5000,
+        overdue_months: 1,
+        not_yet_due: 0,
+        ended_months: 1,
+        paid_ended_months: 0,
+        can_stop_rent_tracking: false,
+      })),
     },
-    rentPeriods: { listForTenants: vi.fn(async () => [period]), listByIds: vi.fn(async () => [period]) },
+    rentPeriods: {
+      listForTenants: vi.fn(async () => [period]),
+      listByIds: vi.fn(async () => [period]),
+      // tenant_months_page; its SQL behaviour is in test/schema.test.ts.
+      page: vi.fn(async () => ({
+        rows: [
+          {
+            id: period.id,
+            period_month: period.period_month,
+            amount_due: Number(period.amount_due),
+            amount_allocated: Number(period.amount_allocated),
+            status: period.status,
+            display_status: period.status,
+            month_label: "March 2026",
+          },
+        ],
+        total: 1,
+        all: 1,
+        page: 0,
+      })),
+    },
+    // billing_page / billing_totals; their SQL behaviour is in test/schema.test.ts.
+    billing: {
+      page: vi.fn(async () => ({
+        rows: [
+          {
+            id: period.id,
+            tenant_id: period.tenant_id,
+            tenant_name: "Asha",
+            property_name: "Tower 1",
+            unit_codes: ["AC-T1-G01"],
+            period_month: period.period_month,
+            month_label: "March 2026",
+            amount_due: 5000,
+            amount_allocated: 5000,
+            balance: 0,
+            status: "paid" as const,
+            not_yet_due: false,
+            paid_direct: false,
+            payments: [
+              {
+                payment_id: "00000000-0000-4000-8000-000000000201",
+                receipt_no: "2026/03/001",
+                payment_date: "2026-03-05",
+                mode: "upi" as const,
+                amount: 5000,
+              },
+            ],
+          },
+        ],
+        total: 1,
+        all: 1,
+        page: 0,
+      })),
+      totals: vi.fn(async () => ({
+        billed: 5000,
+        collected: 5000,
+        balance: 0,
+        overdue: 0,
+        collection_rate: 100,
+        tenants: 1,
+      })),
+    },
+    // tenant_ledger_page, simplified to the tenant's payments; its SQL behaviour is in test/schema.test.ts.
+    ledger: {
+      page: vi.fn(async () => {
+        const rows = [...state.payments.values()].map((p) => ({
+          id: `payment-${p.id}`,
+          type: "payment" as const,
+          date: p.payment_date,
+          description: `Payment received (${p.mode.replace(/_/g, " ")})`,
+          caption: `#${p.receipt_no} · ${p.acknowledged_at ? "signed by tenant" : "not signed by tenant"}`,
+          debit: 0,
+          credit: Number(p.amount),
+          balance: 0,
+          status: "confirmed" as const,
+          ref_id: p.id,
+          receipt_no: p.receipt_no,
+          acknowledged: Boolean(p.acknowledged_at),
+        }));
+        return { rows, total: rows.length, all: rows.length, page: 0 };
+      }),
+    },
     payments: {
       listForTenants: vi.fn(async () => [...state.payments.values()]),
       get: vi.fn(async (id: string) => state.payments.get(id) ?? null),

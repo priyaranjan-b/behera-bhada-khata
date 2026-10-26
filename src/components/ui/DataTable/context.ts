@@ -27,9 +27,12 @@ export interface DataTableConfig {
   subtitle?: React.ReactNode;
   /** Rows before the caller's own filters; the count chip reads "visible of total". */
   totalCount: number;
+  /** Paged on the server: rows matching the query across all pages (the grid only holds one page). */
+  matchingCount?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each filter has its own value union
   filters: DataTableFilter<any>[];
   toolbarExtra?: React.ReactNode;
+  toolbarExtraActive: boolean;
   search: DataTableSearch | false;
   columnsButton: boolean;
   filterButton: boolean;

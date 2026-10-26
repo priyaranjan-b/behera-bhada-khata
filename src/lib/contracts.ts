@@ -10,9 +10,12 @@ import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
 import type { AuditCategory } from "@/lib/domain/audit";
+import type { GridQueryParams } from "@/lib/domain/gridQuery";
+import type { BillingShow, TenantMonthShow } from "@/lib/domain/billing";
 import type {
   AuditAction,
   AuditActorKind,
+  PaidDirectView,
   PaymentMode,
   PeriodStatus,
   PreferredChannel,
@@ -163,14 +166,25 @@ export interface BillingRow {
   paidDirect: boolean;
 }
 
-export interface BillingReport {
+/** GET /api/dashboard/billing: one page of the grid for the range (A15). */
+export interface BillingPage extends TablePage<BillingRow> {
   /** The range shown, month keys (both ends included). */
   from: string;
   to: string;
-  /** The month the page opens on: the latest month that has fallen due (this month). */
-  latestMonth: string;
-  rows: BillingRow[];
-  totals: BillingTotals;
+}
+
+/** GET /api/dashboard/billing/totals: the stat cards for the whole range. */
+export interface BillingTotalsView extends BillingTotals {
+  /** Tenants with a month in the range. */
+  tenants: number;
+}
+
+/** The Billing grid's query: the range and paid-direct view, plus the grid's own. */
+export interface BillingPageQuery extends GridQueryParams {
+  from?: string;
+  to?: string;
+  paidDirect?: PaidDirectView;
+  show?: BillingShow;
 }
 
 /**
@@ -453,16 +467,25 @@ export interface TenantDetail {
 // the account (…/[id]/account) and the ledger (…/[id]/ledger).
 
 /** GET …/tenants/[id]/account: what the tenant owes, month by month. */
+/** The tenant page's account stats: what's owed, not the months themselves (those page in the Months tab). */
 export interface TenantAccount {
   balance: TenantBalanceSummary;
-  periods: TenantPeriod[];
+  /** Rent months that have ended (owed), and how many of them are paid. */
+  endedMonths: number;
+  paidEndedMonths: number;
   /** A tracked government tenant with nothing recorded yet: rent tracking can still be turned off. */
   canStopRentTracking: boolean;
 }
 
-/** GET …/tenants/[id]/ledger: payments and adjustments against the months, with their proofs. */
-export interface TenantLedgerView {
-  ledger: LedgerRow[];
+/** GET …/tenants/[id]/ledger query: the grid's page, sort, search and filters, plus a day range. */
+export interface TenantLedgerQuery extends GridQueryParams {
+  /** yyyy-MM-dd, inclusive. */
+  from?: string;
+  to?: string;
+}
+
+/** GET …/tenants/[id]/ledger: one page of charges, payments and adjustments, with their proofs (A15). */
+export interface TenantLedgerView extends TablePage<LedgerRow> {
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
 }
@@ -595,7 +618,7 @@ export interface AuditEntry {
   /** Entries with the same txId were one change (e.g. a move-out and the months it dropped). */
   txId: number;
   actorKind: AuditActorKind;
-  /** "Ramesh Sahu", "Tenant", "System"... */
+  /** "Ramesh Sahu", "Tenant", "System"... as stored with the change (0017). */
   actorName: string;
   action: AuditAction;
   entityId: string | null;
@@ -605,6 +628,10 @@ export interface AuditEntry {
   propertyCode: string | null;
   changes: Record<string, [unknown, unknown]>;
   context: Record<string, unknown>;
+  /** "Rent changed": written by the database when the change happened (0017). */
+  title: string;
+  /** The changed values as shown: "Monthly rent: ₹6,000.00 → ₹6,500.00 · …". */
+  details: string;
 }
 
 /** A page of history, newest first; pass `nextBefore` as `before` for the next page. */
@@ -613,11 +640,42 @@ export interface AuditPage {
   nextBefore: number | null;
 }
 
-/** GET /api/dashboard/activity query: all optional. */
-export interface ActivityQuery {
+/** One page of a table that pages in SQL (A15): `total` matching, `all` before filters, `page` as clamped. */
+export interface TablePage<R> {
+  rows: R[];
+  total: number;
+  all: number;
+  page: number;
+}
+
+/** GET …/tenants/[id]/months query: the grid's page, sort, search and filters, plus "Show". */
+export interface TenantMonthsQuery extends GridQueryParams {
+  show?: TenantMonthShow;
+}
+
+/** A rent month as the Months table shows it. */
+export interface TenantMonthRow extends TenantPeriod {
+  displayStatus: PeriodStatus | "not_due_yet";
+  /** "October 2026". */
+  monthLabel: string;
+}
+
+/** A history table's query (Activity, …/tenants/[id]/history; A14): the grid's page, sort, search and filters, plus "Show" and dates. */
+export interface AuditTableQuery extends GridQueryParams {
   category?: AuditCategory;
   /** yyyy-MM-dd, inclusive. */
   from?: string;
   to?: string;
-  before?: number;
 }
+
+/** One page of a history table, paged in SQL. */
+export interface AuditTablePage {
+  entries: AuditEntry[];
+  /** Entries matching the query, across all pages. */
+  total: number;
+  /** All the entries (the tenant's, or every change), before "Show", dates, search and filters. */
+  all: number;
+  /** The page returned (0-based); the last one when the asked-for page is past the end. */
+  page: number;
+}
+

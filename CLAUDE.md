@@ -47,15 +47,17 @@ development, required in production.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D25), see below.
+- **Database:** `docs/database-design.md` (D1–D29), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
   real names stay local, `statusLabel`, the custom Excel export
   (`exportValue`, MUI's is Premium-only), the per-tower monthly-rent split,
   the audit history screens and events (A10), Govt rent counted as paid
-  direct (A11), pages streamed in sections (A12), and owner pages without a
-  `/` prefix (A13). Read it before changing
+  direct (A11), pages streamed in sections (A12), owner pages without a
+  `/` prefix (A13), history tables paged in the database (A14), which
+  tables page in the database vs the browser (A15), and record pages in
+  lazy tabs by data source (A16). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -122,8 +124,9 @@ both together.
   even for months no one logged a payment for). **Billing is per tenant:**
   one combined monthly rent covers all of a tenant's houses.
 - **Outstanding counts only months that have ended** (up to the end of last
-  month): `summarizeBalance` in `src/lib/domain/allocation.ts`, used by every
-  screen. Rent rows for the current month and later exist (created ahead so
+  month): `summarizeBalance` in `src/lib/domain/allocation.ts`, and the same
+  rule in SQL for the tenant page's figures (`tenant_account_summary`, D29;
+  a schema test keeps them in step). Rent rows for the current month and later exist (created ahead so
   rent can be paid in advance) but are "not due yet" (`notYetDue`), shown as
   such in the Months table and ledger and left out of balances.
 - **Which houses, at what rent, and when are dated history, never
@@ -175,11 +178,16 @@ both together.
 - **Audit log** (`0015_audit_log.sql`, D25): triggers on every vital table
   append `{column: [old, new]}` diffs to `audit_log` (grouped by `tx_id`);
   `log_event()` adds app events (messages, receipt downloads, sign-ins).
-  Nobody, not even the service role, can edit or delete it. Reads and the
-  best-effort `recordEvent` are in `src/server/services/audit.ts`, the text
-  in `src/lib/domain/audit.ts`; shown by `AuditTimeline` and
-  `/activity` (A10). A new table with vital data gets the
-  trigger (checklist in `docs/database-design.md`).
+  Nobody, not even the service role, can edit or delete it. Each row stores
+  the text the history shows (`title`, `details`, `actor_name`), written by
+  a `BEFORE INSERT` trigger from `audit_describe()` in SQL
+  (`0017_audit_text.sql`, D27); the app shows it as stored and never
+  rebuilds it. Action labels and "Show" categories are in
+  `src/lib/domain/audit.ts`. Reads and the best-effort `recordEvent` are in
+  `src/server/services/audit.ts`; shown by `AuditTimeline`, `/activity`
+  (A10) and the tenant's Change history (`audit_history_page()`, A14). A
+  new table with vital data gets the trigger (checklist in
+  `docs/database-design.md`).
 - **Recorded = counted** (`0010_instant_confirmation.sql`, D20): both
   ledger tables are written as `status = 'confirmed'` and applied to
   `rent_periods.amount_allocated` in the same transaction. The tenant's
@@ -354,7 +362,7 @@ until the tenant-signed copy exists.
   through `round2()` in `src/lib/money.ts`; display via `formatMoney()`
   (`CURRENCY_SYMBOL` is the one thing to edit for a different currency).
 - `src/lib/domain/` (`allocation.ts` oldest-first allocation and balances,
-  `reports.ts`, `tenantLedger.ts`, `tenant.ts`) is pure and framework-free
+  `reports.ts`, `billing.ts`, `tenant.ts`) is pure and framework-free
   with no `server-only` import — shared between services and client
   components such as `PaymentForm` — and unit-tested next to the code.
 - **Dates go through `src/lib/dates.ts`**: "today", "this month" and the day
@@ -476,7 +484,17 @@ Each of these was found broken somewhere; keep them when adding code.
   (default 10), `emptyState` (when there are no rows at all), `noRowsLabel`,
   `rowDensity` (`standard` 56px for avatar + two-line cells, `dense` 44px)
   and `variant="plain"` inside another card. Money columns via
-  `moneyColumn`.
+  `moneyColumn`. `paginationMode="server"` pages, sorts and filters on the
+  server: pass one page of `rows`, `rowCount`, the controlled models and
+  build the query with `toGridQueryParams`; the service validates it with
+  `gridQuerySchema` and the database runs it (A14: the tenant Change
+  history and Activity, `AuditHistoryTable` and `audit_history_page()`).
+  **Rows that grow every month** (history, payments, rent months, billing)
+  use server mode through the kit hook `useServerGrid` and an SQL
+  `…_page()` function (the Months, Ledger, Billing, Activity and Change
+  history tables; D28); master data (tenants, houses, towers) stays
+  client-side (A15; recipes in the `add-api-endpoint` and
+  `build-dashboard-page` skills).
 - The top-bar search (`src/components/shell/Search.tsx`, also behind the
   search icon in the mobile `AppNavbar`) loads `GET /api/dashboard/search`
   once per page and matches tenants (name, business) and houses (label,
@@ -488,6 +506,25 @@ Each of these was found broken somewhere; keep them when adding code.
   `sections/*.tsx` inside an `AsyncSection` (Suspense + per-card error
   boundary), placed by `OverviewLayout`; the placeholders are one map,
   `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`.
+- The tenant page (`tenants/[tenantId]/(profile)/`) is a record page in
+  tabs by data source (A16): header, alerts and account stats on top, then
+  `PageTabs` with Details, Ledger, Months and Change history. A tab mounts
+  when first opened and stays mounted (that is the cache); the page's
+  per-render `version` resets them after a write. Tables in a tab load
+  themselves (`useServerGrid({ empty, … })`, no `initial`), with the
+  grid's skeleton rows as their loading state. Link to a tab with
+  `routes.tenants.detail(id, { tab: "ledger" })`. A data component that
+  renders several cells exports its own `<Name>Skeleton`
+  (`AccountStatsSkeleton`), shared by its fallback and `loading.tsx`.
+- **Phones:** `PageTabs` shows a "Section" select instead of tabs, and
+  `ActionStack phone="primaryOnTop"` puts the primary (last) button on top
+  with the rest two to a row. A `DataTable` toolbar is one row on phones:
+  the count, then search (expands across the row), a filter button opening
+  a panel with the "Show" selects, `toolbarExtra` (pass
+  `toolbarExtraActive` so its badge counts set dates) and column filters,
+  then columns and Excel. A destructive button is `variant="outlined"
+  color="error"` (red via the theme variant in `app.ts`; the template's
+  outlined style alone greys it).
 - Defaulters (`/defaulters`, `getDefaultersReport` in
   `src/server/services/dashboard.ts`): every tenant, moved-out ones too,
   with rent unpaid for an ended month, most months behind first. Aging

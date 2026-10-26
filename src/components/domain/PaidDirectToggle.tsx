@@ -4,12 +4,13 @@ import { useTransition } from "react";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Switch from "@mui/material/Switch";
 import { useAppRouter } from "@/components/ui/Loading";
-import { savePaidDirectView } from "@/lib/preferences";
+import { PAID_DIRECT_PARAM } from "@/lib/preferences";
 
 /**
- * "Include Govt paid direct" on Overview and Billing: one remembered choice
- * (a cookie) whether government rent paid to the owner directly (A11) counts
- * in the figures. The page re-renders on the server with the new totals.
+ * "Include Govt paid direct" on Overview and Billing: whether government rent
+ * paid to the owner directly (A11) counts in the figures. Off on every visit;
+ * switching it sets `?paidDirect=show` on this page's URL (nothing is
+ * remembered), and the page re-renders on the server with the new totals.
  */
 export default function PaidDirectToggle({ shown }: { shown: boolean }) {
   const router = useAppRouter();
@@ -22,8 +23,10 @@ export default function PaidDirectToggle({ shown }: { shown: boolean }) {
           checked={shown}
           disabled={pending}
           onChange={(e) => {
-            savePaidDirectView(e.target.checked ? "show" : "hide");
-            startTransition(() => router.refresh());
+            const url = new URL(window.location.href);
+            if (e.target.checked) url.searchParams.set(PAID_DIRECT_PARAM, "show");
+            else url.searchParams.delete(PAID_DIRECT_PARAM);
+            startTransition(() => router.replace(`${url.pathname}${url.search}`, { scroll: false }));
           }}
         />
       }

@@ -1,73 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import Alert from "@mui/material/Alert";
 import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, {
   moneyColumn,
+  SERVER_TEXT_OPERATORS,
+  useServerGrid,
   type DataTableColDef,
 } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
 import { StatusChip } from "@/components/domain/StatusChip";
+import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
-import type { BillingRow } from "@/lib/contracts";
+import type { BillingPage, BillingPageQuery, BillingQuery, BillingRow } from "@/lib/contracts";
 import { formatDateKey } from "@/lib/dates";
-import { periodDisplayStatus } from "@/lib/domain/billing";
+import { BILLING_SHOW_OPTIONS, periodDisplayStatus, type BillingShow } from "@/lib/domain/billing";
+import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { paymentModeLabel } from "@/lib/domain/payments";
 import { statusLabel } from "@/lib/domain/status";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 
-type ShowFilter =
-  | "all"
-  | "unpaid"
-  | "partly"
-  | "paid"
-  | "paidDirect"
-  | "notDue";
-
-const SHOW_OPTIONS: { value: ShowFilter; label: string }[] = [
-  { value: "all", label: "All months" },
-  { value: "unpaid", label: "Unpaid (overdue)" },
-  { value: "partly", label: "Partly paid" },
-  { value: "paid", label: "Paid" },
-  { value: "paidDirect", label: "Govt - paid direct" },
-  { value: "notDue", label: "Not due yet" },
-];
-
 const displayStatus = (row: BillingRow) =>
   row.paidDirect
     ? "paid_direct"
     : periodDisplayStatus(row.status, row.notYetDue);
-
-function matches(row: BillingRow, show: ShowFilter): boolean {
-  const status = displayStatus(row);
-  switch (show) {
-    case "unpaid":
-      return status === "pending" || status === "partially_paid";
-    case "partly":
-      return status === "partially_paid";
-    case "paid":
-      return status === "paid" || status === "paid_direct";
-    case "paidDirect":
-      return status === "paid_direct";
-    case "notDue":
-      return status === "not_due_yet";
-    default:
-      return true;
-  }
-}
-
-/** Sort rank: higher = needs the owner more, so a descending sort puts what's owed first. */
-const STATUS_RANK: Record<ReturnType<typeof displayStatus>, number> = {
-  pending: 4,
-  partially_paid: 3,
-  not_due_yet: 2,
-  paid: 1,
-  paid_direct: 0,
-};
 
 const PAID_DIRECT_TEXT = "Paid to your bank directly";
 
@@ -85,12 +47,14 @@ const columns: DataTableColDef<BillingRow>[] = [
     minWidth: 140,
     flex: 0.7,
     valueFormatter: (_value, row) => row.monthLabel,
+    filterOperators: SERVER_TEXT_OPERATORS,
   },
   {
     field: "tenantName",
     headerName: "Tenant",
     flex: 1.3,
     minWidth: 200,
+    filterOperators: SERVER_TEXT_OPERATORS,
     renderCell: ({ row }) => (
       <IdentityCell
         name={row.tenantName}
@@ -99,23 +63,16 @@ const columns: DataTableColDef<BillingRow>[] = [
       />
     ),
   },
-  moneyColumn<BillingRow>("amountDue", "Billed"),
-  moneyColumn<BillingRow>("amountAllocated", "Collected"),
-  moneyColumn<BillingRow>("balance", "Balance"),
+  moneyColumn<BillingRow>("amountDue", "Billed", { filterable: false }),
+  moneyColumn<BillingRow>("amountAllocated", "Collected", { filterable: false }),
+  moneyColumn<BillingRow>("balance", "Balance", { filterable: false }),
   {
     field: "status",
     headerName: "Status",
     minWidth: 130,
     valueGetter: (_value, row) => statusLabel(displayStatus(row)),
-    sortComparator: (_v1, _v2, p1, p2) => {
-      const a = p1.api.getRow(p1.id) as BillingRow | null;
-      const b = p2.api.getRow(p2.id) as BillingRow | null;
-      if (!a || !b) return 0;
-      return (
-        STATUS_RANK[displayStatus(a)] - STATUS_RANK[displayStatus(b)] ||
-        a.balance - b.balance
-      );
-    },
+    // Sorted in SQL by need (unpaid, partly paid, not due, paid, paid direct), then balance.
+    filterOperators: SERVER_TEXT_OPERATORS,
     renderCell: ({ row }) => <StatusChip status={displayStatus(row)} />,
   },
   {
@@ -124,6 +81,7 @@ const columns: DataTableColDef<BillingRow>[] = [
     flex: 1.4,
     minWidth: 230,
     sortable: false,
+    filterOperators: SERVER_TEXT_OPERATORS,
     valueGetter: (_value, row) => receiptText(row),
     exportValue: (row) => receiptText(row),
     renderCell: ({ row }) =>
@@ -156,54 +114,77 @@ const columns: DataTableColDef<BillingRow>[] = [
   },
 ];
 
-/** Every tenant's rent for each month in the range, with what paid it. */
+interface Extra {
+  show: BillingShow;
+}
+
+const DEFAULT_EXTRA: Extra = { show: "all" };
+const DEFAULT_SORT: GridSortModel = [{ field: "amountAllocated", sort: "desc" }];
+const getRowId = (row: BillingRow) => row.id;
+const toQuery = (grid: GridQueryParams, extra: Extra): BillingPageQuery => ({ ...grid, show: extra.show });
+
+/**
+ * Every tenant's rent for each month in the range, with what paid it - one
+ * page at a time: paging, sort, search and "Show" run in SQL (billing_page,
+ * A15). The range and the paid-direct view come from the page.
+ */
 export default function BillingGrid({
-  rows,
+  initial,
+  query,
   rangeLabel,
 }: {
-  rows: BillingRow[];
+  initial: BillingPage;
+  query: BillingQuery;
   rangeLabel: string;
 }) {
-  const [show, setShow] = useState<ShowFilter>("all");
-  const filtered = useMemo(
-    () => rows.filter((row) => matches(row, show)),
-    [rows, show],
+  const { from, to, paidDirect } = query;
+  const load = useCallback(
+    (q: BillingPageQuery) => api.dashboard.billing({ from, to, paidDirect, ...q }),
+    [from, to, paidDirect]
   );
+  const { data, error, extra, setExtra, gridProps } = useServerGrid({
+    initial,
+    load,
+    toQuery,
+    defaultSort: DEFAULT_SORT,
+    defaultExtra: DEFAULT_EXTRA,
+    errorText: "Couldn't load the billing months.",
+  });
   const filters = useMemo(
     () => [
       {
         label: "Show",
-        value: show,
-        options: SHOW_OPTIONS,
-        onChange: setShow,
-        defaultValue: "all" as const,
+        value: extra.show,
+        options: BILLING_SHOW_OPTIONS,
+        onChange: (show: BillingShow) => setExtra({ show }),
+        defaultValue: "all" as BillingShow,
       },
     ],
-    [show],
+    [extra.show, setExtra]
   );
 
   return (
-    <DataTable<BillingRow>
-      title="Billing & collection"
-      subtitle={`Rent per tenant per month, ${rangeLabel}`}
-      rows={filtered}
-      totalCount={rows.length}
-      filters={filters}
-      columns={columns}
-      getRowId={(row) => row.id}
-      search={{ placeholder: "Search tenant or receipt…" }}
-      rowDensity="standard"
-      noRowsLabel="No months match."
-      emptyState={
-        <EmptyState
-          icon={<ReceiptLongRoundedIcon />}
-          title="Nothing billed in these months"
-          description="Rent months appear here once a tenant is billed for them."
-        />
-      }
-      initialState={{
-        sorting: { sortModel: [{ field: "amountAllocated", sort: "desc" }] },
-      }}
-    />
+    <Stack spacing={2}>
+      {error ? <Alert severity="error">{error}</Alert> : null}
+      <DataTable<BillingRow>
+        title="Billing & collection"
+        subtitle={`Rent per tenant per month, ${rangeLabel}`}
+        rows={data.rows}
+        {...gridProps}
+        filters={filters}
+        columns={columns}
+        getRowId={getRowId}
+        search={{ placeholder: "Search tenant or receipt…" }}
+        rowDensity="standard"
+        noRowsLabel="No months match."
+        emptyState={
+          <EmptyState
+            icon={<ReceiptLongRoundedIcon />}
+            title="Nothing billed in these months"
+            description="Rent months appear here once a tenant is billed for them."
+          />
+        }
+      />
+    </Stack>
   );
 }

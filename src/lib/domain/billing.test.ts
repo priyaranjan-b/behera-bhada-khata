@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  billingTotals,
-  isPaidDirect,
   monthsIn,
   paidDirectId,
   paidDirectMonths,
@@ -54,19 +52,6 @@ describe("periodDisplayStatus", () => {
   });
 });
 
-describe("billingTotals", () => {
-  it("sums billed and collected, and counts only ended months as overdue", () => {
-    expect(
-      billingTotals([
-        { amountDue: 5000, amountAllocated: 5000, notYetDue: false },
-        { amountDue: 4000, amountAllocated: 1000, notYetDue: false },
-        { amountDue: 4000, amountAllocated: 0, notYetDue: true },
-      ])
-    ).toEqual({ billed: 13000, collected: 6000, balance: 7000, overdue: 3000, collectionRate: 46 });
-    expect(billingTotals([]).collectionRate).toBeNull();
-  });
-});
-
 describe("paid direct (government rent, 0016)", () => {
   const rates = [
     { effective_month: "2022-01-01", monthly_amount: "5300.00" },
@@ -95,7 +80,7 @@ describe("paid direct (government rent, 0016)", () => {
 
   it("marks its months with an id no uuid can match", () => {
     const id = paidDirectId("t1", "2026-10-01");
-    expect(isPaidDirect(id)).toBe(true);
-    expect(isPaidDirect("00000000-0000-4000-8000-000000000101")).toBe(false);
+    expect(id).toBe("paid-direct:t1:2026-10-01");
+    expect(id).not.toMatch(/^[0-9a-f-]{36}$/);
   });
 });
