@@ -49,10 +49,12 @@ export const routes = {
   /** The Overview: where sign-in lands and where a bad `next` falls back to. */
   home: "/",
   /** The Overview for a month; `month` is `yyyy-MM` (see monthKeyFromParam in src/lib/dates.ts). */
-  dashboard: (query?: { month?: string; show?: string }, hash?: string) => withQuery("/", query, hash),
+  /** `paidDirect: "show"` keeps "Include Govt paid direct" on (A11); off when left out. */
+  dashboard: (query?: { month?: string; show?: string; paidDirect?: "show" }, hash?: string) =>
+    withQuery("/", query, hash),
   defaulters: "/defaulters",
   /** `from`/`to` are `yyyy-MM`; none = this month. */
-  billing: (query?: { from?: string; to?: string }) => withQuery("/billing", query),
+  billing: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/billing", query),
   activity: "/activity",
   profile: (flash?: Flash) => withQuery("/profile", flash),
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),

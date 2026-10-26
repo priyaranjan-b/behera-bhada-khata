@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { serverApi } from "@/lib/api-client/server";
 import { addMonthsToKey, formatMonth, monthKeyFromParam, yearMonthOf } from "@/lib/dates";
-import { PAID_DIRECT_COOKIE, paidDirectViewOf } from "@/lib/preferences";
+import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
 import { ActionStack } from "@/components/ui";
 import AsyncSection from "@/components/ui/AsyncSection";
@@ -27,10 +26,10 @@ import VacantStat from "./sections/VacantStat";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; show?: string }>;
+  searchParams: Promise<{ month?: string; show?: string; paidDirect?: string }>;
 }) {
-  const { month, show } = await searchParams;
-  const paidDirect = paidDirectViewOf((await cookies()).get(PAID_DIRECT_COOKIE)?.value);
+  const { month, show, paidDirect: paidDirectParam } = await searchParams;
+  const paidDirect = paidDirectViewOf(paidDirectParam);
   const monthKey = monthKeyFromParam(month);
   const monthView = `${monthKey}-${paidDirect}`;
 
@@ -55,8 +54,14 @@ export default async function DashboardPage({
               </AsyncSection>
               <PeriodSwitcher
                 label={formatMonth(monthKey)}
-                prevHref={routes.dashboard({ month: yearMonthOf(addMonthsToKey(monthKey, -1)) })}
-                nextHref={routes.dashboard({ month: yearMonthOf(addMonthsToKey(monthKey, 1)) })}
+                prevHref={routes.dashboard({
+                  month: yearMonthOf(addMonthsToKey(monthKey, -1)),
+                  ...paidDirectQuery(paidDirect),
+                })}
+                nextHref={routes.dashboard({
+                  month: yearMonthOf(addMonthsToKey(monthKey, 1)),
+                  ...paidDirectQuery(paidDirect),
+                })}
               />
             </ActionStack>
           }

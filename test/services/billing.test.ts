@@ -24,7 +24,7 @@ describe("Billing", () => {
     expect(fakes.owner.billing.page).toHaveBeenLastCalledWith({
       from: "2026-10-01",
       to: "2026-10-01",
-      paidDirect: true,
+      paidDirect: false, // off unless the page asks for it (A11)
       show: "all",
       search: undefined,
       filters: [],
@@ -93,7 +93,7 @@ describe("Billing", () => {
     expect(fakes.owner.billing.totals).toHaveBeenLastCalledWith({ from: "2026-03-01", to: "2026-03-01", paidDirect: false });
   });
 
-  it("counts the cash received in the range, government rent paid direct included unless hidden", async () => {
+  it("counts the cash received in the range, government rent paid direct only when shown", async () => {
     expect(await getBillingReceived(ctx, { from: "2026-03", to: "2026-03" })).toEqual({ amount: 5000, payments: 1, paidDirect: 0 });
 
     const GOVT = "00000000-0000-4000-8000-000000000102";
@@ -105,12 +105,14 @@ describe("Billing", () => {
       { id: 9, tenant_id: GOVT, effective_month: "2022-01-01", monthly_amount: "5300.00", created_at: "", recorded_by: null },
     ]);
     fakes.owner.payments.listForTenants.mockResolvedValue([]);
-    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10" })).toEqual({ amount: 10600, payments: 0, paidDirect: 10600 });
-    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" })).toEqual({
-      amount: 0,
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "show" })).toEqual({
+      amount: 10600,
       payments: 0,
-      paidDirect: 0,
+      paidDirect: 10600,
     });
+    const hidden = { amount: 0, payments: 0, paidDirect: 0 };
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "hide" })).toEqual(hidden);
+    expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10" })).toEqual(hidden); // the default
   });
 
   it("swaps a reversed range and rejects a malformed month or query", async () => {

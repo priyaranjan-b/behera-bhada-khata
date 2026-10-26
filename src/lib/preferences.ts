@@ -1,19 +1,19 @@
 import type { PaidDirectView } from "@/lib/types";
 
-// Per-viewer display preferences kept in a cookie, so Server Components can
-// read them (and compute totals accordingly) and they survive a reload.
+// "Include Govt paid direct" (A11) on Overview and Billing is off on every
+// visit. Switching it on adds `?paidDirect=show` to the page's URL, so Server
+// Components compute the figures with it, and nothing is remembered: leaving
+// the page (or opening it from the menu) starts off again.
 
-/** Whether Overview and Billing include government rent paid direct (A11): "show" (default) or "hide". */
-export const PAID_DIRECT_COOKIE = "bbk-paid-direct";
+/** The URL param that switches government rent paid direct on. */
+export const PAID_DIRECT_PARAM = "paidDirect";
 
-const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
-
-/** The stored view; anything but "hide" means the default, shown. */
-export function paidDirectViewOf(cookieValue: string | undefined): PaidDirectView {
-  return cookieValue === "hide" ? "hide" : "show";
+/** The view from the URL param: shown only when it says "show". */
+export function paidDirectViewOf(param: string | string[] | undefined): PaidDirectView {
+  return param === "show" ? "show" : "hide";
 }
 
-/** Browser only: remember the choice for a year. */
-export function savePaidDirectView(view: PaidDirectView): void {
-  document.cookie = `${PAID_DIRECT_COOKIE}=${view}; path=/; max-age=${ONE_YEAR_SECONDS}; samesite=lax`;
+/** Query to keep the view on links within the page (e.g. the next month): only when shown. */
+export function paidDirectQuery(view: PaidDirectView): { paidDirect?: "show" } {
+  return view === "show" ? { paidDirect: "show" } : {};
 }

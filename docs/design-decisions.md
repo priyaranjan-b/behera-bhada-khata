@@ -233,6 +233,13 @@ collected** for each month it holds its houses:
   - a tower's monthly rent (A9).
 - **Never:** a row in `rent_periods`, a payment, arrears or Defaulters.
   Tracking it like any other tenant is still "Start tracking rent" (D26).
+- **Off by default, every visit.** On the Overview and Billing it counts only
+  while "Include Govt paid direct" is switched on. The switch sets
+  `?paidDirect=show` on the page's URL (`PAID_DIRECT_PARAM`,
+  `paidDirectViewOf` in `src/lib/preferences.ts`), and month and range links
+  on the page keep it (`paidDirectQuery`). Nothing is remembered: opening the
+  page again starts off. The API default is "hide" too
+  (`paidDirectViewSchema`). This replaced a one-year cookie that kept it on.
 
 **Why.** The owner wanted this rent visible in the totals because it does
 arrive every month. Rejected alternatives:

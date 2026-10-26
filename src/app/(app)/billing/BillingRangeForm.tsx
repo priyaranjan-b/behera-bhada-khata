@@ -5,10 +5,12 @@ import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import { useAppRouter } from "@/components/ui/Loading";
+import { paidDirectQuery } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
+import type { PaidDirectView } from "@/lib/types";
 
-/** From / To month inputs for the Billing page; Show opens that range. */
-export default function BillingRangeForm({ from, to }: { from: string; to: string }) {
+/** From / To month inputs for the Billing page; Show opens that range, keeping the paid-direct view. */
+export default function BillingRangeForm({ from, to, paidDirect }: { from: string; to: string; paidDirect: PaidDirectView }) {
   const router = useAppRouter();
   const [start, setStart] = useState(from);
   const [end, setEnd] = useState(to);
@@ -22,7 +24,7 @@ export default function BillingRangeForm({ from, to }: { from: string; to: strin
       sx={{ flexWrap: "wrap", alignItems: "center" }}
       onSubmit={(e: React.FormEvent) => {
         e.preventDefault();
-        router.push(routes.billing({ from: start || end, to: end || start }));
+        router.push(routes.billing({ from: start || end, to: end || start, ...paidDirectQuery(paidDirect) }));
       }}
     >
       <TextField

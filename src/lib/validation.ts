@@ -439,8 +439,8 @@ export const auditTableQuerySchema = gridQuerySchema(AUDIT_TABLE_SORT_FIELDS, AU
 /** The Billing page shows at most this many months at once. */
 export const BILLING_LIMITS = { maxMonths: 24 } as const;
 
-/** Include government rent paid direct (A11)? Missing or unknown = shown. */
-export const paidDirectViewSchema = z.enum(PAID_DIRECT_VIEWS).catch("show").default("show");
+/** Include government rent paid direct (A11)? Missing or unknown = hidden: it is off until switched on. */
+export const paidDirectViewSchema = z.enum(PAID_DIRECT_VIEWS).catch("hide").default("hide");
 
 const yearMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month (yyyy-MM)");
 
