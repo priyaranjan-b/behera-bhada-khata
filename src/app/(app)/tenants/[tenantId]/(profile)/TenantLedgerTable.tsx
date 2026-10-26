@@ -1,22 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
-import type { GridColDef } from "@mui/x-data-grid";
+import type { GridSortModel } from "@mui/x-data-grid";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
-import { formatDateKey, yearMonthOf } from "@/lib/dates";
+import type { TenantLedgerQuery, TenantLedgerView } from "@/lib/contracts";
+import { formatDateKey, monthDayRange } from "@/lib/dates";
 import { statusLabel } from "@/lib/domain/status";
-import DataTable, { moneyColumn } from "@/components/ui/DataTable";
+import type { GridQueryParams } from "@/lib/domain/gridQuery";
+import DataTable, { moneyColumn, SERVER_TEXT_OPERATORS, useServerGrid, type DataTableColDef } from "@/components/ui/DataTable";
 import { GridCell } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
 import ProofsButton from "@/components/domain/ProofsButton";
-import { apiHref, apiPaths } from "@/lib/api-client";
+import { api, apiHref, apiPaths } from "@/lib/api-client";
 import { routes } from "@/lib/routes";
-import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 
 type FilterMode = "all" | "range" | "month";
@@ -27,11 +30,23 @@ const FILTER_OPTIONS: { value: FilterMode; label: string }[] = [
   { value: "month", label: "Month" },
 ];
 
-const TYPE_LABEL: Record<LedgerRow["type"], string> = {
-  charge: "Charge",
-  payment: "Payment",
-  adjustment: "Adjustment",
-};
+interface Extra {
+  mode: FilterMode;
+  from: string;
+  to: string;
+  /** yyyy-MM, from `<input type="month">`. */
+  month: string;
+}
+
+const DEFAULT_EXTRA: Extra = { mode: "all", from: "", to: "", month: "" };
+const DEFAULT_SORT: GridSortModel = [{ field: "date", sort: "desc" }];
+const EMPTY: TenantLedgerView = { rows: [], total: 0, all: 0, page: 0, tenantMessaging: false };
+
+function toQuery(grid: GridQueryParams, extra: Extra): TenantLedgerQuery {
+  if (extra.mode === "month" && extra.month) return { ...grid, ...monthDayRange(extra.month) };
+  if (extra.mode === "range") return { ...grid, from: extra.from || undefined, to: extra.to || undefined };
+  return grid;
+}
 
 // Every payment/adjustment counts once recorded (0010): its receipt can be
 // downloaded straight away (e.g. to send on WhatsApp), and the tenant can be
@@ -65,50 +80,29 @@ function ActionsCell({ row, tenantId, tenantMessaging }: { row: LedgerRow; tenan
   );
 }
 
-function captionOf(row: LedgerRow): string {
-  if (row.type === "charge") return TYPE_LABEL.charge;
-  const signed = row.acknowledged ? "signed by tenant" : "not signed by tenant";
-  return `${row.receiptNo ? `#${row.receiptNo}` : TYPE_LABEL[row.type]} · ${signed}`;
-}
-
 function blankZero(value: number | null | undefined) {
   return value ? value : null;
 }
 
-export default function TenantLedgerTable({
-  rows,
-  tenantId,
-  tenantMessaging,
-}: {
-  rows: LedgerRow[];
-  tenantId: string;
-  /** Twilio is set up; otherwise there's no "Send link". */
-  tenantMessaging: boolean;
-}) {
-  const [filterMode, setFilterMode] = useState<FilterMode>("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [month, setMonth] = useState("");
+/**
+ * A tenant's ledger, one page at a time: the journal, its running balance
+ * (all-time, whatever the page or filter), paging, sort, search and the
+ * date filters all come from SQL (tenant_ledger_page, A15). Loads its first
+ * page when mounted (the Ledger tab, A16).
+ */
+export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
+  const load = useCallback((query: TenantLedgerQuery) => api.dashboard.tenants.ledger(tenantId, query), [tenantId]);
+  const { data, error, extra, setExtra, gridProps } = useServerGrid({
+    empty: EMPTY,
+    load,
+    toQuery,
+    defaultSort: DEFAULT_SORT,
+    defaultExtra: DEFAULT_EXTRA,
+    errorText: "Couldn't load the ledger.",
+  });
+  const tenantMessaging = data.tenantMessaging;
 
-  const filtered = useMemo(() => {
-    return rows.filter((row) => {
-      if (filterMode === "month") {
-        if (!month) return true;
-        return yearMonthOf(row.date) === month;
-      }
-      if (filterMode === "range") {
-        if (fromDate && row.date < fromDate) return false;
-        if (toDate && row.date > toDate) return false;
-      }
-      return true;
-    });
-  }, [rows, filterMode, fromDate, toDate, month]);
-
-  // Rows arrive in ledger order (the order the running balance was built in);
-  // same-day entries keep that order instead of whatever the grid's sort yields.
-  const ledgerOrder = useMemo(() => new Map(rows.map((row, i) => [row.id, i])), [rows]);
-
-  const columns = useMemo<GridColDef<LedgerRow>[]>(
+  const columns = useMemo<DataTableColDef<LedgerRow>[]>(
     () => [
       {
         field: "date",
@@ -116,21 +110,22 @@ export default function TenantLedgerTable({
         minWidth: 110,
         flex: 0.6,
         valueFormatter: (value: string) => formatDateKey(value),
-        sortComparator: (a: string, b: string, p1, p2) =>
-          a.localeCompare(b) || (ledgerOrder.get(String(p1.id)) ?? 0) - (ledgerOrder.get(String(p2.id)) ?? 0),
+        filterOperators: SERVER_TEXT_OPERATORS,
       },
       {
         field: "description",
         headerName: "Description",
         flex: 1.4,
         minWidth: 200,
+        filterOperators: SERVER_TEXT_OPERATORS,
+        exportValue: (row) => `${row.description} (${row.caption})`,
         renderCell: ({ row }) => (
           <GridCell direction="column" spacing={0}>
             <Typography variant="body2" noWrap>
               {row.description}
             </Typography>
             <Typography variant="caption" color="textSecondary" noWrap>
-              {captionOf(row)}
+              {row.caption}
             </Typography>
           </GridCell>
         ),
@@ -139,6 +134,7 @@ export default function TenantLedgerTable({
         field: "status",
         headerName: "Status",
         minWidth: 120,
+        filterOperators: SERVER_TEXT_OPERATORS,
         valueFormatter: (value: LedgerRow["status"]) =>
           value === "billed" ? "" : statusLabel(value === "upcoming" ? "not_due_yet" : value),
         renderCell: ({ row }) =>
@@ -152,9 +148,9 @@ export default function TenantLedgerTable({
             <StatusChip status={row.status} />
           ),
       },
-      moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero }),
-      moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero }),
-      moneyColumn<LedgerRow>("balance", "Balance"),
+      moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false }),
+      moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero, filterable: false }),
+      moneyColumn<LedgerRow>("balance", "Balance", { filterable: false }),
       {
         field: "actions",
         headerName: "Actions",
@@ -168,33 +164,39 @@ export default function TenantLedgerTable({
         renderCell: ({ row }) => <ActionsCell row={row} tenantId={tenantId} tenantMessaging={tenantMessaging} />,
       },
     ],
-    [tenantId, tenantMessaging, ledgerOrder]
+    [tenantId, tenantMessaging]
   );
 
-  function resetFilters(mode: FilterMode) {
-    setFilterMode(mode);
-    setFromDate("");
-    setToDate("");
-    setMonth("");
-  }
+  const filters = useMemo(
+    () => [
+      {
+        label: "Show",
+        value: extra.mode,
+        options: FILTER_OPTIONS,
+        onChange: (mode: FilterMode) => setExtra({ mode, from: "", to: "", month: "" }),
+        defaultValue: "all" as FilterMode,
+      },
+    ],
+    [extra.mode, setExtra]
+  );
 
   const dateInputs =
-    filterMode === "all" ? undefined : filterMode === "range" ? (
+    extra.mode === "all" ? undefined : extra.mode === "range" ? (
       <Stack direction="row" spacing={1}>
         <TextField
           label="From"
           type="date"
           size="small"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
+          value={extra.from}
+          onChange={(e) => setExtra({ from: e.target.value })}
           slotProps={{ inputLabel: { shrink: true } }}
         />
         <TextField
           label="To"
           type="date"
           size="small"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
+          value={extra.to}
+          onChange={(e) => setExtra({ to: e.target.value })}
           slotProps={{ inputLabel: { shrink: true } }}
         />
       </Stack>
@@ -203,23 +205,26 @@ export default function TenantLedgerTable({
         label="Month"
         type="month"
         size="small"
-        value={month}
-        onChange={(e) => setMonth(e.target.value)}
+        value={extra.month}
+        onChange={(e) => setExtra({ month: e.target.value })}
         slotProps={{ inputLabel: { shrink: true } }}
       />
     );
 
   return (
-    <DataTable<LedgerRow>
-      title="Ledger"
-      subtitle="Charges, payments and corrections"
-      rows={filtered}
-      totalCount={rows.length}
-      columns={columns}
-      filters={[{ label: "Show", value: filterMode, options: FILTER_OPTIONS, onChange: resetFilters, defaultValue: "all" }]}
-      toolbarExtra={dateInputs}
-      noRowsLabel="No entries match this filter."
-      initialState={{ sorting: { sortModel: [{ field: "date", sort: "desc" }] } }}
-    />
+    <Stack spacing={2}>
+      {error ? <Alert severity="error">{error}</Alert> : null}
+      <DataTable<LedgerRow>
+        title="Ledger"
+        subtitle="Charges, payments and corrections"
+        rows={data.rows}
+        columns={columns}
+        {...gridProps}
+        filters={filters}
+        toolbarExtra={dateInputs}
+        search={{ placeholder: "Search the ledger…" }}
+        noRowsLabel="No entries match this filter."
+      />
+    </Stack>
   );
 }

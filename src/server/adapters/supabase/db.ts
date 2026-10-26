@@ -61,6 +61,24 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
       async list(filter) {
         return must(await auditQuery(db, filter), "list audit log");
       },
+      async historyPage(filter) {
+        return must(
+          await db.rpc("audit_history_page", {
+            p_tenant_id: filter.tenantId ?? null,
+            p_actions: filter.actions ? [...filter.actions] : null,
+            p_from: filter.fromDate ?? null,
+            p_to: filter.toDate ?? null,
+            p_search: filter.search ?? null,
+            p_filters: filter.filters,
+            p_logic: filter.logic,
+            p_sort: filter.sort,
+            p_dir: filter.dir,
+            p_page: filter.page,
+            p_page_size: filter.pageSize,
+          }),
+          "read history page"
+        );
+      },
       async log(event) {
         mustWrite(await db.rpc("log_event", logEventArgs(event)), "log event");
       },
@@ -184,6 +202,9 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
     },
 
     tenants: {
+      async accountSummary(id) {
+        return must(await db.rpc("tenant_account_summary", { p_tenant_id: id }), "read tenant account");
+      },
       async list(filter = {}) {
         let query = db.from("tenants").select("*");
         if (filter.status) query = query.eq("status", filter.status);
@@ -281,6 +302,69 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
       async listByIds(ids) {
         const batches = await Promise.all(chunk(ids).map((part) => ownerPeriods((q) => q.in("id", part))));
         return batches.flat();
+      },
+      async page(filter) {
+        return must(
+          await db.rpc("tenant_months_page", {
+            p_tenant_id: filter.tenantId,
+            p_show: filter.show,
+            p_search: filter.search ?? null,
+            p_filters: filter.filters,
+            p_logic: filter.logic,
+            p_sort: filter.sort,
+            p_dir: filter.dir,
+            p_page: filter.page,
+            p_page_size: filter.pageSize,
+          }),
+          "read rent months page"
+        );
+      },
+    },
+
+    billing: {
+      async page(filter) {
+        return must(
+          await db.rpc("billing_page", {
+            p_from: filter.from,
+            p_to: filter.to,
+            p_paid_direct: filter.paidDirect,
+            p_show: filter.show,
+            p_search: filter.search ?? null,
+            p_filters: filter.filters,
+            p_logic: filter.logic,
+            p_sort: filter.sort,
+            p_dir: filter.dir,
+            p_page: filter.page,
+            p_page_size: filter.pageSize,
+          }),
+          "read billing page"
+        );
+      },
+      async totals(range) {
+        return must(
+          await db.rpc("billing_totals", { p_from: range.from, p_to: range.to, p_paid_direct: range.paidDirect }),
+          "read billing totals"
+        );
+      },
+    },
+
+    ledger: {
+      async page(filter) {
+        return must(
+          await db.rpc("tenant_ledger_page", {
+            p_tenant_id: filter.tenantId,
+            p_from: filter.fromDate ?? null,
+            p_to: filter.toDate ?? null,
+            p_search: filter.search ?? null,
+            p_filters: filter.filters,
+            p_logic: filter.logic,
+            p_sort: filter.sort,
+            p_dir: filter.dir,
+            p_page: filter.page,
+            p_page_size: filter.pageSize,
+          }),
+          "read ledger page"
+        );
       },
     },
 

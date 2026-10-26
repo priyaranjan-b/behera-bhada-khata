@@ -5,7 +5,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import FormHelperText from "@mui/material/FormHelperText";
 import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
-import type { Flash } from "@/lib/routes";
+import type { Flash, TenantTab } from "@/lib/routes";
 
 /**
  * "Ask the tenant to acknowledge" for the payment and adjustment forms. The
@@ -46,8 +46,11 @@ export default function NotifyTenantField({
   );
 }
 
-/** The tenant page's flash param after saving, from the API's `notified` (null = not asked). */
-export function recordedFlash(notified: boolean | null): Flash {
-  if (notified === null) return { paymentCreated: "1" };
-  return notified ? { paymentCreated: "sent" } : { notifyFailed: "1" };
+/**
+ * The tenant page's query after saving: the flash, from the API's `notified`
+ * (null = not asked), and the Ledger tab, where the new record is.
+ */
+export function recordedFlash(notified: boolean | null): Flash & { tab: TenantTab } {
+  const flash: Flash = notified === null ? { paymentCreated: "1" } : notified ? { paymentCreated: "sent" } : { notifyFailed: "1" };
+  return { ...flash, tab: "ledger" };
 }

@@ -3,9 +3,12 @@ import type { PaidDirectView } from "@/lib/types";
 import type {
   BillingQuery,
   BillingReceived,
-  BillingReport,
-  ActivityQuery,
+  BillingPage,
+  BillingPageQuery,
+  BillingTotalsView,
   AuditPage,
+  AuditTablePage,
+  AuditTableQuery,
   AdjustPaymentForm,
   AnyTowerTenantForm,
   BulkCreateResult,
@@ -54,6 +57,10 @@ import type {
   SessionTokens,
   TenantAccount,
   TenantDetail,
+  TenantMonthRow,
+  TenantMonthsQuery,
+  TablePage,
+  TenantLedgerQuery,
   TenantLedgerView,
   TenantSearchRow,
   UnitRow,
@@ -82,11 +89,14 @@ export interface ApiQueries {
     /** Tenants behind on rent, most months behind first. */
     defaulters(): Promise<DefaultersReport>;
     /** Rent billed per tenant per month in a range, and the payments for it. */
-    billing(query?: BillingQuery): Promise<BillingReport>;
+    /** One page of the Billing grid for the range, paged, sorted and searched in SQL (A15). */
+    billing(query?: BillingPageQuery): Promise<BillingPage>;
+    /** The Billing stat cards: totals of the whole range. */
+    billingTotals(query?: BillingQuery): Promise<BillingTotalsView>;
     /** Cash received in the same range (its own section of the Billing page, A12). */
     billingReceived(query?: BillingQuery): Promise<BillingReceived>;
-    /** Everything that changed, newest first (audit_log, 0015). */
-    activity(query?: ActivityQuery): Promise<AuditPage>;
+    /** Everything that changed: one page, paged, sorted and searched in SQL (A14). */
+    activity(query?: AuditTableQuery): Promise<AuditTablePage>;
     /** Top-bar search index (tenants and houses). */
     search(): Promise<SearchIndex>;
     /** The owner's name and saved signature (Profile page, app shell). */
@@ -117,10 +127,13 @@ export interface ApiQueries {
       /** The tenant page's profile; its money is in account and ledger (A12). */
       detail(tenantId: string): Promise<TenantDetail>;
       account(tenantId: string): Promise<TenantAccount>;
-      ledger(tenantId: string): Promise<TenantLedgerView>;
+      /** One page of the tenant's rent months, paged, sorted and searched in SQL (A15). */
+      months(tenantId: string, query?: TenantMonthsQuery): Promise<TablePage<TenantMonthRow>>;
+      /** One page of the tenant's ledger, with the all-time running balance (A15). */
+      ledger(tenantId: string, query?: TenantLedgerQuery): Promise<TenantLedgerView>;
       edit(tenantId: string): Promise<EditTenantForm>;
-      /** One tenant's change history; `before` = AuditPage.nextBefore. */
-      history(tenantId: string, before?: number): Promise<AuditPage>;
+      /** One page of a tenant's change history, paged, sorted and searched on the server (A14). */
+      history(tenantId: string, query?: AuditTableQuery): Promise<AuditTablePage>;
       newPayment(tenantId: string): Promise<NewPaymentForm>;
     };
     payments: {

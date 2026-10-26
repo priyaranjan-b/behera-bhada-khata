@@ -75,6 +75,14 @@ export function addMonthsToKey(monthKey: string, months: number): string {
   return `${String(y).padStart(4, "0")}-${String(m + 1).padStart(2, "0")}-01`;
 }
 
+/** The first and last day (yyyy-MM-dd) of the month a key or yyyy-MM falls in. */
+export function monthDayRange(key: string): { from: string; to: string } {
+  const from = monthKeyOf(key);
+  const next = addMonthsToKey(from, 1);
+  const last = new Date(Date.UTC(Number(next.slice(0, 4)), Number(next.slice(5, 7)) - 1, 0)).getUTCDate();
+  return { from, to: `${from.slice(0, 8)}${String(last).padStart(2, "0")}` };
+}
+
 /** Is `value` a real yyyy-MM-dd calendar date? */
 export function isDateKey(value: string): boolean {
   const match = DATE_KEY.exec(value);

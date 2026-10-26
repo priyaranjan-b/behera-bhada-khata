@@ -1,6 +1,6 @@
 ---
 name: add-api-endpoint
-description: Add or change a data operation in Behera Bhada Khata - a new read for a page, a new form submit/mutation, a new field in an API response, or anything that touches the database (tables, columns, migrations, RLS policies, SQL functions, seed data). Starts from docs/database-design.md, then walks the layers (migration -> types -> contract -> port/adapter -> service -> route.ts -> API client -> page) so Supabase stays behind src/server and the API tree keeps mirroring the page tree. Use before writing any data-fetching or database code in this repo.
+description: Add or change a data operation in Behera Bhada Khata - a new read for a page, a new form submit/mutation, a new field in an API response, or anything that touches the database (tables, columns, migrations, RLS policies, SQL functions, seed data). Starts from docs/database-design.md, then walks the layers (migration -> types -> contract -> port/adapter -> service -> route.ts -> API client -> page) so Supabase stays behind src/server and the API tree keeps mirroring the page tree. Includes the recipe for lists that grow every month (history, payments, rent months, billing), which are paged, sorted and searched in SQL. Use before writing any data-fetching or database code in this repo.
 ---
 
 # Add an API endpoint
@@ -100,6 +100,63 @@ Add the path to `src/lib/api-client/paths.ts` (`apiPaths`).
 3. Never import an adapter from a service. Import `ownerDb` / `systemDb` /
    `auth` / `storage` from `@/server/infra`.
 
+## 3a. A list that grows: page it in SQL (A15)
+
+**Which lists:** a list whose rows grow every month (history, payments,
+adjustments, rent months, billing rows) is served one page at a time. The
+database pages, sorts, searches and filters it; JS never loads it all to
+slice. A list fixed by master data (tenants, houses, towers, sites) returns
+every row and the grid does the rest in the browser. The UI half is in
+`build-dashboard-page`.
+
+**Worked examples:** Activity / a tenant's Change history (below), and the
+tenant Months, Ledger and Billing (D28: `tenant_months_page`,
+`tenant_ledger_page`, `billing_page`, built on the 0019 grid helpers
+`grid_check` / `grid_row_matches`, which new tables should reuse). Follow
+it layer by layer:
+
+| Layer | Example |
+|---|---|
+| Query + limits | `GridQueryParams` (`src/lib/domain/gridQuery.ts`); `gridQuerySchema(sortFields, filterFields, defaults)` + extra filters (`auditTableQuerySchema`); `GRID_LIMITS` (page sizes 10/25/50/100, search length, max filters) in `src/lib/validation.ts` |
+| Contract | `AuditTableQuery extends GridQueryParams`; response `{ entries, total, all, page }` (`AuditTablePage`): `total` matching, `all` before filters, `page` as clamped |
+| SQL | `audit_history_page()` in `0018_audit_history_page.sql` |
+| Port / adapter | `audit.historyPage(filter)` → `db.rpc(…)` in `must()` |
+| Service | `historyPage()` in `src/server/services/audit.ts`: `parseInput`, a const map of table field → column (`HISTORY_COLUMNS`), one repository call |
+| Route | unchanged one-liner; query params arrive as strings (`readQuery`) |
+
+**The SQL function** (copy `audit_history_page`):
+- **Security invoker**, so RLS (`is_app_owner()`) decides what the caller
+  sees. Revoke from public/anon/authenticated, then grant execute to
+  `authenticated` on it *and on every helper it calls*.
+- **Validate first:** sort, direction, logic, page ≥ 0, page size in range,
+  and every filter's `field` and `operator` against fixed lists. Anything
+  else raises `BBK00`. Never build SQL from a field name: sort with a
+  `CASE` whitelist in `ORDER BY`, with `id desc` as the tie-break.
+- **Search:** every word must appear in some searchable column, via
+  `ilike '%' || like_escape(w) || '%'` (`like_escape`, 0017, makes `%` and
+  `_` literal). **Filters:** `audit_text_matches(text, operator, value)`
+  (0017) for the grid's text operators, combined with and/or. Drop filters
+  without a value first, or an empty one matches everything under "or".
+- **Counts and paging:** count `all` and `total`, clamp the page to the
+  last one, and return `jsonb_build_object('rows', …, 'total', …, 'all', …, 'page', …)`.
+- **Searchable text must be in columns.** Search and sort only make sense
+  on what the user sees. If a shown value is built in JS (a label, a
+  formatted amount), either store the display text with the row at write
+  time (D27: `audit_log.title`/`details`, filled by a `BEFORE INSERT`
+  trigger) or leave that column out of search and sort. Never search raw
+  enum values the user never sees.
+- **Indexes:** the base filter (e.g. `tenant_id`) needs an index ordered
+  like the default sort (`(tenant_id, id desc)`).
+- **Schema tests:**
+  - paging and clamping;
+  - each operator with and/or;
+  - `%` typed literally;
+  - each sort either way;
+  - every extra filter;
+  - a bad sort/filter → `BBK00`;
+  - a non-owner → no rows;
+  - anon → `42501`.
+
 ## 4. Service
 
 In `src/server/services/<domain>.ts` (start the file with `import "server-only"`):
@@ -114,7 +171,7 @@ In `src/server/services/<domain>.ts` (start the file with `import "server-only"`
 - Don't import `next/*`, `@supabase/*` or `twilio`; ESLint blocks them. Send
   messages through `messaging` / `notifyTenant`, read config via `env()`.
 - Keep pure calculations in `src/lib/domain/*` (`allocation.ts`,
-  `reports.ts`, `tenantLedger.ts`) when the browser needs them too, with a
+  `reports.ts`, `billing.ts`) when the browser needs them too, with a
   colocated `*.test.ts`. Dates come from `src/lib/dates.ts` (app time zone).
 - A write that touches more than one row, or moves money, is a Postgres
   function in a new migration (see `0004_ledger_integrity.sql`): one
@@ -226,6 +283,8 @@ with a readable `error` for invalid input.
 - [ ] Service validates every input and id; limits and enums are shared
       constants; no duplicated helper from another service.
 - [ ] A test in `test/services/` (and `test/schema.test.ts` for SQL).
+- [ ] A list that grows every month is paged, sorted and searched in SQL
+      (3a); a master-data list returns every row.
 - Don't read-modify-write a balance in JS; let SQL do `x = x + delta`.
 - Don't reintroduce `owner_id` columns or owner filters. Ownership is the single
   `app_owner` row (see `docs/database-design.md`, D1).

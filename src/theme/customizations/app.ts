@@ -3,7 +3,7 @@
 // index.ts merges these per component (variants are appended, not replaced).
 import { alpha, type Components, type Theme } from "@mui/material/styles";
 import { chipClasses } from "@mui/material/Chip";
-import { brand, gray, orange } from "../themePrimitives";
+import { brand, gray, orange, red } from "../themePrimitives";
 import { cardShadows, lightSurfaces, slate } from "../appTokens";
 
 declare module "@mui/material/Chip" {
@@ -189,7 +189,30 @@ export const appCustomizations: Components<Theme> = {
       },
     ],
   },
-  MuiButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
+  MuiButton: {
+    variants: [
+      { props: {}, style: coarsePointerTarget },
+      // The template's outlined style greys every colour but secondary; a
+      // destructive action (Move out) must read as one before it's tapped.
+      {
+        props: { variant: "outlined", color: "error" },
+        style: ({ theme }) => ({
+          color: red[400],
+          borderColor: red[200],
+          backgroundColor: red[50],
+          "&:hover": { borderColor: red[300], backgroundColor: red[100] },
+          "&:active": { backgroundColor: alpha(red[200], 0.7) },
+          ...theme.applyStyles("dark", {
+            color: red[300],
+            borderColor: red[700],
+            backgroundColor: alpha(red[900], 0.4),
+            "&:hover": { borderColor: red[500], backgroundColor: alpha(red[800], 0.6) },
+            "&:active": { backgroundColor: alpha(red[800], 0.8) },
+          }),
+        }),
+      },
+    ],
+  },
   MuiToggleButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
   MuiIconButton: {
     variants: [{ props: {}, style: { "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 } } }],

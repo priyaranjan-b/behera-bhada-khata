@@ -156,8 +156,8 @@ describe("viewing proofs", () => {
   });
 
   it("lists a payment's proofs on its ledger row", async () => {
-    const { ledger } = await getTenantLedger(ctx, "00000000-0000-4000-8000-000000000101");
-    const row = ledger.find((r) => r.refId === "00000000-0000-4000-8000-000000000201");
+    const { rows } = await getTenantLedger(ctx, "00000000-0000-4000-8000-000000000101", {});
+    const row = rows.find((r) => r.refId === "00000000-0000-4000-8000-000000000201");
     expect(row?.proofs).toEqual([{ id: PROOF_ID, fileName: "UPI.jpg", contentType: "image/jpeg" }]);
   });
 
@@ -202,7 +202,7 @@ describe("instant confirmation (0010)", () => {
     expect((await getNewPaymentForm(ctx, tenantId)).tenantMessaging).toBe(true);
     await withoutTwilio();
     expect((await getNewPaymentForm(ctx, tenantId)).tenantMessaging).toBe(false);
-    expect((await getTenantLedger(ctx, tenantId)).tenantMessaging).toBe(false);
+    expect((await getTenantLedger(ctx, tenantId, {})).tenantMessaging).toBe(false);
     expect((await createPayment(ctx, tenantId, body)).notified).toBe(false);
     expect(fakes.messaging.send).not.toHaveBeenCalled();
     expect(fakes.owner.payments.create).toHaveBeenCalled();

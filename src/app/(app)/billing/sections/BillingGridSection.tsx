@@ -1,8 +1,16 @@
-import type { BillingReport } from "@/lib/contracts";
+import type { BillingPage, BillingQuery } from "@/lib/contracts";
 import BillingGrid from "../BillingGrid";
 
-/** Billing: every tenant's rent for each month in the range, with what paid it. */
-export default async function BillingGridSection({ report, rangeLabel }: { report: Promise<BillingReport>; rangeLabel: string }) {
-  const { rows } = await report;
-  return <BillingGrid rows={rows} rangeLabel={rangeLabel} />;
+/** Billing: every tenant's rent for each month in the range, with what paid it - one page at a time (A15). */
+export default async function BillingGridSection({
+  grid,
+  query,
+  rangeLabel,
+}: {
+  grid: Promise<BillingPage>;
+  /** The range and paid-direct view the page shows; the grid pages within it. */
+  query: BillingQuery;
+  rangeLabel: string;
+}) {
+  return <BillingGrid initial={await grid} query={query} rangeLabel={rangeLabel} />;
 }

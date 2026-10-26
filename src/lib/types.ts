@@ -512,6 +512,12 @@ export interface Database {
           /** {column: [old, new]} - only what changed. */
           changes: Record<string, [unknown, unknown]>;
           context: Record<string, unknown>;
+          /** 0017: the text the history shows, written once on insert (D27). */
+          title: string;
+          /** The changed values as shown, lines joined with " · ". */
+          details: string;
+          /** The owner's name at the time, or Tenant / System / Not signed in. */
+          actor_name: string;
         };
         Insert: never;
         Update: never;
@@ -645,9 +651,155 @@ export interface Database {
         };
         Returns: undefined;
       };
+      /** 0018: one page of history (a tenant's, or all of it), searched, filtered and sorted in SQL (A14). */
+      audit_history_page: {
+        Args: {
+          p_tenant_id?: string | null;
+          p_actions?: AuditAction[] | null;
+          p_from?: string | null;
+          p_to?: string | null;
+          p_search?: string | null;
+          p_filters?: { field: AuditTextColumn; operator: string; value?: string }[];
+          p_logic?: "and" | "or";
+          p_sort?: "at" | Exclude<AuditTextColumn, "details">;
+          p_dir?: "asc" | "desc";
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: { rows: AuditLogEntry[]; total: number; all: number; page: number };
+      };
+      /** 0021: one page of the Billing grid: tenants × months in the range, plus paid-direct months (A15). */
+      billing_page: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_paid_direct?: boolean;
+          p_show?: string;
+          p_search?: string | null;
+          p_filters?: { field: "month" | "tenant" | "status" | "payments"; operator: string; value?: string }[];
+          p_logic?: "and" | "or";
+          p_sort?: "period_month" | "tenant_name" | "amount_due" | "amount_allocated" | "balance" | "status";
+          p_dir?: "asc" | "desc";
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: { rows: BillingDbRow[]; total: number; all: number; page: number };
+      };
+      /** 0021: the Billing stat cards for the whole range. */
+      billing_totals: {
+        Args: { p_from: string; p_to: string; p_paid_direct?: boolean };
+        Returns: BillingTotalsDb;
+      };
+      /** 0022: the tenant page's account figures (D29). */
+      tenant_account_summary: {
+        Args: { p_tenant_id: string };
+        Returns: TenantAccountSummaryDb;
+      };
+      /** 0020: one page of a tenant's ledger, with the all-time running balance (A15). */
+      tenant_ledger_page: {
+        Args: {
+          p_tenant_id: string;
+          p_from?: string | null;
+          p_to?: string | null;
+          p_search?: string | null;
+          p_filters?: { field: "date" | "description" | "status"; operator: string; value?: string }[];
+          p_logic?: "and" | "or";
+          p_sort?: "date" | "description" | "status" | "debit" | "credit" | "balance";
+          p_dir?: "asc" | "desc";
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: { rows: TenantLedgerDbRow[]; total: number; all: number; page: number };
+      };
+      /** 0019: one page of a tenant's rent months (A15). */
+      tenant_months_page: {
+        Args: {
+          p_tenant_id: string;
+          p_show?: string;
+          p_search?: string | null;
+          p_filters?: { field: "month" | "status"; operator: string; value?: string }[];
+          p_logic?: "and" | "or";
+          p_sort?: "period_month" | "amount_due" | "amount_allocated" | "status";
+          p_dir?: "asc" | "desc";
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: { rows: TenantMonthDbRow[]; total: number; all: number; page: number };
+      };
     };
   };
 }
+
+/** A row of tenant_months_page (0019): a rent month as the Months table shows it. */
+export interface TenantMonthDbRow {
+  id: string;
+  period_month: string;
+  amount_due: number;
+  amount_allocated: number;
+  status: PeriodStatus;
+  display_status: PeriodStatus | "not_due_yet";
+  /** "October 2026". */
+  month_label: string;
+}
+
+/** A row of billing_page (0021): one tenant's rent for one month, or a paid-direct month. */
+export interface BillingDbRow {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  property_name: string;
+  unit_codes: string[];
+  period_month: string;
+  month_label: string;
+  amount_due: number;
+  amount_allocated: number;
+  balance: number;
+  status: PeriodStatus;
+  not_yet_due: boolean;
+  paid_direct: boolean;
+  payments: { payment_id: string; receipt_no: string | null; payment_date: string; mode: PaymentMode; amount: number }[];
+}
+
+/** billing_totals (0021): the range's stat cards. */
+export interface BillingTotalsDb {
+  billed: number;
+  collected: number;
+  balance: number;
+  overdue: number;
+  collection_rate: number | null;
+  tenants: number;
+}
+
+/** tenant_account_summary (0022): the tenant page's account figures. */
+export interface TenantAccountSummaryDb {
+  /** Unpaid on months that have ended. */
+  total_outstanding: number;
+  overdue_months: number;
+  /** Unpaid on this month and later. */
+  not_yet_due: number;
+  ended_months: number;
+  paid_ended_months: number;
+  can_stop_rent_tracking: boolean;
+}
+
+/** A row of tenant_ledger_page (0020). */
+export interface TenantLedgerDbRow {
+  id: string;
+  type: "charge" | "payment" | "adjustment";
+  date: string;
+  description: string;
+  caption: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  status: "billed" | "upcoming" | "confirmed" | "pending";
+  ref_id: string | null;
+  receipt_no: string | null;
+  acknowledged: boolean | null;
+}
+
+/** The text columns audit_history_page searches and filters (0018); tenant_name is read from tenants. */
+export type AuditTextColumn = "actor_name" | "title" | "tenant_name" | "unit_code" | "details";
 
 export type OwnerProfile = Database["public"]["Tables"]["owner_profile"]["Row"];
 export type Location = Database["public"]["Tables"]["locations"]["Row"];

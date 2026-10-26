@@ -19,14 +19,16 @@ import BillingStats, { BILLING_STAT_CELL } from "./sections/BillingStats";
 import ReceivedStat from "./sections/ReceivedStat";
 
 // The page loads in sections (A12): the range comes straight from the URL, so
-// the header, the range form and the switch render at once; the months (grid
-// and totals) and the cash received stream in on their own calls.
+// the header, the range form and the switch render at once; the totals, the
+// grid (one page at a time, paged in SQL, A15) and the cash received stream
+// in on their own calls.
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   const params = await searchParams;
   const paidDirect = paidDirectViewOf((await cookies()).get(PAID_DIRECT_COOKIE)?.value);
   const range = rangeFromParams(params, currentMonthKey(), BILLING_LIMITS.maxMonths);
   const query = { ...rangeQuery(range), paidDirect };
-  const report = serverApi.dashboard.billing(query);
+  const totals = serverApi.dashboard.billingTotals(query);
+  const grid = serverApi.dashboard.billing(query);
   const received = serverApi.dashboard.billingReceived(query);
   const paidDirectState = serverApi.dashboard.paidDirect({ paidDirect });
 
@@ -59,7 +61,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
       <Grid container spacing={2} columns={12}>
         <AsyncSection key={view} title="Billing totals" fallback={SKELETON.stats}>
-          <BillingStats report={report} rangeLabel={rangeLabel} />
+          <BillingStats totals={totals} rangeLabel={rangeLabel} />
         </AsyncSection>
         <Grid size={BILLING_STAT_CELL}>
           <AsyncSection key={view} title="Received" fallback={SKELETON.received}>
@@ -69,7 +71,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </Grid>
 
       <AsyncSection key={view} title="Billing" fallback={SKELETON.grid}>
-        <BillingGridSection report={report} rangeLabel={rangeLabel} />
+        <BillingGridSection grid={grid} query={query} rangeLabel={rangeLabel} />
       </AsyncSection>
     </Stack>
   );

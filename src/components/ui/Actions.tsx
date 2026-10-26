@@ -1,13 +1,44 @@
 "use client";
 
 import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
-/** Button group: full-width stack on phones, a row from `sm`. */
-export function ActionStack({ align = "end", children }: { align?: "start" | "end"; children: React.ReactNode }) {
+/**
+ * Button group: a row from `sm`. On phones, `phone="stack"` stacks every
+ * button full width; `phone="primaryOnTop"` puts the last button (the
+ * primary, right-most on desktop) full width on top and pairs the rest two
+ * to a row below it.
+ */
+export function ActionStack({
+  align = "end",
+  phone = "stack",
+  children,
+}: {
+  align?: "start" | "end";
+  phone?: "stack" | "primaryOnTop";
+  children: React.ReactNode;
+}) {
+  if (phone === "primaryOnTop") {
+    return (
+      <Box
+        sx={{
+          display: { xs: "grid", sm: "flex" },
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 1.5,
+          justifyContent: align === "end" ? "flex-end" : "flex-start",
+          width: { xs: "100%", sm: "auto" },
+          "& > :last-child": { gridColumn: "1 / -1", order: { xs: -1, sm: 0 } },
+          "& > *": { width: { xs: "100%", sm: "auto" } },
+        }}
+      >
+        {children}
+      </Box>
+    );
+  }
   return (
     <Stack
       direction={{ xs: "column", sm: "row" }}

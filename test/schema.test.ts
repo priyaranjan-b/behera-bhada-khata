@@ -9,6 +9,20 @@ import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { addMonthsToKey, currentMonthKey, formatDateKey, formatDateTime, formatMonth } from "@/lib/dates";
+import { monthsIn, paidDirectMonths } from "@/lib/domain/billing";
+import { summarizeBalance } from "@/lib/domain/allocation";
+import { auditActionLabel } from "@/lib/domain/audit";
+import { PAYMENT_MODE_LABELS } from "@/lib/domain/payments";
+import {
+  PREFERRED_CHANNEL_LABELS,
+  TENANT_KIND_LABELS,
+  TENANT_STATUS_DISPLAY,
+  UNIT_TYPE_LABELS,
+  formatFloor,
+} from "@/lib/domain/tenant";
+import { formatMoney } from "@/lib/money";
+import { AUDIT_ACTIONS } from "@/lib/types";
 
 const MIGRATIONS = path.resolve(__dirname, "../supabase/migrations");
 const SEED = path.resolve(__dirname, "../supabase/seed/arnapal_master_data.sql");
@@ -1365,5 +1379,608 @@ describe("government tenants with untracked rent (0016)", () => {
     await createPayment(owner(OWNER_A), { tenant: id, amount: 20000, allocations: [{ rent_period_id: march.id, amount: 20000 }] });
     expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]))).toBe("BBK09");
     expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [fx.tenantA]))).toBe("BBK09");
+  });
+});
+
+describe("stored audit text (0017)", () => {
+  type Text = { action: string; title: string; details: string; actor_name: string };
+  const texts = async (filter = "true", params: unknown[] = []) =>
+    (await db.query<Text>(`select action, title, details, actor_name from audit_log where ${filter} order by id`, params))
+      .rows;
+  const sql = async (expr: string, params: unknown[] = []) =>
+    (await db.query<{ v: string }>(`select ${expr} as v`, params)).rows[0].v;
+
+  it("formats money, dates and times exactly as the app does", async () => {
+    for (const amount of [0, 5, 999.5, 5000, 30000, 123456.78, 1234567.5, 100000000, -500, -123456]) {
+      expect(await sql(`audit_money($1)`, [amount])).toBe(formatMoney(amount));
+    }
+    for (const day of ["2026-01-05", "2026-06-30", "2026-07-01", "2026-09-05", "2026-12-31"]) {
+      expect(await sql(`audit_date($1::date)`, [day])).toBe(formatDateKey(day));
+      expect(await sql(`audit_month($1::date)`, [day])).toBe(formatMonth(day));
+    }
+    for (const at of ["2026-10-26T13:20:00Z", "2026-06-01T00:05:00Z", "2026-09-28T06:30:00Z", "2026-07-01T18:30:00Z"]) {
+      expect(await sql(`audit_datetime($1::timestamptz)`, [at])).toBe(formatDateTime(at));
+    }
+  });
+
+  it("uses the app's labels for every action and value", async () => {
+    for (const action of AUDIT_ACTIONS) {
+      expect(await sql(`audit_action_label($1)`, [action])).toBe(auditActionLabel(action));
+    }
+    const value = (v: string, format: string) => sql(`audit_value(to_jsonb($1::text), $2)`, [v, format]);
+    for (const [k, d] of Object.entries(TENANT_STATUS_DISPLAY)) expect(await value(k, "status")).toBe(d.label);
+    for (const [k, label] of Object.entries(TENANT_KIND_LABELS)) expect(await value(k, "kind")).toBe(label);
+    for (const [k, label] of Object.entries(PREFERRED_CHANNEL_LABELS)) expect(await value(k, "channel")).toBe(label);
+    for (const [k, label] of Object.entries(UNIT_TYPE_LABELS)) expect(await value(k, "unitType")).toBe(label);
+    for (const [k, label] of Object.entries(PAYMENT_MODE_LABELS)) expect(await value(k, "mode")).toBe(label);
+    for (const floor of ["G", "B", "B2", "1", "12"]) expect(await value(floor, "floor")).toBe(formatFloor(floor));
+  });
+
+  it("writes the text of a table change when it happens", async () => {
+    await db.exec(`truncate audit_log`);
+    const rent = (amount: number) =>
+      as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, '+919876543210', 'both', null, null, $2, '2026-03-01', null)`, [
+        fx.tenantA,
+        amount,
+      ]);
+    await rent(6000);
+    await rent(6500);
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    await as(owner(OWNER_A), `select move_out_tenant($1, '2026-02-28')`, [fx.tenantA]);
+    const rows = await texts();
+    expect(rows.find((r) => r.action === "rent_rate.changed")).toMatchObject({
+      title: "Rent changed",
+      details: "Monthly rent: ₹6,000.00 → ₹6,500.00",
+      actor_name: "Owner",
+    });
+    expect(rows.find((r) => r.action === "rent_rate.set")?.details).toBe("From month: March 2026 · Monthly rent: ₹6,000.00");
+    expect(rows.find((r) => r.action === "payment.recorded")?.details).toMatch(
+      /^Receipt: \d{4}\/\d{2}\/\d{3} · Amount: ₹5,000\.00 · Paid on: 5 Mar 2026 · Mode: Cash$/
+    );
+    const movedOut = rows.find((r) => r.action === "tenant.moved_out");
+    expect(movedOut?.title).toBe("Moved out");
+    expect(movedOut?.details).toContain("Status: Active → Moved out");
+    expect(movedOut?.details).toContain("Moved out on: — → 28 Feb 2026");
+    expect(rows.map((r) => r.details).join("\n")).not.toMatch(/inactive|bank_transfer|\d{4}-\d{2}-\d{2}/);
+  });
+
+  it("names the owner from their profile, and the tenant and the system by role", async () => {
+    await as(owner(OWNER_A), `insert into owner_profile (first_name, last_name) values ('Ramesh', 'Sahu')`);
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `update units set label = 'Chemist' where unit_code = 'AC-T1-G01'`);
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    await acknowledge("payment", await latestPaymentId());
+    await as(
+      service,
+      `select log_event('auth.sign_in_failed', null, null, null, '{"method":"password","reason":"wrong_password"}', 'visitor')`
+    );
+    expect((await texts()).map((r) => [r.title, r.actor_name, r.details])).toEqual([
+      ["House details changed", "Ramesh Sahu", "Label: — → Chemist"],
+      ["Payment recorded", "Ramesh Sahu", expect.stringContaining("Amount: ₹5,000.00")],
+      ["Payment acknowledged by tenant", "Tenant", expect.stringMatching(/^Acknowledged: — → \d+ \w+ \d{4}, \d+:\d\d [ap]m IST$/)],
+      ["Failed sign-in", "Not signed in", "Password · Wrong password"],
+    ]);
+  });
+
+  it("writes the text of app events from their context", async () => {
+    await db.exec(`truncate audit_log`);
+    await as(
+      owner(OWNER_A),
+      `select log_event('message.sent', $1, 'payment', 'p1', '{"channel":"sms","delivered":false,"receiptNo":"2026/03/001"}')`,
+      [fx.tenantA]
+    );
+    await as(owner(OWNER_A), `select log_event('message.sent', $1, 'payment', 'p1', '{"channel":"both","delivered":true}')`, [
+      fx.tenantA,
+    ]);
+    await as(owner(OWNER_A), `insert into owner_profile (first_name, signature_path) values ('Ramesh', 'owner/a.png')`);
+    await as(owner(OWNER_A), `update owner_profile set signature_path = 'owner/b.png'`);
+    expect((await texts()).map((r) => [r.title, r.details])).toEqual([
+      ["Link not delivered to tenant", "SMS · not delivered · Receipt 2026/03/001"],
+      ["Link sent to tenant", "WhatsApp + SMS · delivered"],
+      ["Profile set up", "First name: Ramesh · Saved signature added"],
+      ["Profile changed", "Saved signature replaced"],
+    ]);
+  });
+
+  it("has text on every row, and the text can't be rewritten", async () => {
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from audit_log where title is null or details is null or actor_name is null`
+    );
+    expect(rows[0].n).toBe(0);
+    expect(await errorCode(db.query(`update audit_log set title = 'x'`))).toBe("BBK09");
+  });
+
+  describe("audit_history_page", () => {
+    type Page = {
+      rows: { id: number; title: string; details: string; unit_code: string | null }[];
+      total: number;
+      all: number;
+      page: number;
+    };
+    const page = async (args: Record<string, unknown> = {}, who: Role = owner(OWNER_A)) => {
+      const names = Object.keys(args);
+      const named = names.map((n, i) => `, p_${n} => $${i + 2}`).join("");
+      const [row] = await as<{ v: Page }>(who, `select audit_history_page(p_tenant_id => $1${named}) as v`, [
+        fx.tenantA,
+        ...names.map((n) => args[n]),
+      ]);
+      return row.v;
+    };
+    const details = (p: Page) => p.rows.map((r) => r.details);
+    const filters = (items: unknown[]) => JSON.stringify(items);
+
+    beforeEach(async () => {
+      await db.exec(`truncate audit_log`);
+      for (let i = 1; i <= 25; i++) {
+        const receiptNo = `2026/03/${String(i).padStart(3, "0")}`;
+        await as(owner(OWNER_A), `select log_event('receipt.downloaded', $1, 'payment', 'p', $2::jsonb)`, [
+          fx.tenantA,
+          JSON.stringify({ receiptNo }),
+        ]);
+      }
+      await as(owner(OWNER_A), `select log_event('receipt.downloaded', $1)`, [fx.tenantA2]);
+    });
+
+    it("returns one page, newest first, with the counts, and the last page when past the end", async () => {
+      const first = await page();
+      expect(first).toMatchObject({ total: 25, all: 25, page: 0 });
+      expect(first.rows).toHaveLength(10);
+      expect(details(first)[0]).toBe("Receipt 2026/03/025");
+      expect(details(await page({ page: 2 }))).toEqual([
+        "Receipt 2026/03/005",
+        "Receipt 2026/03/004",
+        "Receipt 2026/03/003",
+        "Receipt 2026/03/002",
+        "Receipt 2026/03/001",
+      ]);
+      expect((await page({ page: 9 })).page).toBe(2);
+      expect((await page({ page_size: 25 })).rows).toHaveLength(25);
+    });
+
+    it("searches every word in who, what, house and details, taking % and _ literally", async () => {
+      expect(details(await page({ search: "2026/03/007" }))).toEqual(["Receipt 2026/03/007"]);
+      expect((await page({ search: "owner downloaded 2026/03/01" })).total).toBe(10);
+      expect((await page({ search: "%" })).total).toBe(0);
+      expect((await page({ search: "_" })).total).toBe(0);
+      expect((await page({ search: "nothing like this" })).total).toBe(0);
+    });
+
+    it("applies column filters with and / or, Show and the dates", async () => {
+      const ends = (value: string) => ({ field: "details", operator: "endsWith", value });
+      expect((await page({ filters: filters([ends("009")]) })).total).toBe(1);
+      expect((await page({ filters: filters([ends("009"), ends("010")]) })).total).toBe(0);
+      expect((await page({ filters: filters([ends("009"), ends("010")]), logic: "or" })).total).toBe(2);
+      expect((await page({ filters: filters([{ field: "unit_code", operator: "isNotEmpty" }]) })).total).toBe(0);
+      expect((await page({ filters: filters([{ field: "title", operator: "contains", value: "" }]), logic: "or" })).total).toBe(25);
+      expect((await page({ actions: ["tenant.updated"] })).total).toBe(0);
+      expect((await page({ actions: ["receipt.downloaded"] })).total).toBe(25);
+      expect((await page({ from: "2999-01-01" })).total).toBe(0);
+    });
+
+    it("sorts by a column either way, ties newest first", async () => {
+      expect(details(await page({ sort: "title", dir: "asc" }))[0]).toBe("Receipt 2026/03/025");
+      expect(details(await page({ sort: "at", dir: "asc" }))[0]).toBe("Receipt 2026/03/001");
+    });
+
+    it("refuses a bad query, and shows nothing to anyone but the owner", async () => {
+      expect(await errorCode(page({ sort: "changes" }))).toBe("BBK00");
+      expect(await errorCode(page({ page_size: 500 }))).toBe("BBK00");
+      expect(await errorCode(page({ filters: filters([{ field: "changes", operator: "contains", value: "x" }]) }))).toBe("BBK00");
+      expect(await page({}, owner(OWNER_B))).toMatchObject({ rows: [], total: 0, all: 0 });
+      expect(await errorCode(page({}, { role: "anon" } as unknown as Role))).toBe("42501");
+    });
+
+    it("pages the whole log without a tenant, and searches, filters and sorts by tenant name", async () => {
+      // A business name wins over the person's name, as tenantDisplayName does.
+      await db.query(`update tenants set business_name = 'Lotus Prints' where id = $1`, [fx.tenantA2]);
+      const whole = async (args: Record<string, unknown> = {}) => {
+        const names = Object.keys(args);
+        const named = names.map((n, i) => `${i ? ", " : ""}p_${n} => $${i + 1}`).join("");
+        const [row] = await as<{ v: Page }>(owner(OWNER_A), `select audit_history_page(${named}) as v`, names.map((n) => args[n]));
+        return row.v;
+      };
+      // 25 receipts for Asha, one for Lotus Prints, and the business-name edit.
+      expect(await whole()).toMatchObject({ total: 27, all: 27, page: 0 });
+      expect((await whole({ search: "lotus" })).total).toBe(2);
+      expect((await whole({ search: "bimal" })).total).toBe(0);
+      expect((await whole({ filters: filters([{ field: "tenant_name", operator: "equals", value: "asha" }]) })).total).toBe(25);
+      const byTenant = await whole({ sort: "tenant_name", dir: "desc" });
+      // Lotus Prints first: its name edit (newest), then its receipt download (no receipt number).
+      expect(byTenant.rows.slice(0, 2).map((r) => [r.title, r.details])).toEqual([
+        ["Tenant details changed", "Business: — → Lotus Prints"],
+        ["Receipt downloaded", ""],
+      ]);
+      expect((await whole({ sort: "tenant_name", dir: "asc", page_size: 25 })).rows.every((r) => r.details.startsWith("Receipt"))).toBe(
+        true
+      );
+      expect(await errorCode(whole({ sort: "tenant" }))).toBe("BBK00");
+    });
+  });
+});
+
+describe("tenant_months_page (0019)", () => {
+  type MonthsPage = {
+    rows: { period_month: string; amount_due: number; amount_allocated: number; display_status: string; month_label: string }[];
+    total: number;
+    all: number;
+    page: number;
+  };
+  const months = async (args: Record<string, unknown> = {}, who: Role = owner(OWNER_A)) => {
+    const names = Object.keys(args);
+    const named = names.map((n, i) => `, p_${n} => $${i + 2}`).join("");
+    const [row] = await as<{ v: MonthsPage }>(who, `select tenant_months_page(p_tenant_id => $1${named}) as v`, [
+      fx.tenantA,
+      ...names.map((n) => args[n]),
+    ]);
+    return row.v;
+  };
+  const labels = (p: MonthsPage) => p.rows.map((r) => r.month_label);
+
+  beforeEach(async () => {
+    // Jan-Mar 2026 (ended: owed) and, billed ahead, Oct 2026 onwards (not due yet while current).
+    await as(service, `select ensure_rent_periods($1::uuid[], '2027-02-01')`, [[fx.tenantA]]);
+    // January paid, February partly paid.
+    await createPayment(owner(OWNER_A), {
+      amount: 7000,
+      allocations: [
+        { rent_period_id: fx.periods[0].id, amount: 5000 },
+        { rent_period_id: fx.periods[1].id, amount: 2000 },
+      ],
+    });
+  });
+
+  it("pages the months newest first, with the counts and the labels the app shows", async () => {
+    const first = await months({ page_size: 10 });
+    expect(first.all).toBe(14);
+    expect(first).toMatchObject({ total: 14, page: 0 });
+    expect(labels(first)[0]).toBe("February 2027");
+    const last = await months({ page: 1, page_size: 10 });
+    expect(labels(last)).toEqual(["April 2026", "March 2026", "February 2026", "January 2026"]);
+    expect(last.rows.map((r) => r.display_status)).toEqual(["pending", "pending", "partially_paid", "paid"]);
+    expect((await months({ page: 7 })).page).toBe(1);
+  });
+
+  it("shows unpaid, partly paid, paid and not-due-yet months", async () => {
+    const shown = async (show: string) => labels(await months({ show, page_size: 100 }));
+    expect(await shown("paid")).toEqual(["January 2026"]);
+    expect(await shown("partly")).toEqual(["February 2026"]);
+    expect((await shown("unpaid")).at(-1)).toBe("February 2026");
+    const notDue = await months({ show: "notDue", page_size: 100 });
+    expect(notDue.rows.every((r) => r.display_status === "not_due_yet")).toBe(true);
+    expect(notDue.total + (await months({ show: "unpaid", page_size: 100 })).total + 1).toBe(14);
+  });
+
+  it("searches and filters the month and status labels, and sorts any column", async () => {
+    expect(labels(await months({ search: "march" }))).toEqual(["March 2026"]);
+    expect(labels(await months({ search: "2026 partially" }))).toEqual(["February 2026"]);
+    expect((await months({ search: "%" })).total).toBe(0);
+    const filters = JSON.stringify([{ field: "status", operator: "equals", value: "paid" }]);
+    expect(labels(await months({ filters }))).toEqual(["January 2026"]);
+    expect(labels(await months({ sort: "amount_allocated", dir: "desc" })).slice(0, 2)).toEqual(["January 2026", "February 2026"]);
+    expect(labels(await months({ sort: "period_month", dir: "asc" }))[0]).toBe("January 2026");
+  });
+
+  it("refuses a bad query, and shows nothing to anyone but the owner", async () => {
+    expect(await errorCode(months({ sort: "id" }))).toBe("BBK00");
+    expect(await errorCode(months({ show: "everything" }))).toBe("BBK00");
+    expect(await errorCode(months({ filters: JSON.stringify([{ field: "id", operator: "contains", value: "x" }]) }))).toBe("BBK00");
+    expect(await months({}, owner(OWNER_B))).toMatchObject({ rows: [], total: 0, all: 0 });
+    expect(await errorCode(months({}, { role: "anon" } as unknown as Role))).toBe("42501");
+  });
+});
+
+describe("tenant_ledger_page (0020)", () => {
+  type LedgerDbRow = {
+    id: string;
+    type: string;
+    date: string;
+    description: string;
+    caption: string;
+    debit: number;
+    credit: number;
+    balance: number;
+    status: string;
+    receipt_no: string | null;
+  };
+  type LedgerPage = { rows: LedgerDbRow[]; total: number; all: number; page: number };
+  const ledger = async (args: Record<string, unknown> = {}, who: Role = owner(OWNER_A)) => {
+    const names = Object.keys(args);
+    const named = names.map((n, i) => `, p_${n} => $${i + 2}`).join("");
+    const [row] = await as<{ v: LedgerPage }>(who, `select tenant_ledger_page(p_tenant_id => $1${named}) as v`, [
+      fx.tenantA,
+      ...names.map((n) => args[n]),
+    ]);
+    return row.v;
+  };
+  const pay = (date: string, amount: number, periodId: string) =>
+    as(
+      owner(OWNER_A),
+      `select create_payment(gen_random_uuid(), $1, $2, $3, 'bank_transfer', 'NEFT', 'sig.png',
+         md5(random()::text), now() + interval '14 days', $4::jsonb)`,
+      [fx.tenantA, amount, date, JSON.stringify([{ rent_period_id: periodId, amount }])]
+    );
+  const all = async () => (await ledger({ sort: "date", dir: "asc", page_size: 100 })).rows;
+
+  beforeEach(async () => {
+    // Jan 2026 - Jan 2027 at 5,000: the months from this one on are upcoming.
+    await as(service, `select ensure_rent_periods($1::uuid[], '2027-01-01')`, [[fx.tenantA]]);
+    await pay("2026-01-10", 5000, fx.periods[0].id);
+    await pay("2026-03-05", 5000, fx.periods[1].id);
+    // A correction of the January payment: 500 less, so 500 more owed (dated today).
+    const [{ id: janPayment }] = (
+      await db.query<{ id: string }>(`select id from payments where payment_date = '2026-01-10'`)
+    ).rows;
+    await as(
+      owner(OWNER_A),
+      `select create_adjustment(gen_random_uuid(), $1, -500, 'Counted twice', 'sig.png',
+         md5(random()::text), now() + interval '14 days', $2::jsonb)`,
+      [janPayment, JSON.stringify([{ rent_period_id: fx.periods[0].id, amount: -500 }])]
+    );
+  });
+
+  it("builds the journal with the app's text and a running balance over billed, confirmed rows", async () => {
+    const rows = await all();
+    expect(rows.slice(0, 5).map((r) => [r.type, r.date, r.description, r.debit, r.credit, r.balance, r.status])).toEqual([
+      ["charge", "2026-01-01", "Rent due — January 2026", 5000, 0, 5000, "billed"],
+      ["payment", "2026-01-10", "Payment received (bank transfer) — NEFT", 0, 5000, 0, "confirmed"],
+      ["charge", "2026-02-01", "Rent due — February 2026", 5000, 0, 5000, "billed"],
+      ["charge", "2026-03-01", "Rent due — March 2026", 5000, 0, 10000, "billed"],
+      ["payment", "2026-03-05", "Payment received (bank transfer) — NEFT", 0, 5000, 5000, "confirmed"],
+    ]);
+    expect(rows[0].caption).toBe("Charge");
+    expect(rows[1].caption).toMatch(/^#\d{4}\/\d{2}\/\d{3} · not signed by tenant$/);
+
+    // Months from this one on are shown as upcoming and leave the balance alone;
+    // the correction (a debit, dated today) still counts.
+    const upcoming = rows.filter((r) => r.status === "upcoming");
+    expect(upcoming.length).toBeGreaterThanOrEqual(3);
+    const adjustment = rows.find((r) => r.type === "adjustment");
+    expect(adjustment).toMatchObject({ description: "Adjustment — Counted twice", debit: 500, credit: 0, status: "confirmed" });
+    expect(adjustment?.caption).toMatch(/^#ADJ\/\d{4}\/\d{2}\/\d{3} · not signed by tenant$/);
+    const billed = rows.filter((r) => r.type === "charge" && r.status === "billed").length;
+    expect(rows.at(-1)?.balance).toBe(billed * 5000 - 10000 + 500);
+    for (const r of upcoming) expect(r.balance).toBe(rows[rows.indexOf(r) - 1].balance);
+  });
+
+  it("shows the all-time balance on every page and under every filter", async () => {
+    const balances = new Map((await all()).map((r) => [r.id, r.balance]));
+    const page2 = await ledger({ page: 1, page_size: 4 });
+    expect(page2.rows).toHaveLength(4);
+    for (const r of page2.rows) expect(r.balance).toBe(balances.get(r.id));
+    const march = await ledger({ from: "2026-03-01", to: "2026-03-31" });
+    expect(march.rows.map((r) => [r.description, r.balance])).toEqual([
+      ["Payment received (bank transfer) — NEFT", 5000],
+      ["Rent due — March 2026", 10000],
+    ]);
+    expect(march).toMatchObject({ total: 2, all: balances.size });
+  });
+
+  it("searches what the table shows, filters it, and sorts any column", async () => {
+    expect((await ledger({ search: "january" })).rows.map((r) => r.description)).toEqual([
+      "Rent due — January 2027",
+      "Rent due — January 2026",
+    ]);
+    expect((await ledger({ search: "neft 10 jan" })).total).toBe(1);
+    expect((await ledger({ search: "counted" })).rows.map((r) => r.type)).toEqual(["adjustment"]);
+    expect((await ledger({ search: "%" })).total).toBe(0);
+    const filters = JSON.stringify([{ field: "status", operator: "equals", value: "confirmed" }]);
+    expect((await ledger({ filters })).total).toBe(3);
+    expect((await ledger({ sort: "credit", dir: "desc" })).rows[0].credit).toBe(5000);
+    expect((await ledger({ sort: "balance", dir: "asc" })).rows[0].balance).toBe(0);
+    expect((await ledger({ page: 99 })).page).toBeGreaterThan(0);
+  });
+
+  it("refuses a bad query, and shows nothing to anyone but the owner", async () => {
+    expect(await errorCode(ledger({ sort: "ref_id" }))).toBe("BBK00");
+    expect(await errorCode(ledger({ filters: JSON.stringify([{ field: "debit", operator: "equals", value: "1" }]) }))).toBe("BBK00");
+    expect(await ledger({}, owner(OWNER_B))).toMatchObject({ rows: [], total: 0, all: 0 });
+    expect(await errorCode(ledger({}, { role: "anon" } as unknown as Role))).toBe("42501");
+  });
+});
+
+describe("billing_page and billing_totals (0021)", () => {
+  type BillingDbRow = {
+    id: string;
+    tenant_name: string;
+    property_name: string;
+    unit_codes: string[];
+    period_month: string;
+    month_label: string;
+    amount_due: number;
+    amount_allocated: number;
+    balance: number;
+    status: string;
+    not_yet_due: boolean;
+    paid_direct: boolean;
+    payments: { receipt_no: string; payment_date: string; mode: string; amount: number }[];
+  };
+  type BillingPage = { rows: BillingDbRow[]; total: number; all: number; page: number };
+  const billing = async (args: Record<string, unknown> = {}, who: Role = owner(OWNER_A)) => {
+    const full = { from: "2026-01-01", to: "2026-03-01", ...args };
+    const names = Object.keys(full);
+    const named = names.map((n, i) => `p_${n} => $${i + 1}`).join(", ");
+    const [row] = await as<{ v: BillingPage }>(who, `select billing_page(${named}) as v`, names.map((n) => full[n as keyof typeof full]));
+    return row.v;
+  };
+  const totals = async (paidDirect = true, from = "2026-01-01", to = "2026-03-01") =>
+    (await as<{ v: Record<string, number | null> }>(owner(OWNER_A), `select billing_totals($1, $2, $3) as v`, [from, to, paidDirect]))[0].v;
+  const ids = (p: BillingPage) => p.rows.map((r) => `${r.tenant_name} ${r.month_label}`);
+
+  beforeEach(async () => {
+    // A government office paying the owner's bank directly: 20,000 a month from January.
+    await as(
+      owner(OWNER_A),
+      `select create_tenant('Block Office', null, null, 'both', 20000, '2026-01-01', array['AC-T1-G03'], null, null,
+         'government', false)`
+    );
+    // Asha pays January (recorded 5 March).
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+  });
+
+  it("lists each tenant's months with tower, houses and receipts, plus paid-direct months", async () => {
+    const page = await billing({ page_size: 100, sort: "tenant_name", dir: "asc" });
+    expect(page).toMatchObject({ total: 9, all: 9, page: 0 });
+    const asha = page.rows.find((r) => r.tenant_name === "Asha" && r.month_label === "January 2026");
+    expect(asha).toMatchObject({
+      property_name: "Tower 1",
+      unit_codes: ["AC-T1-G01"],
+      amount_due: 5000,
+      amount_allocated: 5000,
+      balance: 0,
+      status: "paid",
+      paid_direct: false,
+    });
+    expect(asha?.payments).toEqual([
+      expect.objectContaining({ payment_date: "2026-03-05", mode: "cash", amount: 5000, receipt_no: expect.stringMatching(/^\d{4}\/\d{2}\/\d{3}$/) }),
+    ]);
+    const direct = page.rows.filter((r) => r.paid_direct);
+    expect(direct.map((r) => [r.tenant_name, r.month_label, r.amount_due, r.amount_allocated, r.status])).toEqual([
+      ["Block Office", "March 2026", 20000, 20000, "paid"],
+      ["Block Office", "February 2026", 20000, 20000, "paid"],
+      ["Block Office", "January 2026", 20000, 20000, "paid"],
+    ]);
+    expect((await billing({ paid_direct: false })).all).toBe(6);
+  });
+
+  it("makes the same paid-direct months as the app, up to two months ahead", async () => {
+    const through = addMonthsToKey(currentMonthKey(), 2);
+    const from = addMonthsToKey(currentMonthKey(), -1);
+    const to = addMonthsToKey(currentMonthKey(), 5);
+    const sql = (await billing({ from, to, show: "paidDirect", page_size: 100, sort: "period_month", dir: "asc" })).rows.map(
+      (r) => [r.period_month, r.amount_due]
+    );
+    const js = paidDirectMonths(
+      { leaseStart: "2026-01-01", movedOutOn: null },
+      [{ effective_month: "2026-01-01", monthly_amount: 20000 }],
+      monthsIn({ from, to }),
+      through
+    ).map((m) => [m.month, m.amount]);
+    expect(sql).toEqual(js);
+    expect(sql.at(-1)?.[0]).toBe(through);
+  });
+
+  it("shows unpaid, partly paid, paid and paid-direct months, and searches what the table shows", async () => {
+    expect((await billing({ show: "paid" })).total).toBe(4);
+    expect((await billing({ show: "paidDirect" })).total).toBe(3);
+    expect((await billing({ show: "unpaid" })).total).toBe(5);
+    expect((await billing({ show: "partly" })).total).toBe(0);
+    expect((await billing({ search: "bimal" })).total).toBe(3);
+    expect((await billing({ search: "tower 1 march" })).total).toBe(3);
+    expect(ids(await billing({ search: "5 mar 2026" }))).toEqual(["Asha January 2026"]);
+    expect((await billing({ search: "%" })).total).toBe(0);
+    const filters = JSON.stringify([{ field: "status", operator: "equals", value: "Paid direct" }]);
+    expect((await billing({ filters })).total).toBe(3);
+  });
+
+  it("sorts by need (status, then balance) and by any column", async () => {
+    const byNeed = await billing({ sort: "status", dir: "desc", page_size: 100 });
+    expect(byNeed.rows.slice(0, 2).map((r) => [r.tenant_name, r.status, r.balance])).toEqual([
+      ["Asha", "pending", 5000],
+      ["Asha", "pending", 5000],
+    ]);
+    expect(byNeed.rows.at(-1)?.paid_direct).toBe(true);
+    expect((await billing({ sort: "amount_due", dir: "asc" })).rows[0].amount_due).toBe(4000);
+    expect((await billing({ page: 50, page_size: 4 })).page).toBe(2);
+  });
+
+  it("totals the whole range for the stat cards", async () => {
+    expect(await totals()).toEqual({
+      billed: 87000,
+      collected: 65000,
+      balance: 22000,
+      overdue: 22000,
+      collection_rate: 75,
+      tenants: 3,
+    });
+    expect(await totals(false)).toMatchObject({ billed: 27000, collected: 5000, collection_rate: 19, tenants: 2 });
+    expect(await totals(true, "2030-01-01", "2030-02-01")).toMatchObject({ billed: 0, collection_rate: null, tenants: 0 });
+  });
+
+  it("refuses a bad query, and shows nothing to anyone but the owner", async () => {
+    expect(await errorCode(billing({ sort: "id" }))).toBe("BBK00");
+    expect(await errorCode(billing({ show: "owed" }))).toBe("BBK00");
+    expect(await errorCode(billing({ from: "2026-03-01", to: "2026-01-01" }))).toBe("BBK00");
+    expect(await billing({}, owner(OWNER_B))).toMatchObject({ rows: [], total: 0, all: 0 });
+    expect(await errorCode(billing({}, { role: "anon" } as unknown as Role))).toBe("42501");
+  });
+});
+
+describe("tenant_account_summary (0022)", () => {
+  type Summary = {
+    total_outstanding: number;
+    overdue_months: number;
+    not_yet_due: number;
+    ended_months: number;
+    paid_ended_months: number;
+    can_stop_rent_tracking: boolean;
+  };
+  const summary = async (tenantId: string, who: Role = owner(OWNER_A)) =>
+    (await as<{ v: Summary }>(who, `select tenant_account_summary($1) as v`, [tenantId]))[0].v;
+
+  /** The tenant's months as the JS side reads them. */
+  async function monthsOf(tenantId: string) {
+    const { rows } = await db.query<{ id: string; period_month: string; amount_due: string; amount_allocated: string }>(
+      `select id, to_char(period_month, 'YYYY-MM-DD') as period_month, amount_due, amount_allocated
+       from rent_periods where tenant_id = $1`,
+      [tenantId]
+    );
+    return rows;
+  }
+
+  it("splits owed (ended months) from not due yet, as summarizeBalance does", async () => {
+    // Billed a few months ahead of today, like the app does.
+    await as(service, `select ensure_rent_periods($1::uuid[], $2)`, [[fx.tenantA], addMonthsToKey(currentMonthKey(), 2)]);
+    // January paid, February partly paid.
+    await createPayment(owner(OWNER_A), {
+      amount: 7000,
+      allocations: [
+        { rent_period_id: fx.periods[0].id, amount: 5000 },
+        { rent_period_id: fx.periods[1].id, amount: 2000 },
+      ],
+    });
+    const months = await monthsOf(fx.tenantA);
+    const s = await summary(fx.tenantA);
+    const js = summarizeBalance(months, currentMonthKey());
+    expect({
+      totalOutstanding: Number(s.total_outstanding),
+      overdueMonths: s.overdue_months,
+      notYetDue: Number(s.not_yet_due),
+    }).toEqual(js);
+    const ended = months.filter((m) => m.period_month < currentMonthKey());
+    expect(s.ended_months).toBe(ended.length);
+    expect(s.paid_ended_months).toBe(1); // January only; February is partly paid
+    expect(s.overdue_months).toBe(ended.length - 1);
+    expect(Number(s.not_yet_due)).toBeGreaterThan(0);
+  });
+
+  it("is all zeros for a tenant without months, and nothing for anyone but the owner", async () => {
+    await db.query(`delete from rent_periods where tenant_id = $1`, [fx.tenantA2]);
+    expect(await summary(fx.tenantA2)).toEqual({
+      total_outstanding: 0,
+      overdue_months: 0,
+      not_yet_due: 0,
+      ended_months: 0,
+      paid_ended_months: 0,
+      can_stop_rent_tracking: false,
+    });
+    expect(await summary(fx.tenantA, owner(OWNER_B))).toMatchObject({ total_outstanding: 0, ended_months: 0 });
+    expect(await errorCode(summary(fx.tenantA, { role: "anon" } as unknown as Role))).toBe("42501");
+  });
+
+  it("allows stopping tracking only for a tracked government tenant with nothing recorded", async () => {
+    const [{ id }] = await as<{ id: string }>(
+      owner(OWNER_A),
+      `select create_tenant('Block Office', null, null, 'both', 20000, '2026-01-01', array['AC-T1-G04'], null, null,
+         'government', true) as id`
+    );
+    await as(service, `select ensure_rent_periods($1::uuid[], '2026-03-01')`, [[id]]);
+    expect((await summary(id)).can_stop_rent_tracking).toBe(true);
+    expect((await summary(fx.tenantA)).can_stop_rent_tracking).toBe(false); // an individual
+    const [first] = (await db.query<{ id: string }>(`select id from rent_periods where tenant_id = $1 order by period_month limit 1`, [id]))
+      .rows;
+    await createPayment(owner(OWNER_A), { tenant: id, amount: 20000, allocations: [{ rent_period_id: first.id, amount: 20000 }] });
+    expect((await summary(id)).can_stop_rent_tracking).toBe(false);
+    // The same rule stop_rent_tracking enforces.
+    expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]))).toBe("BBK09");
   });
 });

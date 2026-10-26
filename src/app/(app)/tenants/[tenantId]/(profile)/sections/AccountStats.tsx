@@ -3,18 +3,24 @@ import type { TenantAccount } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, formatMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import StatCard from "@/components/ui/StatCard";
+import { StatCardSkeleton } from "@/components/ui/Skeletons";
 
 /** Grid cell of one account stat card. */
-export const ACCOUNT_STAT_CELL = { xs: 6, md: 3 } as const;
+const ACCOUNT_STAT_CELL = { xs: 6 } as const;
 
-/** Tenant page: Outstanding and Months overdue - two grid cells. */
+/** `AccountStats` while the account loads: the same two grid cells. */
+export function AccountStatsSkeleton() {
+  return [0, 1].map((i) => (
+    <Grid key={i} size={ACCOUNT_STAT_CELL}>
+      <StatCardSkeleton />
+    </Grid>
+  ));
+}
+
+/** Tenant page: Outstanding and Months overdue - two cells of a `Grid container`. */
 export default async function AccountStats({ account }: { account: Promise<TenantAccount> }) {
-  const { balance, periods } = await account;
-  const thisMonth = currentMonthKey();
-  const lastMonth = formatMonth(addMonthsToKey(thisMonth, -1));
-  // Only months that have ended are owed (summarizeBalance); later ones are billed ahead.
-  const ended = periods.filter((p) => p.periodMonth < thisMonth);
-  const paidMonths = ended.filter((p) => p.status === "paid").length;
+  const { balance, endedMonths, paidEndedMonths } = await account;
+  const lastMonth = formatMonth(addMonthsToKey(currentMonthKey(), -1));
   return (
     <>
       <Grid size={ACCOUNT_STAT_CELL}>
@@ -35,7 +41,7 @@ export default async function AccountStats({ account }: { account: Promise<Tenan
         <StatCard
           title="Months overdue"
           value={String(balance.overdueMonths)}
-          caption={`${paidMonths} of ${ended.length} ended month${ended.length === 1 ? "" : "s"} paid`}
+          caption={`${paidEndedMonths} of ${endedMonths} ended month${endedMonths === 1 ? "" : "s"} paid`}
           badge={
             balance.overdueMonths > 0 ? { label: "Follow up", tone: "danger" } : { label: "On track", tone: "success" }
           }

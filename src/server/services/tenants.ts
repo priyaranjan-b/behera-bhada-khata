@@ -7,13 +7,15 @@ import type {
   EditTenantForm,
   TenantAccount,
   TenantDetail,
+  TablePage,
   TenantLedgerView,
+  TenantMonthRow,
   TenantSearchRow,
 } from "@/lib/contracts";
 import { currentMonthKey } from "@/lib/dates";
 import { summarizeBalance } from "@/lib/domain/allocation";
+import { round2 } from "@/lib/money";
 import { tenantDisplayName } from "@/lib/domain/tenant";
-import { buildTenantLedger } from "@/lib/domain/tenantLedger";
 import { errorMessage } from "@/lib/errors";
 import type { RentPeriod } from "@/lib/types";
 import {
@@ -21,6 +23,8 @@ import {
   createTenantSchema,
   moveOutSchema,
   startRentTrackingSchema,
+  tenantLedgerQuerySchema,
+  tenantMonthsQuerySchema,
   updateTenantSchema,
 } from "@/lib/validation";
 import { tenantMessagingEnabled } from "@/server/env";
@@ -28,7 +32,7 @@ import { ownerDb } from "@/server/infra";
 import type { NewTenant } from "@/server/ports";
 import { parseInput, requireTenant, type OwnerContext } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
-import { db, tenantAdjustments, tenantById, tenantPayments, tenantPlacements, tenantRentMonths } from "./loaders";
+import { db, tenantById, tenantPlacements } from "./loaders";
 import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
 
@@ -129,59 +133,120 @@ export async function getTenantDetail(_ctx: OwnerContext, tenantId: string): Pro
   };
 }
 
-/** What the tenant owes: the balance and every rent month. */
+/**
+ * What the tenant owes: the balance, how many ended months are paid and
+ * whether tracking can stop - aggregated in SQL (tenant_account_summary,
+ * D29), never by loading every month, payment and adjustment.
+ */
 export async function getTenantAccount(_ctx: OwnerContext, tenantId: string): Promise<TenantAccount> {
-  const [tenant, periods, payments, adjustments] = await Promise.all([
-    tenantById(tenantId),
-    tenantRentMonths(tenantId),
-    tenantPayments(tenantId),
-    tenantAdjustments(tenantId),
-  ]);
+  const tenant = await tenantById(tenantId);
+  // Months billed ahead must exist before they're counted as not due yet.
+  await ensureRentPeriodsFor(billedTenantIds([tenant]));
+  const s = await (await db()).tenants.accountSummary(tenantId);
   return {
-    balance: summarizeBalance(periods, currentMonthKey()),
-    periods: periods.map((p) => ({
-      id: p.id,
-      periodMonth: p.period_month,
-      amountDue: Number(p.amount_due),
-      amountAllocated: Number(p.amount_allocated),
-      status: p.status,
-    })),
-    // Same rule as stop_rent_tracking (0016): nothing recorded against any month.
-    canStopRentTracking:
-      tenant.tenant_kind === "government" &&
-      tenant.status === "active" &&
-      tenant.rent_tracked &&
-      payments.length === 0 &&
-      adjustments.length === 0 &&
-      periods.every((p) => Number(p.amount_allocated) === 0),
+    balance: {
+      totalOutstanding: round2(Number(s.total_outstanding)),
+      overdueMonths: s.overdue_months,
+      notYetDue: round2(Number(s.not_yet_due)),
+    },
+    endedMonths: s.ended_months,
+    paidEndedMonths: s.paid_ended_months,
+    canStopRentTracking: s.can_stop_rent_tracking,
   };
 }
 
-/** The tenant's ledger: payments and adjustments against the months, with each payment's proofs. */
-export async function getTenantLedger(_ctx: OwnerContext, tenantId: string): Promise<TenantLedgerView> {
-  const [periods, payments, adjustments, repos] = await Promise.all([
-    tenantRentMonths(tenantId),
-    tenantPayments(tenantId),
-    tenantAdjustments(tenantId),
-    db(),
-  ]);
-  const proofs = await repos.payments.listProofs(payments.map((p) => p.id));
-  const proofsByPayment = new Map<string, typeof proofs>();
-  for (const proof of proofs) proofsByPayment.set(proof.payment_id, [...(proofsByPayment.get(proof.payment_id) ?? []), proof]);
+// The Months table's fields → the columns tenant_months_page reads.
+const MONTH_SORT_COLUMNS = {
+  periodMonth: "period_month",
+  amountDue: "amount_due",
+  amountAllocated: "amount_allocated",
+  status: "status",
+} as const;
+const MONTH_FILTER_COLUMNS = { periodMonth: "month", status: "status" } as const;
+
+/** One page of the tenant's rent months, paged, sorted and searched in SQL (A15). */
+export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, query: unknown): Promise<TablePage<TenantMonthRow>> {
+  const tenant = await tenantById(tenantId);
+  const q = parseInput(tenantMonthsQuerySchema, query);
+  await ensureRentPeriodsFor(billedTenantIds([tenant]));
+  const result = await (await db()).rentPeriods.page({
+    tenantId,
+    show: q.show,
+    search: q.q || undefined,
+    filters: q.filters.map((f) => ({ ...f, field: MONTH_FILTER_COLUMNS[f.field] })),
+    logic: q.logic,
+    sort: MONTH_SORT_COLUMNS[q.sort],
+    dir: q.dir,
+    page: q.page,
+    pageSize: q.pageSize,
+  });
   return {
-    ledger: buildTenantLedger(
-      periods,
-      payments.map((p) => ({
-        ...p,
-        proofs: (proofsByPayment.get(p.id) ?? []).map((f) => ({
-          id: f.id,
-          fileName: f.file_name,
-          contentType: f.content_type,
-        })),
-      })),
-      adjustments,
-      currentMonthKey()
-    ),
+    rows: result.rows.map((r) => ({
+      id: r.id,
+      periodMonth: r.period_month,
+      amountDue: Number(r.amount_due),
+      amountAllocated: Number(r.amount_allocated),
+      status: r.status,
+      displayStatus: r.display_status,
+      monthLabel: r.month_label,
+    })),
+    total: result.total,
+    all: result.all,
+    page: result.page,
+  };
+}
+
+// The Ledger table's fields → the columns tenant_ledger_page reads (the same names).
+const LEDGER_FILTER_COLUMNS = { date: "date", description: "description", status: "status" } as const;
+
+/**
+ * One page of the tenant's ledger (charges, payments, adjustments), paged,
+ * sorted and searched in SQL with the all-time running balance (A15), plus
+ * the proofs of that page's payments.
+ */
+export async function getTenantLedger(_ctx: OwnerContext, tenantId: string, query: unknown): Promise<TenantLedgerView> {
+  const tenant = await tenantById(tenantId);
+  const q = parseInput(tenantLedgerQuerySchema, query);
+  await ensureRentPeriodsFor(billedTenantIds([tenant]));
+  const repos = await db();
+  const result = await repos.ledger.page({
+    tenantId,
+    fromDate: q.from,
+    toDate: q.to,
+    search: q.q || undefined,
+    filters: q.filters.map((f) => ({ ...f, field: LEDGER_FILTER_COLUMNS[f.field] })),
+    logic: q.logic,
+    sort: q.sort,
+    dir: q.dir,
+    page: q.page,
+    pageSize: q.pageSize,
+  });
+  const paymentIds = result.rows.filter((r) => r.type === "payment" && r.ref_id).map((r) => r.ref_id as string);
+  const proofs = paymentIds.length > 0 ? await repos.payments.listProofs(paymentIds) : [];
+  return {
+    rows: result.rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      date: r.date,
+      description: r.description,
+      caption: r.caption,
+      debit: Number(r.debit),
+      credit: Number(r.credit),
+      balance: Number(r.balance),
+      status: r.status,
+      refId: r.ref_id ?? undefined,
+      receiptNo: r.receipt_no ?? undefined,
+      proofs:
+        r.type === "payment"
+          ? proofs
+              .filter((f) => f.payment_id === r.ref_id)
+              .map((f) => ({ id: f.id, fileName: f.file_name, contentType: f.content_type }))
+          : undefined,
+      acknowledged: r.acknowledged ?? undefined,
+    })),
+    total: result.total,
+    all: result.all,
+    page: result.page,
     tenantMessaging: tenantMessagingEnabled(),
   };
 }

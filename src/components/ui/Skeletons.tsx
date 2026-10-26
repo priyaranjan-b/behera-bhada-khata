@@ -39,6 +39,20 @@ export function PageHeaderSkeleton({ action = false }: { action?: boolean }) {
   );
 }
 
+/** Matches `PageTabs`: the "Section" select on phones, a row of tab labels over a divider from `sm`. */
+export function TabsSkeleton({ tabs = 4 }: { tabs?: number }) {
+  return (
+    <Box aria-hidden sx={{ mb: 2 }}>
+      <Skeleton variant="rounded" height={40} sx={{ display: { xs: "block", sm: "none" } }} />
+      <Stack direction="row" spacing={2} sx={{ display: { xs: "none", sm: "flex" }, borderBottom: 1, borderColor: "divider", pb: 1 }}>
+        {Array.from({ length: tabs }, (_, i) => (
+          <Skeleton key={i} variant="rounded" width={88} height={28} />
+        ))}
+      </Stack>
+    </Box>
+  );
+}
+
 /** Matches `StatCard`: title, value + badge, caption, 50px sparkline. */
 export function StatCardSkeleton() {
   return (

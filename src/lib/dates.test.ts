@@ -11,6 +11,7 @@ import {
   monthsBetween,
   todayKey,
   yearMonthOf,
+  monthDayRange,
 } from "./dates";
 
 describe("dates (Asia/Kolkata)", () => {
@@ -63,5 +64,14 @@ describe("month helpers", () => {
     expect(monthsBetween("2026-10-01", "2026-10-01")).toBe(0);
     expect(monthsBetween("2025-11-01", "2026-02-01")).toBe(3);
     expect(monthsBetween("2026-02-01", "2025-11-01")).toBe(0);
+  });
+});
+
+describe("monthDayRange", () => {
+  it("gives the first and last day of the month, leap years included", () => {
+    expect(monthDayRange("2026-10")).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(monthDayRange("2026-02-14")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(monthDayRange("2028-02")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
+    expect(monthDayRange("2026-12-01")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
   });
 });

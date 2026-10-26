@@ -1,6 +1,16 @@
 import * as z from "zod";
 import { isDateKey } from "@/lib/dates";
-import { AUDIT_CATEGORIES } from "@/lib/domain/audit";
+import { AUDIT_CATEGORIES, AUDIT_TABLE_FILTER_FIELDS, AUDIT_TABLE_SORT_FIELDS } from "@/lib/domain/audit";
+import { FILTER_LOGICS, GRID_TEXT_OPERATORS, SORT_DIRECTIONS, type SortDirection } from "@/lib/domain/gridQuery";
+import {
+  BILLING_FILTER_FIELDS,
+  BILLING_SHOWS,
+  BILLING_SORT_FIELDS,
+  TENANT_MONTH_FILTER_FIELDS,
+  TENANT_MONTH_SHOWS,
+  TENANT_MONTH_SORT_FIELDS,
+} from "@/lib/domain/billing";
+import { LEDGER_FILTER_FIELDS, LEDGER_SORT_FIELDS } from "@/lib/domain/tenantLedger";
 import {
   PAID_DIRECT_VIEWS,
   PAYMENT_MODES,
@@ -344,17 +354,79 @@ export const confirmSchema = z.object({
   tenantSignaturePng: signaturePngSchema,
 });
 
+// ---- Server-side tables (A14) ---------------------------------------------------
+
+/** Rows-per-page choices, the search length and how many column filters a server-side table accepts. */
+export const GRID_LIMITS = { pageSizes: [10, 25, 50, 100], searchMax: 100, maxFilters: 5, filtersJsonMax: 2000 } as const;
+
+/**
+ * The query of a table that pages on the server (GridQueryParams in
+ * src/lib/domain/gridQuery.ts). Query params arrive as strings; `filters` is a
+ * JSON array.
+ */
+export function gridQuerySchema<S extends string, F extends string>(
+  sortFields: readonly [S, ...S[]],
+  filterFields: readonly [F, ...F[]],
+  defaults: { sort: S; dir: SortDirection }
+) {
+  const filter = z.object({
+    field: z.enum(filterFields),
+    operator: z.enum(GRID_TEXT_OPERATORS),
+    value: z.string().max(GRID_LIMITS.searchMax).optional(),
+  });
+  return z.object({
+    page: z.coerce.number().int().min(0).default(0),
+    pageSize: z.coerce
+      .number()
+      .int()
+      .refine((n) => (GRID_LIMITS.pageSizes as readonly number[]).includes(n), "Choose a listed page size")
+      .default(GRID_LIMITS.pageSizes[0]),
+    sort: z.enum(sortFields).default(defaults.sort),
+    dir: z.enum(SORT_DIRECTIONS).default(defaults.dir),
+    q: z.string().trim().max(GRID_LIMITS.searchMax).optional(),
+    filters: z
+      .string()
+      .max(GRID_LIMITS.filtersJsonMax)
+      .transform((text, ctx) => {
+        try {
+          return JSON.parse(text) as unknown;
+        } catch {
+          ctx.addIssue({ code: "custom", message: "Filters are not valid" });
+          return z.NEVER;
+        }
+      })
+      .pipe(z.array(filter).max(GRID_LIMITS.maxFilters))
+      .default([]),
+    logic: z.enum(FILTER_LOGICS).default("and"),
+  });
+}
+
+/** A tenant's Months table: paged, sorted, searched and filtered in SQL (A15). */
+export const tenantMonthsQuerySchema = gridQuerySchema(TENANT_MONTH_SORT_FIELDS, TENANT_MONTH_FILTER_FIELDS, {
+  sort: "periodMonth",
+  dir: "desc",
+}).extend({ show: z.enum(TENANT_MONTH_SHOWS).default("all") });
+
+/** A tenant's Ledger table: paged, sorted, searched and filtered in SQL (A15). `from`/`to` are days, inclusive. */
+export const tenantLedgerQuerySchema = gridQuerySchema(LEDGER_SORT_FIELDS, LEDGER_FILTER_FIELDS, { sort: "date", dir: "desc" })
+  .extend({ from: dateKeySchema.optional(), to: dateKeySchema.optional() })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, "The start date must be on or before the end date");
+
 // ---- Audit history (0015) ----------------------------------------------------
 
-/** Entries per page of history (Activity page, tenant and house timelines). */
+/** Entries per page of history (Activity page, house timeline). */
 export const AUDIT_LIMITS = { pageSize: 50 } as const;
 
-/** `before`: the id to continue below (from AuditPage.nextBefore). Query params arrive as strings. */
+/** The house History dialog: `before` is the id to continue below (AuditPage.nextBefore). Query params arrive as strings. */
 export const auditPageSchema = z.object({
   before: z.coerce.number().int().positive().optional(),
 });
 
-export const activityQuerySchema = auditPageSchema
+/** A history table (Activity, a tenant's Change history): paged, sorted, searched and filtered in SQL (A14). */
+export const auditTableQuerySchema = gridQuerySchema(AUDIT_TABLE_SORT_FIELDS, AUDIT_TABLE_FILTER_FIELDS, {
+  sort: "at",
+  dir: "desc",
+})
   .extend({
     category: z.enum(AUDIT_CATEGORIES).optional(),
     from: dateKeySchema.optional(),
@@ -378,3 +450,9 @@ export const billingQuerySchema = z.object({
   to: yearMonthSchema.optional(),
   paidDirect: paidDirectViewSchema,
 });
+
+/** The Billing grid: the range and paid-direct view, plus the grid's page, sort, search and filters (A15). */
+export const billingPageQuerySchema = gridQuerySchema(BILLING_SORT_FIELDS, BILLING_FILTER_FIELDS, {
+  sort: "amountAllocated",
+  dir: "desc",
+}).extend({ ...billingQuerySchema.shape, show: z.enum(BILLING_SHOWS).default("all") });
