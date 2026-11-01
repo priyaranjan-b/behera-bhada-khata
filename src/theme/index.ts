@@ -9,6 +9,7 @@ import { navigationCustomizations } from "./customizations/navigation";
 import { surfacesCustomizations } from "./customizations/surfaces";
 import { chartsCustomizations } from "./customizations/charts";
 import { dataGridCustomizations } from "./customizations/dataGrid";
+import { datePickersCustomizations } from "./customizations/datePickers";
 import { appCustomizations } from "./customizations/app";
 import { lightSurfaces } from "./appTokens";
 
@@ -80,6 +81,7 @@ const theme = createTheme({
     surfacesCustomizations,
     chartsCustomizations,
     dataGridCustomizations,
+    datePickersCustomizations,
     appCustomizations
   ),
 });

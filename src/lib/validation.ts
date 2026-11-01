@@ -290,12 +290,23 @@ export const paymentAllocationInputSchema = z.object({
   amountAllocated: positiveMoneySchema,
 });
 
+/**
+ * A payment's note, and the quick-select notes offered for it (0024): one
+ * length, so any saved note fits the field. `maxPresets` keeps the list short
+ * enough to pick from.
+ */
+export const PAYMENT_NOTE_LIMITS = { maxLength: 500, maxPresets: 30 } as const;
+
+export const paymentNotePresetSchema = z.object({
+  text: z.string().trim().min(1, "Enter the note").max(PAYMENT_NOTE_LIMITS.maxLength),
+});
+
 export const createPaymentSchema = z.object({
   tenantId: z.uuid(),
   amount: positiveMoneySchema,
   paymentDate: dateKeySchema,
   mode: z.enum(PAYMENT_MODES),
-  note: optionalText(500),
+  note: optionalText(PAYMENT_NOTE_LIMITS.maxLength),
   allocations: z.array(paymentAllocationInputSchema).min(1, "Select at least one period").max(240),
   /** Drawn for this payment; omitted = the saved signature (owner_profile, 0013). */
   ownerSignaturePng: signaturePngSchema.optional(),

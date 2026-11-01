@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
+import { DateField } from "@/components/ui";
 import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, { useServerGrid } from "@/components/ui/DataTable";
@@ -94,21 +94,17 @@ export default function AuditHistoryTable({
 
   const dateInputs = (
     <Stack direction="row" spacing={1}>
-      <TextField
+      <DateField
         label="From"
-        type="date"
         size="small"
         value={extra.from}
-        onChange={(e) => setExtra({ from: e.target.value })}
-        slotProps={{ inputLabel: { shrink: true } }}
+        onChange={(v) => setExtra({ from: v })}
       />
-      <TextField
+      <DateField
         label="To"
-        type="date"
         size="small"
         value={extra.to}
-        onChange={(e) => setExtra({ to: e.target.value })}
-        slotProps={{ inputLabel: { shrink: true } }}
+        onChange={(v) => setExtra({ to: v })}
       />
     </Stack>
   );

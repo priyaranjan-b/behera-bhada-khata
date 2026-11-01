@@ -13,7 +13,7 @@ import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { FormActions, SectionCard } from "@/components/ui";
+import { DateField, FormActions, MonthField, SectionCard } from "@/components/ui";
 import TenantDocumentsCard, { type PendingDocument } from "@/components/domain/TenantDocumentsCard";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AvailableUnit, EditTenantForm, TenantDocumentView } from "@/lib/contracts";
@@ -291,15 +291,13 @@ export default function TenantForm({
               )}
             />
             {unitsChanged && !movedOut ? (
-              <TextField
+              <DateField
                 label="Houses change from"
-                type="date"
                 value={unitsEffective}
-                onChange={(e) => setUnitsEffective(e.target.value)}
+                onChange={setUnitsEffective}
                 helperText="Removed houses end the day before; added houses start on this date."
                 required
                 fullWidth
-                slotProps={{ inputLabel: { shrink: true } }}
               />
             ) : null}
 
@@ -325,36 +323,31 @@ export default function TenantForm({
               />
               {editing && !draft ? (
                 rentChanged && !movedOut ? (
-                  <TextField
+                  <MonthField
                     label="New rent from"
-                    type="month"
                     value={rentEffectiveMonth}
-                    onChange={(e) => setRentEffectiveMonth(e.target.value)}
+                    onChange={setRentEffectiveMonth}
                     helperText="Months before keep the old rent"
                     required
                     fullWidth
-                    slotProps={{ inputLabel: { shrink: true } }}
                   />
                 ) : null
               ) : (
-                <TextField
+                <DateField
                   label="Moved in (lease start)"
-                  type="date"
                   value={leaseStart}
-                  onChange={(e) => setLeaseStart(e.target.value)}
+                  onChange={setLeaseStart}
                   helperText="When they moved in - kept as history"
                   required={!draft}
                   fullWidth
-                  slotProps={{ inputLabel: { shrink: true } }}
                 />
               )}
             </Stack>
             {settingUpBilling ? (
-              <TextField
+              <MonthField
                 label="Rent paid up to"
-                type="month"
                 value={paidThrough}
-                onChange={(e) => setPaidThrough(e.target.value)}
+                onChange={setPaidThrough}
                 helperText={
                   billingStart
                     ? `Billing starts ${formatMonth(billingStart)}. Months before that were settled outside the app.`
@@ -363,7 +356,6 @@ export default function TenantForm({
                       : "Leave blank for a new tenant: billing starts from the lease start"
                 }
                 fullWidth
-                slotProps={{ inputLabel: { shrink: true } }}
               />
             ) : null}
             <TextField

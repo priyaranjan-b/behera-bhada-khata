@@ -147,6 +147,13 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["owner_profile"]["Insert"]>;
         Relationships: [];
       };
+      /** Quick-select notes for the Record payment form (0024), edited on the Profile page. */
+      payment_note_presets: {
+        Row: { id: string; text: string; created_at: string; updated_at: string };
+        Insert: { text: string };
+        Update: { text?: string };
+        Relationships: [];
+      };
       locations: {
         Row: {
           location_code: string;
@@ -802,6 +809,7 @@ export interface TenantLedgerDbRow {
 export type AuditTextColumn = "actor_name" | "title" | "tenant_name" | "unit_code" | "details";
 
 export type OwnerProfile = Database["public"]["Tables"]["owner_profile"]["Row"];
+export type PaymentNotePreset = Database["public"]["Tables"]["payment_note_presets"]["Row"];
 export type Location = Database["public"]["Tables"]["locations"]["Row"];
 export type Property = Database["public"]["Tables"]["properties"]["Row"];
 export type Unit = Database["public"]["Tables"]["units"]["Row"];

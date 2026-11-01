@@ -25,7 +25,7 @@ import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import { SectionCard } from "@/components/ui";
 import { api, apiHref, apiPaths, errorMessage } from "@/lib/api-client";
 import type { TenantDocumentView } from "@/lib/contracts";
-import { dateKeyOf } from "@/lib/dates";
+import { dateKeyOf, formatDateKey } from "@/lib/dates";
 import { formatBytes, prepareProofFile } from "@/lib/proofImages";
 import { DOCUMENT_LIMITS, TENANT_DOCUMENT_TYPES } from "@/lib/validation";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
@@ -235,7 +235,7 @@ export default function TenantDocumentsCard({
                   {doc.documentType}
                 </Typography>
                 <Typography variant="caption" color="textSecondary" noWrap component="p" title={doc.fileName}>
-                  {doc.fileName} · {formatBytes(doc.sizeBytes)} · {dateKeyOf(doc.uploadedAt)}
+                  {doc.fileName} · {formatBytes(doc.sizeBytes)} · {formatDateKey(dateKeyOf(doc.uploadedAt))}
                 </Typography>
               </Box>
               <IconButton

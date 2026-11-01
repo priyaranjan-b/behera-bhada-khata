@@ -5,6 +5,7 @@ import { FLASH } from "@/lib/routes";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import FlashAlert from "@/components/ui/FlashAlert";
 import ChangePasswordCard from "./ChangePasswordCard";
+import PaymentNotesCard from "./PaymentNotesCard";
 import ProfileForm from "./ProfileForm";
 
 export default async function ProfilePage({
@@ -12,7 +13,11 @@ export default async function ProfilePage({
 }: {
   searchParams: Promise<{ saved?: string; passwordChanged?: string }>;
 }) {
-  const [profile, { saved, passwordChanged }] = await Promise.all([serverApi.dashboard.profile(), searchParams]);
+  const [profile, paymentNotes, { saved, passwordChanged }] = await Promise.all([
+    serverApi.dashboard.profile(),
+    serverApi.dashboard.paymentNotes(),
+    searchParams,
+  ]);
 
   return (
     <Stack spacing={2}>
@@ -35,6 +40,9 @@ export default async function ProfilePage({
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
           <ChangePasswordCard />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <PaymentNotesCard notes={paymentNotes} />
         </Grid>
       </Grid>
     </Stack>

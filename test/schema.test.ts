@@ -1087,6 +1087,33 @@ describe("owner profile (0013)", () => {
   });
 });
 
+describe("payment note presets (0024)", () => {
+  const notes = async (who: Role) =>
+    (await as<{ text: string }>(who, `select text from payment_note_presets order by text`)).map((r) => r.text);
+
+  it("starts with a few notes the owner can add to, edit and delete", async () => {
+    expect(await notes(owner(OWNER_A))).toContain("Paid via UPI");
+    await as(owner(OWNER_A), `insert into payment_note_presets (text) values ('Paid by cheque')`);
+    await as(owner(OWNER_A), `update payment_note_presets set text = 'Paid by cheque (cleared)' where text = 'Paid by cheque'`);
+    expect(await notes(owner(OWNER_A))).toContain("Paid by cheque (cleared)");
+    await as(owner(OWNER_A), `delete from payment_note_presets where text = 'Paid by cheque (cleared)'`);
+    expect(await notes(owner(OWNER_A))).not.toContain("Paid by cheque (cleared)");
+  });
+
+  it("keeps one of each whatever the case, and refuses blank or padded text", async () => {
+    expect(await errorCode(as(owner(OWNER_A), `insert into payment_note_presets (text) values ('paid VIA upi')`))).toBe("23505");
+    expect(await errorCode(as(owner(OWNER_A), `insert into payment_note_presets (text) values ('')`))).toBe("23514");
+    expect(await errorCode(as(owner(OWNER_A), `insert into payment_note_presets (text) values (' x')`))).toBe("23514");
+  });
+
+  it("shows another account nothing and lets it write nothing", async () => {
+    expect(await notes(owner(OWNER_B))).toEqual([]);
+    expect(await errorCode(as(owner(OWNER_B), `insert into payment_note_presets (text) values ('x')`))).toBe("42501");
+    await as(owner(OWNER_B), `delete from payment_note_presets`);
+    expect((await notes(owner(OWNER_A))).length).toBeGreaterThan(0);
+  });
+});
+
 describe("correct_paid_through (0014)", () => {
   const correct = (who: Role, paidThrough: string | null, tenant = fx.tenantA) =>
     as<{ billing_start: string }>(
@@ -1435,12 +1462,12 @@ describe("stored audit text (0017)", () => {
     });
     expect(rows.find((r) => r.action === "rent_rate.set")?.details).toBe("From month: March 2026 · Monthly rent: ₹6,000.00");
     expect(rows.find((r) => r.action === "payment.recorded")?.details).toMatch(
-      /^Receipt: \d{4}\/\d{2}\/\d{3} · Amount: ₹5,000\.00 · Paid on: 5 Mar 2026 · Mode: Cash$/
+      /^Receipt: \d{4}\/\d{2}\/\d{3} · Amount: ₹5,000\.00 · Paid on: 05\/03\/2026 · Mode: Cash$/
     );
     const movedOut = rows.find((r) => r.action === "tenant.moved_out");
     expect(movedOut?.title).toBe("Moved out");
     expect(movedOut?.details).toContain("Status: Active → Moved out");
-    expect(movedOut?.details).toContain("Moved out on: — → 28 Feb 2026");
+    expect(movedOut?.details).toContain("Moved out on: — → 28/02/2026");
     expect(rows.map((r) => r.details).join("\n")).not.toMatch(/inactive|bank_transfer|\d{4}-\d{2}-\d{2}/);
   });
 
@@ -1457,7 +1484,7 @@ describe("stored audit text (0017)", () => {
     expect((await texts()).map((r) => [r.title, r.actor_name, r.details])).toEqual([
       ["House details changed", "Ramesh Sahu", "Label: — → Chemist"],
       ["Payment recorded", "Ramesh Sahu", expect.stringContaining("Amount: ₹5,000.00")],
-      ["Payment acknowledged by tenant", "Tenant", expect.stringMatching(/^Acknowledged: — → \d+ \w+ \d{4}, \d+:\d\d [ap]m IST$/)],
+      ["Payment acknowledged by tenant", "Tenant", expect.stringMatching(/^Acknowledged: — → \d\d\/\d\d\/\d{4}, \d+:\d\d [ap]m IST$/)],
       ["Failed sign-in", "Not signed in", "Password · Wrong password"],
     ]);
   });
@@ -1760,7 +1787,7 @@ describe("tenant_ledger_page (0020)", () => {
       "Rent due — January 2027",
       "Rent due — January 2026",
     ]);
-    expect((await ledger({ search: "neft 10 jan" })).total).toBe(1);
+    expect((await ledger({ search: "neft 10/01/2026" })).total).toBe(1);
     expect((await ledger({ search: "counted" })).rows.map((r) => r.type)).toEqual(["adjustment"]);
     expect((await ledger({ search: "%" })).total).toBe(0);
     const filters = JSON.stringify([{ field: "status", operator: "equals", value: "confirmed" }]);
@@ -1866,7 +1893,7 @@ describe("billing_page and billing_totals (0021)", () => {
     expect((await billing({ show: "partly" })).total).toBe(0);
     expect((await billing({ search: "bimal" })).total).toBe(3);
     expect((await billing({ search: "tower 1 march" })).total).toBe(3);
-    expect(ids(await billing({ search: "5 mar 2026" }))).toEqual(["Asha January 2026"]);
+    expect(ids(await billing({ search: "05/03/2026" }))).toEqual(["Asha January 2026"]);
     expect((await billing({ search: "%" })).total).toBe(0);
     const filters = JSON.stringify([{ field: "status", operator: "equals", value: "Paid direct" }]);
     expect((await billing({ filters })).total).toBe(3);

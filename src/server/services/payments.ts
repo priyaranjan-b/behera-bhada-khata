@@ -25,6 +25,7 @@ import {
 } from "./confirmLinks";
 import { recordEvent } from "./audit";
 import { checkProofFiles, storeProofs } from "./proofs";
+import { paymentNoteSuggestions } from "./paymentNotes";
 import { ownerSignatureBytes, savedSignatureFor } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
 import { ensureRentPeriodsFor } from "./periods";
@@ -35,9 +36,10 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
   const tenant = await requireTenant(db, tenantId);
 
   await ensureRentPeriodsFor([tenantId]);
-  const [periods, savedSignature] = await Promise.all([
+  const [periods, savedSignature, noteSuggestions] = await Promise.all([
     db.rentPeriods.listForTenants([tenantId], { openOnly: true }),
     savedSignatureFor(db, ctx),
+    paymentNoteSuggestions(db),
   ]);
 
   return {
@@ -51,6 +53,7 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
     })),
     savedSignature,
     tenantMessaging: tenantMessagingEnabled(),
+    noteSuggestions,
   };
 }
 

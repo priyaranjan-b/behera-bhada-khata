@@ -30,6 +30,8 @@ export const apiPaths = {
     search: "/api/dashboard/search",
     profile: "/api/dashboard/profile",
     profilePassword: "/api/dashboard/profile/password",
+    paymentNotes: "/api/dashboard/profile/payment-notes",
+    paymentNote: (noteId: string) => `/api/dashboard/profile/payment-notes/${e(noteId)}`,
     properties: {
       list: "/api/dashboard/properties",
       new: "/api/dashboard/properties/new",

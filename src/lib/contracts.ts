@@ -37,6 +37,7 @@ import type {
   startRentTrackingSchema,
   billingQuerySchema,
   ownerProfileSchema,
+  paymentNotePresetSchema,
   updateTenantSchema,
 } from "@/lib/validation";
 
@@ -245,7 +246,14 @@ export interface OwnerProfileView {
   signatureUrl: string | null;
 }
 
+/** A quick-select note for the Record payment form (0024), managed on the Profile page. */
+export interface PaymentNotePresetView {
+  id: string;
+  text: string;
+}
+
 export type UpdateOwnerProfileInput = z.input<typeof ownerProfileSchema>;
+export type PaymentNotePresetInput = z.input<typeof paymentNotePresetSchema>;
 
 /** The signature a payment/adjustment form can use instead of drawing one. */
 export interface SavedSignature {
@@ -547,6 +555,8 @@ export interface NewPaymentForm {
   savedSignature: SavedSignature | null;
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
+  /** Quick-select notes from the Profile page, alphabetical; any other text is fine too. */
+  noteSuggestions: string[];
 }
 
 export type CreatePaymentInput = Omit<z.infer<typeof createPaymentSchema>, "tenantId">;

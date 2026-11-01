@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MonthField } from "@/components/ui";
 import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -9,7 +10,6 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { api, errorMessage } from "@/lib/api-client";
 import { addMonthsToKey, formatMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
@@ -75,14 +75,12 @@ export default function CorrectPaidThroughButton({
               The last month this tenant paid before using the app. Billing starts the month after; payments already
               recorded stay on the months they were applied to.
             </Typography>
-            <TextField
+            <MonthField
               label="Rent paid up to"
-              type="month"
               value={paidThrough}
-              onChange={(e) => setPaidThrough(e.target.value)}
+              onChange={setPaidThrough}
               required
               fullWidth
-              slotProps={{ inputLabel: { shrink: true } }}
             />
             {newStart && newStart !== billingStart ? (
               <Alert severity={removed ? "warning" : "info"}>

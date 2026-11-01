@@ -4,6 +4,7 @@ import {
   currentMonthKey,
   dateKeyOf,
   formatDateKey,
+  formatDateTime,
   formatMonth,
   isDateKey,
   lastMonthKey,
@@ -42,7 +43,13 @@ describe("dates (Asia/Kolkata)", () => {
   it("labels months the same whatever the runtime's own zone", () => {
     expect(formatMonth("2026-03-01")).toBe("March 2026");
     expect(formatMonth("2026-03-01", "short")).toBe("Mar 2026");
-    expect(formatDateKey("2026-10-04")).toBe("4 Oct 2026");
+  });
+
+  it("writes dates as DATE_FORMAT (dd/MM/yyyy), in IST for instants", () => {
+    expect(formatDateKey("2026-10-04")).toBe("04/10/2026");
+    expect(formatDateKey("2026-12-31T10:00:00Z")).toBe("31/12/2026");
+    // 2026-10-31 20:00 UTC is 1 Nov 01:30 IST.
+    expect(formatDateTime("2026-10-31T20:00:00Z")).toBe("01/11/2026, 1:30 am IST");
   });
 });
 

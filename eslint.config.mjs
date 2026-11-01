@@ -78,6 +78,12 @@ const eslintConfig = defineConfig([
           selector: "MemberExpression[object.name='process'][property.name='env']",
           message: "Read configuration via env() from @/server/env (server) or @/lib/publicEnv (browser).",
         },
+        // Native date inputs show the browser's own format (MM/dd/yyyy in many);
+        // the kit fields show DATE_FORMAT from src/lib/dates.ts everywhere.
+        {
+          selector: "JSXAttribute[name.name='type'][value.value=/^(date|month|datetime-local)$/]",
+          message: "Use DateField / MonthField from @/components/ui, not a native date input.",
+        },
       ],
     },
   },

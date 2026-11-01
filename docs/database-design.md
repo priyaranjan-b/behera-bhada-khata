@@ -15,6 +15,7 @@ why.
 ```
 app_owner            the single account that owns the rent book (one row)
   └ owner_profile    the owner's name, the signer's name and saved signature (one row)
+payment_note_presets quick-select notes for Record payment (D30)
 
 locations            AC          Arnapal Chakk Complex          (site)
   └ properties       AC-T1       Tower 1                        (tower)
@@ -54,6 +55,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0018_audit_history_page.sql` | `audit_history_page()` replaces `tenant_history_page()`: the tenant is optional (Activity), and the tenant's name is searchable, filterable and sortable (A14) |
 | `0019_tenant_months_page.sql` | grid helpers (`grid_check`, `grid_row_matches`, ...), `period_display_status()`, `tenant_months_page()` for a tenant's Months (D28) |
 | `0020_tenant_ledger_page.sql` | `tenant_ledger_page()`: a tenant's journal and running balance, built and paged in SQL; replaces `buildTenantLedger` (D28) |
+| `0024_payment_note_presets.sql` | `payment_note_presets` (quick notes for Record payment, D30); `audit_date` writes dd/MM/yyyy |
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 
 Seeds, in order:
@@ -746,6 +748,20 @@ just those numbers. Never load the history into JS to add it up.
 **Why.** The tenant page read every rent month, payment and adjustment of
 the tenant on each visit to show two cards. That cost grew with the
 tenant's age; one aggregate returns one row however long the history is.
+
+### D30 — Quick payment notes are plain master data; dates read dd/MM/yyyy
+
+**Decision (0024).** `payment_note_presets` (uuid, `text`, unique on
+`lower(text)`) holds the notes offered under Note on Record payment. The
+owner adds, edits and deletes them on /profile; RLS with `is_app_owner()`
+for all four, plain table writes (D5: single rows). The form gets them in
+its one GET (`noteSuggestions` on `…/payments/new`).
+- **No audit trigger:** a payment copies the note's text into
+  `payments.note`, so a preset is a typing shortcut, not a record.
+- **Limits:** `PAYMENT_NOTE_LIMITS` (length = the payment note's, at most 30).
+- **Dates:** every date is written `DATE_FORMAT` (`DD/MM/YYYY`,
+  `src/lib/dates.ts`); `audit_date` was redefined to match. Audit rows stored
+  earlier keep their old "4 Oct 2026" text (D27).
 
 ---
 

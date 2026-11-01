@@ -172,6 +172,11 @@ both together.
   the payment and adjustment forms use unless you sign by hand - each record
   gets its own copy. Edited on `/profile`
   (`src/server/services/profile.ts`).
+- **Quick payment notes** (`0024_payment_note_presets.sql`, D30): strings
+  offered under Note on Record payment (`noteSuggestions` in the form's GET),
+  managed on `/profile` (`PaymentNotesCard`,
+  `src/server/services/paymentNotes.ts`). No audit trigger: a payment copies
+  the text.
 - **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
   agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,
   `src/server/services/tenantDocuments.ts`), one `tenant_documents` row per
@@ -424,7 +429,10 @@ Each of these was found broken somewhere; keep them when adding code.
   `monthsBetween`, `addMonthsToKey`), never `.slice(0, 7)` or
   `` `${month}-01` ``.
 - **Every date a user sees is formatted** (`formatDateKey`, `formatMonth`,
-  `formatDateTime`); never render a raw `yyyy-MM-dd`. Every number/date
+  `formatDateTime`); never render a raw `yyyy-MM-dd`. Dates read
+  `DATE_FORMAT` (dd/MM/yyyy, `src/lib/dates.ts`, matched by SQL
+  `audit_date`), and every date/month input is the kit's `DateField` /
+  `MonthField` (MUI pickers; ESLint bans native `type="date"`/`"month"`). Every number/date
   formatter passes `APP_LOCALE` (no `"en-IN"` literals, no
   `toLocaleString(undefined, …)`, which differs between server and browser).
 - **Page URLs and flash params are not ad-hoc strings.** Build page links

@@ -21,6 +21,7 @@ import type {
   LedgerStatus,
   Location,
   OwnerProfile,
+  PaymentNotePreset,
   Payment,
   PaymentAllocation,
   PaymentProof,
@@ -249,6 +250,16 @@ export interface OwnerRepositories {
     get(): Promise<OwnerProfile | null>;
     /** Creates or replaces the row. */
     save(profile: Pick<OwnerProfile, "first_name" | "last_name" | "signature_name" | "signature_path">): Promise<void>;
+  };
+  /** Quick-select payment notes (0024). Duplicates (any case) are a 409. */
+  paymentNotePresets: {
+    /** Alphabetical. */
+    list(): Promise<PaymentNotePreset[]>;
+    create(text: string): Promise<void>;
+    /** False if no such note. */
+    update(id: string, text: string): Promise<boolean>;
+    /** False if no such note. */
+    remove(id: string): Promise<boolean>;
   };
   locations: {
     /** By code. */

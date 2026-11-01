@@ -73,6 +73,12 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       profile: () => get(p.dashboard.profile),
       updateProfile: (input) => put(p.dashboard.profile, input),
       changePassword: (input) => post(p.dashboard.profilePassword, input),
+      paymentNotes: () => get(p.dashboard.paymentNotes),
+      createPaymentNote: (input) => post(p.dashboard.paymentNotes, input),
+      updatePaymentNote: (noteId, input) => put(p.dashboard.paymentNote(noteId), input),
+      deletePaymentNote: async (noteId) => {
+        await request("DELETE", p.dashboard.paymentNote(noteId));
+      },
       properties: {
         list: () => get(p.dashboard.properties.list),
         newForm: () => get(p.dashboard.properties.new),

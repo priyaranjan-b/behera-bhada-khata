@@ -93,6 +93,29 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
       },
     },
 
+    paymentNotePresets: {
+      async list() {
+        return must(await db.from("payment_note_presets").select("*").order("text"), "list payment note presets");
+      },
+      async create(text) {
+        mustWrite(await db.from("payment_note_presets").insert({ text }), "add payment note preset");
+      },
+      async update(id, text) {
+        const updated = mustWrite(
+          await db.from("payment_note_presets").update({ text }).eq("id", id).select("id"),
+          "edit payment note preset"
+        );
+        return updated.length > 0;
+      },
+      async remove(id) {
+        const deleted = mustWrite(
+          await db.from("payment_note_presets").delete().eq("id", id).select("id"),
+          "delete payment note preset"
+        );
+        return deleted.length > 0;
+      },
+    },
+
     locations: {
       async list() {
         return must(

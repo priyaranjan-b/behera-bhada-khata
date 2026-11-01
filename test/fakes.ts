@@ -6,11 +6,13 @@
 import { vi } from "vitest";
 import type { AuditEvent, AuditFilter, AuditHistoryFilter } from "@/server/ports";
 import { auditActionLabel } from "@/lib/domain/audit";
+import { ApiError } from "@/lib/errors";
 import type {
   Adjustment,
   AuditLogEntry,
   OwnerProfile,
   Payment,
+  PaymentNotePreset,
   PaymentAllocation,
   PaymentProof,
   TenantDocument,
@@ -21,6 +23,10 @@ import type {
   Unit,
   UnitOccupancy,
 } from "@/lib/types";
+
+function notePreset(id: string, text: string): PaymentNotePreset {
+  return { id, text, created_at: "2026-10-24T00:00:00Z", updated_at: "2026-10-24T00:00:00Z" };
+}
 
 export const OWNER_ID = "00000000-0000-4000-8000-00000000000a";
 
@@ -137,10 +143,21 @@ function build() {
     proofs: new Map<string, PaymentProof>(),
     documents: new Map<string, TenantDocument>(),
     profile: null as OwnerProfile | null,
+    notePresets: new Map<string, PaymentNotePreset>([
+      ["00000000-0000-4000-8000-000000000501", notePreset("00000000-0000-4000-8000-000000000501", "Paid via UPI")],
+    ]),
+    notesAdded: 0,
     rateLimitAllows: true,
     /** Newest last; list() returns newest first like the database. */
     audit: [] as AuditLogEntry[],
   };
+
+  /** Like the unique index on lower(text): a duplicate is the adapter's 409. */
+  function saveNote(id: string, text: string) {
+    const clash = [...state.notePresets.values()].some((n) => n.id !== id && n.text.toLowerCase() === text.toLowerCase());
+    if (clash) throw new ApiError(409, "That already exists");
+    state.notePresets.set(id, notePreset(id, text));
+  }
 
   function logAudit(event: AuditEvent, actorKind: AuditLogEntry["actor_kind"], actorId: string | null) {
     state.audit.push({
@@ -204,6 +221,18 @@ function build() {
       save: vi.fn(async (p: Pick<OwnerProfile, "first_name" | "last_name" | "signature_name" | "signature_path">) => {
         state.profile = { singleton: true, created_at: "", updated_at: "", ...p };
       }),
+    },
+    paymentNotePresets: {
+      list: vi.fn(async () => [...state.notePresets.values()].sort((a, b) => a.text.localeCompare(b.text))),
+      create: vi.fn(async (text: string) => {
+        saveNote(`00000000-0000-4000-8000-${String(501 + ++state.notesAdded).padStart(12, "0")}`, text);
+      }),
+      update: vi.fn(async (id: string, text: string) => {
+        if (!state.notePresets.has(id)) return false;
+        saveNote(id, text);
+        return true;
+      }),
+      remove: vi.fn(async (id: string) => state.notePresets.delete(id)),
     },
     locations: {
       list: vi.fn(async () => [

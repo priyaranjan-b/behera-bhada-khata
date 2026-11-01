@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateField } from "@/components/ui";
 import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -9,7 +10,6 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { api, errorMessage } from "@/lib/api-client";
@@ -82,14 +82,12 @@ export default function MoveOutButton({
                 {formatMoney(outstanding)} is still owed. It stays on their ledger after they move out.
               </Alert>
             ) : null}
-            <TextField
+            <DateField
               label="Last day in the house"
-              type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
               required
               fullWidth
-              slotProps={{ inputLabel: { shrink: true } }}
             />
             {error ? <Alert severity="error">{error}</Alert> : null}
           </Stack>

@@ -9,6 +9,14 @@
 /** Edit for a different locale - the one place the app's calendar is defined. */
 export const APP_TIME_ZONE = "Asia/Kolkata";
 export const APP_LOCALE = "en-IN";
+/**
+ * How every calendar date is written, shown and typed (dayjs tokens: DD, MM,
+ * YYYY): formatDateKey, the DateField picker and receipts. The audit log's SQL
+ * (audit_date, 0024) writes the same, kept equal by test/schema.test.ts.
+ */
+export const DATE_FORMAT = "DD/MM/YYYY";
+/** How the MonthField picker writes a month in its input. */
+export const MONTH_FORMAT = "MMM YYYY";
 
 const DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -113,26 +121,24 @@ export function formatMonth(monthKey: string, style: "long" | "short" = "long"):
   });
 }
 
-/** An instant as a readable date and time in the app time zone, e.g. for receipts. */
+const timeFormatter = new Intl.DateTimeFormat(APP_LOCALE, {
+  timeZone: APP_TIME_ZONE,
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "short",
+});
+
+/** "01/11/2026, 2:30 pm IST": an instant's date and time in the app time zone, e.g. for receipts. */
 export function formatDateTime(instant: Date | string): string {
   const d = typeof instant === "string" ? new Date(instant) : instant;
-  return d.toLocaleString(APP_LOCALE, {
-    timeZone: APP_TIME_ZONE,
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
+  return `${formatDateKey(dateKeyOf(d))}, ${timeFormatter.format(d)}`;
 }
 
-/** "24 Oct 2026" for a date key (yyyy-MM-dd); fixed locale and UTC, like formatMonth. */
+/**
+ * A date key (yyyy-MM-dd) in DATE_FORMAT, e.g. "04/10/2026". Built from the
+ * key's own digits, so server, browser and PDF print the same text.
+ */
 export function formatDateKey(dateKey: string): string {
-  return new Date(`${dateKey.slice(0, 10)}T00:00:00Z`).toLocaleDateString(APP_LOCALE, {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const [year, month, day] = dateKey.slice(0, 10).split("-");
+  return DATE_FORMAT.replace("YYYY", year).replace("MM", month).replace("DD", day);
 }

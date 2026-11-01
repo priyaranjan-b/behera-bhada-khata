@@ -36,6 +36,8 @@ import type {
   OverviewMonth,
   OverviewTrend,
   OwnerProfileView,
+  PaymentNotePresetInput,
+  PaymentNotePresetView,
   PaidDirectState,
   PortfolioFacts,
   UpdateOwnerProfileInput,
@@ -101,6 +103,8 @@ export interface ApiQueries {
     search(): Promise<SearchIndex>;
     /** The owner's name and saved signature (Profile page, app shell). */
     profile(): Promise<OwnerProfileView>;
+    /** Quick-select notes for Record payment (Profile page). */
+    paymentNotes(): Promise<PaymentNotePresetView[]>;
     properties: {
       list(): Promise<LocationGroup[]>;
       newForm(): Promise<NewPropertyForm>;
@@ -156,6 +160,9 @@ export interface ApiCommands {
   dashboard: {
     updateProfile(input: UpdateOwnerProfileInput): Promise<void>;
     changePassword(input: ChangePasswordInput): Promise<void>;
+    createPaymentNote(input: PaymentNotePresetInput): Promise<void>;
+    updatePaymentNote(noteId: string, input: PaymentNotePresetInput): Promise<void>;
+    deletePaymentNote(noteId: string): Promise<void>;
     properties: {
       create(input: CreatePropertyInput): Promise<{ code: string }>;
       createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;

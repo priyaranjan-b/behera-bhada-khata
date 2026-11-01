@@ -29,6 +29,7 @@ import {
   listPropertyHouses,
   listPropertyTenants,
 } from "@/server/services/properties";
+import { listPaymentNotePresets } from "@/server/services/paymentNotes";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getSearchIndex } from "@/server/services/search";
 import {
@@ -73,6 +74,7 @@ const inProcessApi: ApiQueries = {
     activity: async (query) => listActivity(await owner(), query ?? {}),
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),
+    paymentNotes: async () => listPaymentNotePresets(await owner()),
     properties: {
       list: async () => listProperties(await owner()),
       newForm: async () => getNewPropertyForm(await owner()),

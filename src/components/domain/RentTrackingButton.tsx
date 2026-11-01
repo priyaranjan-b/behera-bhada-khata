@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MonthField } from "@/components/ui";
 import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -92,14 +93,12 @@ export default function RentTrackingButton(
                   fullWidth
                   slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
                 />
-                <TextField
+                <MonthField
                   label="Rent paid up to"
-                  type="month"
                   value={paidThrough}
-                  onChange={(e) => setPaidThrough(e.target.value)}
+                  onChange={setPaidThrough}
                   helperText="The last month already received in your bank. Billing starts the month after."
                   fullWidth
-                  slotProps={{ inputLabel: { shrink: true } }}
                 />
                 {billingStart ? (
                   <Alert severity={endedMonths > 0 ? "warning" : "info"}>

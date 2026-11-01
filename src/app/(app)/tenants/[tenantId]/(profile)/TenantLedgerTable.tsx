@@ -4,7 +4,6 @@ import { useCallback, useMemo } from "react";
 import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -14,7 +13,7 @@ import { formatDateKey, monthDayRange } from "@/lib/dates";
 import { statusLabel } from "@/lib/domain/status";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import DataTable, { moneyColumn, SERVER_TEXT_OPERATORS, useServerGrid, type DataTableColDef } from "@/components/ui/DataTable";
-import { GridCell } from "@/components/ui";
+import { DateField, GridCell, MonthField } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
 import ProofsButton from "@/components/domain/ProofsButton";
@@ -34,7 +33,7 @@ interface Extra {
   mode: FilterMode;
   from: string;
   to: string;
-  /** yyyy-MM, from `<input type="month">`. */
+  /** yyyy-MM, from the MonthField. */
   month: string;
 }
 
@@ -183,31 +182,25 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
   const dateInputs =
     extra.mode === "all" ? undefined : extra.mode === "range" ? (
       <Stack direction="row" spacing={1}>
-        <TextField
+        <DateField
           label="From"
-          type="date"
           size="small"
           value={extra.from}
-          onChange={(e) => setExtra({ from: e.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
+          onChange={(v) => setExtra({ from: v })}
         />
-        <TextField
+        <DateField
           label="To"
-          type="date"
           size="small"
           value={extra.to}
-          onChange={(e) => setExtra({ to: e.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
+          onChange={(v) => setExtra({ to: v })}
         />
       </Stack>
     ) : (
-      <TextField
+      <MonthField
         label="Month"
-        type="month"
         size="small"
         value={extra.month}
-        onChange={(e) => setExtra({ month: e.target.value })}
-        slotProps={{ inputLabel: { shrink: true } }}
+        onChange={(v) => setExtra({ month: v })}
       />
     );
 

@@ -9,10 +9,12 @@ import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
+import Autocomplete from "@mui/material/Autocomplete";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import {
   AmountRow,
   BadgeRow,
+  DateField,
   FileAttachmentsField,
   FormActions,
   SectionCard,
@@ -24,7 +26,7 @@ import { currentMonthKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 import { prepareProofFile } from "@/lib/proofImages";
-import { PROOF_LIMITS } from "@/lib/validation";
+import { PAYMENT_NOTE_LIMITS, PROOF_LIMITS } from "@/lib/validation";
 import { PAYMENT_MODE_OPTIONS } from "@/lib/domain/payments";
 import type { PaymentMode } from "@/lib/types";
 import { api, errorMessage } from "@/lib/api-client";
@@ -36,6 +38,7 @@ export default function PaymentForm({
   periods,
   savedSignature,
   tenantMessaging,
+  noteSuggestions,
   inDialog = false,
 }: {
   tenantId: string;
@@ -44,13 +47,15 @@ export default function PaymentForm({
   savedSignature: SavedSignature | null;
   /** Twilio is set up, so the tenant can be sent a link. */
   tenantMessaging: boolean;
+  /** Quick notes from the Profile page; the owner may type anything else. */
+  noteSuggestions: string[];
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;
 }) {
   const router = useAppRouter();
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => todayKey());
-  const [mode, setMode] = useState<PaymentMode>("bank_transfer");
+  const [mode, setMode] = useState<PaymentMode>("upi");
   const [note, setNote] = useState("");
   const [proofs, setProofs] = useState<File[]>([]);
   const [notify, setNotify] = useState(tenantMessaging);
@@ -137,14 +142,12 @@ export default function PaymentForm({
                 fullWidth
               />
 
-              <TextField
+              <DateField
                 id="paymentDate"
                 label="Date received"
-                type="date"
                 required
                 value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                slotProps={{ inputLabel: { shrink: true } }}
+                onChange={setPaymentDate}
                 fullWidth
               />
 
@@ -156,11 +159,23 @@ export default function PaymentForm({
                 ))}
               </TextField>
 
-              <TextField
-                id="note"
-                label="Note (optional)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+              <Autocomplete
+                freeSolo
+                options={noteSuggestions}
+                inputValue={note}
+                onInputChange={(_e, value) => setNote(value)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    id="note"
+                    label="Note (optional)"
+                    helperText="Pick a quick note or type your own"
+                    slotProps={{
+                      ...params.slotProps,
+                      htmlInput: { ...params.slotProps.htmlInput, maxLength: PAYMENT_NOTE_LIMITS.maxLength },
+                    }}
+                  />
+                )}
                 fullWidth
               />
             </SectionCard>
