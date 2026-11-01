@@ -11,6 +11,7 @@ import {
   TENANT_MONTH_SORT_FIELDS,
 } from "@/lib/domain/billing";
 import { LEDGER_FILTER_FIELDS, LEDGER_SORT_FIELDS } from "@/lib/domain/tenantLedger";
+import { PAYMENTS_FILTER_FIELDS, PAYMENTS_SORT_FIELDS } from "@/lib/domain/payments";
 import {
   PAID_DIRECT_VIEWS,
   PAYMENT_MODES,
@@ -467,6 +468,21 @@ export const billingQuerySchema = z.object({
   to: yearMonthSchema.optional(),
   paidDirect: paidDirectViewSchema,
 });
+
+/** The Payments page (0026): at most two years of days in one view (payments_page refuses more). */
+export const PAYMENTS_LIMITS = { maxDays: 731 } as const;
+
+/** `?from=yyyy-MM-dd&to=yyyy-MM-dd` on /payments: days received; either may be missing (default: last month). */
+export const paymentsQuerySchema = z.object({
+  from: dateKeySchema.optional(),
+  to: dateKeySchema.optional(),
+});
+
+/** The Payments grid: the days, plus the grid's page, sort, search and filters (A15). */
+export const paymentsPageQuerySchema = gridQuerySchema(PAYMENTS_SORT_FIELDS, PAYMENTS_FILTER_FIELDS, {
+  sort: "paymentDate",
+  dir: "desc",
+}).extend(paymentsQuerySchema.shape);
 
 /** The Billing grid: the range and paid-direct view, plus the grid's page, sort, search and filters (A15). */
 export const billingPageQuerySchema = gridQuerySchema(BILLING_SORT_FIELDS, BILLING_FILTER_FIELDS, {

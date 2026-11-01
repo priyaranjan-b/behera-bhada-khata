@@ -697,6 +697,21 @@ export interface Database {
         };
         Returns: { rows: BillingDbRow[]; total: number; all: number; page: number };
       };
+      /** 0026: the Payments page - payments by day received, one page, with totals per mode. */
+      payments_page: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_search?: string | null;
+          p_filters?: { field: PaymentsFilterColumn; operator: string; value?: string }[];
+          p_logic?: "and" | "or";
+          p_sort?: PaymentsSortColumn;
+          p_dir?: "asc" | "desc";
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: { rows: PaymentsDbRow[]; total: number; all: number; page: number; totals: PaymentsTotalsDb };
+      };
       /** 0021: the Billing stat cards for the whole range. */
       billing_totals: {
         Args: { p_from: string; p_to: string; p_paid_direct?: boolean };
@@ -770,6 +785,33 @@ export interface BillingDbRow {
   not_yet_due: boolean;
   paid_direct: boolean;
   payments: { payment_id: string; receipt_no: string | null; payment_date: string; mode: PaymentMode; amount: number }[];
+}
+
+/** payments_page (0026): the columns it sorts and matches by. */
+export type PaymentsSortColumn = "payment_date" | "receipt_no" | "tenant_name" | "mode" | "amount";
+export type PaymentsFilterColumn = "date" | "receipt" | "tenant" | "mode" | "months" | "note";
+
+/** A row of payments_page (0026): one confirmed payment. */
+export interface PaymentsDbRow {
+  id: string;
+  receipt_no: string | null;
+  payment_date: string;
+  tenant_id: string;
+  tenant_name: string;
+  property_name: string;
+  mode: PaymentMode;
+  amount: number;
+  /** The rent months it paid, "January 2026, February 2026". */
+  months_text: string;
+  note: string;
+  acknowledged: boolean;
+}
+
+/** payments_page totals (0026): every matching row, whatever the page. */
+export interface PaymentsTotalsDb {
+  amount: number;
+  count: number;
+  by_mode: Record<PaymentMode, number>;
 }
 
 /** billing_totals (0021): the range's stat cards. */

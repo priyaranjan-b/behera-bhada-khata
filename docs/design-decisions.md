@@ -553,3 +553,27 @@ adapter → PostgREST → RLS) found injection and data-access risk low (bound
 parameters, whitelisted sort/filter columns, `like_escape`, RLS on every
 table, explicit grants), but nothing limited authenticated calls or query
 time, and the IP used for public limits could be spoofed.
+
+### A18 — The Payments page: payments by day received, cards that follow the table
+
+**Decision.** `/payments` lists every tenant's recorded payments by the day
+they were received (`payment_date`), not the rent month they paid. It opens
+on last month (whole calendar month, like Billing and the Overview); the
+date form picks any days up to `PAYMENTS_LIMITS.maxDays` and the ‹ › arrows
+move whole months by months, other ranges by their length
+(`src/lib/domain/payments.ts`).
+- **One call for the table and the per-mode cards.** The cards (Received,
+  Cash, UPI, Bank transfer, Cheque & other) must add up exactly what the
+  table finds under its search and column filters, so `payments_page()`
+  (0026) returns the totals of every matching row with the page. A separate
+  totals endpoint would have to repeat the grid's whole query.
+- **Govt rent paid direct (A11) is its own card and call.** It is never
+  recorded, so it has no date received: it counts by the rent months the
+  days touch, up to this month, and the table's search doesn't apply.
+- **Payments only.** Adjustments stay on the tenant's Ledger.
+- **Server-paged (A15).** Payments grow every month; search and filters
+  match the text shown (date as dd/MM/yyyy, mode label, "For months"),
+  built in SQL (`payment_mode_label`, `audit_date`, `audit_month`).
+
+**Why.** The owner wanted one place to see what came in, how, and when -
+Billing answers "what was owed per month", not "what arrived on which day".

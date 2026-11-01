@@ -59,7 +59,8 @@ development, required in production.
   tables page in the database vs the browser (A15), record pages in
   lazy tabs by data source (A16), and the abuse limits: owner API rate
   limit, client IP from the last `x-forwarded-for` hop, statement timeouts
-  (A17). Read it before changing
+  (A17), and the Payments page: payments by day received, cards that
+  follow the table (A18). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -541,6 +542,11 @@ Each of these was found broken somewhere; keep them when adding code.
   then columns and Excel. A destructive button is `variant="outlined"
   color="error"` (red via the theme variant in `app.ts`; the template's
   outlined style alone greys it).
+- Payments (`/payments`, A18, `src/server/services/paymentsReport.ts`):
+  every tenant's payments by day received (default last month), paged in
+  SQL (`payments_page`, 0026) with the per-mode cards in the same call so
+  they follow the table's search and filters; Govt paid direct is its own
+  card, counted by rent month.
 - Defaulters (`/defaulters`, `getDefaultersReport` in
   `src/server/services/dashboard.ts`): every tenant, moved-out ones too,
   with rent unpaid for an ended month, most months behind first. Aging

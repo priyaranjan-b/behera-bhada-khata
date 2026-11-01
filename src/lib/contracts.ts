@@ -38,6 +38,7 @@ import type {
   startRentTrackingSchema,
   billingQuerySchema,
   ownerProfileSchema,
+  paymentsQuerySchema,
   paymentNotePresetSchema,
   updateTenantSchema,
 } from "@/lib/validation";
@@ -178,6 +179,57 @@ export interface BillingPage extends TablePage<BillingRow> {
 /** GET /api/dashboard/billing/totals: the stat cards for the whole range. */
 export interface BillingTotalsView extends BillingTotals {
   /** Tenants with a month in the range. */
+  tenants: number;
+}
+
+// ---- /api/dashboard/payments (every tenant's payments by day received, 0026) --
+
+/** `?from&to`: days received, yyyy-MM-dd; none = last month. */
+export type PaymentsQuery = z.input<typeof paymentsQuerySchema>;
+
+/** The Payments grid's query: the days, plus the grid's own. */
+export interface PaymentsPageQuery extends GridQueryParams {
+  from?: string;
+  to?: string;
+}
+
+export interface PaymentListRow {
+  id: string;
+  receiptNo: string | null;
+  /** The day it was received, yyyy-MM-dd. */
+  paymentDate: string;
+  tenantId: string;
+  tenantName: string;
+  /** The tenant's tower(s) today. */
+  propertyName: string;
+  mode: PaymentMode;
+  amount: number;
+  /** The rent months it paid, "January 2026, February 2026". */
+  monthsText: string;
+  note: string;
+  /** The tenant signed for it. */
+  acknowledged: boolean;
+}
+
+/** Money per mode for every payment that matches the search and filters, whatever the page. */
+export interface PaymentTotals {
+  amount: number;
+  count: number;
+  byMode: Record<PaymentMode, number>;
+}
+
+export interface PaymentsPage extends TablePage<PaymentListRow> {
+  /** The days shown (yyyy-MM-dd, both included). */
+  from: string;
+  to: string;
+  totals: PaymentTotals;
+}
+
+/** GET /api/dashboard/payments/paid-direct: Govt rent paid to the bank directly for the rent months the days touch (A11). */
+export interface PaymentsPaidDirect {
+  amount: number;
+  /** Tenant-months counted. */
+  months: number;
   tenants: number;
 }
 

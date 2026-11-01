@@ -1,9 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Chip from "@mui/material/Chip";
+import Stack from "@mui/material/Stack";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { DATE_FORMAT } from "@/lib/dates";
+import { DATE_FORMAT, formatDateKey } from "@/lib/dates";
 import { boundOf, usePickerValue } from "./pickerValue";
 
 export interface DateFieldProps {
@@ -21,6 +23,8 @@ export interface DateFieldProps {
   helperText?: ReactNode;
   id?: string;
   sx?: SxProps<Theme>;
+  /** One-tap days under the field ("Today", "Yesterday"); the one matching the value shows selected. */
+  quickPicks?: { label: string; value: string }[];
 }
 
 /**
@@ -28,9 +32,23 @@ export interface DateFieldProps {
  * src/lib/dates.ts) in every browser, with a calendar to pick from. Never use
  * a native `type="date"` field (ESLint refuses it).
  */
-export default function DateField({ label, value, onChange, min, max, required, disabled, fullWidth, size, helperText, id, sx }: DateFieldProps) {
+export default function DateField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  required,
+  disabled,
+  fullWidth,
+  size,
+  helperText,
+  id,
+  sx,
+  quickPicks,
+}: DateFieldProps) {
   const picker = usePickerValue(value, onChange, "YYYY-MM-DD");
-  return (
+  const field = (
     <DatePicker
       label={label}
       {...picker}
@@ -41,5 +59,30 @@ export default function DateField({ label, value, onChange, min, max, required, 
       sx={sx}
       slotProps={{ textField: { id, required, fullWidth, size, helperText } }}
     />
+  );
+  if (!quickPicks?.length) return field;
+  return (
+    <Stack spacing={1}>
+      {field}
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+        {quickPicks.map((pick) => {
+          const selected = pick.value === value;
+          return (
+            <Chip
+              key={pick.label}
+              label={pick.label}
+              size="small"
+              clickable
+              disabled={disabled}
+              color={selected ? "primary" : "default"}
+              variant={selected ? "filled" : "outlined"}
+              aria-pressed={selected}
+              aria-label={`${label}: ${pick.label}, ${formatDateKey(pick.value)}`}
+              onClick={() => onChange(pick.value)}
+            />
+          );
+        })}
+      </Stack>
+    </Stack>
   );
 }

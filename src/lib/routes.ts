@@ -79,6 +79,8 @@ export const routes = {
     newPayment: (id: string) => `/tenants/${e(id)}/payments/new`,
   },
   payments: {
+    /** `from`/`to` are days received, yyyy-MM-dd; none = last month. */
+    list: (query?: { from?: string; to?: string }) => withQuery("/payments", query),
     adjust: (id: string) => `/payments/${e(id)}/adjust`,
   },
 } as const;

@@ -2078,3 +2078,97 @@ describe("statement timeouts (0023)", () => {
     ]);
   });
 });
+
+describe("payments_page (0026)", () => {
+  type Row = { receipt_no: string; payment_date: string; tenant_name: string; mode: string; amount: number; months_text: string; note: string };
+  type Page = {
+    rows: Row[];
+    total: number;
+    all: number;
+    page: number;
+    totals: { amount: number; count: number; by_mode: Record<string, number> };
+  };
+  const payments = async (args: Record<string, unknown> = {}, who: Role = owner(OWNER_A)) => {
+    const full = { from: "2026-03-01", to: "2026-03-31", ...args };
+    const names = Object.keys(full);
+    const named = names.map((n, i) => `p_${n} => $${i + 1}`).join(", ");
+    const [row] = await as<{ v: Page }>(who, `select payments_page(${named}) as v`, names.map((n) => full[n as keyof typeof full]));
+    return row.v;
+  };
+  const pay = (date: string, mode: string, amount: number, period: string, note: string | null = null, tenant = fx.tenantA) =>
+    as(
+      owner(OWNER_A),
+      `select create_payment(gen_random_uuid(), $1, $2, $3::date, $4, $5, 'sig.png', md5(random()::text),
+         now() + interval '14 days', $6::jsonb)`,
+      [tenant, amount, date, mode, note, JSON.stringify([{ rent_period_id: period, amount }])]
+    );
+  const receipts = (p: Page) => p.rows.map((r) => `${r.payment_date} ${r.mode} ${r.amount}`);
+
+  beforeEach(async () => {
+    await pay("2026-03-02", "cash", 1000, fx.periods[0].id, "Paid in cash at site");
+    await pay("2026-03-10", "upi", 2000, fx.periods[0].id, "Paid via UPI");
+    await pay("2026-03-20", "bank_transfer", 3000, fx.periods[1].id);
+    await pay("2026-03-25", "cheque", 500, fx.otherTenantPeriod, null, fx.tenantA2);
+    await pay("2026-04-01", "cash", 700, fx.periods[2].id);
+  });
+
+  it("labels modes exactly as the app does", async () => {
+    for (const [mode, label] of Object.entries(PAYMENT_MODE_LABELS)) {
+      expect((await as<{ v: string }>(owner(OWNER_A), `select payment_mode_label($1) as v`, [mode]))[0].v).toBe(label);
+    }
+  });
+
+  it("lists payments by the day received, newest first, with totals per mode", async () => {
+    const page = await payments();
+    expect(receipts(page)).toEqual([
+      "2026-03-25 cheque 500",
+      "2026-03-20 bank_transfer 3000",
+      "2026-03-10 upi 2000",
+      "2026-03-02 cash 1000",
+    ]);
+    expect(page).toMatchObject({ total: 4, all: 4, page: 0 });
+    expect(page.totals).toEqual({
+      amount: 6500,
+      count: 4,
+      by_mode: { cash: 1000, upi: 2000, bank_transfer: 3000, cheque: 500, other: 0 },
+    });
+    expect(page.rows[3]).toMatchObject({ tenant_name: "Asha", months_text: "January 2026", note: "Paid in cash at site" });
+    expect(receipts(await payments({ from: "2026-03-10", to: "2026-03-20" }))).toEqual([
+      "2026-03-20 bank_transfer 3000",
+      "2026-03-10 upi 2000",
+    ]);
+  });
+
+  it("searches and filters what the table shows, and the totals follow", async () => {
+    const upi = await payments({ search: "via upi" });
+    expect(receipts(upi)).toEqual(["2026-03-10 upi 2000"]);
+    expect(upi.totals).toMatchObject({ amount: 2000, count: 1, by_mode: { upi: 2000, cash: 0 } });
+    expect((await payments({ search: "bimal" })).total).toBe(1);
+    expect((await payments({ search: "10/03/2026" })).total).toBe(1);
+    expect((await payments({ search: "%" })).total).toBe(0);
+    const filters = JSON.stringify([
+      { field: "mode", operator: "equals", value: "Cash" },
+      { field: "mode", operator: "equals", value: "UPI" },
+    ]);
+    const either = await payments({ filters, logic: "or" });
+    expect(either).toMatchObject({ total: 2, all: 4, totals: { amount: 3000 } });
+    const months = JSON.stringify([{ field: "months", operator: "contains", value: "february" }]);
+    expect(receipts(await payments({ filters: months }))).toEqual(["2026-03-20 bank_transfer 3000"]);
+  });
+
+  it("sorts any column and clamps the page", async () => {
+    expect((await payments({ sort: "amount", dir: "asc" })).rows.map((r) => r.amount)).toEqual([500, 1000, 2000, 3000]);
+    expect((await payments({ sort: "tenant_name", dir: "desc" })).rows[0].tenant_name).toBe("Bimal");
+    expect((await payments({ sort: "mode", dir: "asc" })).rows[0].mode).toBe("bank_transfer");
+    const last = await payments({ page: 9, page_size: 10 });
+    expect(last.page).toBe(0);
+  });
+
+  it("refuses a bad query, shows nothing to anyone but the owner, and nothing to anon", async () => {
+    expect(await errorCode(payments({ sort: "note" }))).toBe("BBK00");
+    expect(await errorCode(payments({ from: "2026-03-31", to: "2026-03-01" }))).toBe("BBK00");
+    expect(await errorCode(payments({ from: "2024-01-01", to: "2026-03-31" }))).toBe("BBK00");
+    expect(await payments({}, owner(OWNER_B))).toMatchObject({ rows: [], total: 0, all: 0 });
+    expect(await errorCode(payments({}, { role: "anon" } as unknown as Role))).toBe("42501");
+  });
+});

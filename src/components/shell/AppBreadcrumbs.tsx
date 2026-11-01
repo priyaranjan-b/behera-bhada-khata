@@ -15,7 +15,7 @@ export interface Crumb {
 /**
  * Every owner page and its breadcrumb label; "/" (the Overview) starts every
  * trail. `:id` matches any dynamic segment. Add a line here when adding a
- * page; URL prefixes with no page of their own (e.g. /payments) are skipped.
+ * page; URL prefixes with no page of their own are skipped.
  */
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Overview",
@@ -36,6 +36,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/profile": "Profile",
   "/defaulters": "Defaulters",
   "/billing": "Billing",
+  "/payments": "Payments",
   "/activity": "Activity",
 };
 

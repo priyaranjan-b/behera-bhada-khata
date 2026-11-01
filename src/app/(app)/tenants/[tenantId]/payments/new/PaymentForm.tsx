@@ -22,12 +22,12 @@ import {
 } from "@/components/ui";
 import { OwnerSignatureField, type OwnerSignatureHandle } from "@/components/domain/OwnerSignatureField";
 import { suggestAllocations, summarizeBalance, type PeriodLike } from "@/lib/domain/allocation";
-import { currentMonthKey, formatMonth, todayKey } from "@/lib/dates";
+import { currentMonthKey, formatDateKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 import { prepareProofFile } from "@/lib/proofImages";
 import { PAYMENT_NOTE_LIMITS, PROOF_LIMITS } from "@/lib/validation";
-import { PAYMENT_MODE_OPTIONS } from "@/lib/domain/payments";
+import { PAYMENT_MODE_OPTIONS, recentDayPicks } from "@/lib/domain/payments";
 import type { PaymentMode } from "@/lib/types";
 import { api, errorMessage } from "@/lib/api-client";
 import type { SavedSignature } from "@/lib/contracts";
@@ -54,7 +54,8 @@ export default function PaymentForm({
 }) {
   const router = useAppRouter();
   const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(() => todayKey());
+  // No default: back entries kept getting saved as today. Today/Yesterday are one tap.
+  const [paymentDate, setPaymentDate] = useState("");
   const [mode, setMode] = useState<PaymentMode>("upi");
   const [note, setNote] = useState("");
   const [proofs, setProofs] = useState<File[]>([]);
@@ -86,6 +87,10 @@ export default function PaymentForm({
     e.preventDefault();
     setError(null);
 
+    if (!paymentDate) {
+      setError("Pick the date the money was received");
+      return;
+    }
     const signature = signatureHandle.current?.value();
     if (signature === null) {
       setError("Please sign before saving");
@@ -148,6 +153,9 @@ export default function PaymentForm({
                 required
                 value={paymentDate}
                 onChange={setPaymentDate}
+                max={todayKey()}
+                helperText="The day the money came in"
+                quickPicks={recentDayPicks()}
                 fullWidth
               />
 
@@ -249,7 +257,7 @@ export default function PaymentForm({
             error={error}
             cancelHref={routes.tenants.detail(tenantId)}
             onCancel={inDialog ? () => router.back() : undefined}
-            submitLabel="Save payment"
+            submitLabel={paymentDate ? `Save payment · received ${formatDateKey(paymentDate)}` : "Save payment"}
             pendingLabel="Saving…"
             pending={submitting}
           />

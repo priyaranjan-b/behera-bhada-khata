@@ -67,6 +67,8 @@ export const apiPaths = {
         `/api/dashboard/tenants/${e(tenantId)}/documents/${e(documentId)}`,
     },
     payments: {
+      list: "/api/dashboard/payments",
+      paidDirect: "/api/dashboard/payments/paid-direct",
       adjust: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/adjust`,
       adjustments: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/adjustments`,
       resend: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/resend`,

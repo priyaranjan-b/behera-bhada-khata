@@ -39,6 +39,10 @@ import type {
   OwnerProfileView,
   PaymentNotePresetInput,
   PaymentNotePresetView,
+  PaymentsPage,
+  PaymentsPageQuery,
+  PaymentsPaidDirect,
+  PaymentsQuery,
   PaidDirectState,
   PortfolioFacts,
   UpdateOwnerProfileInput,
@@ -142,6 +146,10 @@ export interface ApiQueries {
       newPayment(tenantId: string): Promise<NewPaymentForm>;
     };
     payments: {
+      /** Every tenant's payments by day received, one page, with totals per mode (A18). */
+      list(query?: PaymentsPageQuery): Promise<PaymentsPage>;
+      /** Govt rent paid direct for the rent months the days touch (A11). */
+      paidDirect(query?: PaymentsQuery): Promise<PaymentsPaidDirect>;
       adjust(paymentId: string): Promise<AdjustPaymentForm>;
     };
   };

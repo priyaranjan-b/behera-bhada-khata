@@ -91,6 +91,20 @@ export function addMonthsToKey(monthKey: string, months: number): string {
   return `${String(y).padStart(4, "0")}-${String(m + 1).padStart(2, "0")}-01`;
 }
 
+/** The date key `days` days after (or before, if negative) the given one. */
+export function addDaysToKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  const pad = (n: number, width = 2) => String(n).padStart(width, "0");
+  return `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+}
+
+/** Days from `from` to `to` (date keys); negative if `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  const utc = (key: string) => Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
+
 /** The first and last day (yyyy-MM-dd) of the month a key or yyyy-MM falls in. */
 export function monthDayRange(key: string): { from: string; to: string } {
   const from = monthKeyOf(key);

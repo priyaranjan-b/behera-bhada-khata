@@ -22,6 +22,10 @@ import type {
   Location,
   OwnerProfile,
   PaymentNotePreset,
+  PaymentsDbRow,
+  PaymentsFilterColumn,
+  PaymentsSortColumn,
+  PaymentsTotalsDb,
   Payment,
   PaymentAllocation,
   PaymentProof,
@@ -178,6 +182,20 @@ export interface BillingFilter {
   filters: { field: "month" | "tenant" | "status" | "payments"; operator: GridTextOperator; value?: string }[];
   logic: FilterLogic;
   sort: "period_month" | "tenant_name" | "amount_due" | "amount_allocated" | "balance" | "status";
+  dir: SortDirection;
+  page: number;
+  pageSize: number;
+}
+
+/** One page of the Payments grid, run by payments_page (0026, A15). */
+export interface PaymentsFilter {
+  /** Days received, yyyy-MM-dd, both included. */
+  from: string;
+  to: string;
+  search?: string;
+  filters: { field: PaymentsFilterColumn; operator: GridTextOperator; value?: string }[];
+  logic: FilterLogic;
+  sort: PaymentsSortColumn;
   dir: SortDirection;
   page: number;
   pageSize: number;
@@ -377,6 +395,8 @@ export interface OwnerRepositories {
      * acknowledged yet; never touches ledger facts. False otherwise.
      */
     rotateToken(id: string, tokenHash: string, expiresAt: string): Promise<boolean>;
+    /** Every tenant's payments received in the days, one page, with totals per mode of all that match. */
+    page(filter: PaymentsFilter): Promise<DbPage<PaymentsDbRow> & { totals: PaymentsTotalsDb }>;
   };
   adjustments: {
     /** `fromDate` (yyyy-MM-dd): only adjustments confirmed on or after it. */

@@ -31,6 +31,7 @@ import {
 } from "@/server/services/properties";
 import { listPaymentNotePresets } from "@/server/services/paymentNotes";
 import { getOwnerProfile } from "@/server/services/profile";
+import { getPaymentsPage, getPaymentsPaidDirect } from "@/server/services/paymentsReport";
 import { getSearchIndex } from "@/server/services/search";
 import {
   getAnyTowerTenantForm,
@@ -102,6 +103,8 @@ const inProcessApi: ApiQueries = {
       newPayment: async (id) => getNewPaymentForm(await owner(), id),
     },
     payments: {
+      list: async (query) => getPaymentsPage(await owner(), query),
+      paidDirect: async (query) => getPaymentsPaidDirect(await owner(), query),
       adjust: async (id) => getAdjustPaymentForm(await owner(), id),
     },
   },

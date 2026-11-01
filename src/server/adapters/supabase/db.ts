@@ -482,6 +482,22 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
         );
         return rows.length > 0;
       },
+      async page(filter) {
+        return must(
+          await db.rpc("payments_page", {
+            p_from: filter.from,
+            p_to: filter.to,
+            p_search: filter.search ?? null,
+            p_filters: filter.filters,
+            p_logic: filter.logic,
+            p_sort: filter.sort,
+            p_dir: filter.dir,
+            p_page: filter.page,
+            p_page_size: filter.pageSize,
+          }),
+          "read payments page"
+        );
+      },
     },
 
     adjustments: {

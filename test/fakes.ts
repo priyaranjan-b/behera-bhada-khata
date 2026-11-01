@@ -366,6 +366,13 @@ function build() {
       listProofs: vi.fn(async (ids: string[]) => [...state.proofs.values()].filter((p) => ids.includes(p.payment_id))),
       getProof: vi.fn(async (id: string) => state.proofs.get(id) ?? null),
       rotateToken: vi.fn(async (id: string) => !state.payments.get(id)?.acknowledged_at),
+      page: vi.fn(async () => ({
+        rows: [],
+        total: 0,
+        all: 0,
+        page: 0,
+        totals: { amount: 0, count: 0, by_mode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0 } },
+      })),
     },
     adjustments: {
       listForTenants: vi.fn(async () => []),

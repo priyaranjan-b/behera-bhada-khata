@@ -57,6 +57,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0020_tenant_ledger_page.sql` | `tenant_ledger_page()`: a tenant's journal and running balance, built and paged in SQL; replaces `buildTenantLedger` (D28) |
 | `0024_payment_note_presets.sql` | `payment_note_presets` (quick notes for Record payment, D30); `audit_date` writes dd/MM/yyyy |
 | `0025_correct_rent.sql` | `correct_rent()`: fix a rent entered wrongly from a month on, paid months included (D31) |
+| `0026_payments_page.sql` | `payments_page()`: every payment by day received, paged in SQL with totals per mode (A18); `payment_mode_label()`; index `payments (payment_date)` |
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 
 Seeds, in order:
