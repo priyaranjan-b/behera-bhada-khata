@@ -7,6 +7,7 @@ vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => n
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
 const {
   correctPaidThrough,
+  correctRent,
   createTenant,
   getTenantAccount,
   getTenantDetail,
@@ -181,6 +182,22 @@ describe("correctPaidThrough", () => {
     await expect(correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "July" })).rejects.toMatchObject({ status: 400 });
     await expect(correctPaidThrough(ctx, "nobody", { paidThrough: "2026-07" })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.correctPaidThrough).not.toHaveBeenCalled();
+  });
+});
+
+describe("correctRent", () => {
+  const id = "00000000-0000-4000-8000-000000000101";
+
+  it("passes the first of the month and the rent to the database", async () => {
+    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 1000 });
+    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 1000);
+  });
+
+  it("rejects a bad month or rent and an unknown tenant", async () => {
+    await expect(correctRent(ctx, id, { fromMonth: "April", monthlyRent: 1000 })).rejects.toMatchObject({ status: 400 });
+    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 0 })).rejects.toMatchObject({ status: 400 });
+    await expect(correctRent(ctx, "nobody", { fromMonth: "2026-04", monthlyRent: 1000 })).rejects.toMatchObject({ status: 404 });
+    expect(fakes.owner.tenants.correctRent).not.toHaveBeenCalled();
   });
 });
 

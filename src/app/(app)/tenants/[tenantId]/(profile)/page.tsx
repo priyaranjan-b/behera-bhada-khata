@@ -15,6 +15,7 @@ import { ActionStack, BadgeRow, DetailList, DetailRow, SectionCard } from "@/com
 import MoveOutButton from "@/components/domain/MoveOutButton";
 import AsyncSection from "@/components/ui/AsyncSection";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
+import CorrectRentButton from "@/components/domain/CorrectRentButton";
 import RentTrackingButton from "@/components/domain/RentTrackingButton";
 import TenantKindTags from "@/components/domain/TenantKindTags";
 import { unitMixLabel } from "@/lib/domain/tenant";
@@ -87,6 +88,9 @@ export default async function TenantPage({
             </DetailRow>
             <DetailRow label={untracked ? "Agreement rent" : "Combined rent"}>
               {tenant.monthlyRent > 0 ? `${formatMoney(tenant.monthlyRent)} / month` : "Not set"}
+              {tenant.billingStart && tenant.rentTracked ? (
+                <CorrectRentButton tenantId={tenantId} billingStart={tenant.billingStart} monthlyRent={tenant.monthlyRent} />
+              ) : null}
             </DetailRow>
             <DetailRow label="Security deposit">
               {tenant.depositAmount ? formatMoney(tenant.depositAmount) : draft ? "Not set" : "None"}

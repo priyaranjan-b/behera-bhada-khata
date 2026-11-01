@@ -106,6 +106,10 @@ both together.
   "Correct" button by "Billing from" on an active tenant's page calls
   `correct_paid_through`, which moves `billing_start` and adds or drops
   months (refused if a dropped month has a payment).
+- **Correcting a wrong rent** (`0025_correct_rent.sql`, D31): "Correct" by
+  "Combined rent" calls `correct_rent`, which re-prices every month from a
+  chosen month (paid ones included; refused if a month has more counted
+  than the new rent). Edit tenant's rent change is for real increases.
 - **Government tenants** (`0016_government_tenants.sql`, D26):
   `tenants.tenant_kind` is `individual | business | government`. A
   government tenant may have no phone, and with `rent_tracked = false`

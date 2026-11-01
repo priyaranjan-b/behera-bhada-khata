@@ -34,6 +34,7 @@ import type {
   createUnitSchema,
   moveOutSchema,
   correctPaidThroughSchema,
+  correctRentSchema,
   startRentTrackingSchema,
   billingQuerySchema,
   ownerProfileSchema,
@@ -545,6 +546,7 @@ export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type MoveOutInput = z.infer<typeof moveOutSchema>;
 
 export type CorrectPaidThroughInput = z.input<typeof correctPaidThroughSchema>;
+export type CorrectRentInput = z.input<typeof correctRentSchema>;
 export type StartRentTrackingInput = z.input<typeof startRentTrackingSchema>;
 
 export interface NewPaymentForm {

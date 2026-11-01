@@ -315,6 +315,12 @@ export interface OwnerRepositories {
      */
     correctPaidThrough(id: string, paidThrough: string): Promise<string>;
     /**
+     * Fixes a rent entered wrongly (0025): the rent is `monthlyRent` from
+     * `fromMonth` (a month key, not before billing start) on, and those months
+     * are re-priced even if paid; 409 if one has more counted than that.
+     */
+    correctRent(id: string, fromMonth: string, monthlyRent: number): Promise<void>;
+    /**
      * Starts billing an untracked government tenant (0016) from the month
      * after `paidThrough` (null = last month). Returns the billing start.
      */

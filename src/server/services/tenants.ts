@@ -20,6 +20,7 @@ import { errorMessage } from "@/lib/errors";
 import type { RentPeriod } from "@/lib/types";
 import {
   correctPaidThroughSchema,
+  correctRentSchema,
   createTenantSchema,
   moveOutSchema,
   startRentTrackingSchema,
@@ -365,6 +366,14 @@ export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, bo
   const db = await ownerDb();
   await requireTenant(db, tenantId);
   await db.tenants.correctPaidThrough(tenantId, paidThrough);
+}
+
+/** Fixes a rent entered wrongly (correct_rent, 0025); for a real rent change use updateTenant. */
+export async function correctRent(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const { fromMonth, monthlyRent } = parseInput(correctRentSchema, body);
+  const db = await ownerDb();
+  await requireTenant(db, tenantId);
+  await db.tenants.correctRent(tenantId, fromMonth, monthlyRent);
 }
 
 /**

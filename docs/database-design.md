@@ -56,6 +56,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0019_tenant_months_page.sql` | grid helpers (`grid_check`, `grid_row_matches`, ...), `period_display_status()`, `tenant_months_page()` for a tenant's Months (D28) |
 | `0020_tenant_ledger_page.sql` | `tenant_ledger_page()`: a tenant's journal and running balance, built and paged in SQL; replaces `buildTenantLedger` (D28) |
 | `0024_payment_note_presets.sql` | `payment_note_presets` (quick notes for Record payment, D30); `audit_date` writes dd/MM/yyyy |
+| `0025_correct_rent.sql` | `correct_rent()`: fix a rent entered wrongly from a month on, paid months included (D31) |
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 
 Seeds, in order:
@@ -762,6 +763,27 @@ its one GET (`noteSuggestions` on `…/payments/new`).
 - **Dates:** every date is written `DATE_FORMAT` (`DD/MM/YYYY`,
   `src/lib/dates.ts`); `audit_date` was redefined to match. Audit rows stored
   earlier keep their old "4 Oct 2026" text (D27).
+
+### D31 — A rent entered wrongly can be corrected, paid months included
+
+**Decision (0025).** `correct_rent(tenant, from_month, amount)` sets the
+rent from a month (not before `billing_start`) on: later rates are
+replaced, and every rent month from it is re-priced, paid or not. Refused
+(`BBK09`) only if a month already has more counted than the new rent, so
+allocations stay within `[0, amount_due]`. The UI is the "Correct" button by
+Combined rent on the tenant page.
+
+**Why not Edit tenant.** `update_tenant` is for a real change: months with
+a payment keep their price, and the new rent defaults to next month. A typo
+(1,100 for 1,000) was wrong in every month since, so those prices must
+change too.
+
+**The ledger.** Payments, adjustments and their allocations are untouched
+(D4). `amount_due` is priced from the dated rate history and was already
+rewritten by `update_tenant` and `correct_paid_through`; the audit triggers
+record each rate and month change with old and new values. The trade-off:
+the tenant's Ledger shows the corrected charge on the old month, not the old
+charge plus a reversing line.
 
 ---
 

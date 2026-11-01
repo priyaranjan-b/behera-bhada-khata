@@ -18,6 +18,7 @@ import type {
   Confirmed,
   Created,
   CorrectPaidThroughInput,
+  CorrectRentInput,
   StartRentTrackingInput,
   CreatedAdjustment,
   CreateAdjustmentInput,
@@ -173,6 +174,8 @@ export interface ApiCommands {
       update(tenantId: string, input: UpdateTenantInput): Promise<void>;
       moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
       correctPaidThrough(tenantId: string, input: CorrectPaidThroughInput): Promise<void>;
+      /** A rent entered wrongly: re-prices from a month on, paid months included. */
+      correctRent(tenantId: string, input: CorrectRentInput): Promise<void>;
       /** Government tenant (0016): bill from the month after `paidThrough`. */
       startRentTracking(tenantId: string, input: StartRentTrackingInput): Promise<void>;
       /** Undo startRentTracking; 409 once a payment is recorded. */

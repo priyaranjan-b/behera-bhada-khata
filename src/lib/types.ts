@@ -595,6 +595,11 @@ export interface Database {
         Args: { p_tenant_id: string; p_paid_through: string };
         Returns: string;
       };
+      /** 0025: fixes a wrongly entered rent from a month on, paid months included. */
+      correct_rent: {
+        Args: { p_tenant_id: string; p_from_month: string; p_monthly_amount: number };
+        Returns: undefined;
+      };
       /** 0016: starts billing an untracked government tenant; returns the new billing_start. */
       start_rent_tracking: {
         Args: { p_tenant_id: string; p_monthly_rent: number | null; p_paid_through: string | null };

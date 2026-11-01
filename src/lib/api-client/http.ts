@@ -110,6 +110,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),
         moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
         correctPaidThrough: (id, input) => post(p.dashboard.tenants.paidThrough(id), input),
+        correctRent: (id, input) => post(p.dashboard.tenants.rentCorrection(id), input),
         startRentTracking: (id, input) => post(p.dashboard.tenants.rentTracking(id), input),
         stopRentTracking: async (id) => {
           await request("DELETE", p.dashboard.tenants.rentTracking(id));

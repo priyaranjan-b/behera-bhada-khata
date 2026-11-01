@@ -1171,6 +1171,61 @@ describe("correct_paid_through (0014)", () => {
   });
 });
 
+describe("correct_rent (0025)", () => {
+  const correct = (who: Role, from: string | null, amount: number | null, tenant = fx.tenantA) =>
+    as(who, `select correct_rent($1, $2::date, $3)`, [tenant, from, amount]);
+  const dues = async () => (await periodsOf(fx.tenantA)).map((p) => p.amount_due);
+  const rates = async () =>
+    (
+      await db.query<{ m: string; amount: number }>(
+        `select to_char(effective_month, 'YYYY-MM-DD') as m, monthly_amount::float as amount
+         from tenant_rent_rates where tenant_id = $1 order by effective_month`,
+        [fx.tenantA]
+      )
+    ).rows;
+
+  it("re-prices every month from the one chosen, paid ones included, and keeps the payment", async () => {
+    // Asha: billed Jan-Mar at 5,000; February has 4,000 paid.
+    await createPayment(owner(OWNER_A), { amount: 4000, allocations: [{ rent_period_id: fx.periods[1].id, amount: 4000 }] });
+    await correct(owner(OWNER_A), "2026-01-01", 4500);
+    expect(await dues()).toEqual([4500, 4500, 4500]);
+    expect(await allocated(fx.periods[1].id)).toBe(4000);
+    expect(await rates()).toEqual([{ m: "2026-01-01", amount: 4500 }]);
+  });
+
+  it("replaces later rates but keeps earlier ones", async () => {
+    await as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, '+919876543210', 'both', null, null, 6000, '2026-03-01', null)`, [
+      fx.tenantA,
+    ]);
+    await correct(owner(OWNER_A), "2026-02-01", 4500);
+    expect(await rates()).toEqual([
+      { m: "2026-01-01", amount: 5000 },
+      { m: "2026-02-01", amount: 4500 },
+    ]);
+    expect(await dues()).toEqual([5000, 4500, 4500]);
+  });
+
+  it("won't price a month below what is already counted against it", async () => {
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[1].id, amount: 5000 }] });
+    expect(await errorCode(correct(owner(OWNER_A), "2026-01-01", 4500))).toBe("BBK09");
+    expect(await dues()).toEqual([5000, 5000, 5000]);
+    // From March, after the paid month, is fine.
+    await correct(owner(OWNER_A), "2026-03-01", 4500);
+    expect(await dues()).toEqual([5000, 5000, 4500]);
+  });
+
+  it("refuses non-owners, months before billing, a bad amount and unbilled tenants", async () => {
+    expect(await errorCode(correct(owner(OWNER_B), "2026-01-01", 4500))).toBe("BBK04");
+    expect(await errorCode(correct(owner(OWNER_A), "2025-12-01", 4500))).toBe("BBK00");
+    expect(await errorCode(correct(owner(OWNER_A), "2026-01-01", 0))).toBe("BBK00");
+    expect(await errorCode(correct(owner(OWNER_A), null, 4500))).toBe("BBK00");
+    const [{ id: draft }] = (
+      await db.query<{ id: string }>(`insert into tenants (name, status, preferred_channel) values ('Draft', 'draft', 'both') returning id`)
+    ).rows;
+    expect(await errorCode(correct(owner(OWNER_A), "2026-01-01", 4500, draft))).toBe("BBK09");
+  });
+});
+
 describe("audit log (0015)", () => {
   type Entry = { action: string; actor_kind: string; changes: Record<string, [unknown, unknown]>; tx_id: string };
   const log = async (filter = "true", params: unknown[] = []) =>

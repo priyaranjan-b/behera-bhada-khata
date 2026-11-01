@@ -292,6 +292,12 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
           "correct paid up to"
         ) as string;
       },
+      async correctRent(id, fromMonth, monthlyRent) {
+        mustWrite(
+          await db.rpc("correct_rent", { p_tenant_id: id, p_from_month: fromMonth, p_monthly_amount: monthlyRent }),
+          "correct rent"
+        );
+      },
       async startRentTracking(id, monthlyRent, paidThrough) {
         return mustWrite(
           await db.rpc("start_rent_tracking", {

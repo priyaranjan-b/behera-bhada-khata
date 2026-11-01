@@ -273,6 +273,12 @@ export const correctPaidThroughSchema = z.object({
   paidThrough: monthKeySchema,
 });
 
+/** A rent entered wrongly (0025): the right amount, from the first month it was wrong. */
+export const correctRentSchema = z.object({
+  fromMonth: monthKeySchema,
+  monthlyRent: positiveMoneySchema,
+});
+
 /**
  * Starts billing an untracked government tenant (0016): from the month after
  * `paidThrough` (default: last month). `monthlyRentAmount` is needed unless
