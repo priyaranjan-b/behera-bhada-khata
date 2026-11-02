@@ -2,6 +2,7 @@ import "server-only";
 import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must } from "../errors";
+import { billingPage, billingTotals } from "../queries/billingPage";
 import { paymentsPage } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
 import {
@@ -74,6 +75,10 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
       accountSummary: (id) => read(`read tenant account ${id}`, (tx) => tenantAccountSummary(tx, id)),
       list: (filter) => read("list tenants", (tx) => listTenants(tx, filter)),
       get: (id) => read(`get tenant ${id}`, (tx) => getTenant(tx, id)),
+    },
+    billing: {
+      page: (filter) => read(`read billing page ${pageLabel(filter)} show ${filter.show}`, (tx) => billingPage(tx, filter)),
+      totals: (range) => read(`read billing totals ${range.from}..${range.to}`, (tx) => billingTotals(tx, range)),
     },
     rentPeriods: {
       listForTenants: (ids, filter) => read(`list rent periods of ${ids.length} tenants`, (tx) => listRentPeriods(tx, ids, filter)),

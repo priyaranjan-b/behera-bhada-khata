@@ -29,30 +29,38 @@ export function labelOf(value: SQL, labels: Record<string, string>, fallback: st
 export const tenantDisplayName = (businessName: SQL, name: SQL) => sql`coalesce(nullif(${businessName}, ''), ${name}, ${NOT_SET})`;
 
 /**
- * The towers of the houses a tenant holds on `today` (yyyy-MM-dd), or held
- * last once moved out, as "Tower 1, Tower 2" by first house code; "—" with
- * none (tenant_placement_now's property_name, 0021; currentPlacement in
- * src/server/services/placements.ts). `today` comes from the app's clock
- * (todayKey), like every page.
+ * The houses a tenant holds on `today` (yyyy-MM-dd), or held last once moved
+ * out (tenant_placement_now, 0021; currentPlacement in
+ * src/server/services/placements.ts), as rows (unit_code, property_name) to
+ * select from. `today` comes from the app's clock (todayKey), like every page.
  */
-export function towersNow(tenantId: SQL, today: string): SQL {
+function housesNow(tenantId: SQL, today: string): SQL {
   const holds = (endDate: SQL) => sql`(${endDate} is null or ${endDate} >= ${today}::date)`;
+  return sql`(
+    select tu.unit_code, coalesce(pr.name, u.property_code) as property_name
+    from tenant_units tu
+    join units u on u.unit_code = tu.unit_code
+    left join properties pr on pr.property_code = u.property_code
+    where tu.tenant_id = ${tenantId}
+      and (
+        ${holds(sql`tu.end_date`)}
+        or (
+          not exists (select 1 from tenant_units h where h.tenant_id = ${tenantId} and ${holds(sql`h.end_date`)})
+          and tu.end_date = (select max(h.end_date) from tenant_units h where h.tenant_id = ${tenantId})
+        )
+      )
+  )`;
+}
+
+/** Their towers, as "Tower 1, Tower 2" by first house code; NOT_SET with none. */
+export function towersNow(tenantId: SQL, today: string): SQL {
   return sql`coalesce((
     select string_agg(x.property_name, ', ' order by x.first_code)
-    from (
-      select coalesce(pr.name, u.property_code) as property_name, min(tu.unit_code) as first_code
-      from tenant_units tu
-      join units u on u.unit_code = tu.unit_code
-      left join properties pr on pr.property_code = u.property_code
-      where tu.tenant_id = ${tenantId}
-        and (
-          ${holds(sql`tu.end_date`)}
-          or (
-            not exists (select 1 from tenant_units h where h.tenant_id = ${tenantId} and ${holds(sql`h.end_date`)})
-            and tu.end_date = (select max(h.end_date) from tenant_units h where h.tenant_id = ${tenantId})
-          )
-        )
-      group by 1
-    ) x
+    from (select h.property_name, min(h.unit_code) as first_code from ${housesNow(tenantId, today)} h group by 1) x
   ), ${NOT_SET})`;
+}
+
+/** Their house codes, sorted; empty with none. */
+export function unitCodesNow(tenantId: SQL, today: string): SQL {
+  return sql`coalesce((select array_agg(h.unit_code order by h.unit_code) from ${housesNow(tenantId, today)} h), '{}'::text[])`;
 }

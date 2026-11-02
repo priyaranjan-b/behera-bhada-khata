@@ -31,6 +31,8 @@ export interface LedgerDb {
     leaseStart: string;
     units: string[];
     kind?: "individual" | "business" | "government";
+    /** false: a government tenant whose rent is paid to the owner directly (0016). Default true. */
+    rentTracked?: boolean;
   }): Promise<string>;
   /** Bills every given tenant up to `through` (ensure_rent_periods). */
   bill(tenantIds: string[], through: string): Promise<void>;
@@ -64,7 +66,7 @@ export async function createLedgerDb(): Promise<LedgerDb> {
       const [row] = await rows<{ id: string }>(
         asOwner,
         sql`select create_tenant(${t.name}, null, ${phone}, 'both', ${t.rent}, ${t.leaseStart}::date,
-              ${textArray(t.units)}, null, null, ${kind}, true) as id`
+              ${textArray(t.units)}, null, null, ${kind}, ${t.rentTracked ?? true}) as id`
       );
       return row.id;
     },

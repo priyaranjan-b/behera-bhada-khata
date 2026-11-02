@@ -1,19 +1,11 @@
 import "server-only";
-import { addMonthsToKey, currentMonthKey } from "@/lib/dates";
-import { paidDirectId, paidDirectMonths } from "@/lib/domain/billing";
+import { billedThroughMonth, paidDirectId, paidDirectMonths } from "@/lib/domain/billing";
 import { isRentTracked } from "@/lib/domain/tenant";
 import type { RentPeriod, Tenant, TenantRentRate } from "@/lib/types";
 import { systemDb } from "@/server/infra";
 
-const LOOKAHEAD_MONTHS = 2;
-
-/** The last month rent months exist for (billed ahead up to LOOKAHEAD_MONTHS). */
-export function throughMonth(): string {
-  return addMonthsToKey(currentMonthKey(), LOOKAHEAD_MONTHS);
-}
-
 // Creates any rent_periods between each tenant's lease start and
-// LOOKAHEAD_MONTHS from now that don't already exist, so a tenant who is
+// RENT_LOOKAHEAD_MONTHS from now that don't already exist, so a tenant who is
 // months behind (or who the owner hasn't logged a payment for yet) always
 // shows up as overdue rather than simply missing. One set-based statement
 // however many tenants, and a no-op once the periods exist - cheap enough to
@@ -21,7 +13,7 @@ export function throughMonth(): string {
 // Callers pass ids they already got from an owner-scoped query.
 export async function ensureRentPeriodsFor(tenantIds: string[]): Promise<void> {
   if (tenantIds.length === 0) return;
-  await systemDb().rentPeriods.ensure(tenantIds, throughMonth());
+  await systemDb().rentPeriods.ensure(tenantIds, billedThroughMonth());
 }
 
 /** Rent months by tenant id. */
@@ -55,7 +47,7 @@ export function paidDirectPeriods(
   ratesByTenant: Map<string, TenantRentRate[]>,
   months: string[]
 ): RentPeriod[] {
-  const horizon = throughMonth();
+  const horizon = billedThroughMonth();
   return paidDirectTenants(tenants).flatMap((t) =>
     paidDirectMonths(
       { leaseStart: t.lease_start, movedOutOn: t.moved_out_on },
@@ -77,7 +69,7 @@ export function paidDirectPeriods(
 /** Cron: top up periods for every active tenant and drop expired rate-limit counters. */
 export async function runDailyUpkeep(): Promise<{ periodsCreated: number; rateLimitsPruned: number }> {
   const db = systemDb();
-  const periodsCreated = await db.rentPeriods.ensure(null, throughMonth());
+  const periodsCreated = await db.rentPeriods.ensure(null, billedThroughMonth());
   const rateLimitsPruned = await db.rateLimits.prune();
   return { periodsCreated, rateLimitsPruned };
 }

@@ -606,7 +606,9 @@ routes, contracts and the UI don't change.
   `rentPeriods.listForTenants/listByIds`, `payments.listForTenants/get/
   listAllocations/listAllocationsForPeriods/listProofs/getProof` and
   `adjustments.listForTenants/get/listAllocations` (`tables/ledger.ts`);
-  `payments.page` (replaces `payments_page`, `queries/paymentsPage.ts`).
+  `payments.page` (replaces `payments_page`, `queries/paymentsPage.ts`);
+  `billing.page` and `billing.totals` (replace `billing_page` and
+  `billing_totals`, `queries/billingPage.ts`).
   Update this line as each method moves.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
@@ -628,6 +630,12 @@ routes, contracts and the UI don't change.
   page names its range, page, sort and filter count, never the search text.
   The parity test for each page runs a matrix of searches, filters, sorts
   and pages against the SQL function it replaces.
+- **The app's clock, not the database's.** "Today", "this month" and the
+  billing horizon in these queries come from one read of `todayKey()` per
+  statement (`RENT_LOOKAHEAD_MONTHS` ahead for the horizon), the clock the
+  pages and `summarizeBalance` use, where the SQL functions read
+  `app_current_month()`. Both are Asia/Kolkata, so they only disagree for a
+  moment around midnight; the parity tests rely on that.
 - **Same values as PostgREST.** Money reads back as a JS number, which is
   what PostgREST sends and what `src/lib/types.ts` declares (`number`, since
   Nov 2026; it used to say `string`). Dates are `yyyy-MM-dd` keys and
