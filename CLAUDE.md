@@ -43,6 +43,17 @@ everywhere (tenant messages then show as "not delivered" and OTP sends fail;
 a production server logs a warning). `CRON_SECRET` is optional in
 development, required in production.
 
+## Code review
+
+Run `/review-all` before a commit or PR (`/review-all security` for one
+area). It runs the read-only reviewers in `.claude/agents/` in parallel and
+merges their findings: `architecture-reviewer`, `security-reviewer`,
+`database-reviewer` (when `supabase/` or the data layer changed),
+`production-readiness-reviewer` and `ui-conventions-reviewer` (when the UI
+changed). They apply the rules in this file and `docs/`, so a new rule goes
+here, not into an agent. Anything a tool can check belongs in ESLint or a
+test instead.
+
 ## Architecture
 
 ### Design decisions
