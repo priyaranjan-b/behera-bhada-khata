@@ -201,7 +201,7 @@ export interface PaymentsFilter {
   pageSize: number;
 }
 
-/** One page of a tenant's ledger, run by tenant_ledger_page (0020, A15). */
+/** One page of a tenant's ledger: tenant_ledger_page (0020, A15), or queries/tenantLedgerPage.ts on Drizzle (A19). */
 export interface TenantLedgerFilter {
   tenantId: string;
   /** yyyy-MM-dd, inclusive. */
