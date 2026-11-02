@@ -3,6 +3,19 @@ import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must } from "../errors";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
+import {
+  getAdjustment,
+  getPayment,
+  getPaymentProof,
+  listAdjustmentAllocations,
+  listAdjustments,
+  listAllocationsForPeriods,
+  listPaymentAllocations,
+  listPaymentProofs,
+  listPayments,
+  listRentPeriods,
+  listRentPeriodsByIds,
+} from "../tables/ledger";
 import { getOwnerProfile, listPaymentNotePresets } from "../tables/owner";
 import { getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
 import { getTenant, listRentRates, listTenants } from "../tables/tenants";
@@ -39,15 +52,36 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
       list: (filter) => read("list units", (tx) => listUnits(tx, filter)),
     },
     occupancy: {
-      list: (filter) => read("list occupancy", (tx) => listOccupancy(tx, filter)),
+      list: (filter) =>
+        read(filter?.tenantIds ? `list occupancy of ${filter.tenantIds.length} tenants` : "list occupancy", (tx) =>
+          listOccupancy(tx, filter)
+        ),
     },
     rentRates: {
-      listForTenants: (ids) => read("list rent rates", (tx) => listRentRates(tx, ids)),
+      listForTenants: (ids) => read(`list rent rates of ${ids.length} tenants`, (tx) => listRentRates(tx, ids)),
     },
     tenants: {
       accountSummary: (id) => read(`read tenant account ${id}`, (tx) => tenantAccountSummary(tx, id)),
       list: (filter) => read("list tenants", (tx) => listTenants(tx, filter)),
       get: (id) => read(`get tenant ${id}`, (tx) => getTenant(tx, id)),
+    },
+    rentPeriods: {
+      listForTenants: (ids, filter) => read(`list rent periods of ${ids.length} tenants`, (tx) => listRentPeriods(tx, ids, filter)),
+      listByIds: (ids) => read(`list ${ids.length} rent periods`, (tx) => listRentPeriodsByIds(tx, ids)),
+    },
+    payments: {
+      listForTenants: (ids, filter) => read(`list payments of ${ids.length} tenants`, (tx) => listPayments(tx, ids, filter)),
+      get: (id) => read(`get payment ${id}`, (tx) => getPayment(tx, id)),
+      listAllocations: (id) => read(`list allocations of payment ${id}`, (tx) => listPaymentAllocations(tx, id)),
+      listAllocationsForPeriods: (ids) =>
+        read(`list allocations for ${ids.length} months`, (tx) => listAllocationsForPeriods(tx, ids)),
+      listProofs: (ids) => read(`list proofs of ${ids.length} payments`, (tx) => listPaymentProofs(tx, ids)),
+      getProof: (id) => read(`get payment proof ${id}`, (tx) => getPaymentProof(tx, id)),
+    },
+    adjustments: {
+      listForTenants: (ids, filter) => read(`list adjustments of ${ids.length} tenants`, (tx) => listAdjustments(tx, ids, filter)),
+      get: (id) => read(`get adjustment ${id}`, (tx) => getAdjustment(tx, id)),
+      listAllocations: (id) => read(`list allocations of adjustment ${id}`, (tx) => listAdjustmentAllocations(tx, id)),
     },
   };
 }

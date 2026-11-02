@@ -1976,7 +1976,8 @@ describe("tenant_account_summary (0022)", () => {
        from rent_periods where tenant_id = $1`,
       [tenantId]
     );
-    return rows;
+    // numeric comes back as text from PGlite; the app's rows carry numbers.
+    return rows.map((r) => ({ ...r, amount_due: Number(r.amount_due), amount_allocated: Number(r.amount_allocated) }));
   }
 
   it("splits owed (ended months) from not due yet, as summarizeBalance does", async () => {

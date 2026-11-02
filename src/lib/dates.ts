@@ -99,6 +99,16 @@ export function addDaysToKey(dateKey: string, days: number): string {
   return `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
+/**
+ * 00:00 UTC on the day before `dateKey`, as an ISO timestamp: a lower bound
+ * for every instant of that day in APP_TIME_ZONE (ahead of UTC), so a query
+ * on a timestamp column can't miss the day's first hours. It may return a few
+ * hours of the day before; callers bucket by dateKeyOf().
+ */
+export function utcStartOfDayBefore(dateKey: string): string {
+  return `${addDaysToKey(dateKey, -1)}T00:00:00.000Z`;
+}
+
 /** Days from `from` to `to` (date keys); negative if `to` is earlier. */
 export function daysBetween(from: string, to: string): number {
   const utc = (key: string) => Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));

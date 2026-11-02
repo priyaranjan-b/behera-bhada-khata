@@ -14,6 +14,7 @@ import {
   todayKey,
   yearMonthOf,
   monthDayRange,
+  utcStartOfDayBefore,
 } from "./dates";
 
 describe("dates (Asia/Kolkata)", () => {
@@ -88,5 +89,15 @@ describe("monthDayRange", () => {
     expect(monthDayRange("2026-02-14")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
     expect(monthDayRange("2028-02")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
     expect(monthDayRange("2026-12-01")).toEqual({ from: "2026-12-01", to: "2026-12-31" });
+  });
+});
+
+describe("utcStartOfDayBefore", () => {
+  it("is 00:00 UTC the day before, so it covers the whole app-time-zone day", () => {
+    expect(utcStartOfDayBefore("2026-03-01")).toBe("2026-02-28T00:00:00.000Z");
+    expect(utcStartOfDayBefore("2026-01-01")).toBe("2025-12-31T00:00:00.000Z");
+    // 00:00 IST on the day is 18:30 UTC the day before: inside the bound.
+    expect(Date.parse(utcStartOfDayBefore("2026-10-15"))).toBeLessThanOrEqual(Date.parse("2026-10-15T00:00:00+05:30"));
+    expect(dateKeyOf("2026-10-14T18:30:00Z")).toBe("2026-10-15");
   });
 });

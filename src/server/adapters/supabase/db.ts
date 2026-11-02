@@ -1,12 +1,8 @@
 import "server-only";
+import { utcStartOfDayBefore } from "@/lib/dates";
 import type { RentPeriod } from "@/lib/types";
 import type { AuditEvent, AuditFilter, OwnerRepositories, SystemRepositories } from "@/server/ports";
 import { chunk, createAdminClient, createSessionClient, must, mustWrite, type Supabase } from "./clients";
-
-/** One day before a yyyy-MM-dd key, as an ISO timestamp - a safe lower bound for an app-time-zone day. */
-function dayBefore(dateKey: string): string {
-  return new Date(Date.parse(`${dateKey}T00:00:00Z`) - 24 * 60 * 60 * 1000).toISOString();
-}
 
 // Asia/Kolkata has no daylight saving, so a day there is a fixed UTC range.
 const APP_UTC_OFFSET = "+05:30";
@@ -33,8 +29,9 @@ function logEventArgs(event: AuditEvent) {
   };
 }
 
+/** Oldest month first, then by tenant ((tenant, month) is unique), as the Drizzle adapter orders them. */
 function byPeriodMonth(a: RentPeriod, b: RentPeriod): number {
-  return a.period_month.localeCompare(b.period_month);
+  return a.period_month.localeCompare(b.period_month) || a.tenant_id.localeCompare(b.tenant_id);
 }
 
 /**
@@ -507,7 +504,7 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
           chunk(tenantIds).map(async (ids) => {
             let query = db.from("adjustments").select("*").in("tenant_id", ids);
             if (filter.status) query = query.eq("status", filter.status);
-            if (filter.fromDate) query = query.gte("confirmed_at", dayBefore(filter.fromDate));
+            if (filter.fromDate) query = query.gte("confirmed_at", utcStartOfDayBefore(filter.fromDate));
             return must(await query, "list adjustments");
           })
         );

@@ -6,8 +6,8 @@ import { round2 } from "@/lib/money";
 export interface PeriodLike {
   id: string;
   period_month: string;
-  amount_due: number | string;
-  amount_allocated: number | string;
+  amount_due: number;
+  amount_allocated: number;
 }
 
 export interface AllocationSuggestion {

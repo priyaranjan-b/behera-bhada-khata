@@ -108,7 +108,7 @@ export function monthsIn(range: MonthRange): string[] {
  */
 export function paidDirectMonths(
   tenant: { leaseStart: string | null; movedOutOn: string | null },
-  rates: { effective_month: string; monthly_amount: number | string }[],
+  rates: { effective_month: string; monthly_amount: number }[],
   months: string[],
   throughMonth: string
 ): { month: string; amount: number }[] {

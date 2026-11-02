@@ -602,8 +602,11 @@ routes, contracts and the UI don't change.
   `tenant_account_summary`); the plain reads `ownerProfile.get`,
   `paymentNotePresets.list`, `locations.list`, `properties.list/get`,
   `units.list`, `occupancy.list`, `tenants.list/get` and
-  `rentRates.listForTenants` (`tables/`). Update this line as each method
-  moves.
+  `rentRates.listForTenants` (`tables/`); the plain ledger reads
+  `rentPeriods.listForTenants/listByIds`, `payments.listForTenants/get/
+  listAllocations/listAllocationsForPeriods/listProofs/getProof` and
+  `adjustments.listForTenants/get/listAllocations` (`tables/ledger.ts`).
+  Update this line as each method moves.
 - **Same values as PostgREST.** Money reads back as a JS number, which is
   what PostgREST sends and what `src/lib/types.ts` declares (`number`, since
   Nov 2026; it used to say `string`). Dates are `yyyy-MM-dd` keys and
@@ -612,7 +615,10 @@ routes, contracts and the UI don't change.
 - **No chunking.** The Supabase adapter splits long id lists (`chunk()`)
   because they go into a PostgREST URL, then merges and re-sorts in JS. A
   Drizzle query sends them as bound parameters, so it is one query and the
-  database's `order by` (with a unique tie-break) is the order.
+  database's `order by` (with a unique tie-break) is the order. Postgres
+  allows 65,535 parameters per statement; these lists are a page's records
+  or one record's months, a few hundred at most. Error labels name how many
+  ids a list read had (`list payments of 26 tenants`), never row values.
 - **Same database guarantees.** Every query runs through `inScope()`
   (`client.ts`): one transaction that switches to `authenticated` with the
   session's verified user id (`sessionJwtClaims()` in the Supabase auth
