@@ -5,6 +5,7 @@ import { must } from "../errors";
 import { billingPage, billingTotals } from "../queries/billingPage";
 import { paymentsPage } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
+import { tenantLedgerPage } from "../queries/tenantLedgerPage";
 import {
   getAdjustment,
   getPayment,
@@ -27,8 +28,18 @@ import { getTenant, listRentRates, listTenants } from "../tables/tenants";
  * page, sort and how many filters, and whether there was a search but never
  * its text (it can hold names or phone numbers).
  */
-function pageLabel(f: { from: string; to: string; page: number; pageSize: number; sort: string; dir: string; filters: unknown[]; search?: string }): string {
-  return `${f.from}..${f.to} page ${f.page}x${f.pageSize} by ${f.sort} ${f.dir}, ${f.filters.length} filters${f.search ? ", searched" : ""}`;
+function pageLabel(f: {
+  from?: string;
+  to?: string;
+  page: number;
+  pageSize: number;
+  sort: string;
+  dir: string;
+  filters: unknown[];
+  search?: string;
+}): string {
+  const range = f.from || f.to ? `${f.from ?? ""}..${f.to ?? ""} ` : "";
+  return `${range}page ${f.page}x${f.pageSize} by ${f.sort} ${f.dir}, ${f.filters.length} filters${f.search ? ", searched" : ""}`;
 }
 
 /** Some methods of some namespaces: what the Drizzle adapter implements so far. */
@@ -79,6 +90,13 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
     billing: {
       page: (filter) => read(`read billing page ${pageLabel(filter)} show ${filter.show}`, (tx) => billingPage(tx, filter)),
       totals: (range) => read(`read billing totals ${range.from}..${range.to}`, (tx) => billingTotals(tx, range)),
+    },
+    ledger: {
+      page: (filter) =>
+        read(
+          `read ledger page of tenant ${filter.tenantId} ${pageLabel({ ...filter, from: filter.fromDate, to: filter.toDate })}`,
+          (tx) => tenantLedgerPage(tx, filter)
+        ),
     },
     rentPeriods: {
       listForTenants: (ids, filter) => read(`list rent periods of ${ids.length} tenants`, (tx) => listRentPeriods(tx, ids, filter)),

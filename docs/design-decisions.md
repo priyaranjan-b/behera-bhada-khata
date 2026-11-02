@@ -608,7 +608,8 @@ routes, contracts and the UI don't change.
   `adjustments.listForTenants/get/listAllocations` (`tables/ledger.ts`);
   `payments.page` (replaces `payments_page`, `queries/paymentsPage.ts`);
   `billing.page` and `billing.totals` (replace `billing_page` and
-  `billing_totals`, `queries/billingPage.ts`).
+  `billing_totals`, `queries/billingPage.ts`); `ledger.page` (replaces
+  `tenant_ledger_page`, `queries/tenantLedgerPage.ts`).
   Update this line as each method moves.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
