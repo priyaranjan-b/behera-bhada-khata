@@ -5,7 +5,11 @@ import { customType } from "drizzle-orm/pg-core";
 // (PostgREST JSON), so rows keep the shapes in src/lib/types.ts whichever
 // adapter is bound.
 
-/** numeric(12,2) as a plain JS number (src/lib/money.ts rounds through round2). */
+/**
+ * numeric(12,2) as a JS number, which is what PostgREST sends (a JSON number)
+ * and what src/lib/types.ts declares, so the value is the same whichever
+ * adapter is bound. Aggregates in queries/ use sql`...`.mapWith(Number).
+ */
 export const money = customType<{ data: number; driverData: string }>({
   dataType: () => "numeric(12,2)",
   fromDriver: (value) => Number(value),

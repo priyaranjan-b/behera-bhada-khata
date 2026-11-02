@@ -2096,13 +2096,49 @@ describe("app_drizzle login (0027)", () => {
   });
 
   it("ends in the same state when the role already existed with other settings", async () => {
-    await db.exec(`alter role app_drizzle inherit createdb bypassrls; grant service_role to app_drizzle;`);
+    await db.exec(`alter role app_drizzle inherit createdb createrole; grant service_role to app_drizzle;`);
     await db.exec(readFileSync(path.join(MIGRATIONS, "0027_app_drizzle_role.sql"), "utf8"));
     const { rows } = await db.query(
-      `select rolinherit, rolcreatedb, rolbypassrls, pg_has_role('app_drizzle', 'service_role', 'MEMBER') as service
+      `select rolinherit, rolcreatedb, rolcreaterole, pg_has_role('app_drizzle', 'service_role', 'MEMBER') as service
        from pg_roles where rolname = 'app_drizzle'`
     );
-    expect(rows).toEqual([{ rolinherit: false, rolcreatedb: false, rolbypassrls: false, service: false }]);
+    expect(rows).toEqual([{ rolinherit: false, rolcreatedb: false, rolcreaterole: false, service: false }]);
+  });
+
+  it("runs as a role that isn't a superuser, like Supabase's postgres in the SQL editor", async () => {
+    // What Supabase's postgres has: CREATEROLE/CREATEDB, admin of the API roles
+    // and of the roles it created, but not SUPERUSER.
+    await db.exec(`
+      create role migrator_0027 createrole createdb;
+      grant authenticated, service_role to migrator_0027 with admin option;
+      grant app_drizzle to migrator_0027 with admin option, inherit false, set false;
+      set role migrator_0027;
+      grant service_role to app_drizzle;
+    `);
+    try {
+      await db.exec(readFileSync(path.join(MIGRATIONS, "0027_app_drizzle_role.sql"), "utf8"));
+      await db.exec(`reset role`);
+      const { rows } = await db.query(
+        `select rolinherit, rolsuper, rolbypassrls, pg_has_role('app_drizzle', 'authenticated', 'MEMBER') as owner,
+                pg_has_role('app_drizzle', 'service_role', 'MEMBER') as service
+         from pg_roles where rolname = 'app_drizzle'`
+      );
+      expect(rows).toEqual([{ rolinherit: false, rolsuper: false, rolbypassrls: false, owner: true, service: false }]);
+    } finally {
+      // Never leave the test role behind for the 0027 cases that follow.
+      await db.exec(`reset role; drop owned by migrator_0027; drop role migrator_0027`);
+    }
+  });
+
+  it("refuses a role that has BYPASSRLS, which only a superuser can remove", async () => {
+    await db.exec(`alter role app_drizzle bypassrls`);
+    try {
+      await expect(db.exec(readFileSync(path.join(MIGRATIONS, "0027_app_drizzle_role.sql"), "utf8"))).rejects.toThrow(
+        /SUPERUSER, REPLICATION or BYPASSRLS/
+      );
+    } finally {
+      await db.exec(`alter role app_drizzle nobypassrls`);
+    }
   });
 
   it("can read and run nothing before switching role", async () => {

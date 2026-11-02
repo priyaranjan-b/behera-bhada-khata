@@ -55,14 +55,27 @@ afterAll(async () => {
 });
 
 async function databaseShapes(): Promise<Record<string, Shape>> {
-  const { rows } = await db.query<{ table_name: string; column_name: string; udt_name: string; is_nullable: string }>(
-    `select table_name, column_name, udt_name, is_nullable from information_schema.columns
+  const { rows } = await db.query<{
+    table_name: string;
+    column_name: string;
+    udt_name: string;
+    is_nullable: string;
+    generated_from_not_null: boolean;
+  }>(
+    `select table_name, column_name, udt_name, is_nullable,
+            -- tower_code / house_number: generated from a not-null code, so never null,
+            -- though Postgres reports every generated column as nullable.
+            (is_generated = 'ALWAYS' and (table_name, column_name) in (('properties', 'tower_code'), ('units', 'house_number'))) as generated_from_not_null
+     from information_schema.columns
      where table_schema = 'public' order by table_name, ordinal_position`
   );
   const shapes: Record<string, Shape> = {};
   for (const r of rows) {
     shapes[r.table_name] ??= {};
-    shapes[r.table_name][r.column_name] = { type: r.udt_name, nullable: r.is_nullable === "YES" };
+    shapes[r.table_name][r.column_name] = {
+      type: r.udt_name,
+      nullable: r.is_nullable === "YES" && !r.generated_from_not_null,
+    };
   }
   return shapes;
 }

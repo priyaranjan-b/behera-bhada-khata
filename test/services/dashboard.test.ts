@@ -8,13 +8,13 @@ const { getDefaultersReport } = await import("@/server/services/dashboard");
 
 const ctx = { ownerId: OWNER_ID };
 
-const period = (tenant_id: string, period_month: string, amount_allocated = "0.00"): RentPeriod => ({
+const period = (tenant_id: string, period_month: string, amount_allocated = 0): RentPeriod => ({
   id: `${tenant_id}-${period_month}`,
   tenant_id,
   period_month,
-  amount_due: "5000.00",
+  amount_due: 5000,
   amount_allocated,
-  status: amount_allocated === "0.00" ? "pending" : "partially_paid",
+  status: amount_allocated === 0 ? "pending" : "partially_paid",
   created_at: "2026-01-01T00:00:00Z",
 });
 
@@ -35,7 +35,7 @@ describe("getDefaultersReport", () => {
     ]);
     fakes.owner.rentPeriods.listForTenants.mockResolvedValue([
       period("00000000-0000-4000-8000-000000000101", "2026-09-01"),
-      period("00000000-0000-4000-8000-000000000102", "2026-07-01", "1000.00"),
+      period("00000000-0000-4000-8000-000000000102", "2026-07-01", 1000),
       period("00000000-0000-4000-8000-000000000102", "2026-09-01"),
       // This month isn't due yet, so Chitra isn't behind.
       period("00000000-0000-4000-8000-000000000103", "2026-10-01"),

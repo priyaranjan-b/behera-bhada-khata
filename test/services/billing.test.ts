@@ -102,7 +102,7 @@ describe("Billing", () => {
       tenant({ id: GOVT, name: "Post Office", tenant_kind: "government", rent_tracked: false, billing_start: null, lease_start: "2022-01-01" }),
     ]);
     fakes.owner.rentRates.listForTenants.mockResolvedValue([
-      { id: 9, tenant_id: GOVT, effective_month: "2022-01-01", monthly_amount: "5300.00", created_at: "", recorded_by: null },
+      { id: 9, tenant_id: GOVT, effective_month: "2022-01-01", monthly_amount: 5300, created_at: "", recorded_by: null },
     ]);
     fakes.owner.payments.listForTenants.mockResolvedValue([]);
     expect(await getBillingReceived(ctx, { from: "2026-09", to: "2026-10", paidDirect: "show" })).toEqual({

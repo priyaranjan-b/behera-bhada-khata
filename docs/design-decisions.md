@@ -592,14 +592,27 @@ routes, contracts and the UI don't change.
   the rate-limit counter. Anything whose guarantee must hold for every
   writer stays in Postgres, called through typed wrappers (`procedures/`,
   added with the first wrapper).
-- **Moved so far:** `tenants.accountSummary` (replaces
-  `tenant_account_summary`). Update this line as each method moves.
   That covers triggers (audit log, permanent codes, deposit, receipt
   numbers), `is_app_owner()` and RLS, and the money-moving and
   dated-history functions (`create_payment`, `create_adjustment`,
   `correct_rent`, the tenant lifecycle, `ensure_rent_periods`, D4/D5/D9).
   Those functions lock, check and write in one round trip, and they let the
   owner role keep its writes revoked.
+- **Moved so far:** `tenants.accountSummary` (replaces
+  `tenant_account_summary`); the plain reads `ownerProfile.get`,
+  `paymentNotePresets.list`, `locations.list`, `properties.list/get`,
+  `units.list`, `occupancy.list`, `tenants.list/get` and
+  `rentRates.listForTenants` (`tables/`). Update this line as each method
+  moves.
+- **Same values as PostgREST.** Money reads back as a JS number, which is
+  what PostgREST sends and what `src/lib/types.ts` declares (`number`, since
+  Nov 2026; it used to say `string`). Dates are `yyyy-MM-dd` keys and
+  timestamps ISO strings. The parity test for plain reads compares with
+  Postgres' `json_agg` of the same rows, which is what PostgREST sends.
+- **No chunking.** The Supabase adapter splits long id lists (`chunk()`)
+  because they go into a PostgREST URL, then merges and re-sorts in JS. A
+  Drizzle query sends them as bound parameters, so it is one query and the
+  database's `order by` (with a unique tie-break) is the order.
 - **Same database guarantees.** Every query runs through `inScope()`
   (`client.ts`): one transaction that switches to `authenticated` with the
   session's verified user id (`sessionJwtClaims()` in the Supabase auth
