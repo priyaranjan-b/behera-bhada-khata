@@ -577,3 +577,72 @@ move whole months by months, other ranges by their length
 
 **Why.** The owner wanted one place to see what came in, how, and when -
 Billing answers "what was owed per month", not "what arrived on which day".
+
+### A19 — A Drizzle data adapter, moved one port method at a time
+
+**Decision.** `src/server/adapters/drizzle/` is a second implementation of
+the data ports (`src/server/ports.ts`), built on Drizzle ORM and postgres-js.
+`src/server/infra/index.ts` lays the methods it implements over the Supabase
+adapter, one namespace method at a time. `DATA_ADAPTER=supabase` (the
+default) binds none of them, which makes it the rollback switch. Services,
+routes, contracts and the UI don't change.
+- **What moves and what stays.** Reads that only rebuild what the app
+  already knows move to TS (`queries/`): the `…_page()` report functions,
+  the grid helpers, label and status helpers, `tenant_account_summary`, and
+  the rate-limit counter. Anything whose guarantee must hold for every
+  writer stays in Postgres, called through typed wrappers (`procedures/`,
+  added with the first wrapper).
+- **Moved so far:** `tenants.accountSummary` (replaces
+  `tenant_account_summary`). Update this line as each method moves.
+  That covers triggers (audit log, permanent codes, deposit, receipt
+  numbers), `is_app_owner()` and RLS, and the money-moving and
+  dated-history functions (`create_payment`, `create_adjustment`,
+  `correct_rent`, the tenant lifecycle, `ensure_rent_periods`, D4/D5/D9).
+  Those functions lock, check and write in one round trip, and they let the
+  owner role keep its writes revoked.
+- **Same database guarantees.** Every query runs through `inScope()`
+  (`client.ts`): one transaction that switches to `authenticated` with the
+  session's verified user id (`sessionJwtClaims()` in the Supabase auth
+  adapter, read once per request), or to `service_role`. Only `sub` is
+  passed on, because SQL reads nothing but `auth.uid()`, so no email or phone
+  goes into a query or an error. It also sets the statement timeout (owner
+  5s as in 0023, service role 8s as over the Supabase API, never unlimited;
+  A17) and UTC. As a result, RLS, `is_app_owner()`, `auth.uid()`
+  (the audit actor) and the function grants apply exactly as they do for the
+  Supabase clients. `test/adapters/drizzle/client.test.ts` checks this.
+- **Same shapes.** The column types in `schema/columns.ts` read back what
+  PostgREST sent: numeric as a number, date as a `yyyy-MM-dd` key,
+  timestamptz as an ISO string. `errors.ts` maps the user's mistakes
+  (`BBK*`, constraints, `42501`) the way `writeError` does. Unlike the
+  Supabase adapter, an outage (connection refused or timed out, pool full,
+  statement timeout) is a 500, not "Couldn't save that". Drizzle's own error
+  text, which lists the query's parameters, is never kept or logged.
+- **The schema mirror never drives the schema.** Migrations stay
+  hand-written SQL (A1). `schema/` mirrors them, and
+  `test/adapters/drizzle/schema.test.ts` compares every column's name, type
+  and nullability against a migrated PGlite. `drizzle.config.ts` is for
+  `drizzle-kit pull`/`check` only, never `push`/`migrate`.
+- **Each moved method has a parity test:** on PGlite, its result must equal
+  the SQL function it replaces. The SQL function stays while
+  `DATA_ADAPTER=supabase` can still call it (the rollback) and while the test
+  uses it as its oracle. It is dropped only after the Supabase binding for
+  that method is removed, with the parity test switched to fixed expected
+  values.
+- **Connection.** `DATABASE_URL` is Supabase's shared pooler in transaction
+  mode (port 6543, IPv4, the serverless option), logged in as
+  `app_drizzle.<project-ref>` (0027, D32): a role that can do nothing until
+  `inScope()` switches it to `authenticated`. It gets `service_role` only with
+  the first system method that moves. It never uses `postgres`.
+  `DATABASE_URL` is a secret on a par with `SUPABASE_SECRET_KEY`: server-only
+  (`env.ts` refuses a `NEXT_PUBLIC_` copy), and rotated by running
+  `alter role app_drizzle password ...` again and updating it everywhere.
+  `drizzle-kit` reads its own `DRIZZLE_KIT_URL`, never `DATABASE_URL`. Transaction mode means `prepare: false`, `ssl: "require"`, no
+  session state (everything is `set_config(..., true)` per transaction) and
+  no query pipelining. Postgres.js pipelines concurrent queries, so code
+  inside `inScope()` awaits its queries one by one.
+
+**Why.** The owner wanted type-checked data access that isn't tied to
+PostgREST RPCs, without losing the integrity the ledger functions and RLS
+give. Moving the money writes into app code would mean granting the app's
+role writes on the ledger, and taking several round trips where one does
+today.

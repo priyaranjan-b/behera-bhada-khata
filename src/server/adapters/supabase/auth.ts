@@ -100,3 +100,19 @@ export const supabaseAuth: AuthGateway = {
     await supabase.auth.signOut();
   },
 };
+
+/**
+ * The signed-in account's id from the session's verified JWT, or null when
+ * signed out. The Drizzle adapter replays it into its transaction
+ * (request.jwt.claim.sub), so RLS and auth.uid() see the same owner the
+ * Supabase client would. Only `sub`: SQL reads nothing else.
+ */
+export async function sessionJwtClaims(): Promise<{ sub: string } | null> {
+  const supabase = await createSessionClient();
+  const { data, error } = await supabase.auth.getClaims();
+  // A real failure (keys unreachable, clock skew) is logged, not silently
+  // treated as signed out. Never log the token itself.
+  if (error) console.error(`session claims: [${error.code ?? "?"}] ${error.message}`);
+  const sub = data?.claims?.sub;
+  return sub ? { sub } : null;
+}

@@ -59,8 +59,9 @@ development, required in production.
   tables page in the database vs the browser (A15), record pages in
   lazy tabs by data source (A16), and the abuse limits: owner API rate
   limit, client IP from the last `x-forwarded-for` hop, statement timeouts
-  (A17), and the Payments page: payments by day received, cards that
-  follow the table (A18). Read it before changing
+  (A17), the Payments page: payments by day received, cards that
+  follow the table (A18), and the Drizzle adapter: which SQL functions
+  move to TS and which stay in Postgres (A19). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -248,6 +249,8 @@ Ports      src/server/ports.ts — OwnerRepositories, SystemRepositories,
              AuthGateway, FileStorage, Messaging interfaces
 Infra      src/server/infra/index.ts — binds ports to adapters
 Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
+           src/server/adapters/drizzle/*  — the ONLY code importing drizzle-orm /
+             postgres (A19: bound per method over Supabase by DATA_ADAPTER)
            src/server/adapters/twilio/*   — the ONLY code importing twilio
 ```
 
@@ -276,7 +279,10 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
   standalone backend instead — that's the migration path to a separate
   Node.js server (move `src/server/**` there behind the same routes).
 - Swapping the database (e.g. MySQL) = a new adapter implementing
-  `src/server/ports.ts`, bound in `src/server/infra/index.ts`. `ownerDb()`
+  `src/server/ports.ts`, bound in `src/server/infra/index.ts`. The Drizzle
+  adapter (A19) is bound per method instead: `infra` lays the methods it
+  implements over the Supabase adapter when `DATA_ADAPTER=drizzle`, and every
+  other method stays on Supabase. `ownerDb()`
   must refuse anyone but the single app owner; the Supabase adapter relies on
   RLS (`is_app_owner()`) via the session client, so another database must
   enforce the same check itself. Services take an `OwnerContext` (from

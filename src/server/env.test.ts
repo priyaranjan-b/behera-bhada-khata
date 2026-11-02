@@ -21,3 +21,23 @@ describe("env in production", () => {
     expect(() => env()).toThrow(/CRON_SECRET: Required in production/);
   });
 });
+
+describe("server-only secrets", () => {
+  it("refuses a NEXT_PUBLIC_ copy of DATABASE_URL, which Next would put in the browser bundle", () => {
+    production({ NEXT_PUBLIC_DATABASE_URL: "postgresql://app_drizzle.ref:pw@pooler.supabase.com:6543/postgres" });
+    expect(() => env()).toThrow(/NEXT_PUBLIC_DATABASE_URL: Would be sent to the browser; set DATABASE_URL instead/);
+  });
+
+  it("accepts DATABASE_URL itself", () => {
+    production({
+      DATA_ADAPTER: "drizzle",
+      DATABASE_URL: "postgresql://app_drizzle.ref:pw@pooler.supabase.com:6543/postgres",
+    });
+    expect(env().DATABASE_URL).toMatch(/^postgresql:/);
+  });
+
+  it("needs DATABASE_URL when the Drizzle adapter is on", () => {
+    production({ DATA_ADAPTER: "drizzle", DATABASE_URL: "" });
+    expect(() => env()).toThrow(/DATABASE_URL: Required when DATA_ADAPTER=drizzle/);
+  });
+});

@@ -44,7 +44,16 @@ const schema = z.object({
   ALLOW_DEV_LOGIN: optional(z.string()),
 
   API_BASE_URL: optional(z.url()),
+
+  // Data adapter (A19): "supabase" (default) or "drizzle", which binds the
+  // namespaces moved to src/server/adapters/drizzle. The one-switch rollback.
+  DATA_ADAPTER: z.enum(["supabase", "drizzle"]).default("supabase"),
+  /** Postgres connection string for the Drizzle adapter: Supabase's transaction pooler (port 6543). */
+  DATABASE_URL: optional(z.string().regex(/^postgres(ql)?:\/\//, "Must be a postgres:// connection string")),
 }).superRefine((e, ctx) => {
+  if (e.DATA_ADAPTER === "drizzle" && !e.DATABASE_URL) {
+    ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "Required when DATA_ADAPTER=drizzle" });
+  }
   if (e.NODE_ENV !== "production") return;
   for (const key of PRODUCTION_REQUIRED) {
     if (!e[key]) ctx.addIssue({ code: "custom", path: [key], message: "Required in production" });
@@ -53,15 +62,32 @@ const schema = z.object({
 
 export type Env = z.infer<typeof schema>;
 
+/**
+ * Secrets that must never reach the browser. Next.js inlines every
+ * NEXT_PUBLIC_* variable into the client bundle, so a NEXT_PUBLIC_ copy of
+ * one of these is refused at startup instead of being shipped.
+ */
+const SERVER_ONLY_SECRETS = ["DATABASE_URL", "SUPABASE_SECRET_KEY", "CRON_SECRET", "TWILIO_AUTH_TOKEN"] as const;
+
+/** NEXT_PUBLIC_ copies of the server-only secrets that are set. */
+function leakedSecrets(): string[] {
+  return SERVER_ONLY_SECRETS.map((key) => `NEXT_PUBLIC_${key}`).filter((key) => process.env[key]?.trim());
+}
+
 let cached: Env | undefined;
 
 /** The validated environment. Throws listing every problem if it's invalid. */
 export function env(): Env {
   if (cached) return cached;
   const parsed = schema.safeParse(process.env);
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
-    throw new Error(`Invalid environment variables (see .env.local.example):\n${problems}`);
+  const problems = [
+    ...(parsed.success ? [] : parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`)),
+    ...leakedSecrets().map(
+      (key) => `  - ${key}: Would be sent to the browser; set ${key.slice("NEXT_PUBLIC_".length)} instead (server only)`
+    ),
+  ];
+  if (!parsed.success || problems.length) {
+    throw new Error(`Invalid environment variables (see .env.local.example):\n${problems.join("\n")}`);
   }
   cached = parsed.data;
   return cached;

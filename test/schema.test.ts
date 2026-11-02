@@ -4,10 +4,9 @@
 // grants, storage.buckets), then exercises the ledger functions the way the
 // app calls them: create_* as the signed-in owner under RLS, confirm_* and
 // friends as the service role.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { PGlite } from "@electric-sql/pglite";
-import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
+import type { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { addMonthsToKey, currentMonthKey, formatDateKey, formatDateTime, formatMonth } from "@/lib/dates";
 import { monthsIn, paidDirectMonths } from "@/lib/domain/billing";
@@ -23,35 +22,10 @@ import {
 } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import { AUDIT_ACTIONS } from "@/lib/types";
+import { MIGRATIONS, createMigratedDb } from "./db/pglite";
 
-const MIGRATIONS = path.resolve(__dirname, "../supabase/migrations");
 const SEED = path.resolve(__dirname, "../supabase/seed/arnapal_master_data.sql");
 const TENANT_SEED = path.resolve(__dirname, "../supabase/seed/arnapal_tenants.sql");
-
-const SUPABASE_STUBS = `
-  create role anon nologin;
-  create role authenticated nologin;
-  create role service_role nologin bypassrls;
-  grant usage on schema public to anon, authenticated, service_role;
-  -- Supabase grants everything in public to these roles by default; the
-  -- migrations then revoke what they must.
-  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
-  alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
-
-  create schema auth;
-  grant usage on schema auth to anon, authenticated, service_role;
-  create table auth.users (id uuid primary key, email text);
-  create function auth.uid() returns uuid language sql stable as $$
-    select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-  $$;
-  grant execute on function auth.uid() to anon, authenticated, service_role;
-
-  create schema storage;
-  create table storage.buckets (
-    id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]
-  );
-`;
 
 /** The app owner (registered in app_owner). */
 const OWNER_A = "00000000-0000-4000-8000-00000000000a";
@@ -158,11 +132,7 @@ async function allocated(periodId: string): Promise<number> {
 }
 
 beforeAll(async () => {
-  db = new PGlite({ extensions: { btree_gist } });
-  await db.exec(SUPABASE_STUBS);
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort()) {
-    await db.exec(readFileSync(path.join(MIGRATIONS, file), "utf8"));
-  }
+  db = await createMigratedDb();
 });
 
 afterAll(async () => {
@@ -2076,6 +2046,83 @@ describe("statement timeouts (0023)", () => {
       { rolname: "anon", rolconfig: ["statement_timeout=3s"] },
       { rolname: "authenticated", rolconfig: ["statement_timeout=5s"] },
     ]);
+  });
+});
+
+describe("app_drizzle login (0027)", () => {
+  /**
+   * Runs the statements in order with app_drizzle as the session user, as a
+   * pooler connection would be, returning the last one's rows.
+   */
+  async function asLogin(...statements: string[]): Promise<unknown[]> {
+    await db.exec(`set session authorization app_drizzle`);
+    try {
+      let rows: unknown[] = [];
+      for (const statement of statements) rows = (await db.query(statement)).rows;
+      return rows;
+    } finally {
+      // PGlite's RESET SESSION AUTHORIZATION keeps app_drizzle; name the test's own user instead.
+      await db.exec(`reset role; set session authorization postgres`);
+    }
+  }
+
+  it("is a no-inherit login with no password set by the migration and a 5s backstop timeout", async () => {
+    const { rows } = await db.query(
+      `select r.rolcanlogin, r.rolinherit, r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb, r.rolreplication,
+              a.rolpassword is null as no_password, r.rolconfig
+       from pg_roles r join pg_authid a on a.oid = r.oid where r.rolname = 'app_drizzle'`
+    );
+    expect(rows).toEqual([
+      {
+        rolcanlogin: true,
+        rolinherit: false,
+        rolsuper: false,
+        rolbypassrls: false,
+        rolcreaterole: false,
+        rolcreatedb: false,
+        rolreplication: false,
+        no_password: true,
+        rolconfig: ["statement_timeout=5s"],
+      },
+    ]);
+  });
+
+  it("is only a member of authenticated (service_role comes with the first system method)", async () => {
+    const { rows } = await db.query<{ rolname: string }>(
+      `select r.rolname from pg_auth_members m join pg_roles r on r.oid = m.roleid
+       join pg_roles u on u.oid = m.member where u.rolname = 'app_drizzle'`
+    );
+    expect(rows.map((r) => r.rolname)).toEqual(["authenticated"]);
+  });
+
+  it("ends in the same state when the role already existed with other settings", async () => {
+    await db.exec(`alter role app_drizzle inherit createdb bypassrls; grant service_role to app_drizzle;`);
+    await db.exec(readFileSync(path.join(MIGRATIONS, "0027_app_drizzle_role.sql"), "utf8"));
+    const { rows } = await db.query(
+      `select rolinherit, rolcreatedb, rolbypassrls, pg_has_role('app_drizzle', 'service_role', 'MEMBER') as service
+       from pg_roles where rolname = 'app_drizzle'`
+    );
+    expect(rows).toEqual([{ rolinherit: false, rolcreatedb: false, rolbypassrls: false, service: false }]);
+  });
+
+  it("can read and run nothing before switching role", async () => {
+    expect(await errorCode(asLogin(`select count(*) from tenants`))).toBe("42501");
+    expect(await errorCode(asLogin(`select count(*) from payments`))).toBe("42501");
+    expect(await errorCode(asLogin(`select tenant_account_summary('${fx.tenantA}')`))).toBe("42501");
+  });
+
+  it("can switch to authenticated (then RLS applies), but to nothing else", async () => {
+    await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [OWNER_A]);
+    // Like inScope(): the switch is its own statement, then the query runs as that role.
+    const [owner] = (await asLogin(
+      `select set_config('role', 'authenticated', false)`,
+      `select count(*)::int as n, is_app_owner() as is_owner from tenants`
+    )) as { n: number; is_owner: boolean }[];
+    expect(owner).toMatchObject({ n: 2, is_owner: true });
+    await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+    for (const other of ["service_role", "postgres", "anon"]) {
+      expect(await errorCode(asLogin(`set role ${other}`))).toBe("42501");
+    }
   });
 });
 

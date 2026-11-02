@@ -2,6 +2,9 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// The Drizzle adapter's libraries (A19): only src/server/adapters/drizzle imports them.
+const DRIZZLE = ["drizzle-orm", "drizzle-orm/*", "postgres"];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -15,7 +18,7 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             {
-              group: ["@supabase/*", "@/server/adapters/*", "@/server/infra", "@/server/infra/*"],
+              group: ["@supabase/*", ...DRIZZLE, "@/server/adapters/*", "@/server/infra", "@/server/infra/*"],
               message: "Route handlers stay thin: call a service in src/server/services.",
             },
           ],
@@ -31,7 +34,7 @@ const eslintConfig = defineConfig([
         "error",
         {
           patterns: [
-            { group: ["@supabase/*"], message: "Database access lives in src/server/adapters - go through the API." },
+            { group: ["@supabase/*", ...DRIZZLE], message: "Database access lives in src/server/adapters - go through the API." },
             {
               group: ["@/server/*"],
               message: "UI code reads data with serverApi (Server Components) or api (Client Components).",
@@ -49,10 +52,24 @@ const eslintConfig = defineConfig([
         {
           patterns: [
             {
-              group: ["@supabase/*", "twilio", "@/server/adapters/*"],
+              group: ["@supabase/*", ...DRIZZLE, "twilio", "@/server/adapters/*"],
               message: "Services use the ports via @/server/infra.",
             },
             { group: ["next", "next/*"], message: "Keep services framework-free so they can move to a standalone server." },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/server/**/*.ts"],
+    ignores: ["src/server/services/**", "src/server/adapters/drizzle/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: DRIZZLE, message: "Only src/server/adapters/drizzle imports Drizzle; bind it in @/server/infra." },
           ],
         },
       ],
