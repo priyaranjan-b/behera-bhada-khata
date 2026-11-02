@@ -808,12 +808,17 @@ HTTP APIs. Its login is `app_drizzle`, not `postgres`:
   revoke-and-re-grant rule for every function (D11) keeps empty. Until it
   switches role it can read no table and run no function (`42501`), so a
   migration that forgets that revoke is a D32 problem too.
-- **A member of `authenticated` only**, so it can switch to the owner role
-  for one transaction and to nothing else. `inScope()`
+- **A member of `authenticated`**, so it can switch to the owner role
+  for one transaction (every owner read). `inScope()`
   (`src/server/adapters/drizzle/client.ts`) always does, with the session's
-  verified user id, so RLS and `is_app_owner()` apply. `service_role`, which
-  bypasses RLS, is granted by the migration that first moves a system method
-  (rate limits) to Drizzle, not before.
+  verified user id, so RLS and `is_app_owner()` apply.
+- **And of `service_role` since 0028**, granted with the first system method
+  on Drizzle (the rate limits, D12). Still `NOINHERIT`: it acts as
+  `service_role` only inside an `inScope({ role: "service_role" })`
+  transaction, which only `systemDb()` opens. Run 0028 before using
+  `DATA_ADAPTER=drizzle` with that release, or every owner API call fails at
+  its rate limit. 0027 revokes `service_role`, so re-running 0027 means
+  re-running 0028 after it.
 - **Always the same end state.** The migration sets `noinherit nocreatedb
   nocreaterole` and revokes `service_role` even if the role already existed,
   and refuses to run if it has `SUPERUSER`, `REPLICATION` or `BYPASSRLS`

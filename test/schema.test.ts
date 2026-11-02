@@ -2088,12 +2088,17 @@ describe("app_drizzle login (0027)", () => {
     ]);
   });
 
-  it("is only a member of authenticated (service_role comes with the first system method)", async () => {
-    const { rows } = await db.query<{ rolname: string }>(
-      `select r.rolname from pg_auth_members m join pg_roles r on r.oid = m.roleid
-       join pg_roles u on u.oid = m.member where u.rolname = 'app_drizzle'`
+  /** 0028 again: the 0027 cases below re-run 0027, which revokes service_role. */
+  const regrant0028 = () => db.exec(readFileSync(path.join(MIGRATIONS, "0028_app_drizzle_service_role.sql"), "utf8"));
+
+  it("is a member of authenticated and, since 0028, service_role - and of nothing else", async () => {
+    const { rows } = await db.query<{ rolname: string; inherit: boolean }>(
+      `select r.rolname, m.inherit_option as inherit from pg_auth_members m join pg_roles r on r.oid = m.roleid
+       join pg_roles u on u.oid = m.member where u.rolname = 'app_drizzle' order by r.rolname`
     );
-    expect(rows.map((r) => r.rolname)).toEqual(["authenticated"]);
+    expect(rows.map((r) => r.rolname)).toEqual(["authenticated", "service_role"]);
+    // NOINHERIT: it only ever acts as them after switching role.
+    expect(rows.every((r) => !r.inherit)).toBe(true);
   });
 
   it("ends in the same state when the role already existed with other settings", async () => {
@@ -2104,12 +2109,16 @@ describe("app_drizzle login (0027)", () => {
        from pg_roles where rolname = 'app_drizzle'`
     );
     expect(rows).toEqual([{ rolinherit: false, rolcreatedb: false, rolcreaterole: false, service: false }]);
+    await regrant0028();
   });
 
   it("runs as a role that isn't a superuser, like Supabase's postgres in the SQL editor", async () => {
     // What Supabase's postgres has: CREATEROLE/CREATEDB, admin of the API roles
     // and of the roles it created, but not SUPERUSER.
+    // As before 0028: a revoke only drops grants its own role made (Postgres 16+),
+    // and here 0028 was granted by the test's superuser, not the migrator.
     await db.exec(`
+      revoke service_role from app_drizzle;
       create role migrator_0027 createrole createdb;
       grant authenticated, service_role to migrator_0027 with admin option;
       grant app_drizzle to migrator_0027 with admin option, inherit false, set false;
@@ -2128,6 +2137,7 @@ describe("app_drizzle login (0027)", () => {
     } finally {
       // Never leave the test role behind for the 0027 cases that follow.
       await db.exec(`reset role; drop owned by migrator_0027; drop role migrator_0027`);
+      await regrant0028();
     }
   });
 
@@ -2148,7 +2158,43 @@ describe("app_drizzle login (0027)", () => {
     expect(await errorCode(asLogin(`select tenant_account_summary('${fx.tenantA}')`))).toBe("42501");
   });
 
-  it("can switch to authenticated (then RLS applies), but to nothing else", async () => {
+  it("0028 runs as a role that isn't a superuser, and again, granting set but never inherit", async () => {
+    // From scratch, as on a project where postgres grants it: drop the test superuser's grant first.
+    await db.exec(`
+      revoke service_role from app_drizzle;
+      create role migrator_0028 createrole;
+      grant service_role to migrator_0028 with admin option;
+      set role migrator_0028;
+    `);
+    try {
+      await regrant0028();
+      await regrant0028();
+      await db.exec(`reset role`);
+      const { rows } = await db.query(
+        `select g.rolname as grantor, m.inherit_option, m.set_option, m.admin_option
+         from pg_auth_members m
+         join pg_roles r on r.oid = m.roleid join pg_roles u on u.oid = m.member join pg_roles g on g.oid = m.grantor
+         where r.rolname = 'service_role' and u.rolname = 'app_drizzle'`
+      );
+      expect(rows).toEqual([{ grantor: "migrator_0028", inherit_option: false, set_option: true, admin_option: false }]);
+    } finally {
+      await db.exec(`reset role; revoke service_role from app_drizzle granted by migrator_0028`);
+      await db.exec(`drop owned by migrator_0028; drop role migrator_0028`);
+      await regrant0028();
+    }
+  });
+
+  it("counts rate-limit hits as service_role (0028), the first system method on Drizzle", async () => {
+    const hits = (await asLogin(
+      `select set_config('role', 'service_role', false)`,
+      `select hit_rate_limit('test:0028', 1, 60) as ok`
+    )) as { ok: boolean }[];
+    expect(hits).toEqual([{ ok: true }]);
+    // ...and still can't touch the table as itself.
+    expect(await errorCode(asLogin(`select count(*) from rate_limits`))).toBe("42501");
+  });
+
+  it("can switch to authenticated (then RLS applies) or service_role, never postgres or anon", async () => {
     await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [OWNER_A]);
     // Like inScope(): the switch is its own statement, then the query runs as that role.
     const [owner] = (await asLogin(
@@ -2157,7 +2203,8 @@ describe("app_drizzle login (0027)", () => {
     )) as { n: number; is_owner: boolean }[];
     expect(owner).toMatchObject({ n: 2, is_owner: true });
     await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
-    for (const other of ["service_role", "postgres", "anon"]) {
+    // service_role since 0028 (above); never the schema owner or anon.
+    for (const other of ["postgres", "anon"]) {
       expect(await errorCode(asLogin(`set role ${other}`))).toBe("42501");
     }
   });
