@@ -38,6 +38,10 @@ export interface GridTable<S extends string, F extends string> {
   searchText: SQL;
   /** After the chosen sort, so equal rows always come back in the same order (ends in a unique key). */
   tieBreak: SQL[];
+  /** What the refusal calls it: "table" (the default) or "history" (audit_history_page's wording). */
+  noun?: "table" | "history";
+  /** Sort missing values last in both directions (audit_history_page's sorts). */
+  nullsLast?: boolean;
 }
 
 /** The largest page a table serves (grid_check): the largest page size the grids offer. */
@@ -48,13 +52,13 @@ const MAX_PAGE_SIZE = Math.max(...GRID_LIMITS.pageSizes);
  * → 400). The services validate first (gridQuerySchema), so reaching this
  * means a caller bug: it is logged with which check failed, never the values.
  */
-export function invalidQuery(check: string): ApiError {
+export function invalidQuery(check: string, noun: GridTable<string, string>["noun"] = "table"): ApiError {
   console.warn(`grid query refused: ${check}`);
-  return new ApiError(400, "That table query isn't valid");
+  return new ApiError(400, `That ${noun} query isn't valid`);
 }
-function invalidFilter(check: string): ApiError {
+function invalidFilter(check: string, noun: GridTable<string, string>["noun"] = "table"): ApiError {
   console.warn(`grid filter refused: ${check}`);
-  return new ApiError(400, "That table filter isn't valid");
+  return new ApiError(400, `That ${noun} filter isn't valid`);
 }
 
 /** Postgres' btrim(text): spaces only, not every kind of whitespace. */
@@ -79,17 +83,18 @@ const has = <K extends string>(map: Record<K, unknown>, key: string): key is K =
 
 /** Refuses what the table doesn't offer: a sort, direction, logic, page, page size, filter field or operator (grid_check). */
 export function checkGrid<S extends string, F extends string>(table: GridTable<S, F>, query: GridQuery<S, F>): void {
-  if (!has(table.sorts, query.sort)) throw invalidQuery("sort");
-  if (!SORT_DIRECTIONS.includes(query.dir)) throw invalidQuery("direction");
-  if (!FILTER_LOGICS.includes(query.logic)) throw invalidQuery("logic");
-  if (!Number.isInteger(query.page) || query.page < 0) throw invalidQuery("page");
+  const { noun } = table;
+  if (!has(table.sorts, query.sort)) throw invalidQuery("sort", noun);
+  if (!SORT_DIRECTIONS.includes(query.dir)) throw invalidQuery("direction", noun);
+  if (!FILTER_LOGICS.includes(query.logic)) throw invalidQuery("logic", noun);
+  if (!Number.isInteger(query.page) || query.page < 0) throw invalidQuery("page", noun);
   if (!Number.isInteger(query.pageSize) || query.pageSize < 1 || query.pageSize > MAX_PAGE_SIZE) {
-    throw invalidQuery("page size");
+    throw invalidQuery("page size", noun);
   }
-  if (!Array.isArray(query.filters)) throw invalidQuery("filters");
+  if (!Array.isArray(query.filters)) throw invalidQuery("filters", noun);
   for (const f of query.filters) {
-    if (!has(table.fields, f.field)) throw invalidFilter("field");
-    if (!GRID_TEXT_OPERATORS.includes(f.operator)) throw invalidFilter("operator");
+    if (!has(table.fields, f.field)) throw invalidFilter("field", noun);
+    if (!GRID_TEXT_OPERATORS.includes(f.operator)) throw invalidFilter("operator", noun);
   }
 }
 
@@ -132,7 +137,8 @@ export function gridWhere<S extends string, F extends string>(table: GridTable<S
 
 /** The chosen sort, then the table's tie-break. */
 export function gridOrderBy<S extends string, F extends string>(table: GridTable<S, F>, query: GridQuery<S, F>): SQL {
-  const dir = query.dir === "asc" ? sql`asc` : sql`desc`;
+  const direction = query.dir === "asc" ? sql`asc` : sql`desc`;
+  const dir = table.nullsLast ? sql`${direction} nulls last` : direction;
   const chosen = [table.sorts[query.sort]].flat().map((expr) => sql`${expr} ${dir}`);
   return sql.join([...chosen, ...table.tieBreak], sql`, `);
 }

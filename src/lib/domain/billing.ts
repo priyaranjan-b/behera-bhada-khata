@@ -154,6 +154,20 @@ export const TENANT_MONTH_SHOW_OPTIONS: { value: TenantMonthShow; label: string 
   { value: "paid", label: "Paid" },
   { value: "notDue", label: "Not due yet" },
 ];
+/** A rent month's shown status in the Months table: periodDisplayStatus. */
+export const TENANT_MONTH_DISPLAY_STATUSES = ["pending", "partially_paid", "paid", "not_due_yet"] as const;
+
+/** Which shown statuses each Months "Show" keeps; null keeps every month. */
+export const TENANT_MONTH_SHOW_STATUSES: Record<
+  TenantMonthShow,
+  readonly (typeof TENANT_MONTH_DISPLAY_STATUSES)[number][] | null
+> = {
+  all: null,
+  unpaid: ["pending", "partially_paid"],
+  partly: ["partially_paid"],
+  paid: ["paid"],
+  notDue: ["not_due_yet"],
+};
 export const TENANT_MONTH_SORT_FIELDS = ["periodMonth", "amountDue", "amountAllocated", "status"] as const;
 export const TENANT_MONTH_FILTER_FIELDS = ["periodMonth", "status"] as const;
 
