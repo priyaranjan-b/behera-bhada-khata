@@ -52,8 +52,11 @@ export function writeError(err: unknown, what: string): Error {
   const appStatus = error.code ? APP_ERROR_STATUS[error.code] : undefined;
   if (appStatus) return new ApiError(appStatus, error.message);
   const detail = `${what}: [${error.code ?? "?"}] ${error.message}`;
-  console.error(detail);
-  return inputErrorOf(error) ?? new Error(detail);
+  const inputError = inputErrorOf(error);
+  // Logged once: the user's mistake here (the route doesn't log an ApiError),
+  // anything else by the route that turns it into a 500 (toErrorResponse).
+  if (inputError) console.error(detail);
+  return inputError ?? new Error(detail);
 }
 
 /** Runs a write; a constraint or policy violation becomes the caller's input problem. */

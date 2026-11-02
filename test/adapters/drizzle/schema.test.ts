@@ -21,13 +21,17 @@ const UDT: Record<string, string> = {
   "timestamp with time zone": "timestamptz",
 };
 
-type Shape = Record<string, { type: string; nullable: boolean }>;
+/** `generated`: a generated column (never written). Drizzle's expression text is documentation only. */
+type Shape = Record<string, { type: string; nullable: boolean; generated: boolean }>;
 
 function drizzleShapes(): Record<string, Shape> {
   const shapes: Record<string, Shape> = {};
   const add = (name: string, columns: PgColumn[]) => {
     shapes[name] = Object.fromEntries(
-      columns.map((c) => [c.name, { type: UDT[c.getSQLType()] ?? `unmapped:${c.getSQLType()}`, nullable: !c.notNull }])
+      columns.map((c) => [
+        c.name,
+        { type: UDT[c.getSQLType()] ?? `unmapped:${c.getSQLType()}`, nullable: !c.notNull, generated: c.generated !== undefined },
+      ])
     );
   };
   for (const value of Object.values(schema)) {
@@ -60,9 +64,10 @@ async function databaseShapes(): Promise<Record<string, Shape>> {
     column_name: string;
     udt_name: string;
     is_nullable: string;
+    is_generated: string;
     generated_from_not_null: boolean;
   }>(
-    `select table_name, column_name, udt_name, is_nullable,
+    `select table_name, column_name, udt_name, is_nullable, is_generated,
             -- tower_code / house_number (from a not-null code) and rent_periods.status (a
             -- case with an else) are never null, though Postgres reports every generated
             -- column as nullable.
@@ -77,6 +82,7 @@ async function databaseShapes(): Promise<Record<string, Shape>> {
     shapes[r.table_name][r.column_name] = {
       type: r.udt_name,
       nullable: r.is_nullable === "YES" && !r.generated_from_not_null,
+      generated: r.is_generated === "ALWAYS",
     };
   }
   return shapes;
@@ -87,7 +93,7 @@ describe("Drizzle schema mirror", () => {
     expect(Object.keys(drizzleShapes()).sort()).toEqual(Object.keys(await databaseShapes()).sort());
   });
 
-  it("matches every column's name, type and nullability", async () => {
+  it("matches every column's name, type, nullability and whether it is generated", async () => {
     const actual = await databaseShapes();
     const mirror = drizzleShapes();
     for (const [table, columns] of Object.entries(actual)) {

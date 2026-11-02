@@ -31,7 +31,15 @@ describe("writeError", () => {
       expect(err).not.toBeInstanceOf(ApiError);
       expect(err.message).toBe(`save payment: [${code}] down`);
     }
-    expect(log).toHaveBeenCalledTimes(4);
+    // Not logged here: the route that turns it into a 500 logs it (once).
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("logs the user's mistakes here, since the route doesn't log an ApiError", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = writeError(drizzleError({ code: "23505", message: "duplicate key" }), "add note");
+    expect(err).toBeInstanceOf(ApiError);
+    expect(log).toHaveBeenCalledWith("add note: [23505] duplicate key");
   });
 
   it("never logs or returns Drizzle's text, which carries the parameters", () => {

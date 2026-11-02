@@ -1,7 +1,7 @@
 import "server-only";
 import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
-import { must } from "../errors";
+import { must, mustWrite } from "../errors";
 import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
 import { paymentsPage } from "../queries/paymentsPage";
@@ -21,8 +21,22 @@ import {
   listRentPeriods,
   listRentPeriodsByIds,
 } from "../tables/ledger";
-import { getOwnerProfile, listPaymentNotePresets } from "../tables/owner";
-import { getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
+import {
+  createTenantDocuments,
+  getTenantDocument,
+  listTenantDocuments,
+  removeTenantDocument,
+  tenantIdsWithDocuments,
+} from "../tables/documents";
+import {
+  createPaymentNotePreset,
+  getOwnerProfile,
+  listPaymentNotePresets,
+  removePaymentNotePreset,
+  saveOwnerProfile,
+  updatePaymentNotePreset,
+} from "../tables/owner";
+import { createProperty, createUnit, getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
 import { getTenant, listRentRates, listTenants } from "../tables/tenants";
 
 /**
@@ -57,6 +71,9 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
   /** A read as the owner; a failure is a 500 naming `what`, like the Supabase adapter's `must`. */
   const read = <T>(what: string, fn: (tx: Tx) => Promise<T>) =>
     must(inScope(db, { role: "authenticated", claims }, fn), what);
+  /** A write as the owner; a constraint or policy violation is the user's mistake (writeError), anything else a 500. */
+  const write = <T>(what: string, fn: (tx: Tx) => Promise<T>) =>
+    mustWrite(inScope(db, { role: "authenticated", claims }, fn), what);
 
   return {
     audit: {
@@ -68,9 +85,13 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
     },
     ownerProfile: {
       get: () => read("get owner profile", getOwnerProfile),
+      save: (profile) => write("save owner profile", (tx) => saveOwnerProfile(tx, profile)),
     },
     paymentNotePresets: {
       list: () => read("list payment note presets", listPaymentNotePresets),
+      create: (text) => write("add payment note preset", (tx) => createPaymentNotePreset(tx, text)),
+      update: (id, text) => write(`edit payment note preset ${id}`, (tx) => updatePaymentNotePreset(tx, id, text)),
+      remove: (id) => write(`delete payment note preset ${id}`, (tx) => removePaymentNotePreset(tx, id)),
     },
     locations: {
       list: () => read("list locations", listLocations),
@@ -78,15 +99,25 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
     properties: {
       list: () => read("list properties", listProperties),
       get: (code) => read(`get property ${code}`, (tx) => getProperty(tx, code)),
+      create: (input) => write(`create property ${input.property_code}`, (tx) => createProperty(tx, input)),
     },
     units: {
       list: (filter) => read("list units", (tx) => listUnits(tx, filter)),
+      create: (input) => write(`create unit ${input.unit_code}`, (tx) => createUnit(tx, input)),
     },
     occupancy: {
       list: (filter) =>
         read(filter?.tenantIds ? `list occupancy of ${filter.tenantIds.length} tenants` : "list occupancy", (tx) =>
           listOccupancy(tx, filter)
         ),
+    },
+    tenantDocuments: {
+      list: (tenantId) => read(`list documents of tenant ${tenantId}`, (tx) => listTenantDocuments(tx, tenantId)),
+      tenantIdsWithDocuments: () => read("list tenants with documents", tenantIdsWithDocuments),
+      get: (id) => read(`get tenant document ${id}`, (tx) => getTenantDocument(tx, id)),
+      create: (rows) =>
+        write(`add ${rows.length} documents for tenant ${rows[0]?.tenant_id ?? "-"}`, (tx) => createTenantDocuments(tx, rows)),
+      remove: (id) => write(`delete tenant document ${id}`, (tx) => removeTenantDocument(tx, id)),
     },
     rentRates: {
       listForTenants: (ids) => read(`list rent rates of ${ids.length} tenants`, (tx) => listRentRates(tx, ids)),

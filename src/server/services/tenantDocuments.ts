@@ -73,7 +73,7 @@ export async function uploadTenantDocuments(
   } catch (err) {
     await storage.remove(uploaded);
     if (err instanceof ApiError) throw err;
-    console.error(err);
+    console.error(`upload documents for tenant ${tenantId}: ${err instanceof Error ? err.message : String(err)}`);
     throw new ApiError(500, "Could not save the documents");
   }
   return { documents: await listTenantDocuments(db, tenantId) };
