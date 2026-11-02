@@ -60,3 +60,9 @@ supabase/seed/arnapal_tenants.sql
 
 # drizzle-kit pull output (scratch; the schema lives in src/server/adapters/drizzle/schema)
 /.drizzle
+
+# External agent skills: installed copies, reinstalled from skills-lock.json
+# (the skills CLI that wrote it; source: github.com/supabase/agent-skills)
+/.agents/
+/.claude/skills/supabase
+/.claude/skills/supabase-postgres-best-practices
