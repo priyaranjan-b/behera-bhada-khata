@@ -158,7 +158,7 @@ export interface DbPage<R> {
   page: number;
 }
 
-/** One page of a tenant's rent months, run by tenant_months_page (0019, A15). */
+/** One page of a tenant's rent months: tenant_months_page (0019, A15), or queries/tenantMonthsPage.ts on Drizzle (A19). */
 export interface TenantMonthsFilter {
   tenantId: string;
   show: TenantMonthShow;
@@ -216,7 +216,7 @@ export interface TenantLedgerFilter {
   pageSize: number;
 }
 
-/** One page of history, run by audit_history_page (0018, A14). */
+/** One page of history: audit_history_page (0018, A14), or queries/auditHistoryPage.ts on Drizzle (A19). */
 export interface AuditHistoryFilter {
   /** One tenant's history; none = every change (Activity). */
   tenantId?: string;

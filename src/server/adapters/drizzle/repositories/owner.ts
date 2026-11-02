@@ -2,10 +2,12 @@ import "server-only";
 import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must } from "../errors";
+import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
 import { paymentsPage } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
 import { tenantLedgerPage } from "../queries/tenantLedgerPage";
+import { tenantMonthsPage } from "../queries/tenantMonthsPage";
 import {
   getAdjustment,
   getPayment,
@@ -57,6 +59,13 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
     must(inScope(db, { role: "authenticated", claims }, fn), what);
 
   return {
+    audit: {
+      historyPage: (filter) =>
+        read(
+          `read history page of ${filter.tenantId !== undefined ? `tenant ${filter.tenantId}` : "all tenants"} ${pageLabel({ ...filter, from: filter.fromDate, to: filter.toDate })}${filter.actions ? `, ${filter.actions.length} actions` : ""}`,
+          (tx) => auditHistoryPage(tx, filter)
+        ),
+    },
     ownerProfile: {
       get: () => read("get owner profile", getOwnerProfile),
     },
@@ -101,6 +110,10 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
     rentPeriods: {
       listForTenants: (ids, filter) => read(`list rent periods of ${ids.length} tenants`, (tx) => listRentPeriods(tx, ids, filter)),
       listByIds: (ids) => read(`list ${ids.length} rent periods`, (tx) => listRentPeriodsByIds(tx, ids)),
+      page: (filter) =>
+        read(`read months page of tenant ${filter.tenantId} ${pageLabel(filter)} show ${filter.show}`, (tx) =>
+          tenantMonthsPage(tx, filter)
+        ),
     },
     payments: {
       listForTenants: (ids, filter) => read(`list payments of ${ids.length} tenants`, (tx) => listPayments(tx, ids, filter)),

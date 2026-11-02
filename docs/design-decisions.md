@@ -609,7 +609,10 @@ routes, contracts and the UI don't change.
   `payments.page` (replaces `payments_page`, `queries/paymentsPage.ts`);
   `billing.page` and `billing.totals` (replace `billing_page` and
   `billing_totals`, `queries/billingPage.ts`); `ledger.page` (replaces
-  `tenant_ledger_page`, `queries/tenantLedgerPage.ts`).
+  `tenant_ledger_page`, `queries/tenantLedgerPage.ts`); `rentPeriods.page`
+  (replaces `tenant_months_page`, `queries/tenantMonthsPage.ts`);
+  `audit.historyPage` (replaces `audit_history_page`,
+  `queries/auditHistoryPage.ts`).
   Update this line as each method moves.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
