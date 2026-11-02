@@ -54,8 +54,8 @@ describe("periodDisplayStatus", () => {
 
 describe("paid direct (government rent, 0016)", () => {
   const rates = [
-    { effective_month: "2022-01-01", monthly_amount: "5300.00" },
-    { effective_month: "2026-09-01", monthly_amount: "5800.00" },
+    { effective_month: "2022-01-01", monthly_amount: 5300 },
+    { effective_month: "2026-09-01", monthly_amount: 5800 },
   ];
 
   it("covers the months from the lease month, at the rent in effect, up to the horizon", () => {

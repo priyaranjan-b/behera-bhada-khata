@@ -248,7 +248,7 @@ export interface Database {
           /** First month the app bills (0008); earlier rent was settled on paper. Null on drafts. */
           billing_start: string | null;
           /** Security deposit (optional); frozen once active (0008 trigger). */
-          deposit_amount: string | null;
+          deposit_amount: number | null;
           tenant_kind: TenantKind;
           /** false: rent is paid to the owner directly and not tracked - no rent months (0016). Government only. */
           rent_tracked: boolean;
@@ -316,7 +316,7 @@ export interface Database {
           id: number;
           tenant_id: string;
           effective_month: string;
-          monthly_amount: string;
+          monthly_amount: number;
           created_at: string;
           /** The account that wrote the row (0015); fixed once written. */
           recorded_by: string | null;
@@ -330,8 +330,8 @@ export interface Database {
           id: string;
           tenant_id: string;
           period_month: string;
-          amount_due: string;
-          amount_allocated: string;
+          amount_due: number;
+          amount_allocated: number;
           status: PeriodStatus;
           created_at: string;
         };
@@ -339,8 +339,8 @@ export interface Database {
           id?: string;
           tenant_id: string;
           period_month: string;
-          amount_due: number | string;
-          amount_allocated?: number | string;
+          amount_due: number;
+          amount_allocated?: number;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["rent_periods"]["Insert"]>;
@@ -358,7 +358,7 @@ export interface Database {
         Row: {
           id: string;
           tenant_id: string;
-          amount: string;
+          amount: number;
           payment_date: string;
           mode: PaymentMode;
           note: string | null;
@@ -381,7 +381,7 @@ export interface Database {
         Insert: {
           id?: string;
           tenant_id: string;
-          amount: number | string;
+          amount: number;
           payment_date: string;
           mode: PaymentMode;
           note?: string | null;
@@ -404,14 +404,14 @@ export interface Database {
           id: string;
           payment_id: string;
           rent_period_id: string;
-          amount_allocated: string;
+          amount_allocated: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           payment_id: string;
           rent_period_id: string;
-          amount_allocated: number | string;
+          amount_allocated: number;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["payment_allocations"]["Insert"]>;
@@ -445,7 +445,7 @@ export interface Database {
           id: string;
           tenant_id: string;
           original_payment_id: string;
-          delta_amount: string;
+          delta_amount: number;
           reason: string;
           status: LedgerStatus;
           owner_signature_path: string | null;
@@ -467,7 +467,7 @@ export interface Database {
           id?: string;
           tenant_id: string;
           original_payment_id: string;
-          delta_amount: number | string;
+          delta_amount: number;
           reason: string;
           status?: LedgerStatus;
           owner_signature_path?: string | null;
@@ -488,14 +488,14 @@ export interface Database {
           id: string;
           adjustment_id: string;
           rent_period_id: string;
-          amount_delta: string;
+          amount_delta: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           adjustment_id: string;
           rent_period_id: string;
-          amount_delta: number | string;
+          amount_delta: number;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["adjustment_allocations"]["Insert"]>;

@@ -21,8 +21,8 @@ export const properties = pgTable(
     location_code: text("location_code")
       .notNull()
       .references(() => locations.location_code, { onDelete: "restrict", onUpdate: "restrict" }),
-    /** Generated from the code (split_part). */
-    tower_code: text("tower_code"),
+    /** Generated from the code (split_part), so never null though the catalog says nullable. */
+    tower_code: text("tower_code").notNull(),
     name: text("name").notNull(),
     created_at: timestamptz("created_at").notNull().default(sql`now()`),
     updated_at: timestamptz("updated_at").notNull().default(sql`now()`),
@@ -37,8 +37,8 @@ export const units = pgTable(
     property_code: text("property_code")
       .notNull()
       .references(() => properties.property_code, { onDelete: "restrict", onUpdate: "restrict" }),
-    /** Generated from the code (split_part). */
-    house_number: text("house_number"),
+    /** Generated from the code (split_part), so never null though the catalog says nullable. */
+    house_number: text("house_number").notNull(),
     floor: text("floor"),
     unit_type: text("unit_type", { enum: UNIT_TYPES }).notNull(),
     label: text("label"),

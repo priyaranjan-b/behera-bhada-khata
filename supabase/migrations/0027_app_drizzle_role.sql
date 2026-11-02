@@ -28,8 +28,20 @@ begin
 end
 $$;
 
+-- SUPERUSER, REPLICATION and BYPASSRLS can only be named (even to turn them
+-- off) by a superuser, and Supabase's postgres isn't one, so a role it
+-- created can't have them. Check instead of setting, for a role made earlier.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'app_drizzle' and (rolsuper or rolreplication or rolbypassrls)) then
+    raise exception 'app_drizzle has SUPERUSER, REPLICATION or BYPASSRLS, which only a superuser can remove'
+      using hint = 'Run "drop role app_drizzle;" and run this migration again (then set its password and update DATABASE_URL), or ask Supabase support to remove the attribute.';
+  end if;
+end
+$$;
+
 -- The same end state however the role started (e.g. made by hand earlier).
-alter role app_drizzle login noinherit nosuperuser nocreatedb nocreaterole nobypassrls noreplication;
+alter role app_drizzle login noinherit nocreatedb nocreaterole;
 -- A backstop for the statement before inScope() switches role and sets its own timeout (A17).
 alter role app_drizzle set statement_timeout = '5s';
 

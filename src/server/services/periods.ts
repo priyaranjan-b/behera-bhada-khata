@@ -66,8 +66,8 @@ export function paidDirectPeriods(
       id: paidDirectId(t.id, month),
       tenant_id: t.id,
       period_month: month,
-      amount_due: amount.toFixed(2),
-      amount_allocated: amount.toFixed(2),
+      amount_due: amount,
+      amount_allocated: amount,
       status: "paid" as const,
       created_at: "",
     }))

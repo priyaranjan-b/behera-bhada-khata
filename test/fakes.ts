@@ -54,7 +54,7 @@ export function payment(overrides: Partial<Payment> = {}): Payment {
   return {
     id: "00000000-0000-4000-8000-000000000201",
     tenant_id: "00000000-0000-4000-8000-000000000101",
-    amount: "5000.00",
+    amount: 5000,
     payment_date: "2026-03-05",
     mode: "upi",
     note: null,
@@ -109,7 +109,7 @@ const rate: TenantRentRate = {
   id: 1,
   tenant_id: "00000000-0000-4000-8000-000000000101",
   effective_month: "2026-01-01",
-  monthly_amount: "5000.00",
+  monthly_amount: 5000,
   created_at: "",
   recorded_by: OWNER_ID,
 };
@@ -117,8 +117,8 @@ const period: RentPeriod = {
   id: "period-mar",
   tenant_id: "00000000-0000-4000-8000-000000000101",
   period_month: "2026-03-01",
-  amount_due: "5000.00",
-  amount_allocated: "0.00",
+  amount_due: 5000,
+  amount_allocated: 0,
   status: "pending",
   created_at: "",
 };
@@ -126,7 +126,7 @@ const allocation: PaymentAllocation = {
   id: "alloc-1",
   payment_id: "00000000-0000-4000-8000-000000000201",
   rent_period_id: "period-mar",
-  amount_allocated: "5000.00",
+  amount_allocated: 5000,
   created_at: "",
 };
 

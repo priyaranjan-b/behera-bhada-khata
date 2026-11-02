@@ -256,7 +256,7 @@ describe("instant confirmation (0010)", () => {
     fakes.state.adjustments.set(id, {
       ...payment({ id }),
       original_payment_id: "00000000-0000-4000-8000-000000000201",
-      delta_amount: "-500.00",
+      delta_amount: -500,
       reason: "Recorded too much",
       receipt_no: "ADJ/2026/03/001",
     });

@@ -270,7 +270,13 @@ sends, confirm attempts and magic-link emails.
 
 - **Never edit a migration that has been applied anywhere.** Add a new one.
   Unapplied ones may be rewritten, which is why 0003–0006 were renumbered
-  before their first deploy.
+  before their first deploy. The one exception so far is **0027** (D32),
+  edited in place twice: once to stop granting `service_role`, and once
+  because it named `nosuperuser`/`nobypassrls`/`noreplication`, which only
+  a superuser may write, so it couldn't run on any Supabase project. A new
+  migration would have left 0027 broken for every fresh setup. That's
+  allowed only because 0027 is idempotent (it only sets a role's end state)
+  and the corrected file was re-run where the old one had been applied.
 - **Destructive rebuilds carry a guard** that refuses to run on non-empty
   tables (see the top of 0006). Resetting data is a separate, manual script.
 - **`test/schema.test.ts` runs every migration plus the seed** against PGlite
@@ -802,10 +808,15 @@ HTTP APIs. Its login is `app_drizzle`, not `postgres`:
   verified user id, so RLS and `is_app_owner()` apply. `service_role`, which
   bypasses RLS, is granted by the migration that first moves a system method
   (rate limits) to Drizzle, not before.
-- **Always the same end state.** The migration sets every attribute
-  (`noinherit nosuperuser ... nobypassrls`) and revokes `service_role` even if
-  the role already existed, and sets `statement_timeout = '5s'` on the login
-  as a backstop for the statement before the switch.
+- **Always the same end state.** The migration sets `noinherit nocreatedb
+  nocreaterole` and revokes `service_role` even if the role already existed,
+  and refuses to run if it has `SUPERUSER`, `REPLICATION` or `BYPASSRLS`
+  (only a superuser may name those, even to turn them off, and Supabase's
+  `postgres` isn't one; a test runs the migration as such a role). If that
+  check fires, `drop role app_drizzle;` and run 0027 again, then set the
+  password and update `DATABASE_URL`. It sets `statement_timeout = '5s'` on
+  the login as a backstop for the statement before the switch. It is safe to
+  re-run at any time (D15 notes why it was edited in place).
 - **No password in the migration.** The owner sets it by hand in the SQL
   editor (`alter role app_drizzle password '…'`). `DATABASE_URL` then uses the
   user `app_drizzle.<project-ref>` on port 6543.
@@ -819,8 +830,8 @@ before switching, and which roles it may switch to. Supabase protects its
 reserved roles (`supautils`), and PGlite's superuser can't show whether the
 grant is allowed there: run 0027 on a branch or inside `begin; ...;
 rollback;` first, then check `select pg_has_role('app_drizzle',
-'authenticated', 'SET')`. On this project it applied (Nov 2026) and the app
-reads through it.
+'authenticated', 'SET')`. On this project the corrected file was run as
+`postgres` in the SQL editor (Nov 2026), and the app reads through it.
 
 ---
 

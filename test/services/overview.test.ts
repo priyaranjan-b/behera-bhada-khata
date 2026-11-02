@@ -12,13 +12,13 @@ const ASHA = "00000000-0000-4000-8000-000000000101";
 const GOVT = "00000000-0000-4000-8000-000000000102";
 const DRAFT = "00000000-0000-4000-8000-000000000103";
 
-const period = (tenant_id: string, period_month: string, amount_allocated = "0.00"): RentPeriod => ({
+const period = (tenant_id: string, period_month: string, amount_allocated = 0): RentPeriod => ({
   id: `${tenant_id}-${period_month}`,
   tenant_id,
   period_month,
-  amount_due: "5000.00",
+  amount_due: 5000,
   amount_allocated,
-  status: amount_allocated === "0.00" ? "pending" : "partially_paid",
+  status: amount_allocated === 0 ? "pending" : "partially_paid",
   created_at: "2026-01-01T00:00:00Z",
 });
 
@@ -28,14 +28,14 @@ describe("Overview sections", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-15T06:00:00Z"));
     fakes.owner.tenants.list.mockResolvedValue([
-      tenant({ deposit_amount: "10000.00" }),
+      tenant({ deposit_amount: 10000 }),
       tenant({ id: GOVT, name: "Block Office", tenant_kind: "government", rent_tracked: false, billing_start: null }),
-      tenant({ id: DRAFT, name: "Mohan", status: "draft", billing_start: null, deposit_amount: "2000.00" }),
+      tenant({ id: DRAFT, name: "Mohan", status: "draft", billing_start: null, deposit_amount: 2000 }),
     ]);
     fakes.owner.rentPeriods.listForTenants.mockResolvedValue([
       period(ASHA, "2026-09-01"),
       period(ASHA, "2026-10-01"),
-      period(ASHA, "2026-11-01", "5000.00"),
+      period(ASHA, "2026-11-01", 5000),
     ]);
   });
   afterEach(() => vi.useRealTimers());
@@ -84,7 +84,7 @@ describe("Overview sections", () => {
   });
 
   it("portfolio: rent roll, deposits and advances, Govt paid direct only when shown", async () => {
-    const rate = (tenant_id: string, monthly_amount: string, id: number) => ({
+    const rate = (tenant_id: string, monthly_amount: number, id: number) => ({
       id,
       tenant_id,
       effective_month: "2026-01-01",
@@ -92,7 +92,7 @@ describe("Overview sections", () => {
       created_at: "",
       recorded_by: OWNER_ID,
     });
-    fakes.owner.rentRates.listForTenants.mockResolvedValue([rate(ASHA, "5000.00", 1), rate(GOVT, "11000.00", 2)]);
+    fakes.owner.rentRates.listForTenants.mockResolvedValue([rate(ASHA, 5000, 1), rate(GOVT, 11000, 2)]);
 
     expect(await getPortfolio(ctx, { paidDirect: "show" })).toEqual({
       rentRoll: 16000,

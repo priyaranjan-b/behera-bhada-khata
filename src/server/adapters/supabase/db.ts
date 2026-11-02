@@ -168,14 +168,14 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
         if (filter.tenantIds) {
           const batches = await Promise.all(
             chunk(filter.tenantIds).map(async (ids) =>
-              must(await base().in("tenant_id", ids).order("start_date"), "list occupancy")
+              must(await base().in("tenant_id", ids).order("start_date").order("unit_code"), "list occupancy")
             )
           );
-          return batches.flat().sort((a, b) => a.start_date.localeCompare(b.start_date));
+          return batches.flat().sort((a, b) => a.start_date.localeCompare(b.start_date) || a.unit_code.localeCompare(b.unit_code));
         }
         let query = base();
         if (filter.propertyCode) query = query.eq("property_code", filter.propertyCode);
-        return must(await query.order("start_date"), "list occupancy");
+        return must(await query.order("start_date").order("unit_code"), "list occupancy");
       },
     },
 
@@ -215,12 +215,13 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
                 .from("tenant_rent_rates")
                 .select("*")
                 .in("tenant_id", ids)
-                .order("effective_month"),
+                .order("effective_month")
+                .order("id"),
               "list rent rates"
             )
           )
         );
-        return batches.flat().sort((a, b) => a.effective_month.localeCompare(b.effective_month));
+        return batches.flat().sort((a, b) => a.effective_month.localeCompare(b.effective_month) || a.id - b.id);
       },
     },
 
@@ -231,7 +232,7 @@ export async function supabaseOwnerRepositories(): Promise<OwnerRepositories> {
       async list(filter = {}) {
         let query = db.from("tenants").select("*");
         if (filter.status) query = query.eq("status", filter.status);
-        return must(await query.order("created_at", { ascending: true }), "list tenants");
+        return must(await query.order("created_at", { ascending: true }).order("id"), "list tenants");
       },
       async get(id) {
         return must(
@@ -597,7 +598,7 @@ export function supabaseSystemRepositories(): SystemRepositories {
     occupancy: {
       async listForTenant(tenantId) {
         return must(
-          await db.from("unit_occupancy").select("*").eq("tenant_id", tenantId).order("start_date"),
+          await db.from("unit_occupancy").select("*").eq("tenant_id", tenantId).order("start_date").order("unit_code"),
           "list occupancy"
         );
       },

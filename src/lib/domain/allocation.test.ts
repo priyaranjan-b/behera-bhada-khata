@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { suggestAllocations, summarizeBalance } from "./allocation";
 
 const periods = [
-  { id: "mar", period_month: "2026-03-01", amount_due: "5000.00", amount_allocated: "0.00" },
-  { id: "jan", period_month: "2026-01-01", amount_due: "5000.00", amount_allocated: "4000.00" },
-  { id: "feb", period_month: "2026-02-01", amount_due: "5000.00", amount_allocated: "0.00" },
+  { id: "mar", period_month: "2026-03-01", amount_due: 5000, amount_allocated: 0 },
+  { id: "jan", period_month: "2026-01-01", amount_due: 5000, amount_allocated: 4000 },
+  { id: "feb", period_month: "2026-02-01", amount_due: 5000, amount_allocated: 0 },
 ];
 
 describe("suggestAllocations", () => {
