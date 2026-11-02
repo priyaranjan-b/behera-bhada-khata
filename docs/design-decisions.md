@@ -623,7 +623,10 @@ routes, contracts and the UI don't change.
   `queries/auditHistoryPage.ts`); the system methods `rateLimits.hit` and
   `rateLimits.prune` (replace `hit_rate_limit` / `prune_rate_limits`,
   `tables/rateLimits.ts`, as `service_role`, which 0028 lets `app_drizzle`
-  switch to).
+  switch to); the simple writes `ownerProfile.save`,
+  `paymentNotePresets.create/update/remove`, `properties.create`,
+  `units.create` and all of `tenantDocuments` (`tables/`), through
+  `mustWrite` as the owner, so the audit triggers name the owner.
   Update this line as each method moves.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and

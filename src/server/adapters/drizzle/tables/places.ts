@@ -1,6 +1,7 @@
 import "server-only";
 import { asc, eq, inArray } from "drizzle-orm";
 import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
+import type { NewProperty, NewUnit } from "@/server/ports";
 import type { Tx } from "../client";
 import { locations, properties, unitOccupancy, units } from "../schema";
 
@@ -56,4 +57,14 @@ export async function listOccupancy(
     .from(unitOccupancy)
     .where(where)
     .orderBy(asc(unitOccupancy.start_date), asc(unitOccupancy.unit_code));
+}
+
+/** A new tower; its code is permanent (a trigger refuses a change, D2). */
+export async function createProperty(tx: Tx, input: NewProperty): Promise<void> {
+  await tx.insert(properties).values(input);
+}
+
+/** A new house. */
+export async function createUnit(tx: Tx, input: NewUnit): Promise<void> {
+  await tx.insert(units).values(input);
 }

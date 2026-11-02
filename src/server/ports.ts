@@ -54,6 +54,9 @@ export interface NewProperty {
   name: string;
 }
 
+/** A file kept on a tenant (0011); recorded_by and created_at come from the database. */
+export type NewTenantDocument = Insert<"tenant_documents">;
+
 export interface NewUnit {
   unit_code: string;
   property_code: string;
@@ -305,7 +308,7 @@ export interface OwnerRepositories {
     /** Every tenant with at least one document (Overview's "No documents on file"). */
     tenantIdsWithDocuments(): Promise<string[]>;
     get(id: string): Promise<TenantDocument | null>;
-    create(rows: Insert<"tenant_documents">[]): Promise<void>;
+    create(rows: NewTenantDocument[]): Promise<void>;
     /** False if no such document. */
     remove(id: string): Promise<boolean>;
   };
