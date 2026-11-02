@@ -1,7 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { index, integer, pgTable, primaryKey, text, unique, uuid } from "drizzle-orm/pg-core";
-import { PAYMENT_MODES, type LedgerStatus, type PeriodStatus } from "@/lib/types";
+import { PAYMENT_MODES, type LedgerStatus, type PeriodStatus, type ProofContentType } from "@/lib/types";
 import { dateKey, money, timestamptz } from "./columns";
 import { tenants } from "./tenants";
 
@@ -20,9 +20,13 @@ export const rentPeriods = pgTable(
     period_month: dateKey("period_month").notNull(),
     amount_due: money("amount_due").notNull(),
     amount_allocated: money("amount_allocated").notNull().default(0),
-    /** Generated from the two amounts (the expression lives in the migration). */
+    /**
+     * Generated from the two amounts (the expression lives in the migration).
+     * A case with an else, so never null, though the catalog says nullable.
+     */
     status: text("status")
       .$type<PeriodStatus>()
+      .notNull()
       .generatedAlwaysAs(sql`null`),
     created_at: timestamptz("created_at").notNull().default(sql`now()`),
   },
@@ -132,7 +136,7 @@ export const paymentProofs = pgTable(
       .references(() => payments.id, { onDelete: "restrict", onUpdate: "restrict" }),
     storage_path: text("storage_path").notNull().unique(),
     file_name: text("file_name").notNull(),
-    content_type: text("content_type").notNull(),
+    content_type: text("content_type").$type<ProofContentType>().notNull(),
     size_bytes: integer("size_bytes").notNull(),
     created_at: timestamptz("created_at").notNull().default(sql`now()`),
   },

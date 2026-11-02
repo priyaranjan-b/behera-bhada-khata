@@ -87,9 +87,9 @@ export interface MonthlyTrendPoint {
 // which month's rent it was allocated against. A tenant paying 3 months of
 // arrears in one go shows the whole amount in the month they actually paid.
 export function buildBillingCollectionTrend(
-  periods: { period_month: string; amount_due: number | string }[],
-  payments: { amount: number | string; payment_date: string }[],
-  adjustments: { delta_amount: number | string; confirmed_at: string | null }[],
+  periods: { period_month: string; amount_due: number }[],
+  payments: { amount: number; payment_date: string }[],
+  adjustments: { delta_amount: number; confirmed_at: string | null }[],
   monthKeys: string[]
 ): MonthlyTrendPoint[] {
   const billedByMonth = new Map<string, number>();
