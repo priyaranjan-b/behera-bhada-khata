@@ -2,6 +2,18 @@ import "server-only";
 import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must, mustWrite } from "../errors";
+import { createAdjustment, createPayment } from "../procedures/ledger";
+import { logEvent } from "../procedures/system";
+import {
+  correctPaidThrough,
+  correctRent,
+  createTenant,
+  moveOutTenant,
+  startRentTracking,
+  stopRentTracking,
+  updateTenant,
+} from "../procedures/tenants";
+import { listAudit } from "../tables/audit";
 import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
 import { paymentsPage } from "../queries/paymentsPage";
@@ -20,6 +32,7 @@ import {
   listPayments,
   listRentPeriods,
   listRentPeriodsByIds,
+  rotateToken,
 } from "../tables/ledger";
 import {
   createTenantDocuments,
@@ -58,16 +71,12 @@ function pageLabel(f: {
   return `${range}page ${f.page}x${f.pageSize} by ${f.sort} ${f.dir}, ${f.filters.length} filters${f.search ? ", searched" : ""}`;
 }
 
-/** Some methods of some namespaces: what the Drizzle adapter implements so far. */
-export type RepositoryOverrides<R> = { [K in keyof R]?: Partial<R[K]> };
-
 /**
- * The owner's repositories that have moved to Drizzle (A19). Every query
- * runs through inScope(db, { role: "authenticated", claims }), so RLS still
- * refuses anyone but the single app owner. Namespaces not listed here stay
- * on the Supabase adapter (see src/server/infra/index.ts).
+ * The owner's repositories on Drizzle (A19): every method. Each query runs
+ * through inScope(db, { role: "authenticated", claims }), so RLS and the SQL
+ * functions' is_app_owner() still refuse anyone but the single app owner.
  */
-export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryOverrides<OwnerRepositories> {
+export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerRepositories {
   /** A read as the owner; a failure is a 500 naming `what`, like the Supabase adapter's `must`. */
   const read = <T>(what: string, fn: (tx: Tx) => Promise<T>) =>
     must(inScope(db, { role: "authenticated", claims }, fn), what);
@@ -77,6 +86,10 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
 
   return {
     audit: {
+      list: (filter) => read(`list audit log${filter.tenantId ? ` of tenant ${filter.tenantId}` : ""}`, (tx) => listAudit(tx, filter)),
+      // An app event, by the owner (the session is the actor).
+      log: (event) =>
+        write(`log event ${event.action}${event.tenantId ? ` for tenant ${event.tenantId}` : ""}`, (tx) => logEvent(tx, event)),
       historyPage: (filter) =>
         read(
           `read history page of ${filter.tenantId !== undefined ? `tenant ${filter.tenantId}` : "all tenants"} ${pageLabel({ ...filter, from: filter.fromDate, to: filter.toDate })}${filter.actions ? `, ${filter.actions.length} actions` : ""}`,
@@ -126,6 +139,16 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
       accountSummary: (id) => read(`read tenant account ${id}`, (tx) => tenantAccountSummary(tx, id)),
       list: (filter) => read("list tenants", (tx) => listTenants(tx, filter)),
       get: (id) => read(`get tenant ${id}`, (tx) => getTenant(tx, id)),
+      create: (input) => write("create tenant", (tx) => createTenant(tx, input)),
+      update: (id, changes) => write(`update tenant ${id}`, (tx) => updateTenant(tx, id, changes)),
+      moveOut: (id, date) => write(`move out tenant ${id}`, (tx) => moveOutTenant(tx, id, date)),
+      correctPaidThrough: (id, paidThrough) =>
+        write(`correct paid up to of tenant ${id}`, (tx) => correctPaidThrough(tx, id, paidThrough)),
+      correctRent: (id, fromMonth, monthlyRent) =>
+        write(`correct rent of tenant ${id} from ${fromMonth}`, (tx) => correctRent(tx, id, fromMonth, monthlyRent)),
+      startRentTracking: (id, monthlyRent, paidThrough) =>
+        write(`start rent tracking of tenant ${id}`, (tx) => startRentTracking(tx, id, monthlyRent, paidThrough)),
+      stopRentTracking: (id) => write(`stop rent tracking of tenant ${id}`, (tx) => stopRentTracking(tx, id)),
     },
     billing: {
       page: (filter) => read(`read billing page ${pageLabel(filter)} show ${filter.show}`, (tx) => billingPage(tx, filter)),
@@ -155,11 +178,23 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
       listProofs: (ids) => read(`list proofs of ${ids.length} payments`, (tx) => listPaymentProofs(tx, ids)),
       getProof: (id) => read(`get payment proof ${id}`, (tx) => getPaymentProof(tx, id)),
       page: (filter) => read(`read payments page ${pageLabel(filter)}`, (tx) => paymentsPage(tx, filter)),
+      create: (payment, allocations, proofs) =>
+        write(`create payment ${payment.id} for tenant ${payment.tenant_id}`, (tx) =>
+          createPayment(tx, payment, allocations, proofs)
+        ),
+      rotateToken: (id, tokenHash, expiresAt) =>
+        write(`rotate payment link ${id}`, (tx) => rotateToken(tx, "payment", id, tokenHash, expiresAt)),
     },
     adjustments: {
       listForTenants: (ids, filter) => read(`list adjustments of ${ids.length} tenants`, (tx) => listAdjustments(tx, ids, filter)),
       get: (id) => read(`get adjustment ${id}`, (tx) => getAdjustment(tx, id)),
       listAllocations: (id) => read(`list allocations of adjustment ${id}`, (tx) => listAdjustmentAllocations(tx, id)),
+      create: (adjustment, allocations) =>
+        write(`create adjustment ${adjustment.id} on payment ${adjustment.original_payment_id}`, (tx) =>
+          createAdjustment(tx, adjustment, allocations)
+        ),
+      rotateToken: (id, tokenHash, expiresAt) =>
+        write(`rotate adjustment link ${id}`, (tx) => rotateToken(tx, "adjustment", id, tokenHash, expiresAt)),
     },
   };
 }

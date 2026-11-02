@@ -598,36 +598,25 @@ routes, contracts and the UI don't change.
   already knows move to TS (`queries/`): the `…_page()` report functions,
   the grid helpers, label and status helpers, `tenant_account_summary`, and
   the rate-limit counter. Anything whose guarantee must hold for every
-  writer stays in Postgres, called through typed wrappers (`procedures/`,
-  added with the first wrapper).
+  writer stays in Postgres, called through typed wrappers (`procedures/`:
+  named arguments, as `rpc()` passes them, so a reordered signature can't
+  shift a value into the wrong parameter).
   That covers triggers (audit log, permanent codes, deposit, receipt
   numbers), `is_app_owner()` and RLS, and the money-moving and
   dated-history functions (`create_payment`, `create_adjustment`,
   `correct_rent`, the tenant lifecycle, `ensure_rent_periods`, D4/D5/D9).
   Those functions lock, check and write in one round trip, and they let the
   owner role keep its writes revoked.
-- **Moved so far:** `tenants.accountSummary` (replaces
-  `tenant_account_summary`); the plain reads `ownerProfile.get`,
-  `paymentNotePresets.list`, `locations.list`, `properties.list/get`,
-  `units.list`, `occupancy.list`, `tenants.list/get` and
-  `rentRates.listForTenants` (`tables/`); the plain ledger reads
-  `rentPeriods.listForTenants/listByIds`, `payments.listForTenants/get/
-  listAllocations/listAllocationsForPeriods/listProofs/getProof` and
-  `adjustments.listForTenants/get/listAllocations` (`tables/ledger.ts`);
-  `payments.page` (replaces `payments_page`, `queries/paymentsPage.ts`);
-  `billing.page` and `billing.totals` (replace `billing_page` and
-  `billing_totals`, `queries/billingPage.ts`); `ledger.page` (replaces
-  `tenant_ledger_page`, `queries/tenantLedgerPage.ts`); `rentPeriods.page`
-  (replaces `tenant_months_page`, `queries/tenantMonthsPage.ts`);
-  `audit.historyPage` (replaces `audit_history_page`,
-  `queries/auditHistoryPage.ts`); the system methods `rateLimits.hit` and
-  `rateLimits.prune` (replace `hit_rate_limit` / `prune_rate_limits`,
-  `tables/rateLimits.ts`, as `service_role`, which 0028 lets `app_drizzle`
-  switch to); the simple writes `ownerProfile.save`,
-  `paymentNotePresets.create/update/remove`, `properties.create`,
-  `units.create` and all of `tenantDocuments` (`tables/`), through
-  `mustWrite` as the owner, so the audit triggers name the owner.
-  Update this line as each method moves.
+- **Moved: every port method** (Nov 2026). The owner's reads (`tables/`,
+  and `queries/` for the account figures and the six paged tables), the
+  simple writes (`tables/`), the ledger and tenant-lifecycle writes
+  (`procedures/ledger.ts`, `procedures/tenants.ts`), and the system side:
+  rate limits, rent-month upkeep, the confirm link's lookups and
+  acknowledgement, audit events (`procedures/system.ts`, `tables/`). Both
+  repository builders satisfy the full port types, so a new port method
+  can't be left on Supabase by accident. `src/server/adapters/supabase/db.ts`
+  stays as the `DATA_ADAPTER=supabase` rollback until it is deleted (with
+  the replaced SQL functions, after a release on Drizzle).
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
   order by, replacing `grid_words`, `grid_check`, `grid_active_filters`,

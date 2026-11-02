@@ -158,11 +158,27 @@ export async function confirmRecord(token: string, body: unknown, meta: RequestM
     });
     if (!acknowledged) throw new ApiError(409, "Already acknowledged");
   } catch (err) {
+    // A lost reply can follow a committed acknowledgement: keep the files if
+    // the record now points at them, else they'd be dangling links.
+    if (!(err instanceof ApiError) && (await acknowledgedWith(token, ctx.recordType, pdfPath))) throw err;
     await storage.remove(uploaded);
     throw err;
   }
 
   return { receiptUrl: await storage.signedUrl(pdfPath, ACKNOWLEDGED_RECEIPT_URL_SECONDS) };
+}
+
+/** Whether the record ended up acknowledged with this attempt's receipt (false if that can't be read either). */
+async function acknowledgedWith(token: string, recordType: RecordType, pdfPath: string): Promise<boolean> {
+  try {
+    const db = systemDb();
+    const tokenHash = hashToken(token);
+    const record =
+      recordType === "payment" ? await db.payments.findByTokenHash(tokenHash) : await db.adjustments.findByTokenHash(tokenHash);
+    return record?.pdf_path === pdfPath;
+  } catch {
+    return false;
+  }
 }
 
 /** Short-lived download URL for the tenant's signed copy of the receipt. */

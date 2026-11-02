@@ -67,6 +67,24 @@ describe("confirmRecord", () => {
     expect(fakes.state.files.size).toBe(0);
   });
 
+  it("keeps its files when the reply was lost after the acknowledgement committed", async () => {
+    // The database wrote it (the record now points at this attempt's receipt), then the connection dropped.
+    fakes.system.payments.acknowledge.mockImplementationOnce(async (...args: unknown[]) => {
+      const [id, patch] = args as [string, { pdf_path: string; tenant_signature_path: string }];
+      const record = fakes.state.payments.get(id)!;
+      fakes.state.payments.set(id, { ...record, ...patch, acknowledged_at: "2026-03-06T00:00:00Z" });
+      throw new Error("acknowledge payment: [?] connection closed");
+    });
+    await expect(confirmRecord("token", body, meta)).rejects.toThrow("connection closed");
+    expect(fakes.state.files.size).toBe(2);
+  });
+
+  it("still cleans up when an unexpected failure left the record unacknowledged", async () => {
+    fakes.system.payments.acknowledge.mockRejectedValueOnce(new Error("acknowledge payment: [?] connection refused"));
+    await expect(confirmRecord("token", body, meta)).rejects.toThrow("connection refused");
+    expect(fakes.state.files.size).toBe(0);
+  });
+
   it("checks the OTP before storing anything", async () => {
     fakes.messaging.checkOtp.mockResolvedValueOnce(false);
     expect(await status(confirmRecord("token", body, meta))).toBe(400);

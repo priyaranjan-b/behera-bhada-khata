@@ -68,3 +68,8 @@ export async function createProperty(tx: Tx, input: NewProperty): Promise<void> 
 export async function createUnit(tx: Tx, input: NewUnit): Promise<void> {
   await tx.insert(units).values(input);
 }
+
+export async function getLocation(tx: Tx, locationCode: string): Promise<Location | null> {
+  const [row] = await tx.select().from(locations).where(eq(locations.location_code, locationCode));
+  return row ?? null;
+}
