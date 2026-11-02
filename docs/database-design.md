@@ -786,6 +786,42 @@ record each rate and month change with old and new values. The trade-off:
 the tenant's Ledger shows the corrected charge on the old month, not the old
 charge plus a reversing line.
 
+### D32 — The Drizzle adapter logs in as `app_drizzle`, which can do nothing of its own
+
+**Decision (0027).** The Drizzle adapter (A19 in `docs/design-decisions.md`)
+connects to Postgres directly, through the transaction pooler. That takes a
+role and password: the publishable and secret keys only work for Supabase's
+HTTP APIs. Its login is `app_drizzle`, not `postgres`:
+- **`NOINHERIT`, with nothing beyond what PUBLIC has**, which the
+  revoke-and-re-grant rule for every function (D11) keeps empty. Until it
+  switches role it can read no table and run no function (`42501`), so a
+  migration that forgets that revoke is a D32 problem too.
+- **A member of `authenticated` only**, so it can switch to the owner role
+  for one transaction and to nothing else. `inScope()`
+  (`src/server/adapters/drizzle/client.ts`) always does, with the session's
+  verified user id, so RLS and `is_app_owner()` apply. `service_role`, which
+  bypasses RLS, is granted by the migration that first moves a system method
+  (rate limits) to Drizzle, not before.
+- **Always the same end state.** The migration sets every attribute
+  (`noinherit nosuperuser ... nobypassrls`) and revokes `service_role` even if
+  the role already existed, and sets `statement_timeout = '5s'` on the login
+  as a backstop for the statement before the switch.
+- **No password in the migration.** The owner sets it by hand in the SQL
+  editor (`alter role app_drizzle password '…'`). `DATABASE_URL` then uses the
+  user `app_drizzle.<project-ref>` on port 6543.
+
+**Why.** The dashboard's `postgres` connection string can alter or drop
+tables, which is more than the secret key can do. A leaked `app_drizzle`
+password gives at most what the app's own roles already have.
+`test/schema.test.ts` checks the role's attributes and timeout, that a
+re-run resets a role made with other settings, that it can't read anything
+before switching, and which roles it may switch to. Supabase protects its
+reserved roles (`supautils`), and PGlite's superuser can't show whether the
+grant is allowed there: run 0027 on a branch or inside `begin; ...;
+rollback;` first, then check `select pg_has_role('app_drizzle',
+'authenticated', 'SET')`. On this project it applied (Nov 2026) and the app
+reads through it.
+
 ---
 
 ## 3. Checklists

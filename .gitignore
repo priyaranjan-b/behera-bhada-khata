@@ -57,3 +57,6 @@ src/lib/database.generated.ts
 # real occupant names from the paper register - keep local, never publish
 supabase/seed/arnapal_tenants.sql
 *.xlsx
+
+# drizzle-kit pull output (scratch; the schema lives in src/server/adapters/drizzle/schema)
+/.drizzle
