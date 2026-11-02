@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, gte, inArray, lte, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte, ne, or, type SQL } from "drizzle-orm";
 import { utcStartOfDayBefore } from "@/lib/dates";
 import type {
   Adjustment,
@@ -124,4 +124,36 @@ export async function getAdjustment(tx: Tx, id: string): Promise<Adjustment | nu
 
 export function listAdjustmentAllocations(tx: Tx, adjustmentId: string): Promise<AdjustmentAllocation[]> {
   return tx.select().from(adjustmentAllocations).where(eq(adjustmentAllocations.adjustment_id, adjustmentId));
+}
+
+/** The record a confirm link points at, by the hash of its token (src/server/token.ts); system only. */
+export async function findPaymentByTokenHash(tx: Tx, tokenHash: string): Promise<Payment | null> {
+  const [row] = await tx.select().from(payments).where(eq(payments.token_hash, tokenHash));
+  return row ?? null;
+}
+
+export async function findAdjustmentByTokenHash(tx: Tx, tokenHash: string): Promise<Adjustment | null> {
+  const [row] = await tx.select().from(adjustments).where(eq(adjustments.token_hash, tokenHash));
+  return row ?? null;
+}
+
+/**
+ * A new confirm-link token for a payment or adjustment the tenant hasn't
+ * acknowledged; the owner's UPDATE grant covers only these two columns
+ * (0001). False otherwise (acknowledged, or no such record for this owner).
+ */
+export async function rotateToken(
+  tx: Tx,
+  record: "payment" | "adjustment",
+  id: string,
+  tokenHash: string,
+  expiresAt: string
+): Promise<boolean> {
+  const table = record === "payment" ? payments : adjustments;
+  const rows = await tx
+    .update(table)
+    .set({ token_hash: tokenHash, token_expires_at: expiresAt })
+    .where(and(eq(table.id, id), isNull(table.acknowledged_at)))
+    .returning({ id: table.id });
+  return rows.length > 0;
 }

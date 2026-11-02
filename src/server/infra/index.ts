@@ -8,26 +8,11 @@ import { supabaseOwnerRepositories, supabaseSystemRepositories } from "@/server/
 import { sessionJwtClaims, supabaseAuth } from "@/server/adapters/supabase/auth";
 import { supabaseStorage } from "@/server/adapters/supabase/storage";
 import { twilioMessaging } from "@/server/adapters/twilio/messaging";
-import {
-  drizzleDb,
-  drizzleOwnerRepositories,
-  drizzleSystemRepositories,
-  type RepositoryOverrides,
-} from "@/server/adapters/drizzle";
+import { drizzleDb, drizzleOwnerRepositories, drizzleSystemRepositories } from "@/server/adapters/drizzle";
 import { env } from "@/server/env";
 
-/**
- * The Supabase repositories with the methods already moved to Drizzle laid
- * over them, one namespace method at a time (A19).
- */
-function withOverrides<R extends object>(base: R, overrides: RepositoryOverrides<R>): R {
-  const merged = { ...base };
-  for (const key of Object.keys(overrides) as (keyof R)[]) {
-    merged[key] = { ...base[key], ...overrides[key] } as R[keyof R];
-  }
-  return merged;
-}
-
+// DATA_ADAPTER picks one data adapter for the whole app (A19): drizzle, or
+// supabase - the rollback, until src/server/adapters/supabase/db.ts is deleted.
 const drizzleBound = () => env().DATA_ADAPTER === "drizzle";
 
 /** Once per request: a page makes several ownerDb() calls, each would verify the JWT again. */
@@ -35,17 +20,15 @@ const requestClaims = cache(sessionJwtClaims);
 
 /** Data access as the signed-in owner (the database refuses anyone else). */
 export async function ownerDb(): Promise<OwnerRepositories> {
-  const base = await supabaseOwnerRepositories();
-  if (!drizzleBound()) return base;
-  // Signed out: the Supabase client already sees nothing, so keep it.
+  if (!drizzleBound()) return supabaseOwnerRepositories();
   const claims = await requestClaims();
-  return claims ? withOverrides(base, drizzleOwnerRepositories(drizzleDb(), claims)) : base;
+  // Signed out: the Supabase session client sees nothing (RLS), so it is the safe answer.
+  return claims ? drizzleOwnerRepositories(drizzleDb(), claims) : supabaseOwnerRepositories();
 }
 
 /** Data access with no owner scope - see SystemRepositories for who may use it. */
 export function systemDb(): SystemRepositories {
-  const base = supabaseSystemRepositories();
-  return drizzleBound() ? withOverrides(base, drizzleSystemRepositories(drizzleDb())) : base;
+  return drizzleBound() ? drizzleSystemRepositories(drizzleDb()) : supabaseSystemRepositories();
 }
 
 export const auth: AuthGateway = supabaseAuth;

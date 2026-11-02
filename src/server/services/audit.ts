@@ -18,6 +18,12 @@ import { notFound, parseInput, requireTenant, type OwnerContext } from "./contex
 // table changes itself; this module reads them and adds the app events
 // (messages, receipt downloads, sign-ins).
 
+/** One log line for an event that couldn't be recorded: what, for which record, and why. */
+function auditFailure(event: AuditEvent, err: unknown): string {
+  const why = err instanceof Error ? err.message : String(err);
+  return `audit ${event.action} tenant=${event.tenantId ?? "-"} entity=${event.entityId ?? "-"}: ${why}`;
+}
+
 /**
  * Logs an app event. Best effort: a failure is logged and swallowed, so the
  * audit trail never blocks a payment, a message or a sign-in.
@@ -26,7 +32,7 @@ export async function recordEvent(db: Pick<OwnerRepositories, "audit">, event: A
   try {
     await db.audit.log(event);
   } catch (err) {
-    console.error("audit:", event.action, err);
+    console.error(auditFailure(event, err));
   }
 }
 
@@ -35,7 +41,7 @@ export async function recordSystemEvent(event: Parameters<SystemRepositories["au
   try {
     await systemDb().audit.log(event);
   } catch (err) {
-    console.error("audit:", event.action, err);
+    console.error(auditFailure(event, err));
   }
 }
 
