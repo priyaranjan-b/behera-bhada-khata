@@ -605,8 +605,29 @@ routes, contracts and the UI don't change.
   `rentRates.listForTenants` (`tables/`); the plain ledger reads
   `rentPeriods.listForTenants/listByIds`, `payments.listForTenants/get/
   listAllocations/listAllocationsForPeriods/listProofs/getProof` and
-  `adjustments.listForTenants/get/listAllocations` (`tables/ledger.ts`).
+  `adjustments.listForTenants/get/listAllocations` (`tables/ledger.ts`);
+  `payments.page` (replaces `payments_page`, `queries/paymentsPage.ts`).
   Update this line as each method moves.
+- **Server-paged tables (`grid/`).** One builder turns the grid query
+  (search words, text filters, and / or, sort, page) into the where and
+  order by, replacing `grid_words`, `grid_check`, `grid_active_filters`,
+  `grid_row_matches`, `like_escape` and `audit_text_matches` as the page
+  functions used them. A table is described as SQL over one row: the text
+  each filter reads, the search text, the sort expressions and a unique
+  tie-break. Sort and field names only index into those maps, and every
+  value is a bound parameter. The text the grid searches is built from the
+  app's own sources (`queries/text.ts`): `DATE_FORMAT`, `formatMonth`'s
+  wording, the label maps such as `PAYMENT_MODE_LABELS`, and today from
+  `todayKey()` for which towers a tenant holds. A test compares each with the
+  TS function the UI uses, so a label changed in TS changes what the search
+  finds. A page is one statement (a materialised `matching` set feeding the
+  count, the cards and the page, which is clamped in SQL), so it reads one
+  snapshot under one `statement_timeout` in one round trip, as the SQL
+  function did. Limits come from `src/lib/validation.ts` (`GRID_LIMITS`,
+  `PAYMENTS_LIMITS`); a refused query logs which check failed, and a failed
+  page names its range, page, sort and filter count, never the search text.
+  The parity test for each page runs a matrix of searches, filters, sorts
+  and pages against the SQL function it replaces.
 - **Same values as PostgREST.** Money reads back as a JS number, which is
   what PostgREST sends and what `src/lib/types.ts` declares (`number`, since
   Nov 2026; it used to say `string`). Dates are `yyyy-MM-dd` keys and

@@ -2,6 +2,7 @@ import "server-only";
 import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must } from "../errors";
+import { paymentsPage } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
 import {
   getAdjustment,
@@ -19,6 +20,15 @@ import {
 import { getOwnerProfile, listPaymentNotePresets } from "../tables/owner";
 import { getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
 import { getTenant, listRentRates, listTenants } from "../tables/tenants";
+
+/**
+ * A paged read's query for its error label, enough to reproduce it: range,
+ * page, sort and how many filters, and whether there was a search but never
+ * its text (it can hold names or phone numbers).
+ */
+function pageLabel(f: { from: string; to: string; page: number; pageSize: number; sort: string; dir: string; filters: unknown[]; search?: string }): string {
+  return `${f.from}..${f.to} page ${f.page}x${f.pageSize} by ${f.sort} ${f.dir}, ${f.filters.length} filters${f.search ? ", searched" : ""}`;
+}
 
 /** Some methods of some namespaces: what the Drizzle adapter implements so far. */
 export type RepositoryOverrides<R> = { [K in keyof R]?: Partial<R[K]> };
@@ -77,6 +87,7 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): RepositoryO
         read(`list allocations for ${ids.length} months`, (tx) => listAllocationsForPeriods(tx, ids)),
       listProofs: (ids) => read(`list proofs of ${ids.length} payments`, (tx) => listPaymentProofs(tx, ids)),
       getProof: (id) => read(`get payment proof ${id}`, (tx) => getPaymentProof(tx, id)),
+      page: (filter) => read(`read payments page ${pageLabel(filter)}`, (tx) => paymentsPage(tx, filter)),
     },
     adjustments: {
       listForTenants: (ids, filter) => read(`list adjustments of ${ids.length} tenants`, (tx) => listAdjustments(tx, ids, filter)),
