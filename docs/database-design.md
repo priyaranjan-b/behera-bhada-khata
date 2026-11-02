@@ -729,6 +729,12 @@ How they're built:
 - **Labels:** the SQL text matches what the app showed (month labels,
   `Payment received (cash)`, statuses). The schema tests pin it, and a
   before/after comparison on the live data matched for Months.
+- **With `DATA_ADAPTER=drizzle` (A19):** the same rule (paged, sorted and
+  searched in the database) holds, but the query is built in TypeScript:
+  the `grid/` builder and `queries/*Page.ts` in the Drizzle adapter, one
+  statement per page, as the SQL function was. So far `payments.page`. The
+  SQL `…_page()` function stays, as the `supabase` rollback and the oracle
+  the parity tests compare against, until the last item of A19 drops it.
 
 **Why.** These tables gain rows every month. Loading them whole made every
 page slower over time, and paging in the browser limited search, sort and

@@ -10,6 +10,9 @@ import {
 } from "@/lib/types";
 
 /** How each tenant status reads and which badge tone it gets; the one mapping every screen uses. */
+/** Shown for a missing name or tower; the server-paged tables' SQL shows the same. */
+export const NOT_SET = "—";
+
 export const TENANT_STATUS_DISPLAY: Record<TenantStatus, { label: string; tone: "success" | "warning" | "neutral" }> = {
   active: { label: "Active", tone: "success" },
   draft: { label: "Draft", tone: "warning" },

@@ -1,7 +1,7 @@
 import "server-only";
 import type { AvailableUnit, TenantHouse } from "@/lib/contracts";
 import { currentMonthKey, todayKey } from "@/lib/dates";
-import { unitMix, type UnitMix } from "@/lib/domain/tenant";
+import { NOT_SET, unitMix, type UnitMix } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import type { Property, TenantRentRate, Unit, UnitOccupancy } from "@/lib/types";
 import type { OwnerRepositories } from "@/server/ports";
@@ -112,7 +112,7 @@ export function placementOf(p: Placements, tenantId: string): TenantPlacement {
     houses,
     unitCodes: houses.map((h) => h.unitCode),
     unitMix: unitMix(houses.map((h) => h.unitType)),
-    propertyName: [...new Set(houses.map((h) => h.propertyName))].join(", ") || "—",
+    propertyName: [...new Set(houses.map((h) => h.propertyName))].join(", ") || NOT_SET,
     monthlyRent: rentInEffect(p.ratesByTenant.get(tenantId) ?? []),
   };
 }
