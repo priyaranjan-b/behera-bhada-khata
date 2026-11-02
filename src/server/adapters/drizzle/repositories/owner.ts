@@ -77,7 +77,7 @@ function pageLabel(f: {
  * functions' is_app_owner() still refuse anyone but the single app owner.
  */
 export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerRepositories {
-  /** A read as the owner; a failure is a 500 naming `what`, like the Supabase adapter's `must`. */
+  /** A read as the owner; a failure is a 500 naming `what`, like the old Supabase adapter's `must`. */
   const read = <T>(what: string, fn: (tx: Tx) => Promise<T>) =>
     must(inScope(db, { role: "authenticated", claims }, fn), what);
   /** A write as the owner; a constraint or policy violation is the user's mistake (writeError), anything else a 500. */

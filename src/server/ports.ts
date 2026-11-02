@@ -1,6 +1,7 @@
 // The backend's outside-world dependencies, as interfaces. Services depend
 // only on these; `src/server/infra/index.ts` binds them to an implementation
-// (today: src/server/adapters/supabase and src/server/adapters/twilio).
+// (today: src/server/adapters/drizzle for data, src/server/adapters/supabase
+// for sign-in and storage, src/server/adapters/twilio for messages).
 // Moving to another database or a standalone Node.js server means writing a
 // new adapter that satisfies these interfaces - services and route handlers
 // stay as they are.

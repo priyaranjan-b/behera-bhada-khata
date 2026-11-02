@@ -407,8 +407,9 @@ How it's built:
 - **Service:** `listActivity` / `tenantHistory` share one `historyPage`,
   which maps the table's fields to columns and makes one repository call,
   `audit.historyPage`.
-- **Database:** `audit_history_page()` (0018) does the search, filters,
-  sort and paging in one SQL query over the text stored with each change
+- **Database:** one query (`queries/auditHistoryPage.ts` in the Drizzle
+  adapter, A19; it replaced `audit_history_page()`, 0018) does the search,
+  filters, sort and paging in one statement over the text stored with each change
   (D27 in `docs/database-design.md`). The tenant is optional, and the
   tenant's current name is joined in so it can be searched, filtered and
   sorted. What the database doesn't match isn't shown, and nothing is
@@ -428,12 +429,13 @@ The house History dialog keeps its timeline with "Show older" (`before`,
 ### A15 — Lists that grow every month page in the database; master data pages in the browser
 
 **Decision.** Which way a table pages depends on how its rows grow:
-- **Grows with time → server-side** (`paginationMode="server"`, an SQL
-  `…_page()` function, A14's pattern). This covers history, payments and
-  adjustments, rent months, and anything tenants × months. Done:
-  Activity and a tenant's Change history (`audit_history_page`), the
-  tenant's Months (`tenant_months_page`) and Ledger (`tenant_ledger_page`),
-  and Billing (`billing_page` + `billing_totals`); D28 in
+- **Grows with time → server-side** (`paginationMode="server"`, one paged
+  query in `src/server/adapters/drizzle/queries/` on the `grid/` builder,
+  A14's pattern, A19). This covers history, payments and adjustments, rent
+  months, and anything tenants × months. Done: Activity and a tenant's
+  Change history (`auditHistoryPage`), the tenant's Months
+  (`tenantMonthsPage`) and Ledger (`tenantLedgerPage`), Billing
+  (`billingPage` + `billingTotals`) and Payments (`paymentsPage`); D28 in
   `docs/database-design.md`. The client side of each is the kit hook
   `useServerGrid`.
 - **Fixed by master data → client-side** (the service returns every row).
@@ -538,8 +540,7 @@ script or someone calling Supabase directly can't wear the app down:
   directly; RLS gives them nothing, but a slow query still costs the
   database.
 - **Failing closed.** A rate limit that can't be counted (database or
-  pooler down, or with `DATA_ADAPTER=drizzle` the login not yet allowed to
-  act as `service_role`, D32) fails the call with a 500, on purpose: a
+  pooler down, or the login not yet allowed to act as `service_role`, D32) fails the call with a 500, on purpose: a
   limit that is skipped when the database is in trouble protects nothing,
   and an owner call that can't count a hit can't do its own reads either.
   With Drizzle each hit is its own short transaction (begin, role switch,
@@ -588,12 +589,12 @@ Billing answers "what was owed per month", not "what arrived on which day".
 
 ### A19 — A Drizzle data adapter, moved one port method at a time
 
-**Decision.** `src/server/adapters/drizzle/` is a second implementation of
-the data ports (`src/server/ports.ts`), built on Drizzle ORM and postgres-js.
-`src/server/infra/index.ts` lays the methods it implements over the Supabase
-adapter, one namespace method at a time. `DATA_ADAPTER=supabase` (the
-default) binds none of them, which makes it the rollback switch. Services,
-routes, contracts and the UI don't change.
+**Decision.** `src/server/adapters/drizzle/` implements the data ports
+(`src/server/ports.ts`), built on Drizzle ORM and postgres-js. It was built
+next to the Supabase (PostgREST) adapter one port method at a time, with a
+`DATA_ADAPTER` switch as the rollback, and replaced it in Nov 2026:
+`src/server/adapters/supabase/` is now sign-in and file storage only.
+Services, routes, contracts and the UI didn't change.
 - **What moves and what stays.** Reads that only rebuild what the app
   already knows move to TS (`queries/`): the `…_page()` report functions,
   the grid helpers, label and status helpers, `tenant_account_summary`, and
@@ -614,9 +615,13 @@ routes, contracts and the UI don't change.
   rate limits, rent-month upkeep, the confirm link's lookups and
   acknowledgement, audit events (`procedures/system.ts`, `tables/`). Both
   repository builders satisfy the full port types, so a new port method
-  can't be left on Supabase by accident. `src/server/adapters/supabase/db.ts`
-  stays as the `DATA_ADAPTER=supabase` rollback until it is deleted (with
-  the replaced SQL functions, after a release on Drizzle).
+  can't be left on Supabase by accident.
+- **The Supabase data adapter is gone** (Nov 2026, after a regression round
+  on Drizzle): `db.ts` and its `must`/`mustWrite`/`chunk` helpers are
+  deleted, `DATA_ADAPTER` with them, and `DATABASE_URL` is required. A
+  rollback is now a revert of that commit. `ownerDb()` with no session is a
+  401 (it used to fall back to the Supabase session client, which saw
+  nothing). The replaced SQL functions are dropped by a later migration.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
   order by, replacing `grid_words`, `grid_check`, `grid_active_filters`,
@@ -648,8 +653,8 @@ routes, contracts and the UI don't change.
   Nov 2026; it used to say `string`). Dates are `yyyy-MM-dd` keys and
   timestamps ISO strings. The parity test for plain reads compares with
   Postgres' `json_agg` of the same rows, which is what PostgREST sends.
-- **No chunking.** The Supabase adapter splits long id lists (`chunk()`)
-  because they go into a PostgREST URL, then merges and re-sorts in JS. A
+- **No chunking.** The Supabase adapter split long id lists (`chunk()`)
+  because they went into a PostgREST URL, then merged and re-sorted in JS. A
   Drizzle query sends them as bound parameters, so it is one query and the
   database's `order by` (with a unique tie-break) is the order. Postgres
   allows 65,535 parameters per statement; these lists are a page's records
@@ -668,8 +673,8 @@ routes, contracts and the UI don't change.
 - **Same shapes.** The column types in `schema/columns.ts` read back what
   PostgREST sent: numeric as a number, date as a `yyyy-MM-dd` key,
   timestamptz as an ISO string. `errors.ts` maps the user's mistakes
-  (`BBK*`, constraints, `42501`) the way `writeError` does. Unlike the
-  Supabase adapter, an outage (connection refused or timed out, pool full,
+  (`BBK*`, constraints, `42501`) the way the Supabase adapter's
+  `writeError` did. Unlike it, an outage (connection refused or timed out, pool full,
   statement timeout) is a 500, not "Couldn't save that". Drizzle's own error
   text, which lists the query's parameters, is never kept or logged.
 - **The schema mirror never drives the schema.** Migrations stay
@@ -678,11 +683,10 @@ routes, contracts and the UI don't change.
   and nullability against a migrated PGlite. `drizzle.config.ts` is for
   `drizzle-kit pull`/`check` only, never `push`/`migrate`.
 - **Each moved method has a parity test:** on PGlite, its result must equal
-  the SQL function it replaces. The SQL function stays while
-  `DATA_ADAPTER=supabase` can still call it (the rollback) and while the test
-  uses it as its oracle. It is dropped only after the Supabase binding for
-  that method is removed, with the parity test switched to fixed expected
-  values.
+  the SQL function it replaces. The SQL function stays while the test uses
+  it as its oracle, and while a deployed older release may still call it.
+  It is dropped by a later migration, with the parity test switched to
+  fixed expected values.
 - **Connection.** `DATABASE_URL` is Supabase's shared pooler in transaction
   mode (port 6543, IPv4, the serverless option), logged in as
   `app_drizzle.<project-ref>` (0027, D32): a role that can do nothing until

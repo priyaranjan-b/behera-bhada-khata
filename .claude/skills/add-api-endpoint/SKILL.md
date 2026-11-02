@@ -1,6 +1,6 @@
 ---
 name: add-api-endpoint
-description: Add or change a data operation in Behera Bhada Khata - a new read for a page, a new form submit/mutation, a new field in an API response, or anything that touches the database (tables, columns, migrations, RLS policies, SQL functions, seed data). Starts from docs/database-design.md, then walks the layers (migration -> types -> contract -> port/adapter -> service -> route.ts -> API client -> page) so Supabase stays behind src/server and the API tree keeps mirroring the page tree. Includes the recipe for lists that grow every month (history, payments, rent months, billing), which are paged, sorted and searched in SQL. Use before writing any data-fetching or database code in this repo.
+description: Add or change a data operation in Behera Bhada Khata - a new read for a page, a new form submit/mutation, a new field in an API response, or anything that touches the database (tables, columns, migrations, RLS policies, SQL functions, seed data). Starts from docs/database-design.md, then walks the layers (migration -> types -> contract -> port/adapter -> service -> route.ts -> API client -> page) so the database stays behind src/server and the API tree keeps mirroring the page tree. Includes the recipe for lists that grow every month (history, payments, rent months, billing), which are paged, sorted and searched in the database (a Drizzle queries/ page). Use before writing any data-fetching or database code in this repo.
 ---
 
 # Add an API endpoint
@@ -10,7 +10,8 @@ The UI never imports a database SDK or `@/server/*`. Data flows:
 ```
 page / component ──serverApi (in-process) or api (fetch)──▶ src/app/api/**/route.ts
   ──▶ src/server/services/<domain>.ts ──▶ ports (src/server/ports.ts)
-  ──▶ src/server/infra ──▶ src/server/adapters/supabase/*
+  ──▶ src/server/infra ──▶ src/server/adapters/drizzle/*  (data, A19)
+                           src/server/adapters/supabase/* (sign-in, storage)
 ```
 
 Read `CLAUDE.md` → "Data access — layers" first. Then go through the steps
@@ -33,7 +34,8 @@ index, RLS policy, SQL function, seed row, or a different query shape), read
 - **Every money-moving or multi-row write is one SQL function** with
   `BBK00`/`BBK04`/`BBK09` errors and an explicit revoke + grant.
 - **Never edit an applied migration;** add the next numbered file. Cover it
-  in `test/schema.test.ts` and mirror it in `src/lib/types.ts`.
+  in `test/schema.test.ts` and mirror it in `src/lib/types.ts`, and a new
+  table or column in the Drizzle schema (`src/server/adapters/drizzle/schema/`).
 
 If your change adds a new design decision, or changes one, update
 `docs/database-design.md` in the same change.
@@ -88,15 +90,24 @@ Add the path to `src/lib/api-client/paths.ts` (`apiPaths`).
 1. Add the method to the right interface in `src/server/ports.ts`:
    - `OwnerRepositories`: everything the signed-in owner does. The
      implementation must refuse anyone but the single app owner (the
-     Supabase adapter relies on RLS / `is_app_owner()`).
+     Drizzle adapter relies on RLS / `is_app_owner()`: every call runs in
+     `inScope()` as `authenticated` with the session's user id).
    - `SystemRepositories`: unscoped. Use it only when the caller is authorized
      some other way: the confirm token, cron, or rent-period upkeep.
-2. Implement the method in `src/server/adapters/supabase/db.ts`:
+2. Implement the method in the Drizzle adapter (`src/server/adapters/drizzle/`,
+   A19), wired up in `repositories/owner.ts` or `repositories/system.ts`:
+   - A plain read or write of a table goes in `tables/<domain>.ts`; a read
+     that rebuilds something (a page, a summary) in `queries/`; a call to a
+     SQL function that stays in Postgres in `procedures/` (named arguments,
+     `p_x => ${v}::type`). A new table or column goes in `schema/` too, or
+     the schema mirror test fails.
    - There is no `owner_id` to filter on; RLS already limits every query
      to the app owner. Don't add owner filters.
-   - Guard `.in()` against empty arrays.
-   - Use `must()` for reads (→ 500) and `mustWrite()` for inserts and updates
-     (→ 400 with the DB message).
+   - An empty id list matches nothing: return `[]` before querying.
+   - The repository wraps reads in `read()` (`must`, → 500) and writes in
+     `write()` (`mustWrite`, → 400/404/409 for `BBK*` and constraints).
+     One transaction per call; never `Promise.all` on one `tx`.
+   - Add a test in `test/adapters/drizzle/` on PGlite (`fixtures.ts`).
 3. Never import an adapter from a service. Import `ownerDb` / `systemDb` /
    `auth` / `storage` from `@/server/infra`.
 
@@ -110,35 +121,32 @@ every row and the grid does the rest in the browser. The UI half is in
 `build-dashboard-page`.
 
 **Worked examples:** Activity / a tenant's Change history (below), and the
-tenant Months, Ledger and Billing (D28: `tenant_months_page`,
-`tenant_ledger_page`, `billing_page`, built on the 0019 grid helpers
-`grid_check` / `grid_row_matches`, which new tables should reuse). Follow
-it layer by layer:
+tenant Months, Ledger, Billing and Payments (D28, A19:
+`queries/tenantMonthsPage.ts`, `tenantLedgerPage.ts`, `billingPage.ts`,
+`paymentsPage.ts`, all built on the `grid/` builder, which new tables should
+reuse). Follow it layer by layer:
 
 | Layer | Example |
 |---|---|
 | Query + limits | `GridQueryParams` (`src/lib/domain/gridQuery.ts`); `gridQuerySchema(sortFields, filterFields, defaults)` + extra filters (`auditTableQuerySchema`); `GRID_LIMITS` (page sizes 10/25/50/100, search length, max filters) in `src/lib/validation.ts` |
 | Contract | `AuditTableQuery extends GridQueryParams`; response `{ entries, total, all, page }` (`AuditTablePage`): `total` matching, `all` before filters, `page` as clamped |
-| SQL | `audit_history_page()` in `0018_audit_history_page.sql` |
-| Port / adapter | `audit.historyPage(filter)` → `db.rpc(…)` in `must()` |
+| Query | `auditHistoryPage()` in `src/server/adapters/drizzle/queries/auditHistoryPage.ts` (it replaced the SQL `audit_history_page()`) |
+| Port / adapter | `audit.historyPage(filter)` → `read(…, (tx) => auditHistoryPage(tx, filter))` |
 | Service | `historyPage()` in `src/server/services/audit.ts`: `parseInput`, a const map of table field → column (`HISTORY_COLUMNS`), one repository call |
 | Route | unchanged one-liner; query params arrive as strings (`readQuery`) |
 
-**The SQL function** (copy `audit_history_page`):
-- **Security invoker**, so RLS (`is_app_owner()`) decides what the caller
-  sees. Revoke from public/anon/authenticated, then grant execute to
-  `authenticated` on it *and on every helper it calls*.
-- **Validate first:** sort, direction, logic, page ≥ 0, page size in range,
-  and every filter's `field` and `operator` against fixed lists. Anything
-  else raises `BBK00`. Never build SQL from a field name: sort with a
-  `CASE` whitelist in `ORDER BY`, with `id desc` as the tie-break.
-- **Search:** every word must appear in some searchable column, via
-  `ilike '%' || like_escape(w) || '%'` (`like_escape`, 0017, makes `%` and
-  `_` literal). **Filters:** `audit_text_matches(text, operator, value)`
-  (0017) for the grid's text operators, combined with and/or. Drop filters
-  without a value first, or an empty one matches everything under "or".
-- **Counts and paging:** count `all` and `total`, clamp the page to the
-  last one, and return `jsonb_build_object('rows', …, 'total', …, 'all', …, 'page', …)`.
+**The query** (copy `auditHistoryPage`):
+- **Describe the table once as a `GridTable`** over one row `r`: `sorts`
+  and `fields` (SQL per allowed key, never built from a field name),
+  `searchText`, a unique `tieBreak`, `noun`. `checkGrid` validates sort,
+  direction, logic, page, page size and every filter's field and operator
+  against it, and anything else is a 400 (`invalidQuery`).
+- **Search and filters:** `gridWhere` (every word in `searchText`, `%` and
+  `_` literal; the text operators combined with and/or, filters without a
+  value dropped). **Sort:** `gridOrderBy`.
+- **One statement:** a materialized `matching` set feeding the count, the
+  page (`gridPageNumber` clamps it to the last one) and the json rows, run
+  under RLS through `executeRows`. Return `{ rows, total, all, page }`.
 - **Searchable text must be in columns.** Search and sort only make sense
   on what the user sees. If a shown value is built in JS (a label, a
   formatted amount), either store the display text with the row at write
@@ -147,15 +155,14 @@ it layer by layer:
   enum values the user never sees.
 - **Indexes:** the base filter (e.g. `tenant_id`) needs an index ordered
   like the default sort (`(tenant_id, id desc)`).
-- **Schema tests:**
+- **Tests** (`test/adapters/drizzle/queries/`, PGlite):
   - paging and clamping;
   - each operator with and/or;
   - `%` typed literally;
   - each sort either way;
   - every extra filter;
-  - a bad sort/filter → `BBK00`;
-  - a non-owner → no rows;
-  - anon → `42501`.
+  - a bad sort/filter → 400;
+  - a non-owner → no rows.
 
 ## 4. Service
 
@@ -178,8 +185,9 @@ In `src/server/services/<domain>.ts` (start the file with `import "server-only"`
   transaction, invariants checked in SQL, user-facing errors raised as
   `BBK00`/`BBK04`/`BBK09`, EXECUTE revoked from `public, anon,
   authenticated` and re-granted narrowly. Add it to `Functions` in
-  `src/lib/types.ts`, call it with `db.rpc(...)` wrapped in `mustWrite`, and
-  cover it in `test/schema.test.ts`.
+  `src/lib/types.ts`, call it from a typed wrapper in the Drizzle adapter's
+  `procedures/` (wrapped in `mustWrite`), and cover it in
+  `test/schema.test.ts`.
 - A public endpoint that sends SMS/email or is worth brute-forcing calls
   `enforceRateLimits([...])`; its route passes `requestMeta(request)`.
 - Validate path ids first with `requireId` / `requireTenant` (`./context`):
@@ -282,9 +290,10 @@ with a readable `error` for invalid input.
       reads go through `src/server/services/loaders.ts`.
 - [ ] Service validates every input and id; limits and enums are shared
       constants; no duplicated helper from another service.
-- [ ] A test in `test/services/` (and `test/schema.test.ts` for SQL).
-- [ ] A list that grows every month is paged, sorted and searched in SQL
-      (3a); a master-data list returns every row.
+- [ ] A test in `test/services/`, one in `test/adapters/drizzle/` for the
+      adapter method, and `test/schema.test.ts` for SQL.
+- [ ] A list that grows every month is paged, sorted and searched in the
+      database (a `queries/` page, 3a); a master-data list returns every row.
 - Don't read-modify-write a balance in JS; let SQL do `x = x + delta`.
 - Don't reintroduce `owner_id` columns or owner filters. Ownership is the single
   `app_owner` row (see `docs/database-design.md`, D1).

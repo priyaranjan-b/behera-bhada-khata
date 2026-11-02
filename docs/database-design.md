@@ -170,7 +170,7 @@ unchecked allocations sent by the client.
 `BBK00` → HTTP 400 (bad input), `BBK04` → 404 (not found / not allowed),
 `BBK09` → 409 (conflict with existing state). Messages raised with these are
 written for the person using the app. `writeError()` in
-`src/server/adapters/supabase/clients.ts` maps them, logs any other database
+`src/server/adapters/drizzle/errors.ts` maps them, logs any other database
 error, and returns a generic message.
 
 ### D7 — Occupancy is dated history, never overwritten
@@ -663,8 +663,9 @@ How it's built:
 - **Backfill:** 0017 filled the existing rows, with the immutability trigger
   off for that one statement. It used the owner's name as it was then.
 - **Reads are plain.** The app shows `title` / `details` / `actor_name` as
-  stored; nothing rebuilds the text. `audit_history_page()` (0018, security
-  invoker, so RLS applies) is one query over these columns, plus the
+  stored; nothing rebuilds the text. One query (`queries/auditHistoryPage.ts`
+  in the Drizzle adapter, A19, run under RLS; it replaced
+  `audit_history_page()`, 0018) reads these columns, plus the
   tenant's current name joined from `tenants`, for the Activity page and a
   tenant's Change history (A14 in `docs/design-decisions.md`):
   - search: every word in who / what / tenant / house / details, `%` and
@@ -727,14 +728,22 @@ How they're built:
     the two agree, including the two-months-ahead limit.
   - **Index:** `rent_periods (period_month)` serves the range.
 - **Labels:** the SQL text matches what the app showed (month labels,
-  `Payment received (cash)`, statuses). The schema tests pin it, and a
-  before/after comparison on the live data matched for Months.
-- **With `DATA_ADAPTER=drizzle` (A19):** the same rule (paged, sorted and
-  searched in the database) holds, but the query is built in TypeScript:
-  the `grid/` builder and `queries/*Page.ts` in the Drizzle adapter, one
-  statement per page, as the SQL function was. So far `payments.page`. The
-  SQL `…_page()` function stays, as the `supabase` rollback and the oracle
-  the parity tests compare against, until the last item of A19 drops it.
+  `Payment received (cash)`, statuses). The schema tests pinned it, and a
+  before/after comparison on the live data matched for Months. On Drizzle
+  the labels come from the TS label maps (`queries/text.ts`), pinned by its
+  tests.
+- **On Drizzle (A19):** the same rule (paged, sorted and searched in the
+  database) holds, but the query is built in TypeScript: the `grid/`
+  builder and `queries/*Page.ts` in the Drizzle adapter, one statement per
+  page, as the SQL function was. The app no longer calls the SQL
+  `…_page()` functions; each stays as the oracle the parity tests compare
+  against, until the last item of A19 drops it.
+- **A new growing table** gets only a `queries/<x>Page.ts` on the `grid/`
+  builder: no SQL `…_page()` function, so its tests in
+  `test/adapters/drizzle/queries/` use fixed expected values (paging and
+  clamping, each operator with and / or, `%` literal, each sort, every
+  extra filter, a bad sort or filter → 400, a non-owner → no rows). Index
+  the base filter in the order of the default sort (`(tenant_id, id desc)`).
 
 **Why.** These tables gain rows every month. Loading them whole made every
 page slower over time, and paging in the browser limited search, sort and
@@ -743,18 +752,22 @@ export to what was loaded.
 ### D29 — Stat cards are aggregates in SQL
 
 **Decision.** A page's figures (totals, counts, yes/no flags) come from one
-`stable security invoker` SQL function that returns a `jsonb` object with
-just those numbers. Never load the history into JS to add it up.
-- **Examples:** `tenant_account_summary(tenant)` (0022) for the tenant page's
-  Outstanding, Months overdue, "N of M ended months paid", Move out's amount
-  owed and "Stop tracking"; `billing_totals` (0021) for the Billing cards.
+statement that returns just those numbers. Never load the history into JS to
+add it up. Since A19 the statement is a query in the Drizzle adapter
+(`queries/`), run under RLS; before, it was a `stable security invoker` SQL
+function returning `jsonb`.
+- **Examples:** `queries/tenantAccountSummary.ts` (it replaced
+  `tenant_account_summary`, 0022) for the tenant page's Outstanding, Months
+  overdue, "N of M ended months paid", Move out's amount owed and "Stop
+  tracking"; `billingTotals` in `queries/billingPage.ts` (it replaced
+  `billing_totals`, 0021) for the Billing cards.
 - **Same rules as the JS.** Where a pure helper in `src/lib/domain/` still
   computes the same figure elsewhere (`summarizeBalance` for the Overview and
-  Defaulters), a schema test checks the SQL and the JS agree on the same
-  rows.
+  Defaulters), a test checks the query and the JS agree on the same rows
+  (`test/adapters/drizzle/queries/tenantAccountSummary.test.ts`).
 - **Months billed ahead:** the service still calls `ensure_rent_periods`
   first, so "not due yet" counts the months created ahead.
-- **Security invoker,** so RLS decides what is counted: a non-owner gets
+- **Under RLS,** so it decides what is counted: a non-owner gets
   zeros. A rule that a `security definer` write enforces (stop tracking:
   `has_allocations_from`, not executable by the owner) is spelled out again
   in the aggregate, and the write keeps enforcing it.
@@ -815,9 +828,9 @@ HTTP APIs. Its login is `app_drizzle`, not `postgres`:
 - **And of `service_role` since 0028**, granted with the first system method
   on Drizzle (the rate limits, D12). Still `NOINHERIT`: it acts as
   `service_role` only inside an `inScope({ role: "service_role" })`
-  transaction, which only `systemDb()` opens. Run 0028 before using
-  `DATA_ADAPTER=drizzle` with that release, or every owner API call fails at
-  its rate limit. 0027 revokes `service_role`, so re-running 0027 means
+  transaction, which only `systemDb()` opens. Run 0028 before deploying
+  any release from Nov 2026 on, since every data call goes through
+  `app_drizzle`; without it every owner API call fails at its rate limit. 0027 revokes `service_role`, so re-running 0027 means
   re-running 0028 after it.
 - **Always the same end state.** The migration sets `noinherit nocreatedb
   nocreaterole` and revokes `service_role` even if the role already existed,
@@ -858,8 +871,11 @@ rollback;` first, then check `select pg_has_role('app_drizzle',
    writes must go through a function.
 4. Foreign keys `on update restrict on delete restrict`, with an index on
    each one you query by.
-5. Write `COMMENT ON TABLE`, add the table to `src/lib/types.ts`, and add
-   schema tests: the owner can, a non-owner sees nothing.
+5. Write `COMMENT ON TABLE`, add the table to `src/lib/types.ts` and to the
+   Drizzle schema mirror (`src/server/adapters/drizzle/schema/<domain>.ts`,
+   checked by `test/adapters/drizzle/schema.test.ts`), with its plain reads
+   and writes in `tables/<domain>.ts`, and add schema tests: the owner can,
+   a non-owner sees nothing.
 6. If it holds data worth a history (people, money, places, files), attach
    `audit_row_change('<entity>')` after insert/update/delete (D25), add any
    new action to `AUDIT_ACTIONS` with a label in `src/lib/domain/audit.ts`
@@ -874,8 +890,10 @@ rollback;` first, then check `select pg_has_role('app_drizzle',
    writes; otherwise `security definer` + `set search_path = public` +
    `if not is_app_owner()` first.
 3. Revoke and re-grant `EXECUTE` explicitly.
-4. Add it to `Functions` in `types.ts` and call it via `db.rpc()` wrapped in
-   `mustWrite` in the adapter.
+4. Call it from a typed wrapper in `src/server/adapters/drizzle/procedures/`
+   (named arguments), wrapped in `mustWrite` by the repository; the
+   wrapper's signature is what the compiler checks. Add it to `Functions` in
+   `types.ts` too, to keep that file in step with the SQL.
 5. Add schema tests for the happy path, each rejection, and that a non-owner
    gets `BBK04` or `42501`.
 6. Nothing to add for the audit log: the tables' triggers record what the
@@ -883,15 +901,13 @@ rollback;` first, then check `select pg_has_role('app_drizzle',
    the change should read as a new kind of action.
 
 **Adding figures for a page (totals, counts, flags)**
-1. One `stable security invoker` SQL function returning `jsonb` with just the
-   figures (D29). Use `app_current_month()` for "ended" vs "not due yet".
-2. Revoke from `public, anon, authenticated`, then grant to `authenticated`,
-   also on each helper it calls.
-3. Add it to `Functions` with a `…Db` return type in `types.ts`, and call it
-   via `db.rpc()` wrapped in `must` in the adapter.
-4. Add schema tests: the figures on known rows, the empty case, a non-owner
-   gets zeros, `anon` gets `42501`, and agreement with any JS helper that
-   computes the same figure.
+1. One statement in `src/server/adapters/drizzle/queries/` returning just
+   the figures (D29), read through the repository's `read()` so it runs
+   under RLS. No SQL function. Take "this month" from the app clock
+   (`currentMonthKey`) for "ended" vs "not due yet".
+2. Add tests in `test/adapters/drizzle/queries/`: the figures on known
+   rows, the empty case, a non-owner gets zeros, and agreement with any JS
+   helper that computes the same figure (`summarizeBalance`).
 
 **Changing history** (`tenant_units`, `tenant_rent_rates`, the ledger)
 - Don't. Add a row or close an open one through the existing functions; if a

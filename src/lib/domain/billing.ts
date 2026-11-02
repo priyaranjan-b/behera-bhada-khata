@@ -144,7 +144,7 @@ export function paidDirectMonths(
 }
 
 // A tenant's Months table (A15): its "Show" choices and what it sorts and
-// filters, done by tenant_months_page() in SQL.
+// filters, done in the database (queries/tenantMonthsPage.ts, A19).
 export const TENANT_MONTH_SHOWS = ["all", "unpaid", "partly", "paid", "notDue"] as const;
 export type TenantMonthShow = (typeof TENANT_MONTH_SHOWS)[number];
 export const TENANT_MONTH_SHOW_OPTIONS: { value: TenantMonthShow; label: string }[] = [
@@ -172,8 +172,7 @@ export const TENANT_MONTH_SORT_FIELDS = ["periodMonth", "amountDue", "amountAllo
 export const TENANT_MONTH_FILTER_FIELDS = ["periodMonth", "status"] as const;
 
 // The Billing grid (A15): its "Show" choices and what it sorts and filters,
-// done in the database (billing_page() in SQL, or queries/billingPage.ts in
-// the Drizzle adapter, A19).
+// done in the database (queries/billingPage.ts in the Drizzle adapter, A19).
 export const BILLING_SHOWS = ["all", "unpaid", "partly", "paid", "paidDirect", "notDue"] as const;
 export type BillingShow = (typeof BILLING_SHOWS)[number];
 

@@ -19,5 +19,6 @@ jobs:
       - run: npm run typecheck
       # Includes test/schema.test.ts: every migration applied to an in-process Postgres.
       - run: npm test
-      # Needs no secrets: the environment is validated at server start, not at build.
+      # Needs no secrets (DATABASE_URL included): the environment is validated
+      # at server start, not at build, and no page reads the database while prerendering.
       - run: npm run build

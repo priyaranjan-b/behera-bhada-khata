@@ -14,7 +14,7 @@ description: Review the current change in Behera Bhada Khata with the project re
    - always: architecture-reviewer, security-reviewer,
      production-readiness-reviewer;
    - database-reviewer when `supabase/`, `src/lib/types.ts`,
-     `src/server/ports.ts`, `src/server/adapters/supabase/` or
+     `src/server/ports.ts`, `src/server/adapters/drizzle/` or
      `test/schema.test.ts` changed;
    - ui-conventions-reviewer when `src/app/`, `src/components/` or
      `src/theme/` changed.

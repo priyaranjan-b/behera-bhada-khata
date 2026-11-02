@@ -9,7 +9,7 @@ import { tenantDocuments } from "../schema";
 // owner role has UPDATE revoked). Plain reads and writes under RLS; the
 // audit trigger records each add and delete.
 
-/** Oldest first, then by path (as the Supabase adapter orders them). */
+/** Oldest first, then by path (as the old Supabase adapter ordered them). */
 export function listTenantDocuments(tx: Tx, tenantId: string): Promise<TenantDocument[]> {
   return tx
     .select()

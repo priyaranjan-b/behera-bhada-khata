@@ -45,15 +45,9 @@ const schema = z.object({
 
   API_BASE_URL: optional(z.url()),
 
-  // Data adapter (A19): "supabase" (default) or "drizzle", which binds the
-  // namespaces moved to src/server/adapters/drizzle. The one-switch rollback.
-  DATA_ADAPTER: z.enum(["supabase", "drizzle"]).default("supabase"),
-  /** Postgres connection string for the Drizzle adapter: Supabase's transaction pooler (port 6543). */
-  DATABASE_URL: optional(z.string().regex(/^postgres(ql)?:\/\//, "Must be a postgres:// connection string")),
+  /** Postgres connection string for the data adapter (A19): Supabase's transaction pooler (port 6543). */
+  DATABASE_URL: z.string("Required").regex(/^postgres(ql)?:\/\//, "Must be a postgres:// connection string"),
 }).superRefine((e, ctx) => {
-  if (e.DATA_ADAPTER === "drizzle" && !e.DATABASE_URL) {
-    ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "Required when DATA_ADAPTER=drizzle" });
-  }
   if (e.NODE_ENV !== "production") return;
   for (const key of PRODUCTION_REQUIRED) {
     if (!e[key]) ctx.addIssue({ code: "custom", path: [key], message: "Required in production" });

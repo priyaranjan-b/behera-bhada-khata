@@ -1,6 +1,5 @@
 import "server-only";
-// The Drizzle data adapter (A19): every port method, bound over the Supabase
-// adapter when DATA_ADAPTER=drizzle. Layout:
+// The data adapter (A19): every data port method, on Drizzle. Layout:
 //   schema/       tables, mirroring supabase/migrations
 //   grid/         the server-paged tables' search, filters, sort and page
 //   queries/      reads that replace a SQL function (logic moved to TS)

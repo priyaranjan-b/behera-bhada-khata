@@ -1,6 +1,6 @@
 // A tenant's ledger: rent charges, payments and adjustments in one journal
-// with a running balance. Built, paged, searched and sorted by
-// tenant_ledger_page() in SQL (0020, A15); these are its shapes and fields.
+// with a running balance. Built, paged, searched and sorted in the database
+// (queries/tenantLedgerPage.ts, A15, A19); these are its shapes and fields.
 
 export type LedgerEntryType = "charge" | "payment" | "adjustment";
 /** "upcoming": a rent charge for this month or later - shown, but not owed (or counted) until the month ends. */
