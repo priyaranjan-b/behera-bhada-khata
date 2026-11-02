@@ -537,6 +537,14 @@ script or someone calling Supabase directly can't wear the app down:
   5s, `anon` 3s. The publishable key is public, so anyone can call PostgREST
   directly; RLS gives them nothing, but a slow query still costs the
   database.
+- **Failing closed.** A rate limit that can't be counted (database or
+  pooler down, or with `DATA_ADAPTER=drizzle` the login not yet allowed to
+  act as `service_role`, D32) fails the call with a 500, on purpose: a
+  limit that is skipped when the database is in trouble protects nothing,
+  and an owner call that can't count a hit can't do its own reads either.
+  With Drizzle each hit is its own short transaction (begin, role switch,
+  the upsert, commit) on a pooled connection; a missing 0028 logs "run
+  migration 0028".
 
 **Not done here (yet).**
 - A full Content-Security-Policy (`script-src` with nonces). Next.js nonces
@@ -612,7 +620,10 @@ routes, contracts and the UI don't change.
   `tenant_ledger_page`, `queries/tenantLedgerPage.ts`); `rentPeriods.page`
   (replaces `tenant_months_page`, `queries/tenantMonthsPage.ts`);
   `audit.historyPage` (replaces `audit_history_page`,
-  `queries/auditHistoryPage.ts`).
+  `queries/auditHistoryPage.ts`); the system methods `rateLimits.hit` and
+  `rateLimits.prune` (replace `hit_rate_limit` / `prune_rate_limits`,
+  `tables/rateLimits.ts`, as `service_role`, which 0028 lets `app_drizzle`
+  switch to).
   Update this line as each method moves.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
@@ -683,8 +694,8 @@ routes, contracts and the UI don't change.
 - **Connection.** `DATABASE_URL` is Supabase's shared pooler in transaction
   mode (port 6543, IPv4, the serverless option), logged in as
   `app_drizzle.<project-ref>` (0027, D32): a role that can do nothing until
-  `inScope()` switches it to `authenticated`. It gets `service_role` only with
-  the first system method that moves. It never uses `postgres`.
+  `inScope()` switches it to `authenticated`, or (since 0028, for
+  `systemDb()` only) to `service_role`. It never uses `postgres`.
   `DATABASE_URL` is a secret on a par with `SUPABASE_SECRET_KEY`: server-only
   (`env.ts` refuses a `NEXT_PUBLIC_` copy), and rotated by running
   `alter role app_drizzle password ...` again and updating it everywhere.
