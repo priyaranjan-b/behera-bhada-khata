@@ -136,8 +136,7 @@ export async function getTenantDetail(_ctx: OwnerContext, tenantId: string): Pro
 
 /**
  * What the tenant owes: the balance, how many ended months are paid and
- * whether tracking can stop - aggregated in SQL (tenant_account_summary,
- * D29), never by loading every month, payment and adjustment.
+ * whether tracking can stop - aggregated in one query (D29), never by loading every month, payment and adjustment.
  */
 export async function getTenantAccount(_ctx: OwnerContext, tenantId: string): Promise<TenantAccount> {
   const tenant = await tenantById(tenantId);

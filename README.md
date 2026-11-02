@@ -45,7 +45,17 @@ Twilio for SMS OTP + WhatsApp/SMS delivery.
    - Publishable (or "anon") key → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - Secret (or "service_role") key → `SUPABASE_SECRET_KEY` (never expose
      this to the browser)
-5. **Enable email sign-in**: Authentication → Providers → Email should
+5. **Database login for the app** (`DATABASE_URL`, required): every read
+   and write goes straight to Postgres as the `app_drizzle` role, which
+   migrations 0027 and 0028 create (D32 in `docs/database-design.md`). Give
+   it a password once in the SQL Editor:
+   `alter role app_drizzle password '<long random>';` (never commit it).
+   Then Connect → the "ORM" tab → Drizzle (or "Transaction pooler"): copy the
+   shared pooler string on port 6543 and change the user from
+   `postgres.<ref>` to `app_drizzle.<ref>`, with that password →
+   `DATABASE_URL`. Server-only: never a `NEXT_PUBLIC_` variable. Details are
+   in `.env.local.example`.
+6. **Enable email sign-in**: Authentication → Providers → Email should
    already be on by default, with password sign-in allowed (the app offers
    both a password and an email magic link). Authentication → URL Configuration → add your
    app URL (and `http://localhost:3000` for local dev) to the redirect
@@ -75,7 +85,7 @@ payments count, receipts download, and the "send to tenant" step shows as
 
 ```bash
 cp .env.local.example .env.local
-# fill in the values from steps 1-2, plus:
+# fill in the values from steps 1-2 (including DATABASE_URL), plus:
 #   NEXT_PUBLIC_APP_URL   - http://localhost:3000 for now
 #   OWNER_EMAILS          - your email, so you can create your owner account
 #   ALLOW_DEV_LOGIN=1     - optional: show the sign-in link on screen instead of emailing it
@@ -123,9 +133,14 @@ CI (`.github/workflows/ci.yml`) runs the same on every push and pull request.
 3. Push this repo to GitHub and import it into [Vercel](https://vercel.com).
    Under Settings → Environment Variables (Production) set
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
-   `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_APP_URL` (the production URL),
+   `SUPABASE_SECRET_KEY`, `DATABASE_URL` (step 1.5: the `app_drizzle`
+   login on the transaction pooler, port 6543), `NEXT_PUBLIC_APP_URL` (the
+   production URL),
    `OWNER_EMAILS` and a `CRON_SECRET` of 16+ random characters (the server
-   refuses to start without it). Twilio may stay unset for now. Don't set
+   refuses to start without either). The build doesn't check these, so a
+   missing or wrong `DATABASE_URL` shows up only as a 500 on the first page:
+   run the smoke test below after every change to it. Twilio may stay unset
+   for now. Don't set
    `ALLOW_DEV_LOGIN` - it is ignored in production anyway.
 4. Deploy. `vercel.json` runs the functions in Mumbai (`bom1`), next to the
    Supabase project (`ap-south-1`) - every page makes several database round

@@ -168,9 +168,10 @@ the master data?**
   browser holds one page; the database pages, sorts, searches and filters.
   - Server-side today: **Activity** and a tenant's **Change history**
     (`AuditHistoryTable`), the tenant's **Months** (`TenantPeriodsGrid`)
-    and **Ledger** (`TenantLedgerTable`), and **Billing** (`BillingGrid`).
-    Each is a `useServerGrid` client (below) over an SQL `…_page()`
-    function. Copy the closest one.
+    and **Ledger** (`TenantLedgerTable`), **Billing** (`BillingGrid`) and
+    **Payments**. Each is a `useServerGrid` client (below) over one paged
+    query in `src/server/adapters/drizzle/queries/` (A19). Copy the
+    closest one.
   - Never "load 50 + Load older" on top of client paging: page numbers,
     search and Excel then cover only what was loaded, and a long history
     looks shorter than it is.

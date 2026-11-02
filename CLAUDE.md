@@ -144,8 +144,9 @@ both together.
   one combined monthly rent covers all of a tenant's houses.
 - **Outstanding counts only months that have ended** (up to the end of last
   month): `summarizeBalance` in `src/lib/domain/allocation.ts`, and the same
-  rule in SQL for the tenant page's figures (`tenant_account_summary`, D29;
-  a schema test keeps them in step). Rent rows for the current month and later exist (created ahead so
+  rule for the tenant page's figures in one query
+  (`src/server/adapters/drizzle/queries/tenantAccountSummary.ts`, D29; its
+  test checks it against `summarizeBalance`). Rent rows for the current month and later exist (created ahead so
   rent can be paid in advance) but are "not due yet" (`notYetDue`), shown as
   such in the Months table and ledger and left out of balances.
 - **Which houses, at what rent, and when are dated history, never
@@ -209,7 +210,7 @@ both together.
   rebuilds it. Action labels and "Show" categories are in
   `src/lib/domain/audit.ts`. Reads and the best-effort `recordEvent` are in
   `src/server/services/audit.ts`; shown by `AuditTimeline`, `/activity`
-  (A10) and the tenant's Change history (`audit_history_page()`, A14). A
+  (A10) and the tenant's Change history (`auditHistoryPage`, A14). A
   new table with vital data gets the trigger (checklist in
   `docs/database-design.md`).
 - **Recorded = counted** (`0010_instant_confirmation.sql`, D20): both
@@ -229,7 +230,7 @@ both together.
   in JS and write it back.
 - Errors meant for the user are raised with SQLSTATE `BBK00` (→ 400),
   `BBK04` (→ 404) or `BBK09` (→ 409); `mustWrite`/`writeError` in
-  `src/server/adapters/supabase/clients.ts` map those and log-and-hide every
+  `src/server/adapters/drizzle/errors.ts` map those and log-and-hide every
   other database error.
 - RLS enforces this at the DB level too: `authenticated` (the owner) can
   only `SELECT` ledger tables (`INSERT` revoked in 0010, so writes go through
@@ -259,9 +260,10 @@ Services   src/server/services/* — business logic, no Next.js/Supabase/Twilio 
 Ports      src/server/ports.ts — OwnerRepositories, SystemRepositories,
              AuthGateway, FileStorage, Messaging interfaces
 Infra      src/server/infra/index.ts — binds ports to adapters
-Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
-           src/server/adapters/drizzle/*  — the ONLY code importing drizzle-orm /
-             postgres (A19: bound per method over Supabase by DATA_ADAPTER)
+Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-orm /
+             postgres: all data access (A19), over DATABASE_URL
+           src/server/adapters/supabase/* — the ONLY code importing @supabase:
+             sign-in (auth.ts, proxy.ts) and file storage (storage.ts)
            src/server/adapters/twilio/*   — the ONLY code importing twilio
 ```
 
@@ -290,12 +292,11 @@ Adapters   src/server/adapters/supabase/* — the ONLY code importing @supabase
   standalone backend instead — that's the migration path to a separate
   Node.js server (move `src/server/**` there behind the same routes).
 - Swapping the database (e.g. MySQL) = a new adapter implementing
-  `src/server/ports.ts`, bound in `src/server/infra/index.ts`. The Drizzle
-  adapter (A19) is bound per method instead: `infra` lays the methods it
-  implements over the Supabase adapter when `DATA_ADAPTER=drizzle`, and every
-  other method stays on Supabase. `ownerDb()`
-  must refuse anyone but the single app owner; the Supabase adapter relies on
-  RLS (`is_app_owner()`) via the session client, so another database must
+  `src/server/ports.ts`, bound in `src/server/infra/index.ts`, as the
+  Drizzle adapter replaced the Supabase one (A19). `ownerDb()`
+  must refuse anyone but the single app owner; the Drizzle adapter relies on
+  RLS (`is_app_owner()`) by running each call as `authenticated` with the
+  session's verified user id (`inScope()`), so another database must
   enforce the same check itself. Services take an `OwnerContext` (from
   `getOwnerContext()`) as proof the check ran; name it `_ctx` where unused.
   Tower routes take the property code (`/properties/AC-T1`);
@@ -522,11 +523,11 @@ Each of these was found broken somewhere; keep them when adding code.
   server: pass one page of `rows`, `rowCount`, the controlled models and
   build the query with `toGridQueryParams`; the service validates it with
   `gridQuerySchema` and the database runs it (A14: the tenant Change
-  history and Activity, `AuditHistoryTable` and `audit_history_page()`).
+  history and Activity, `AuditHistoryTable` and `auditHistoryPage`).
   **Rows that grow every month** (history, payments, rent months, billing)
-  use server mode through the kit hook `useServerGrid` and an SQL
-  `…_page()` function (the Months, Ledger, Billing, Activity and Change
-  history tables; D28); master data (tenants, houses, towers) stays
+  use server mode through the kit hook `useServerGrid` and one paged query
+  in `src/server/adapters/drizzle/queries/` (the Months, Ledger, Billing,
+  Payments, Activity and Change history tables; D28, A19); master data (tenants, houses, towers) stays
   client-side (A15; recipes in the `add-api-endpoint` and
   `build-dashboard-page` skills).
 - The top-bar search (`src/components/shell/Search.tsx`, also behind the
@@ -561,7 +562,7 @@ Each of these was found broken somewhere; keep them when adding code.
   outlined style alone greys it).
 - Payments (`/payments`, A18, `src/server/services/paymentsReport.ts`):
   every tenant's payments by day received (default last month), paged in
-  SQL (`payments_page`, 0026) with the per-mode cards in the same call so
+  the database (`paymentsPage`, A19) with the per-mode cards in the same call so
   they follow the table's search and filters; Govt paid direct is its own
   card, counted by rent month.
 - Defaulters (`/defaulters`, `getDefaultersReport` in

@@ -76,6 +76,7 @@ export function actionsInCategory(category: AuditCategory): AuditAction[] {
 }
 
 // The history tables (Activity, a tenant's Change history; A14): what they
-// sort and filter, done by audit_history_page() in SQL on the stored text.
+// sort and filter, done in the database on the stored text (the Drizzle
+// adapter's queries/auditHistoryPage.ts, A19).
 export const AUDIT_TABLE_SORT_FIELDS = ["at", "actorName", "title", "tenantName", "unitCode"] as const;
 export const AUDIT_TABLE_FILTER_FIELDS = ["actorName", "title", "tenantName", "unitCode", "details"] as const;

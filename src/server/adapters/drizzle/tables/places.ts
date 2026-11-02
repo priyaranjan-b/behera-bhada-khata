@@ -6,10 +6,10 @@ import type { Tx } from "../client";
 import { locations, properties, unitOccupancy, units } from "../schema";
 
 // Plain reads of the place master data (0006) and who lived where. Same
-// filters and order as the Supabase adapter (src/server/adapters/supabase/db.ts),
-// each order ending in a unique key so ties come back the same every time.
-// Id lists go in as bound parameters, one query, so unlike the Supabase
-// adapter there is no chunking and no re-sort in JS (A19).
+// filters and order as the Supabase adapter this replaced (A19), each order
+// ending in a unique key so ties come back the same every time. Id lists go
+// in as bound parameters, one query, so there is no chunking and no re-sort
+// in JS.
 
 /** By code. */
 export function listLocations(tx: Tx): Promise<Location[]> {
@@ -26,7 +26,7 @@ export async function getProperty(tx: Tx, propertyCode: string): Promise<Propert
   return row ?? null;
 }
 
-/** By code: all, one tower's, or just `unitCodes` (which wins over `propertyCode`, as in the Supabase adapter). */
+/** By code: all, one tower's, or just `unitCodes` (which wins over `propertyCode`, as in the old Supabase adapter). */
 export async function listUnits(tx: Tx, filter: { propertyCode?: string; unitCodes?: string[] } = {}): Promise<Unit[]> {
   if (filter.unitCodes?.length === 0) return [];
   const where = filter.unitCodes

@@ -14,6 +14,7 @@ const TEST_ENV = {
   TWILIO_SMS_FROM: "+15005550006",
   TWILIO_WHATSAPP_FROM: "whatsapp:+14155238886",
   CRON_SECRET: "cron-secret-at-least-16",
+  DATABASE_URL: "postgresql://app_drizzle.ref:pw@pooler.supabase.test:6543/postgres",
 };
 
 beforeEach(() => {

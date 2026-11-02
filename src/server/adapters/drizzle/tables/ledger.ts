@@ -15,8 +15,8 @@ import { adjustmentAllocations, adjustments, paymentAllocations, paymentProofs, 
 
 // Plain reads of the append-only ledger (0001/0004/0009/0010/0012): rent
 // months, payments, adjustments, their allocations and payment proofs. Same
-// filters and order as the Supabase adapter (src/server/adapters/supabase/db.ts);
-// the lists it leaves unordered stay unordered (services key them by id).
+// filters and order as the Supabase adapter this replaced (A19); the lists
+// it left unordered stay unordered (services key them by id).
 // Every write stays a SQL function (create_payment, create_adjustment, D4).
 // Id lists are bound parameters in one query, not chunked (A19): Postgres
 // allows 65,535 per statement, and these get a page's records or one
@@ -97,7 +97,7 @@ export async function getPaymentProof(tx: Tx, id: string): Promise<PaymentProof 
 
 /**
  * `fromDate` (yyyy-MM-dd): confirmed from utcStartOfDayBefore(fromDate) on,
- * as in the Supabase adapter, so no instant of that day is missed.
+ * as in the old Supabase adapter, so no instant of that day is missed.
  */
 export async function listAdjustments(
   tx: Tx,

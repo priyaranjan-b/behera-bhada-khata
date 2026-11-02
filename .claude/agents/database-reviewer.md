@@ -1,6 +1,6 @@
 ---
 name: database-reviewer
-description: Read-only reviewer for Behera Bhada Khata database changes - migrations, the append-only ledger, money-moving SQL functions, BBK error codes, audit triggers, server-paged ..._page() functions, src/lib/types.ts staying in step and test/schema.test.ts coverage. Use when a change touches supabase/, src/lib/types.ts, ports or the Supabase adapters.
+description: Read-only reviewer for Behera Bhada Khata database changes - migrations, the append-only ledger, money-moving SQL functions, BBK error codes, audit triggers, server-paged queries, the Drizzle data adapter, src/lib/types.ts staying in step and test/schema.test.ts coverage. Use when a change touches supabase/, src/lib/types.ts, ports or src/server/adapters/drizzle.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -16,8 +16,8 @@ section of `CLAUDE.md`. Read the earlier migrations a change builds on.
 ## Scope
 `git diff main...HEAD` plus `git diff HEAD` (uncommitted), focusing on
 `supabase/migrations/`, `supabase/seed/`, `src/lib/types.ts`,
-`src/server/ports.ts`, `src/server/adapters/supabase/` and
-`test/schema.test.ts`. Bash only for read-only git and search commands; you
+`src/server/ports.ts`, `src/server/adapters/drizzle/` (the data adapter,
+A19), `test/adapters/drizzle/` and `test/schema.test.ts`. Bash only for read-only git and search commands; you
 may run `npx vitest run test/schema.test.ts` and say so.
 
 ## Checklist
@@ -37,7 +37,10 @@ may run `npx vitest run test/schema.test.ts` and say so.
 - **Audit:** a new table with vital data gets the audit trigger and
   `audit_describe()` text.
 - **Growing lists:** history/payments/months/billing paged, sorted and
-  searched in an SQL `…_page()` function (D28, A14/A15).
+  searched in the database by one `queries/…Page.ts` statement on the
+  `grid/` builder (D28, A14/A15, A19).
+- **Schema mirror:** a new table or column is in
+  `src/server/adapters/drizzle/schema/` too (the mirror test checks it).
 - **In step:** `src/lib/types.ts` matches the SQL; outstanding-balance rules
   agree between SQL and `src/lib/domain/allocation.ts`; every migration
   change has a case in `test/schema.test.ts`.

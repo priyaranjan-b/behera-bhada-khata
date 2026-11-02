@@ -94,7 +94,6 @@ const MAX_LIFETIME = 30 * 60;
 export function drizzleDb(): Db {
   if (cached) return cached;
   const url = env().DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is required when DATA_ADAPTER=drizzle");
   let client: ReturnType<typeof postgres>;
   try {
     client = postgres(url, {

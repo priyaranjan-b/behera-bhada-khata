@@ -29,15 +29,15 @@ describe("server-only secrets", () => {
   });
 
   it("accepts DATABASE_URL itself", () => {
-    production({
-      DATA_ADAPTER: "drizzle",
-      DATABASE_URL: "postgresql://app_drizzle.ref:pw@pooler.supabase.com:6543/postgres",
-    });
+    production({ DATABASE_URL: "postgresql://app_drizzle.ref:pw@pooler.supabase.com:6543/postgres" });
     expect(env().DATABASE_URL).toMatch(/^postgresql:/);
   });
 
-  it("needs DATABASE_URL when the Drizzle adapter is on", () => {
-    production({ DATA_ADAPTER: "drizzle", DATABASE_URL: "" });
-    expect(() => env()).toThrow(/DATABASE_URL: Required when DATA_ADAPTER=drizzle/);
+  it("needs DATABASE_URL, as a postgres:// string", () => {
+    vi.stubEnv("DATABASE_URL", undefined);
+    production({});
+    expect(() => env()).toThrow(/DATABASE_URL: Required/);
+    production({ DATABASE_URL: "https://project.supabase.co" });
+    expect(() => env()).toThrow(/DATABASE_URL: Must be a postgres:\/\/ connection string/);
   });
 });

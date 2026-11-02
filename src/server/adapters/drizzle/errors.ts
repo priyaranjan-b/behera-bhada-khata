@@ -1,9 +1,9 @@
 import "server-only";
 import { ApiError } from "@/lib/errors";
 
-// The Drizzle twin of must/mustWrite/writeError in ../supabase/clients.ts:
-// the same SQLSTATE -> status mapping and messages for the user's mistakes.
-// Two differences, both on purpose:
+// must/mustWrite/writeError: SQLSTATE -> status, with messages for the
+// user's mistakes (BBK00/04/09, D6). Two choices the Supabase adapter this
+// replaced (A19) made differently, both on purpose:
 //   * an outage (connection refused or timed out, pool full, statement
 //     timeout) is a 500, not "Couldn't save that", so the user isn't told
 //     their input was wrong and monitoring sees it;

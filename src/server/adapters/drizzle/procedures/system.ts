@@ -11,7 +11,7 @@ import { jsonb, uuidArray } from "./params";
 // tenant's acknowledgement
 // (a compare-and-swap on acknowledged_at that moves no money, D20) and
 // app events in the immutable audit log (log_event, D25). Typed calls with
-// named arguments, as the Supabase adapter's rpc() makes them.
+// named arguments, as the old Supabase adapter's rpc() made them.
 
 /** Creates the missing rent months through `throughMonth`; null = every active tenant. Returns how many. */
 export async function ensureRentPeriods(tx: Tx, tenantIds: string[] | null, throughMonth: string): Promise<number> {

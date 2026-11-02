@@ -6,7 +6,7 @@ import { tenantRentRates, tenants } from "../schema";
 
 // Plain reads of tenants and their dated rents (0006). Writes stay in the SQL
 // lifecycle functions (create_tenant, update_tenant, ...; D9). Each order ends
-// in the id so ties come back the same every time, as in the Supabase adapter.
+// in the id so ties come back the same every time, as in the old Supabase adapter.
 
 /** Oldest first. */
 export function listTenants(tx: Tx, filter: { status?: TenantStatus } = {}): Promise<Tenant[]> {

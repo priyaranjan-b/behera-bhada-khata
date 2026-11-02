@@ -8,7 +8,7 @@ import { textArray } from "./params";
 // these functions write dated history (houses, rents, rent months) on tables
 // whose writes are revoked from the owner, and check under the same lock as
 // the write. These are typed calls with named arguments, as the Supabase
-// adapter's rpc() makes them; the logic is unchanged. correct_paid_through
+// adapter's rpc() made them; the logic is unchanged. correct_paid_through
 // and start_rent_tracking return a date: it is read with to_char as its
 // yyyy-MM-dd key, as PostgREST sends it (a raw date would be a JS Date).
 
