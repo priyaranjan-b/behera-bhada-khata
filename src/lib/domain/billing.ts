@@ -1,4 +1,4 @@
-import { addMonthsToKey, isYearMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
+import { addMonthsToKey, currentMonthKey, isYearMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
 import { round2 } from "@/lib/money";
 import type { PeriodStatus } from "@/lib/types";
 
@@ -89,7 +89,24 @@ export interface BillingTotals {
 // month it holds its houses: computed, never stored, so it can't fall into
 // arrears and no payment needs entering (see A11 in docs/design-decisions.md).
 
-const PAID_DIRECT_PREFIX = "paid-direct:";
+/** The start of every paid-direct month id (paidDirectId); the Drizzle Billing query builds the same ids. */
+export const PAID_DIRECT_PREFIX = "paid-direct:";
+
+/** What a paid-direct month shows (and is searched by) where a month shows its receipts. */
+export const PAID_DIRECT_TEXT = "Paid to your bank directly";
+
+/**
+ * Rent months exist this many months ahead of this one, so rent can be paid
+ * in advance. The one copy: ensure_rent_periods is told how far to go
+ * (billedThroughMonth), and the Drizzle Billing query counts paid-direct
+ * months to the same month.
+ */
+export const RENT_LOOKAHEAD_MONTHS = 2;
+
+/** The last month rent months exist for (and paid-direct months are counted to). */
+export function billedThroughMonth(now: Date = new Date()): string {
+  return addMonthsToKey(currentMonthKey(now), RENT_LOOKAHEAD_MONTHS);
+}
 
 /** Id of a computed paid-direct month, so it can never clash with a rent_periods uuid. */
 export function paidDirectId(tenantId: string, monthKey: string): string {
@@ -141,9 +158,33 @@ export const TENANT_MONTH_SORT_FIELDS = ["periodMonth", "amountDue", "amountAllo
 export const TENANT_MONTH_FILTER_FIELDS = ["periodMonth", "status"] as const;
 
 // The Billing grid (A15): its "Show" choices and what it sorts and filters,
-// done by billing_page() in SQL.
+// done in the database (billing_page() in SQL, or queries/billingPage.ts in
+// the Drizzle adapter, A19).
 export const BILLING_SHOWS = ["all", "unpaid", "partly", "paid", "paidDirect", "notDue"] as const;
 export type BillingShow = (typeof BILLING_SHOWS)[number];
+
+/** A Billing row's shown status: periodDisplayStatus, or paid direct (A11). */
+export const BILLING_DISPLAY_STATUSES = ["pending", "partially_paid", "not_due_yet", "paid", "paid_direct"] as const;
+export type BillingDisplayStatus = (typeof BILLING_DISPLAY_STATUSES)[number];
+
+/** Which shown statuses each "Show" keeps; null keeps every row. */
+export const BILLING_SHOW_STATUSES: Record<BillingShow, readonly BillingDisplayStatus[] | null> = {
+  all: null,
+  unpaid: ["pending", "partially_paid"],
+  partly: ["partially_paid"],
+  paid: ["paid", "paid_direct"],
+  paidDirect: ["paid_direct"],
+  notDue: ["not_due_yet"],
+};
+
+/** Status sorts by need: unpaid, partly paid, not due, paid, paid direct (then by balance). */
+export const BILLING_STATUS_RANK: Record<BillingDisplayStatus, number> = {
+  pending: 4,
+  partially_paid: 3,
+  not_due_yet: 2,
+  paid: 1,
+  paid_direct: 0,
+};
 export const BILLING_SHOW_OPTIONS: { value: BillingShow; label: string }[] = [
   { value: "all", label: "All months" },
   { value: "unpaid", label: "Unpaid (overdue)" },

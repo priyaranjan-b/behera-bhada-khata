@@ -19,7 +19,7 @@ import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
 import type { BillingPage, BillingPageQuery, BillingQuery, BillingRow } from "@/lib/contracts";
 import { formatDateKey } from "@/lib/dates";
-import { BILLING_SHOW_OPTIONS, periodDisplayStatus, type BillingShow } from "@/lib/domain/billing";
+import { BILLING_SHOW_OPTIONS, PAID_DIRECT_TEXT, periodDisplayStatus, type BillingShow } from "@/lib/domain/billing";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { paymentModeLabel } from "@/lib/domain/payments";
 import { statusLabel } from "@/lib/domain/status";
@@ -30,8 +30,6 @@ const displayStatus = (row: BillingRow) =>
   row.paidDirect
     ? "paid_direct"
     : periodDisplayStatus(row.status, row.notYetDue);
-
-const PAID_DIRECT_TEXT = "Paid to your bank directly";
 
 const receiptText = (row: BillingRow) =>
   row.paidDirect

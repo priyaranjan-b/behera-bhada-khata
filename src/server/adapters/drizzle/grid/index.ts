@@ -30,8 +30,8 @@ export interface GridQuery<S extends string, F extends string> {
 }
 
 export interface GridTable<S extends string, F extends string> {
-  /** Each sortable column's expression. */
-  sorts: Record<S, SQL>;
+  /** Each sortable column's expression, or expressions sorted one after another in the same direction. */
+  sorts: Record<S, SQL | SQL[]>;
   /** The text each filterable column shows (never null). */
   fields: Record<F, SQL>;
   /** Everything the search box looks through. */
@@ -132,8 +132,9 @@ export function gridWhere<S extends string, F extends string>(table: GridTable<S
 
 /** The chosen sort, then the table's tie-break. */
 export function gridOrderBy<S extends string, F extends string>(table: GridTable<S, F>, query: GridQuery<S, F>): SQL {
-  const chosen = sql`${table.sorts[query.sort]} ${query.dir === "asc" ? sql`asc` : sql`desc`}`;
-  return sql.join([chosen, ...table.tieBreak], sql`, `);
+  const dir = query.dir === "asc" ? sql`asc` : sql`desc`;
+  const chosen = [table.sorts[query.sort]].flat().map((expr) => sql`${expr} ${dir}`);
+  return sql.join([...chosen, ...table.tieBreak], sql`, `);
 }
 
 /**
