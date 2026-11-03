@@ -11,6 +11,7 @@ import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, {
   moneyColumn,
+  selectColumn,
   SERVER_TEXT_OPERATORS,
   tagsColumn,
   useServerGrid,
@@ -24,13 +25,15 @@ import { apiHref, apiPaths } from "@/lib/api-client/paths";
 import type { PaymentListRow, PaymentsPage, PaymentsPageQuery, PaymentTotals } from "@/lib/contracts";
 import { formatDateKey } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
-import { paymentModeLabel, type DayRange } from "@/lib/domain/payments";
+import { PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/domain/payments";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import EditPaymentTagsDialog from "@/components/domain/EditPaymentTagsDialog";
 import { PAYMENT_STAT_CELL } from "./paymentStatCell";
 
 const tagsOf = (row: PaymentListRow) => row.tags;
+/** The database filters on the label the column shows. */
+const MODE_LABELS = PAYMENT_MODE_OPTIONS.map((o) => o.label);
 
 const baseColumns: DataTableColDef<PaymentListRow>[] = [
   {
@@ -65,13 +68,10 @@ const baseColumns: DataTableColDef<PaymentListRow>[] = [
       <IdentityCell name={row.tenantName} caption={row.propertyName} href={routes.tenants.detail(row.tenantId)} />
     ),
   },
-  {
-    field: "mode",
-    headerName: "Mode",
+  selectColumn<PaymentListRow>("mode", "Mode", MODE_LABELS, {
     minWidth: 120,
     valueGetter: (_value, row) => paymentModeLabel(row.mode),
-    filterOperators: SERVER_TEXT_OPERATORS,
-  },
+  }),
   moneyColumn<PaymentListRow>("amount", "Amount", { filterable: false }),
   {
     field: "monthsText",
@@ -91,11 +91,14 @@ const baseColumns: DataTableColDef<PaymentListRow>[] = [
   },
 ];
 
-/** The Tags column with an edit button per row, which opens the tag editor for that payment. */
-function columnsWithTags(onEdit: (row: PaymentListRow) => void): DataTableColDef<PaymentListRow>[] {
+/** The Tags column (filtered by the tag suggestions) with an edit button per row, which opens the tag editor for that payment. */
+function columnsWithTags(
+  tagOptions: readonly string[],
+  onEdit: (row: PaymentListRow) => void
+): DataTableColDef<PaymentListRow>[] {
   return [
     ...baseColumns,
-    tagsColumn<PaymentListRow>("tags", "Tags", tagsOf, {
+    tagsColumn<PaymentListRow>("tags", "Tags", tagsOf, tagOptions, {
       minWidth: 200,
       renderCell: ({ row }) => (
         <TagsCell
@@ -146,7 +149,7 @@ export default function PaymentsView({
   const { from, to } = range;
   const [editing, setEditing] = useState<PaymentListRow | null>(null);
   const [suggestions, setSuggestions] = useState(tagSuggestions);
-  const columns = useMemo(() => columnsWithTags(setEditing), []);
+  const columns = useMemo(() => columnsWithTags(suggestions, setEditing), [suggestions]);
   const load = useCallback((q: PaymentsPageQuery) => api.dashboard.payments.list({ from, to, ...q }), [from, to]);
   const { data, error, reload, gridProps } = useServerGrid({
     initial,

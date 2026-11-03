@@ -1,6 +1,7 @@
 import { gridClasses } from "@mui/x-data-grid";
 import type { Theme } from "@mui/material/styles";
 import { lightSurfaces, slate } from "@/theme/appTokens";
+import { embeddedIconButton } from "@/theme/embeddedIconButton";
 
 /** Row heights per density; `standard` fits an avatar + two-line identity cell. */
 export const ROW_HEIGHT = { standard: 56, dense: 44 } as const;
@@ -84,16 +85,7 @@ export const dataTableSx = (theme: Theme) => ({
   // bordered 44px touch buttons, which on phones squeezed the header text to
   // "D..". On touch screens the column menu goes: tap the header to sort,
   // and the toolbar's Filters and Columns buttons do the rest.
-  [`& .${gridClasses.columnHeader} .MuiIconButton-root`]: {
-    width: 28,
-    height: 28,
-    minWidth: 0,
-    minHeight: 0,
-    padding: 0.5,
-    border: 0,
-    backgroundColor: "transparent",
-    "&:hover": { backgroundColor: (theme.vars || theme).palette.action.hover },
-  },
+  [`& .${gridClasses.columnHeader} .MuiIconButton-root`]: embeddedIconButton(theme, 28),
   "@media (pointer: coarse)": {
     [`& .${gridClasses.menuIcon}`]: { display: "none" },
   },

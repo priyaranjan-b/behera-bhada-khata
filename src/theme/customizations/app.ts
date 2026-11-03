@@ -3,10 +3,14 @@
 // index.ts merges these per component (variants are appended, not replaced).
 import { alpha, type Components, type Theme } from "@mui/material/styles";
 import { alertClasses } from "@mui/material/Alert";
+import { autocompleteClasses } from "@mui/material/Autocomplete";
 import { chipClasses } from "@mui/material/Chip";
 import { iconButtonClasses } from "@mui/material/IconButton";
+import type {} from "@mui/x-date-pickers/themeAugmentation";
+import { pickersInputBaseClasses } from "@mui/x-date-pickers/PickersTextField";
 import { brand, gray, orange, red } from "../themePrimitives";
 import { cardShadows, lightSurfaces, slate } from "../appTokens";
+import { embeddedIconButton } from "../embeddedIconButton";
 
 declare module "@mui/material/Chip" {
   interface ChipPropsVariantOverrides {
@@ -243,6 +247,20 @@ export const appCustomizations: Components<Theme> = {
       },
     ],
   },
+  // A date or month field (MUI X pickers) draws its own input, not
+  // OutlinedInput, so the template's fixed field heights (2.5rem, 2.25rem
+  // small; inputs.tsx) missed it and it stood 56px tall beside 40px fields.
+  // Same height and side padding as every other field.
+  MuiPickersOutlinedInput: {
+    styleOverrides: {
+      root: {
+        height: "2.5rem",
+        padding: "0 12px",
+        [`&.${pickersInputBaseClasses.inputSizeSmall}`]: { height: "2.25rem" },
+        [`& .${pickersInputBaseClasses.sectionsContainer}`]: { padding: 0 },
+      },
+    },
+  },
   MuiToggleButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
   // The 44px touch size is for standalone icon buttons (header bar, row actions).
   MuiIconButton: {
@@ -256,19 +274,19 @@ export const appCustomizations: Components<Theme> = {
     variants: [
       {
         props: {},
+        style: ({ theme }) => ({ [`& .${iconButtonClasses.root}`]: embeddedIconButton(theme, 32, 36) }),
+      },
+    ],
+  },
+  // An Autocomplete's clear × and dropdown arrow (Tags, Note, Search) sit in
+  // its own end slot, not an InputAdornment: the same plain icon, at the
+  // 28px its slot is centred for.
+  MuiAutocomplete: {
+    variants: [
+      {
+        props: {},
         style: ({ theme }) => ({
-          [`& .${iconButtonClasses.root}`]: {
-            width: 32,
-            height: 32,
-            minWidth: 0,
-            minHeight: 0,
-            padding: 4,
-            border: 0,
-            backgroundColor: "transparent",
-            color: (theme.vars || theme).palette.text.secondary,
-            "&:hover, &:active": { backgroundColor: (theme.vars || theme).palette.action.hover },
-            "@media (pointer: coarse)": { width: 36, height: 36 },
-          },
+          [`& .${autocompleteClasses.endAdornment} .${iconButtonClasses.root}`]: embeddedIconButton(theme, 28),
         }),
       },
     ],

@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import type { GridColDef } from "@mui/x-data-grid";
 import Box from "@mui/material/Box";
-import DataTable, { moneyColumn } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, selectColumn } from "@/components/ui/DataTable";
 import { IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { StatusChip } from "@/components/domain/StatusChip";
 import { formatMoney } from "@/lib/money";
 import { statusLabel } from "@/lib/domain/status";
 import type { TenantMonthRow } from "@/lib/domain/reports";
 import { routes } from "@/lib/routes";
+import { PERIOD_STATUSES } from "@/lib/types";
 
+const MONTH_STATUS_OPTIONS = PERIOD_STATUSES.map((value) => ({ value, label: statusLabel(value) }));
 const columns: GridColDef<TenantMonthRow>[] = [
   {
     field: "tenantName",
@@ -34,15 +36,12 @@ const columns: GridColDef<TenantMonthRow>[] = [
   },
   moneyColumn<TenantMonthRow>("monthDue", "Due"),
   moneyColumn<TenantMonthRow>("monthAllocated", "Collected"),
-  {
-    field: "monthStatus",
-    headerName: "This month",
+  selectColumn<TenantMonthRow>("monthStatus", "This month", MONTH_STATUS_OPTIONS, {
     minWidth: 130,
     headerAlign: "right",
     align: "right",
-    valueFormatter: (value: string) => statusLabel(value),
     renderCell: ({ row }) => <StatusChip status={row.monthStatus} />,
-  },
+  }),
   {
     field: "totalOutstanding",
     headerName: "Outstanding",

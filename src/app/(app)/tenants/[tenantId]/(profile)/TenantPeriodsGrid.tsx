@@ -4,11 +4,17 @@ import { useCallback, useMemo } from "react";
 import Alert from "@mui/material/Alert";
 import Stack from "@mui/material/Stack";
 import type { GridSortModel } from "@mui/x-data-grid";
-import DataTable, { moneyColumn, SERVER_TEXT_OPERATORS, useServerGrid, type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, {
+  moneyColumn,
+  selectColumn,
+  SERVER_TEXT_OPERATORS,
+  useServerGrid,
+  type DataTableColDef,
+} from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/domain/StatusChip";
 import { api } from "@/lib/api-client";
 import type { TablePage, TenantMonthRow, TenantMonthsQuery } from "@/lib/contracts";
-import { TENANT_MONTH_SHOW_OPTIONS, type TenantMonthShow } from "@/lib/domain/billing";
+import { TENANT_MONTH_DISPLAY_STATUSES, TENANT_MONTH_SHOW_OPTIONS, type TenantMonthShow } from "@/lib/domain/billing";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { statusLabel } from "@/lib/domain/status";
 
@@ -24,16 +30,14 @@ const columns: DataTableColDef<TenantMonthRow>[] = [
   },
   moneyColumn<TenantMonthRow>("amountDue", "Due", { filterable: false }),
   moneyColumn<TenantMonthRow>("amountAllocated", "Allocated", { filterable: false }),
-  {
-    field: "status",
-    headerName: "Status",
+  // The database filters on the label the column shows.
+  selectColumn<TenantMonthRow>("status", "Status", TENANT_MONTH_DISPLAY_STATUSES.map(statusLabel), {
     minWidth: 140,
     headerAlign: "right",
     align: "right",
-    valueFormatter: (_value, row) => statusLabel(row.displayStatus),
+    valueGetter: (_value, row) => statusLabel(row.displayStatus),
     renderCell: ({ row }) => <StatusChip status={row.displayStatus} />,
-    filterOperators: SERVER_TEXT_OPERATORS,
-  },
+  }),
 ];
 
 interface Extra {

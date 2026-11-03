@@ -1,14 +1,15 @@
 "use client";
 
-import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, selectColumn, type DataTableColDef } from "@/components/ui/DataTable";
 import { IdentityCell } from "@/components/ui/DataDisplay";
 import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { UnitCell } from "@/components/ui";
 import type { PropertyTenantRow } from "@/lib/contracts";
 import { TENANT_STATUS_DISPLAY, isGovernment, tenantTypeTags } from "@/lib/domain/tenant";
-import type { TenantStatus } from "@/lib/types";
+import { TENANT_STATUSES } from "@/lib/types";
 import { routes } from "@/lib/routes";
 
+const STATUS_OPTIONS = TENANT_STATUSES.map((value) => ({ value, label: TENANT_STATUS_DISPLAY[value].label }));
 const columns: DataTableColDef<PropertyTenantRow>[] = [
   {
     field: "displayName",
@@ -37,15 +38,12 @@ const columns: DataTableColDef<PropertyTenantRow>[] = [
   },
   { field: "phone", headerName: "Phone", minWidth: 140, flex: 0.8 },
   moneyColumn<PropertyTenantRow>("monthlyRent", "Combined rent"),
-  {
-    field: "status",
-    headerName: "Status",
+  selectColumn<PropertyTenantRow>("status", "Status", STATUS_OPTIONS, {
     minWidth: 110,
     headerAlign: "right",
     align: "right",
-    valueFormatter: (value: TenantStatus) => TENANT_STATUS_DISPLAY[value].label,
     renderCell: ({ row }) => <TenantStatusBadge status={row.status} />,
-  },
+  }),
 ];
 
 export default function PropertyTenantsGrid({

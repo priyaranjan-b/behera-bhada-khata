@@ -56,6 +56,22 @@ describe("Payments", () => {
     );
   });
 
+  it("passes the dropdown filters through, a list only for \"is any of\"", async () => {
+    const filters = [
+      { field: "mode", operator: "isAnyOf", value: ["UPI", "Cash"] },
+      { field: "tags", operator: "not", value: "Padma" },
+    ];
+    await getPaymentsPage(ctx, { filters: JSON.stringify(filters) });
+    expect(fakes.owner.payments.page).toHaveBeenLastCalledWith(expect.objectContaining({ filters }));
+    for (const bad of [
+      [{ field: "mode", operator: "isAnyOf", value: "UPI" }],
+      [{ field: "mode", operator: "is", value: ["UPI"] }],
+      [{ field: "mode", operator: "isAnyOf", value: Array.from({ length: 21 }, (_, i) => `t${i}`) }],
+    ]) {
+      await expect(getPaymentsPage(ctx, { filters: JSON.stringify(bad) })).rejects.toMatchObject({ status: 400 });
+    }
+  });
+
   it("rejects a malformed date or sort", async () => {
     await expect(getPaymentsPage(ctx, { from: "10/10/2026" })).rejects.toMatchObject({ status: 400 });
     await expect(getPaymentsPage(ctx, { sort: "note" })).rejects.toMatchObject({ status: 400 });

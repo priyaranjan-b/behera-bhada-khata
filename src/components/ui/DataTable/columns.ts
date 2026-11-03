@@ -30,3 +30,24 @@ export function moneyColumn<R extends GridValidRowModel>(
 export type DataTableColDef<R extends GridValidRowModel> = GridColDef<R> & {
   exportValue?: (row: R) => string | number | null;
 };
+
+/** A dropdown choice: a value with the label it shows, or a value that is its own label. */
+export type SelectOption = string | { value: string; label: string };
+
+/**
+ * A column of a fixed set of values (a mode, a status, a type): its column
+ * filter is a dropdown - "is", "is not", "is any of" - instead of free text.
+ *
+ * In a client-side table the cell value is the raw value and `options`
+ * label it (`UNIT_TYPE_OPTIONS`). A server-side table (A14) filters on the
+ * text the column shows, so there the cell value is the label (a
+ * `valueGetter`) and `options` the labels themselves.
+ */
+export function selectColumn<R extends GridValidRowModel>(
+  field: string,
+  headerName: string,
+  options: readonly SelectOption[],
+  extra: Partial<DataTableColDef<R>> = {}
+): DataTableColDef<R> {
+  return { field, headerName, type: "singleSelect", valueOptions: [...options], ...extra } as DataTableColDef<R>;
+}

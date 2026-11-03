@@ -535,7 +535,11 @@ Each of these was found broken somewhere; keep them when adding code.
   (default 10), `emptyState` (when there are no rows at all), `noRowsLabel`,
   `rowDensity` (`standard` 56px for avatar + two-line cells, `dense` 44px)
   and `variant="plain"` inside another card. Money columns via
-  `moneyColumn`. `paginationMode="server"` pages, sorts and filters on the
+  `moneyColumn`. A column of a fixed set of values (mode, status, type,
+  tags) is a `selectColumn` (`tagsColumn` for tags), so its column filter is
+  a dropdown ("is", "is not", "is any of") instead of free text; in a
+  server-side table its value and options are the labels shown, which is
+  what the database compares. `paginationMode="server"` pages, sorts and filters on the
   server: pass one page of `rows`, `rowCount`, the controlled models and
   build the query with `toGridQueryParams`; the service validates it with
   `gridQuerySchema` and the database runs it (A14: the tenant Change
@@ -577,8 +581,13 @@ Each of these was found broken somewhere; keep them when adding code.
   dates) and column filters, then columns and Excel. Touch screens get no
   column ⋮ menu; tapping the header sorts. A standalone icon button is 44px
   on touch screens. One embedded in a field (a picker's calendar, a search
-  clear) or a grid header is a plain small icon (`MuiInputAdornment` in
-  `app.ts`, `dataTableSx`); never size those by hand. A destructive button is
+  clear, an Autocomplete's ×) or a grid header is a plain small icon
+  (`src/theme/embeddedIconButton.ts`, applied by `MuiInputAdornment` and
+  `MuiAutocomplete` in `app.ts` and by `dataTableSx`); never size those by
+  hand. Date and month fields are
+  as tall as every other field (`MuiPickersOutlinedInput` in `app.ts`).
+  One-tap choices under a field (Today/Yesterday, the first five tag
+  suggestions, which toggle) are the kit's `QuickPicks`. A destructive button is
   `variant="outlined" color="error"` (red via the theme variant in `app.ts`;
   the template's outlined style alone greys it).
 - Payments (`/payments`, A18, `src/server/services/paymentsReport.ts`):

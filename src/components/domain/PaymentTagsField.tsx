@@ -1,14 +1,21 @@
 "use client";
 
 import Autocomplete from "@mui/material/Autocomplete";
+import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import { TagPill } from "@/components/ui/DataDisplay";
+import QuickPicks from "@/components/ui/QuickPicks";
 import { PAYMENT_TAG_LIMITS } from "@/lib/validation";
+
+/** How many suggestions show as one-tap chips. */
+const QUICK_TAGS = 5;
 
 /**
  * A payment's tags (0030, D34): pick a suggestion or type a new one
  * (Enter, or leave the field, adds it). One of each whatever the case, and a
- * typed name that matches a known tag takes its spelling.
+ * typed name that matches a known tag takes its spelling. The first
+ * QUICK_TAGS suggestions also show as chips under the field: one tap adds a
+ * tag, another removes it, and several can be on at once.
  */
 export default function PaymentTagsField({
   value,
@@ -25,6 +32,8 @@ export default function PaymentTagsField({
   helperText?: string;
 }) {
   const full = value.length >= PAYMENT_TAG_LIMITS.maxPerPayment;
+  const quick = suggestions.slice(0, QUICK_TAGS);
+  const isOn = (tag: string) => value.some((t) => t.toLowerCase() === tag.toLowerCase());
 
   function change(next: string[]) {
     const tags: string[] = [];
@@ -37,7 +46,11 @@ export default function PaymentTagsField({
     onChange(tags.slice(0, PAYMENT_TAG_LIMITS.maxPerPayment));
   }
 
-  return (
+  function toggle(tag: string) {
+    change(isOn(tag) ? value.filter((t) => t.toLowerCase() !== tag.toLowerCase()) : [...value, tag]);
+  }
+
+  const field = (
     <Autocomplete
       multiple
       freeSolo
@@ -71,5 +84,16 @@ export default function PaymentTagsField({
       )}
       fullWidth
     />
+  );
+  if (quick.length === 0) return field;
+  return (
+    <Stack spacing={1}>
+      {field}
+      <QuickPicks
+        disabled={disabled}
+        picks={quick.map((tag) => ({ label: tag, ariaLabel: `Tag ${tag}`, selected: isOn(tag), disabled: full }))}
+        onPick={(index) => toggle(quick[index])}
+      />
+    </Stack>
   );
 }

@@ -1,7 +1,7 @@
 import * as z from "zod";
 import { isDateKey } from "@/lib/dates";
 import { AUDIT_CATEGORIES, AUDIT_TABLE_FILTER_FIELDS, AUDIT_TABLE_SORT_FIELDS } from "@/lib/domain/audit";
-import { FILTER_LOGICS, GRID_TEXT_OPERATORS, SORT_DIRECTIONS, type SortDirection } from "@/lib/domain/gridQuery";
+import { FILTER_LOGICS, GRID_OPERATORS, SORT_DIRECTIONS, type SortDirection } from "@/lib/domain/gridQuery";
 import {
   BILLING_FILTER_FIELDS,
   BILLING_SHOWS,
@@ -400,7 +400,14 @@ export const confirmSchema = z.object({
 // ---- Server-side tables (A14) ---------------------------------------------------
 
 /** Rows-per-page choices, the search length and how many column filters a server-side table accepts. */
-export const GRID_LIMITS = { pageSizes: [10, 25, 50, 100], searchMax: 100, maxFilters: 5, filtersJsonMax: 2000 } as const;
+export const GRID_LIMITS = {
+  pageSizes: [10, 25, 50, 100],
+  searchMax: 100,
+  maxFilters: 5,
+  /** Values one "is any of" filter may list. */
+  maxFilterValues: 20,
+  filtersJsonMax: 2000,
+} as const;
 
 /**
  * The query of a table that pages on the server (GridQueryParams in
@@ -412,11 +419,15 @@ export function gridQuerySchema<S extends string, F extends string>(
   filterFields: readonly [F, ...F[]],
   defaults: { sort: S; dir: SortDirection }
 ) {
-  const filter = z.object({
-    field: z.enum(filterFields),
-    operator: z.enum(GRID_TEXT_OPERATORS),
-    value: z.string().max(GRID_LIMITS.searchMax).optional(),
-  });
+  const text = z.string().max(GRID_LIMITS.searchMax);
+  const filter = z
+    .object({
+      field: z.enum(filterFields),
+      operator: z.enum(GRID_OPERATORS),
+      value: z.union([text, z.array(text).max(GRID_LIMITS.maxFilterValues)]).optional(),
+    })
+    // "is any of" takes a list of values; every other operator one value (or none).
+    .refine((f) => f.value === undefined || Array.isArray(f.value) === (f.operator === "isAnyOf"), "Filters are not valid");
   return z.object({
     page: z.coerce.number().int().min(0).default(0),
     pageSize: z.coerce
