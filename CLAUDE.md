@@ -24,7 +24,7 @@ npm run dev       # start dev server (http://localhost:3000)
 npm run build     # production build
 npm run start     # run a production build
 npm run lint      # eslint (flat config, eslint-config-next)
-npm run typecheck # tsc --noEmit
+npm run typecheck # next typegen && tsc --noEmit (route types like LayoutProps)
 npm test          # vitest: unit, service (fake ports) and migration tests
 npx vitest run test/schema.test.ts   # one file
 ```
@@ -496,8 +496,9 @@ Each of these was found broken somewhere; keep them when adding code.
   (the barrel), never a deep path. Export only what another module uses.
 - **Tests:** a new service function gets a case in `test/services/`, a new
   pure helper a colocated `*.test.ts`.
-- After deleting or moving a route, run `npx next typegen`: stale
-  `.next/types/validator.ts` otherwise fails `npm run typecheck`.
+- `npm run typecheck` runs `next typegen` first, so the route types
+  (`LayoutProps`, `PageProps`, `.next/types/validator.ts`) exist on a clean
+  checkout (CI) and follow a deleted or moved route.
 
 ### UI & styling
 
