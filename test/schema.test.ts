@@ -1089,6 +1089,81 @@ describe("payment note presets (0024)", () => {
   });
 });
 
+describe("payment tags (0030)", () => {
+  const suggestions = async (who: Role) =>
+    (await as<{ name: string }>(who, `select name from payment_tags order by lower(name)`)).map((r) => r.name);
+  const tagsOf = async (who: Role, paymentId: string) =>
+    (
+      await as<{ name: string }>(who, `select name from payment_record_tags where payment_id = $1 order by lower(name)`, [
+        paymentId,
+      ])
+    ).map((r) => r.name);
+  let paymentId: string;
+
+  // Each test starts from the seeded suggestions and one recorded payment
+  // (the file's beforeEach truncates payments, and with them their tags).
+  beforeEach(async () => {
+    await db.exec(`
+      delete from payment_tags;
+      insert into payment_tags (name) values ('Priyaranjan'), ('Sankarshan'), ('Padma'), ('RameshSutar'), ('Malati');
+    `);
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    paymentId = await latestPaymentId();
+  });
+
+  it("starts with the people who collect rent; the owner adds, renames and deletes suggestions", async () => {
+    expect(await suggestions(owner(OWNER_A))).toEqual(["Malati", "Padma", "Priyaranjan", "RameshSutar", "Sankarshan"]);
+    await as(owner(OWNER_A), `insert into payment_tags (name) values ('Ravi')`);
+    await as(owner(OWNER_A), `update payment_tags set name = 'Ravi K' where name = 'Ravi'`);
+    await as(owner(OWNER_A), `delete from payment_tags where name = 'Ravi K'`);
+    expect(await suggestions(owner(OWNER_A))).not.toContain("Ravi K");
+  });
+
+  it("keeps one suggestion of each whatever the case, and refuses blank, padded or long names", async () => {
+    expect(await errorCode(as(owner(OWNER_A), `insert into payment_tags (name) values ('PADMA')`))).toBe("23505");
+    for (const bad of ["", " Padma", "x".repeat(41)]) {
+      expect(await errorCode(as(owner(OWNER_A), `insert into payment_tags (name) values ($1)`, [bad]))).toBe("23514");
+    }
+  });
+
+  it("a payment keeps its own copy: renaming or deleting the suggestion leaves it as it was", async () => {
+    await as(owner(OWNER_A), `insert into payment_record_tags (payment_id, name) values ($1, 'Padma')`, [paymentId]);
+    await as(owner(OWNER_A), `update payment_tags set name = 'Padmini' where name = 'Padma'`);
+    expect(await tagsOf(owner(OWNER_A), paymentId)).toEqual(["Padma"]);
+    await as(owner(OWNER_A), `delete from payment_tags where name = 'Padmini'`);
+    expect(await tagsOf(owner(OWNER_A), paymentId)).toEqual(["Padma"]);
+  });
+
+  it("one of each on a payment whatever the case; never updated; removable; a payment must exist", async () => {
+    const add = (name: string, id = paymentId) =>
+      as(owner(OWNER_A), `insert into payment_record_tags (payment_id, name) values ($1, $2)`, [id, name]);
+    await add("Padma");
+    expect(await errorCode(add("PADMA"))).toBe("23505");
+    expect(await errorCode(add(" x"))).toBe("23514");
+    expect(await errorCode(add("Malati", "00000000-0000-4000-8000-000000000999"))).toBe("23503");
+    expect(
+      await errorCode(as(owner(OWNER_A), `update payment_record_tags set name = 'Malati' where payment_id = $1`, [paymentId]))
+    ).toBe("42501");
+    await as(owner(OWNER_A), `delete from payment_record_tags where payment_id = $1`, [paymentId]);
+    expect(await tagsOf(owner(OWNER_A), paymentId)).toEqual([]);
+  });
+
+  it("shows another account nothing and lets it write nothing", async () => {
+    await as(owner(OWNER_A), `insert into payment_record_tags (payment_id, name) values ($1, 'Malati')`, [paymentId]);
+    expect(await suggestions(owner(OWNER_B))).toEqual([]);
+    expect(await tagsOf(owner(OWNER_B), paymentId)).toEqual([]);
+    expect(await errorCode(as(owner(OWNER_B), `insert into payment_tags (name) values ('x')`))).toBe("42501");
+    expect(
+      await errorCode(as(owner(OWNER_B), `insert into payment_record_tags (payment_id, name) values ($1, 'x')`, [paymentId]))
+    ).toBe("42501");
+    await as(owner(OWNER_B), `delete from payment_record_tags`);
+    await as(owner(OWNER_B), `delete from payment_tags`);
+    expect(await tagsOf(owner(OWNER_A), paymentId)).toEqual(["Malati"]);
+    expect((await suggestions(owner(OWNER_A))).length).toBe(5);
+    expect(await errorCode(as({ role: "anon" } as unknown as Role, `select * from payment_record_tags`))).toBe("42501");
+  });
+});
+
 describe("correct_paid_through (0014)", () => {
   const correct = (who: Role, paidThrough: string | null, tenant = fx.tenantA) =>
     as<{ billing_start: string }>(

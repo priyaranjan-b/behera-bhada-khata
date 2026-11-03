@@ -243,6 +243,7 @@ export async function getTenantLedger(_ctx: OwnerContext, tenantId: string, quer
               .map((f) => ({ id: f.id, fileName: f.file_name, contentType: f.content_type }))
           : undefined,
       acknowledged: r.acknowledged ?? undefined,
+      tags: r.type === "payment" ? r.tags : undefined,
     })),
     total: result.total,
     all: result.all,

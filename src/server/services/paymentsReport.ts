@@ -29,6 +29,7 @@ const FILTER_COLUMNS = {
   mode: "mode",
   monthsText: "months",
   note: "note",
+  tags: "tags",
 } as const;
 
 /** One page of the Payments grid, with the totals per mode of every payment that matches. */
@@ -61,6 +62,7 @@ export async function getPaymentsPage(_ctx: OwnerContext, query: unknown = {}): 
         monthsText: r.months_text,
         note: r.note,
         acknowledged: r.acknowledged,
+        tags: r.tags,
       })
     ),
     total: result.total,

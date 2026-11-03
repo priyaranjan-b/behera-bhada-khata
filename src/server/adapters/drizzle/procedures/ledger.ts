@@ -2,6 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import type { NewAdjustment, NewAllocation, NewPayment, NewPaymentProof } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
+import { setPaymentTags } from "../tables/paymentTags";
 import { jsonb } from "./params";
 
 // The money-moving writes stay in Postgres (D4, D5, A19): create_payment and
@@ -15,7 +16,8 @@ export async function createPayment(
   tx: Tx,
   payment: NewPayment,
   allocations: NewAllocation[],
-  proofs: NewPaymentProof[] = []
+  proofs: NewPaymentProof[] = [],
+  tags: string[] = []
 ): Promise<void> {
   await executeRows(
     tx,
@@ -33,6 +35,9 @@ export async function createPayment(
       p_proofs => ${jsonb(proofs)}
     )`
   );
+  // Tags aren't ledger facts (D34), so create_payment doesn't take them; the
+  // same transaction writes them, and a refused payment leaves none.
+  if (tags.length > 0) await setPaymentTags(tx, payment.id, tags);
 }
 
 /** The tenant is taken from the original payment. */

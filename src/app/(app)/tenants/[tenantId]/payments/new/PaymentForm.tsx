@@ -25,6 +25,7 @@ import { suggestAllocations, summarizeBalance, type PeriodLike } from "@/lib/dom
 import { currentMonthKey, formatDateKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
+import PaymentTagsField from "@/components/domain/PaymentTagsField";
 import { prepareProofFile } from "@/lib/proofImages";
 import { PAYMENT_NOTE_LIMITS, PROOF_LIMITS } from "@/lib/validation";
 import { PAYMENT_MODE_OPTIONS, recentDayPicks } from "@/lib/domain/payments";
@@ -39,6 +40,7 @@ export default function PaymentForm({
   savedSignature,
   tenantMessaging,
   noteSuggestions,
+  tagSuggestions,
   inDialog = false,
 }: {
   tenantId: string;
@@ -49,6 +51,8 @@ export default function PaymentForm({
   tenantMessaging: boolean;
   /** Quick notes from the Profile page; the owner may type anything else. */
   noteSuggestions: string[];
+  /** Suggested tag names (Profile page); the owner may type a new one. */
+  tagSuggestions: string[];
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;
 }) {
@@ -58,6 +62,7 @@ export default function PaymentForm({
   const [paymentDate, setPaymentDate] = useState("");
   const [mode, setMode] = useState<PaymentMode>("upi");
   const [note, setNote] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [proofs, setProofs] = useState<File[]>([]);
   const [notify, setNotify] = useState(tenantMessaging);
   const [manualAllocations, setManualAllocations] = useState<Record<string, number> | null>(null);
@@ -110,6 +115,7 @@ export default function PaymentForm({
           paymentDate,
           mode,
           note: note || undefined,
+          tags,
           allocations: allocations.map((a) => ({ rentPeriodId: a.rentPeriodId, amountAllocated: a.amountAllocated })),
           ownerSignaturePng: signature,
           notifyTenant: notify,
@@ -186,6 +192,8 @@ export default function PaymentForm({
                 )}
                 fullWidth
               />
+
+              <PaymentTagsField value={tags} onChange={setTags} suggestions={tagSuggestions} disabled={submitting} />
             </SectionCard>
 
             <FileAttachmentsField

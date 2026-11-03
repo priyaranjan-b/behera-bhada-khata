@@ -2,7 +2,9 @@
 // (0026) answers - rows, order, counts, page and the totals per mode - for a
 // matrix of searches, filters, sorts and pages, as the owner and as anyone
 // else. Also pins the text it searches (dates, months, modes, towers) to the
-// TS functions the UI uses.
+// TS functions the UI uses. The frozen function predates tags (0030), so
+// the comparison leaves each row's `tags` out (none are set while it runs);
+// the tags' own tests come last.
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { formatDateKey, formatMonth, todayKey } from "@/lib/dates";
@@ -77,11 +79,12 @@ const viaSql = async (scope: Scope, f: PaymentsFilter) =>
   )[0].v;
 const viaDrizzle = (scope: Scope, f: PaymentsFilter) => inScope(l.db, scope, (tx) => paymentsPage(tx, f));
 
-/** Same answer both ways, and the Drizzle one returned. */
+/** Same answer both ways (bar the rows' tags, which payments_page() never had), and the Drizzle one returned. */
 async function same(f: Partial<PaymentsFilter>, scope: Scope = asOwner) {
   const filter = { ...BASE, ...f };
   const drizzle = await viaDrizzle(scope, filter);
-  expect(drizzle).toEqual(await viaSql(scope, filter));
+  expect(drizzle.rows.every((r) => Array.isArray(r.tags))).toBe(true);
+  expect({ ...drizzle, rows: drizzle.rows.map(({ tags: _tags, ...r }) => r) }).toEqual(await viaSql(scope, filter));
   return drizzle;
 }
 
@@ -217,5 +220,56 @@ describe("the text the grid searches is the text the UI shows", () => {
       const [expected] = await l.rows<{ v: string }>(asOwner, sql`select (tenant_placement_now(${id}::uuid)).property_name as v`);
       expect(await text(towersNow(sql`${id}::uuid`, todayKey()))).toBe(expected.v);
     }
+  });
+});
+
+describe("tags (0030): on the rows, searched and filtered", () => {
+  const tag = (tenant: string, mode: PaymentMode, name: string) =>
+    l.pg.query(
+      `insert into payment_record_tags (payment_id, name)
+       select id, $3 from payments where tenant_id = $1 and mode = $2`,
+      [tenant, mode, name]
+    );
+
+  beforeAll(async () => {
+    await tag(tenants.asha, "upi", "Padma");
+    await tag(tenants.asha, "upi", "malati");
+    await tag(tenants.bimal, "cheque", "Padma");
+  });
+
+  it("each row carries its tags, alphabetical whatever the case", async () => {
+    const { rows } = await viaDrizzle(asOwner, BASE);
+    expect(rows.find((r) => r.tenant_id === tenants.asha && r.mode === "upi")?.tags).toEqual(["malati", "Padma"]);
+    expect(rows.find((r) => r.tenant_id === tenants.bimal && r.mode === "cheque")?.tags).toEqual(["Padma"]);
+    expect(rows.find((r) => r.tenant_id === tenants.chai)?.tags).toEqual([]);
+  });
+
+  it("search and the Tags filter match a tag's name, and the cards follow", async () => {
+    const padma = await viaDrizzle(asOwner, { ...BASE, search: "padma" });
+    expect(padma.total).toBe(2);
+    expect(padma.totals).toMatchObject({ amount: 14000, by_mode: { upi: 10000, cheque: 4000, cash: 0 } });
+    expect((await viaDrizzle(asOwner, { ...BASE, search: "padma malati" })).total).toBe(1);
+    const filtered = await viaDrizzle(asOwner, { ...BASE, filters: [{ field: "tags", operator: "contains", value: "MALATI" }] });
+    expect(filtered.rows.map((r) => r.mode)).toEqual(["upi"]);
+    expect((await viaDrizzle(asOwner, { ...BASE, filters: [{ field: "tags", operator: "isEmpty" }] })).total).toBe(4);
+  });
+
+  it("the Tags filter tests each name, not the joined text", async () => {
+    const count = async (operator: PaymentsFilter["filters"][number]["operator"], value: string) =>
+      (await viaDrizzle(asOwner, { ...BASE, filters: [{ field: "tags", operator, value }] })).total;
+    // Asha's UPI payment has two tags: equals still finds it by either one.
+    expect(await count("equals", "padma")).toBe(2);
+    expect(await count("equals", "MALATI")).toBe(1);
+    expect(await count("equals", "Pad")).toBe(0);
+    expect(await count("startsWith", "pad")).toBe(2);
+    expect(await count("endsWith", "ati")).toBe(1);
+    // Nothing matches across the ", " the column shows between names.
+    expect(await count("contains", "malati, padma")).toBe(0);
+    expect(await count("contains", ", ")).toBe(0);
+    expect((await viaDrizzle(asOwner, { ...BASE, filters: [{ field: "tags", operator: "isNotEmpty" }] })).total).toBe(2);
+  });
+
+  it("shows another signed-in account none", async () => {
+    expect((await viaDrizzle(asStranger, { ...BASE, search: "padma" })).total).toBe(0);
   });
 });

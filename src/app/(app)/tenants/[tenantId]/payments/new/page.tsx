@@ -5,7 +5,7 @@ import PaymentForm from "./PaymentForm";
 
 export default async function NewPaymentPage({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
-  const { tenantName, openPeriods, savedSignature, tenantMessaging, noteSuggestions } = await serverApi.dashboard.tenants.newPayment(tenantId);
+  const { tenantName, openPeriods, savedSignature, tenantMessaging, noteSuggestions, tagSuggestions } = await serverApi.dashboard.tenants.newPayment(tenantId);
 
   return (
     <Stack spacing={2}>
@@ -14,7 +14,7 @@ export default async function NewPaymentPage({ params }: { params: Promise<{ ten
         subtitle={`${tenantName} · counts as soon as you save; the tenant can acknowledge it later.`}
       />
       <PaymentForm tenantId={tenantId} periods={openPeriods} savedSignature={savedSignature}
-        tenantMessaging={tenantMessaging} noteSuggestions={noteSuggestions} />
+        tenantMessaging={tenantMessaging} noteSuggestions={noteSuggestions} tagSuggestions={tagSuggestions} />
     </Stack>
   );
 }

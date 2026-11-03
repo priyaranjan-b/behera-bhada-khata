@@ -65,3 +65,16 @@ export function towersNow(tenantId: SQL, today: string): SQL {
 export function unitCodesNow(tenantId: SQL, today: string): SQL {
   return sql`coalesce((select array_agg(h.unit_code order by h.unit_code) from ${housesNow(tenantId, today)} h), '{}'::text[])`;
 }
+
+/**
+ * A payment's tags (0030, D34), for a `left join lateral (...) as tags on
+ * true`: `tags.names` a json array and `tags.text` the names joined with
+ * ", ", both alphabetical (any case), as the Tags column shows them.
+ */
+export function paymentTagsOf(paymentId: SQL): SQL {
+  return sql`
+    select coalesce(json_agg(prt.name order by lower(prt.name), prt.name), '[]'::json) as names,
+      coalesce(string_agg(prt.name, ', ' order by lower(prt.name), prt.name), '') as text
+    from payment_record_tags prt
+    where prt.payment_id = ${paymentId}`;
+}

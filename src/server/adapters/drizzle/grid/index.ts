@@ -31,11 +31,23 @@ export interface GridQuery<S extends string, F extends string> {
   pageSize: number;
 }
 
+/**
+ * A column that shows several values (a payment's tags): `text` is what it
+ * shows ("Malati, Padma"), `values` a set-returning expression of the values
+ * themselves. A filter with a value matches when one value does, so "equals
+ * Padma" finds a payment tagged Malati and Padma, and "contains Padma" is
+ * tested name by name; "is empty" / "is not empty" test the whole list.
+ */
+export interface GridListField {
+  text: SQL;
+  values: SQL;
+}
+
 export interface GridTable<S extends string, F extends string> {
   /** Each sortable column's expression, or expressions sorted one after another in the same direction. */
   sorts: Record<S, SQL | SQL[]>;
-  /** The text each filterable column shows (never null). */
-  fields: Record<F, SQL>;
+  /** The text each filterable column shows (never null), or a list column's text and values. */
+  fields: Record<F, SQL | GridListField>;
   /** Everything the search box looks through. */
   searchText: SQL;
   /** After the chosen sort, so equal rows always come back in the same order (ends in a unique key). */
@@ -125,12 +137,19 @@ function filterMatches(text: SQL, filter: GridFilter<string>): SQL {
   }
 }
 
+/** One filter on a column: a list column matches when one of its values does. */
+function fieldMatches(field: SQL | GridListField, filter: GridFilter<string>): SQL {
+  if (!("values" in field)) return filterMatches(field, filter);
+  if (filter.operator === "isEmpty" || filter.operator === "isNotEmpty") return filterMatches(field.text, filter);
+  return sql`exists (select 1 from ${field.values} as grid_value(v) where ${filterMatches(sql`grid_value.v`, filter)})`;
+}
+
 /** Whether a row shows: every search word in its text, and the filters combined with and / or (grid_row_matches). */
 export function gridWhere<S extends string, F extends string>(table: GridTable<S, F>, query: GridQuery<S, F>): SQL {
   const conditions = gridWords(query.search).map(
     (w) => sql`coalesce(${table.searchText}, '') ilike ${`%${likeEscape(w)}%`}`
   );
-  const filters = activeFilters(query.filters).map((f) => filterMatches(table.fields[f.field], f));
+  const filters = activeFilters(query.filters).map((f) => fieldMatches(table.fields[f.field], f));
   if (filters.length > 0) {
     conditions.push(sql`(${sql.join(filters, query.logic === "or" ? sql` or ` : sql` and `)})`);
   }

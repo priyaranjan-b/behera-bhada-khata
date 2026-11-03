@@ -79,6 +79,12 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       deletePaymentNote: async (noteId) => {
         await request("DELETE", p.dashboard.paymentNote(noteId));
       },
+      paymentTags: () => get(p.dashboard.paymentTags),
+      createPaymentTag: (input) => post(p.dashboard.paymentTags, input),
+      updatePaymentTag: (tagId, input) => put(p.dashboard.paymentTag(tagId), input),
+      deletePaymentTag: async (tagId) => {
+        await request("DELETE", p.dashboard.paymentTag(tagId));
+      },
       properties: {
         list: () => get(p.dashboard.properties.list),
         newForm: () => get(p.dashboard.properties.new),
@@ -128,6 +134,8 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         adjust: (id) => get(p.dashboard.payments.adjust(id)),
         createAdjustment: (id, input) => post(p.dashboard.payments.adjustments(id), input),
         resend: (id) => post(p.dashboard.payments.resend(id)),
+        tagSuggestions: () => get(p.dashboard.payments.tagSuggestions),
+        setTags: (id, input) => put(p.dashboard.payments.tags(id), input),
       },
       adjustments: {
         resend: (id) => post(p.dashboard.adjustments.resend(id)),

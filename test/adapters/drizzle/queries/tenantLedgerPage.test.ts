@@ -102,10 +102,12 @@ const viaSql = async (scope: Scope, f: TenantLedgerFilter) =>
   )[0].v;
 const viaDrizzle = (scope: Scope, f: TenantLedgerFilter) => inScope(l.db, scope, (tx) => tenantLedgerPage(tx, f));
 
+/** Same answer both ways, bar the rows' tags (0030), which tenant_ledger_page() never had. */
 async function same(f: Partial<TenantLedgerFilter>, scope: Scope = asOwner) {
   const filter = { ...base(), ...f };
   const drizzle = await viaDrizzle(scope, filter);
-  expect(drizzle).toEqual(await viaSql(scope, filter));
+  expect(drizzle.rows.every((r) => Array.isArray(r.tags))).toBe(true);
+  expect({ ...drizzle, rows: drizzle.rows.map(({ tags: _tags, ...r }) => r) }).toEqual(await viaSql(scope, filter));
   return drizzle;
 }
 
@@ -191,5 +193,21 @@ describe("tenantLedgerPage on Drizzle matches tenant_ledger_page()", () => {
   it("another tenant's journal, and nothing for another signed-in account", async () => {
     expect((await same({ tenantId: bimal })).all).toBe(5);
     expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0 });
+  });
+});
+
+describe("tags (0030)", () => {
+  const P2 = "00000000-0000-4000-8000-0000000000e2";
+
+  beforeAll(async () => {
+    await l.pg.query(`insert into payment_record_tags (payment_id, name) values ($1, 'Sankarshan'), ($1, 'Padma')`, [P2]);
+  });
+
+  it("a payment row carries its tags, alphabetical; other rows none; search matches them", async () => {
+    const { rows } = await viaDrizzle(asOwner, base());
+    expect(rows.find((r) => r.ref_id === P2)?.tags).toEqual(["Padma", "Sankarshan"]);
+    expect(rows.filter((r) => r.type !== "payment").every((r) => r.tags.length === 0)).toBe(true);
+    const found = await viaDrizzle(asOwner, { ...base(), search: "sankarshan" });
+    expect(found.rows.map((r) => r.ref_id)).toEqual([P2]);
   });
 });

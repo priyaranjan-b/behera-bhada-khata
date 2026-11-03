@@ -8,12 +8,24 @@ export default async function PaymentsSection({
   range,
   rangeLabel,
   paidDirectCard,
+  tagSuggestions,
 }: {
   grid: Promise<PaymentsPage>;
+  /** Suggested tag names for the tag editor. */
+  tagSuggestions: Promise<string[]>;
   range: DayRange;
   rangeLabel: string;
   /** Streams on its own call (Govt paid direct). */
   paidDirectCard: React.ReactNode;
 }) {
-  return <PaymentsView initial={await grid} range={range} rangeLabel={rangeLabel} paidDirectCard={paidDirectCard} />;
+  const [initial, suggestions] = await Promise.all([grid, tagSuggestions]);
+  return (
+    <PaymentsView
+      initial={initial}
+      range={range}
+      rangeLabel={rangeLabel}
+      paidDirectCard={paidDirectCard}
+      tagSuggestions={suggestions}
+    />
+  );
 }

@@ -8,7 +8,7 @@ import { useId } from "react";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import AppCard from "@/components/ui/AppCard";
-import Chip from "@mui/material/Chip";
+import Chip, { type ChipProps } from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "@/components/ui/Link";
@@ -100,9 +100,16 @@ export function DashboardCardPanel({
 // drops some of them during SSR (hydration mismatch).
 export { StatusBadge, type BadgeTone } from "./StatusBadge";
 
-/** Neutral, quieter label for categories (property name, unit, mode). */
-export function TagPill({ label }: { label: string }) {
-  return <Chip size="small" variant="tag" label={label} title={label} />;
+/**
+ * Neutral, quieter label for categories (property name, unit, mode). The
+ * rest of the props pass through, so an input can make it removable (an
+ * Autocomplete's `getItemProps`: `onDelete`, `tabIndex`, ...).
+ */
+export function TagPill({
+  label,
+  ...chip
+}: { label: string } & Omit<ChipProps, "label" | "size" | "variant" | "title" | "children">) {
+  return <Chip size="small" variant="tag" label={label} title={label} {...chip} />;
 }
 
 /* ------------------------------------------------------------------ */

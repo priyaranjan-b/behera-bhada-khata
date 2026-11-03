@@ -62,7 +62,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D33), see below.
+- **Database:** `docs/database-design.md` (D1–D34), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -199,6 +199,13 @@ both together.
   managed on `/profile` (`PaymentNotesCard`,
   `src/server/services/paymentNotes.ts`). No audit trigger: a payment copies
   the text.
+- **Payment tags** (`0030_payment_tags.sql`, D34): optional labels on a
+  payment (who received it, ...), set on Record payment and edited on
+  `/payments` (`EditPaymentTagsDialog`, `PUT …/payments/[id]/tags`). Each
+  payment keeps its own copy of the names (`payment_record_tags`); the
+  suggestions (`payment_tags`, managed on `/profile`, `PaymentTagsCard`)
+  never change a payment. Searched with the Payments and Ledger tables.
+  Services in `src/server/services/paymentTags.ts`; not audited.
 - **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
   agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,
   `src/server/services/tenantDocuments.ts`), one `tenant_documents` row per

@@ -13,6 +13,7 @@ import type {
   OwnerProfile,
   Payment,
   PaymentNotePreset,
+  PaymentTag,
   PaymentAllocation,
   PaymentProof,
   TenantDocument,
@@ -27,6 +28,12 @@ import type {
 function notePreset(id: string, text: string): PaymentNotePreset {
   return { id, text, created_at: "2026-10-24T00:00:00Z", updated_at: "2026-10-24T00:00:00Z" };
 }
+
+function paymentTag(id: string, name: string): PaymentTag {
+  return { id, name, created_at: "2026-10-24T00:00:00Z", updated_at: "2026-10-24T00:00:00Z" };
+}
+
+const byName = (a: string, b: string) => a.toLowerCase().localeCompare(b.toLowerCase());
 
 export const OWNER_ID = "00000000-0000-4000-8000-00000000000a";
 
@@ -147,6 +154,13 @@ function build() {
       ["00000000-0000-4000-8000-000000000501", notePreset("00000000-0000-4000-8000-000000000501", "Paid via UPI")],
     ]),
     notesAdded: 0,
+    /** The suggestions (payment_tags). */
+    tags: new Map<string, PaymentTag>([
+      ["00000000-0000-4000-8000-000000000601", paymentTag("00000000-0000-4000-8000-000000000601", "Padma")],
+    ]),
+    tagsAdded: 0,
+    /** Each payment's own copy of its tag names (payment_record_tags). */
+    paymentTags: new Map<string, string[]>(),
     rateLimitAllows: true,
     /** Newest last; list() returns newest first like the database. */
     audit: [] as AuditLogEntry[],
@@ -157,6 +171,29 @@ function build() {
     const clash = [...state.notePresets.values()].some((n) => n.id !== id && n.text.toLowerCase() === text.toLowerCase());
     if (clash) throw new ApiError(409, "That already exists");
     state.notePresets.set(id, notePreset(id, text));
+  }
+
+  /** Like the unique index on lower(name): a duplicate is the adapter's 409. */
+  function saveTag(id: string, name: string) {
+    const clash = [...state.tags.values()].some((t) => t.id !== id && t.name.toLowerCase() === name.toLowerCase());
+    if (clash) throw new ApiError(409, "That already exists");
+    state.tags.set(id, paymentTag(id, name));
+  }
+
+  /** As tables/paymentTags.ts setPaymentTags: names it has stay, a new one takes a suggestion's spelling or joins them. */
+  function setTags(paymentId: string, names: string[]): string[] | null {
+    if (!state.payments.has(paymentId)) return null;
+    const current = state.paymentTags.get(paymentId) ?? [];
+    const lower = names.map((n) => n.toLowerCase());
+    const kept = current.filter((n) => lower.includes(n.toLowerCase()));
+    for (const name of names) {
+      if (kept.some((k) => k.toLowerCase() === name.toLowerCase())) continue;
+      const known = [...state.tags.values()].find((t) => t.name.toLowerCase() === name.toLowerCase());
+      if (!known) saveTag(`00000000-0000-4000-8000-${String(601 + ++state.tagsAdded).padStart(12, "0")}`, name);
+      kept.push(known?.name ?? name);
+    }
+    state.paymentTags.set(paymentId, kept);
+    return [...kept].sort(byName);
   }
 
   function logAudit(event: AuditEvent, actorKind: AuditLogEntry["actor_kind"], actorId: string | null) {
@@ -233,6 +270,27 @@ function build() {
         return true;
       }),
       remove: vi.fn(async (id: string) => state.notePresets.delete(id)),
+    },
+    paymentTags: {
+      list: vi.fn(async () =>
+        [...state.tags.values()]
+          .sort((a, b) => byName(a.name, b.name))
+          .map((t) => ({
+            ...t,
+            payment_count: [...state.paymentTags.values()].filter((names) =>
+              names.some((n) => n.toLowerCase() === t.name.toLowerCase())
+            ).length,
+          }))
+      ),
+      create: vi.fn(async (name: string) => {
+        saveTag(`00000000-0000-4000-8000-${String(601 + ++state.tagsAdded).padStart(12, "0")}`, name);
+      }),
+      update: vi.fn(async (id: string, name: string) => {
+        if (!state.tags.has(id)) return false;
+        saveTag(id, name);
+        return true;
+      }),
+      remove: vi.fn(async (id: string) => state.tags.delete(id)),
     },
     locations: {
       list: vi.fn(async () => [
@@ -360,7 +418,13 @@ function build() {
     payments: {
       listForTenants: vi.fn(async () => [...state.payments.values()]),
       get: vi.fn(async (id: string) => state.payments.get(id) ?? null),
-      create: vi.fn(async () => undefined),
+      create: vi.fn(async (p: { id: string }, _allocations: unknown, _proofs?: unknown, tags: string[] = []) => {
+        if (tags.length > 0) {
+          state.payments.set(p.id, state.payments.get(p.id) ?? payment({ id: p.id }));
+          setTags(p.id, tags);
+        }
+      }),
+      setTags: vi.fn(async (id: string, names: string[]) => setTags(id, names)),
       listAllocations: vi.fn(async () => [allocation]),
       listAllocationsForPeriods: vi.fn(async (ids: string[]) => (ids.includes(allocation.rent_period_id) ? [allocation] : [])),
       listProofs: vi.fn(async (ids: string[]) => [...state.proofs.values()].filter((p) => ids.includes(p.payment_id))),

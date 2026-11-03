@@ -39,6 +39,10 @@ import type {
   OwnerProfileView,
   PaymentNotePresetInput,
   PaymentNotePresetView,
+  PaymentTagInput,
+  PaymentTagsView,
+  PaymentTagView,
+  SetPaymentTagsInput,
   PaymentsPage,
   PaymentsPageQuery,
   PaymentsPaidDirect,
@@ -110,6 +114,8 @@ export interface ApiQueries {
     profile(): Promise<OwnerProfileView>;
     /** Quick-select notes for Record payment (Profile page). */
     paymentNotes(): Promise<PaymentNotePresetView[]>;
+    /** Suggested payment tags with usage counts (Profile page). */
+    paymentTags(): Promise<PaymentTagView[]>;
     properties: {
       list(): Promise<LocationGroup[]>;
       newForm(): Promise<NewPropertyForm>;
@@ -151,6 +157,8 @@ export interface ApiQueries {
       /** Govt rent paid direct for the rent months the days touch (A11). */
       paidDirect(query?: PaymentsQuery): Promise<PaymentsPaidDirect>;
       adjust(paymentId: string): Promise<AdjustPaymentForm>;
+      /** The tag names the Payments page's tag editor offers, alphabetical. */
+      tagSuggestions(): Promise<string[]>;
     };
   };
   confirm: {
@@ -172,6 +180,10 @@ export interface ApiCommands {
     createPaymentNote(input: PaymentNotePresetInput): Promise<void>;
     updatePaymentNote(noteId: string, input: PaymentNotePresetInput): Promise<void>;
     deletePaymentNote(noteId: string): Promise<void>;
+    createPaymentTag(input: PaymentTagInput): Promise<void>;
+    updatePaymentTag(tagId: string, input: PaymentTagInput): Promise<void>;
+    /** Payments that carry the name keep it. */
+    deletePaymentTag(tagId: string): Promise<void>;
     properties: {
       create(input: CreatePropertyInput): Promise<{ code: string }>;
       createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;
@@ -197,6 +209,8 @@ export interface ApiCommands {
     payments: {
       createAdjustment(paymentId: string, input: CreateAdjustmentInput): Promise<CreatedAdjustment>;
       resend(paymentId: string): Promise<LinkResent>;
+      /** Replaces the payment's tags; a new name joins the suggestions. */
+      setTags(paymentId: string, input: SetPaymentTagsInput): Promise<PaymentTagsView>;
     };
     adjustments: {
       resend(adjustmentId: string): Promise<LinkResent>;

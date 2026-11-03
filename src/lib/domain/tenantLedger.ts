@@ -31,6 +31,8 @@ export interface LedgerRow {
   proofs?: LedgerProof[]; // payments only
   /** Payments/adjustments: the tenant signed + verified (optional; 0010). */
   acknowledged?: boolean;
+  /** Payments: their tags (0030), alphabetical. */
+  tags?: string[];
 }
 
 // The Ledger table (A15): what it sorts and filters in SQL.
