@@ -1,0 +1,5 @@
+# Migrations are applied as written, and test/schema.test.ts compares the
+# function bodies they create (e.g. 0028 against the 0029 rollback script).
+# A CRLF checkout on Windows (core.autocrlf) changes those bodies, so SQL is
+# always LF, on every machine.
+*.sql text eol=lf
