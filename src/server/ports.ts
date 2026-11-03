@@ -44,7 +44,7 @@ import type {
   UnitOccupancy,
   UnitType,
 } from "@/lib/types";
-import type { FilterLogic, GridTextOperator, SortDirection } from "@/lib/domain/gridQuery";
+import type { FilterLogic, GridFilterValue, GridOperator, SortDirection } from "@/lib/domain/gridQuery";
 import type { BillingShow, TenantMonthShow } from "@/lib/domain/billing";
 import type { Session } from "@/lib/contracts";
 
@@ -168,7 +168,7 @@ export interface TenantMonthsFilter {
   tenantId: string;
   show: TenantMonthShow;
   search?: string;
-  filters: { field: "month" | "status"; operator: GridTextOperator; value?: string }[];
+  filters: { field: "month" | "status"; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;
   sort: "period_month" | "amount_due" | "amount_allocated" | "status";
   dir: SortDirection;
@@ -184,7 +184,7 @@ export interface BillingFilter {
   paidDirect: boolean;
   show: BillingShow;
   search?: string;
-  filters: { field: "month" | "tenant" | "status" | "payments"; operator: GridTextOperator; value?: string }[];
+  filters: { field: "month" | "tenant" | "status" | "payments"; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;
   sort: "period_month" | "tenant_name" | "amount_due" | "amount_allocated" | "balance" | "status";
   dir: SortDirection;
@@ -198,7 +198,7 @@ export interface PaymentsFilter {
   from: string;
   to: string;
   search?: string;
-  filters: { field: PaymentsFilterColumn; operator: GridTextOperator; value?: string }[];
+  filters: { field: PaymentsFilterColumn; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;
   sort: PaymentsSortColumn;
   dir: SortDirection;
@@ -213,7 +213,7 @@ export interface TenantLedgerFilter {
   fromDate?: string;
   toDate?: string;
   search?: string;
-  filters: { field: "date" | "description" | "status"; operator: GridTextOperator; value?: string }[];
+  filters: { field: "date" | "description" | "status"; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;
   sort: "date" | "description" | "status" | "debit" | "credit" | "balance";
   dir: SortDirection;
@@ -231,7 +231,7 @@ export interface AuditHistoryFilter {
   toDate?: string;
   /** Words that must each appear in who, what, tenant, house or details. */
   search?: string;
-  filters: { field: AuditTextColumn; operator: GridTextOperator; value?: string }[];
+  filters: { field: AuditTextColumn; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;
   sort: "at" | Exclude<AuditTextColumn, "details">;
   dir: SortDirection;

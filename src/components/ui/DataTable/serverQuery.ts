@@ -22,7 +22,12 @@ export function toGridQueryParams(
       (item): GridFilter => ({
         field: item.field,
         operator: item.operator as GridFilter["operator"],
-        value: item.value == null ? undefined : String(item.value),
+        // "is any of" sends its list; every other operator one value.
+        value: Array.isArray(item.value)
+          ? item.value.map(String)
+          : item.value == null
+            ? undefined
+            : String(item.value),
       })
     )
   );

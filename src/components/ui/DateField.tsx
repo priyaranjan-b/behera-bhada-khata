@@ -1,12 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { DATE_FORMAT, formatDateKey } from "@/lib/dates";
 import { boundOf, usePickerValue } from "./pickerValue";
+import QuickPicks from "./QuickPicks";
 
 export interface DateFieldProps {
   label: string;
@@ -64,25 +64,15 @@ export default function DateField({
   return (
     <Stack spacing={1}>
       {field}
-      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-        {quickPicks.map((pick) => {
-          const selected = pick.value === value;
-          return (
-            <Chip
-              key={pick.label}
-              label={pick.label}
-              size="small"
-              clickable
-              disabled={disabled}
-              color={selected ? "primary" : "default"}
-              variant={selected ? "filled" : "outlined"}
-              aria-pressed={selected}
-              aria-label={`${label}: ${pick.label}, ${formatDateKey(pick.value)}`}
-              onClick={() => onChange(pick.value)}
-            />
-          );
-        })}
-      </Stack>
+      <QuickPicks
+        disabled={disabled}
+        picks={quickPicks.map((pick) => ({
+          label: pick.label,
+          ariaLabel: `${label}: ${pick.label}, ${formatDateKey(pick.value)}`,
+          selected: pick.value === value,
+        }))}
+        onPick={(index) => onChange(quickPicks[index].value)}
+      />
     </Stack>
   );
 }

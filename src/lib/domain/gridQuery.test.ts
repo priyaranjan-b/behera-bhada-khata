@@ -17,4 +17,19 @@ describe("activeFilters", () => {
       { field: "unitCode", operator: "isNotEmpty", value: "" },
     ]);
   });
+
+  it("keeps a dropdown filter with a value, and \"is any of\" with at least one", () => {
+    expect(
+      activeFilters([
+        { field: "mode", operator: "is", value: "UPI" },
+        { field: "mode", operator: "not", value: "" },
+        { field: "mode", operator: "isAnyOf", value: [] },
+        { field: "mode", operator: "isAnyOf", value: [" "] },
+        { field: "mode", operator: "isAnyOf", value: ["Cash", "UPI"] },
+      ])
+    ).toEqual([
+      { field: "mode", operator: "is", value: "UPI" },
+      { field: "mode", operator: "isAnyOf", value: ["Cash", "UPI"] },
+    ]);
+  });
 });

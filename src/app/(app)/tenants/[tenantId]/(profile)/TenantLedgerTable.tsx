@@ -7,12 +7,18 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import type { LedgerRow } from "@/lib/domain/tenantLedger";
+import { LEDGER_STATUS_LABELS, type LedgerRow } from "@/lib/domain/tenantLedger";
 import type { TenantLedgerQuery, TenantLedgerView } from "@/lib/contracts";
 import { formatDateKey, monthDayRange } from "@/lib/dates";
-import { statusLabel } from "@/lib/domain/status";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
-import DataTable, { moneyColumn, SERVER_TEXT_OPERATORS, tagsColumn, useServerGrid, type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, {
+  moneyColumn,
+  selectColumn,
+  SERVER_TEXT_OPERATORS,
+  tagsColumn,
+  useServerGrid,
+  type DataTableColDef,
+} from "@/components/ui/DataTable";
 import { DateField, GridCell, MonthField } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
@@ -78,6 +84,8 @@ function ActionsCell({ row, tenantId, tenantMessaging }: { row: LedgerRow; tenan
 }
 
 const ledgerTagsOf = (row: LedgerRow) => row.tags ?? [];
+/** The database filters on the label the column shows; a plain charge has none. */
+const LEDGER_STATUS_OPTIONS = Object.values(LEDGER_STATUS_LABELS).filter((label) => label !== "");
 
 function blankZero(value: number | null | undefined) {
   return value ? value : null;
@@ -129,13 +137,9 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
           </GridCell>
         ),
       },
-      {
-        field: "status",
-        headerName: "Status",
+      selectColumn<LedgerRow>("status", "Status", LEDGER_STATUS_OPTIONS, {
         minWidth: 120,
-        filterOperators: SERVER_TEXT_OPERATORS,
-        valueFormatter: (value: LedgerRow["status"]) =>
-          value === "billed" ? "" : statusLabel(value === "upcoming" ? "not_due_yet" : value),
+        valueGetter: (_value, row) => LEDGER_STATUS_LABELS[row.status],
         renderCell: ({ row }) =>
           row.status === "billed" ? (
             <Typography variant="caption" color="textSecondary">
@@ -146,12 +150,12 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
           ) : (
             <StatusChip status={row.status} />
           ),
-      },
+      }),
       moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false }),
       moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero, filterable: false }),
       moneyColumn<LedgerRow>("balance", "Balance", { filterable: false }),
       // Searched, not filtered: the ledger query has no tag filter field.
-      tagsColumn<LedgerRow>("tags", "Tags", ledgerTagsOf, { filterable: false }),
+      tagsColumn<LedgerRow>("tags", "Tags", ledgerTagsOf, [], { filterable: false }),
       {
         field: "actions",
         headerName: "Actions",

@@ -190,6 +190,28 @@ describe("paymentsPage on Drizzle matches payments_page()", () => {
     }
   });
 
+  it("the dropdown filters (is, is not, is any of) on Mode, ignoring case", async () => {
+    const total = async (filters: PaymentsFilter["filters"]) => (await viaDrizzle(asOwner, { ...BASE, filters })).total;
+    const upi = await total([{ field: "mode", operator: "equals", value: "UPI" }]);
+    expect(upi).toBeGreaterThan(0);
+    expect(await total([{ field: "mode", operator: "is", value: "upi" }])).toBe(upi);
+    expect(await total([{ field: "mode", operator: "not", value: "UPI" }])).toBe(6 - upi);
+    expect(await total([{ field: "mode", operator: "isAnyOf", value: ["UPI", "Cheque"] }])).toBe(2);
+    expect(await total([{ field: "mode", operator: "isAnyOf", value: ["UPI", " "] }])).toBe(upi);
+    // No value chosen yet: the filter doesn't filter.
+    expect(await total([{ field: "mode", operator: "isAnyOf", value: [] }])).toBe(6);
+    expect(await total([{ field: "mode", operator: "is", value: "" }])).toBe(6);
+  });
+
+  it("refuses a list for one value, and one value for \"is any of\"", async () => {
+    for (const filters of [
+      [{ field: "mode", operator: "isAnyOf", value: "UPI" }],
+      [{ field: "mode", operator: "is", value: ["UPI"] }],
+    ] as PaymentsFilter["filters"][]) {
+      await expect(viaDrizzle(asOwner, { ...BASE, filters })).rejects.toMatchObject({ status: 400 });
+    }
+  });
+
   it("shows another signed-in account nothing", async () => {
     const page = await same({}, asStranger);
     expect(page).toMatchObject({ rows: [], total: 0, all: 0, page: 0, totals: { amount: 0, count: 0 } });
@@ -267,6 +289,17 @@ describe("tags (0030): on the rows, searched and filtered", () => {
     expect(await count("contains", "malati, padma")).toBe(0);
     expect(await count("contains", ", ")).toBe(0);
     expect((await viaDrizzle(asOwner, { ...BASE, filters: [{ field: "tags", operator: "isNotEmpty" }] })).total).toBe(2);
+  });
+
+  it("the Tags dropdown: is one of the names, is not any of them, is any of several", async () => {
+    const total = async (filter: PaymentsFilter["filters"][number]) =>
+      (await viaDrizzle(asOwner, { ...BASE, filters: [filter] })).total;
+    expect(await total({ field: "tags", operator: "is", value: "Padma" })).toBe(2);
+    // Untagged payments are "not Padma" too.
+    expect(await total({ field: "tags", operator: "not", value: "padma" })).toBe(4);
+    expect(await total({ field: "tags", operator: "not", value: "Malati" })).toBe(5);
+    expect(await total({ field: "tags", operator: "isAnyOf", value: ["Malati", "Nobody"] })).toBe(1);
+    expect(await total({ field: "tags", operator: "isAnyOf", value: ["Malati", "Padma"] })).toBe(2);
   });
 
   it("shows another signed-in account none", async () => {

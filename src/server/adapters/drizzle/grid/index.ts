@@ -1,6 +1,14 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
-import { FILTER_LOGICS, GRID_TEXT_OPERATORS, SORT_DIRECTIONS, type FilterLogic, type GridTextOperator, type SortDirection } from "@/lib/domain/gridQuery";
+import {
+  FILTER_LOGICS,
+  GRID_OPERATORS,
+  SORT_DIRECTIONS,
+  type FilterLogic,
+  type GridFilterValue,
+  type GridOperator,
+  type SortDirection,
+} from "@/lib/domain/gridQuery";
 import { ApiError } from "@/lib/errors";
 import { GRID_LIMITS } from "@/lib/validation";
 
@@ -14,11 +22,13 @@ import { GRID_LIMITS } from "@/lib/validation";
 // for the search box, `sorts`); this builds the where and order by from the
 // user's choices. Every value is a bound parameter; sort and field names
 // only index into those maps, so a name the table doesn't offer is refused.
+// The dropdown operators (is, not, isAnyOf) came after 0029 and have no SQL
+// twin.
 
 export interface GridFilter<F extends string> {
   field: F;
-  operator: GridTextOperator;
-  value?: string;
+  operator: GridOperator;
+  value?: GridFilterValue;
 }
 
 export interface GridQuery<S extends string, F extends string> {
@@ -36,7 +46,8 @@ export interface GridQuery<S extends string, F extends string> {
  * shows ("Malati, Padma"), `values` a set-returning expression of the values
  * themselves. A filter with a value matches when one value does, so "equals
  * Padma" finds a payment tagged Malati and Padma, and "contains Padma" is
- * tested name by name; "is empty" / "is not empty" test the whole list.
+ * tested name by name; "is not Padma" means no value is Padma, and "is
+ * empty" / "is not empty" test the whole list.
  */
 export interface GridListField {
   text: SQL;
@@ -108,18 +119,28 @@ export function checkGrid<S extends string, F extends string>(table: GridTable<S
   if (!Array.isArray(query.filters)) throw invalidQuery("filters", noun);
   for (const f of query.filters) {
     if (!has(table.fields, f.field)) throw invalidFilter("field", noun);
-    if (!GRID_TEXT_OPERATORS.includes(f.operator)) throw invalidFilter("operator", noun);
+    if (!GRID_OPERATORS.includes(f.operator)) throw invalidFilter("operator", noun);
+    if (f.value !== undefined && Array.isArray(f.value) !== (f.operator === "isAnyOf")) throw invalidFilter("value", noun);
   }
+}
+
+/** A filter's values, trimmed, blanks dropped: one for most operators, several for "is any of". */
+function valuesOf(filter: GridFilter<string>): string[] {
+  return [filter.value ?? ""]
+    .flat()
+    .map(btrim)
+    .filter((v) => v !== "");
 }
 
 /** Only filters that filter: one with a value, or an empty / not-empty check (grid_active_filters). */
 function activeFilters<F extends string>(filters: GridFilter<F>[]): GridFilter<F>[] {
-  return filters.filter((f) => f.operator === "isEmpty" || f.operator === "isNotEmpty" || btrim(f.value ?? "") !== "");
+  return filters.filter((f) => f.operator === "isEmpty" || f.operator === "isNotEmpty" || valuesOf(f).length > 0);
 }
 
-/** One text filter, as the filter panel offers them (audit_text_matches). */
+/** One filter, as the filter panel offers them (audit_text_matches, plus the dropdown operators). */
 function filterMatches(text: SQL, filter: GridFilter<string>): SQL {
-  const value = btrim(filter.value ?? "");
+  const values = valuesOf(filter);
+  const value = values[0] ?? "";
   const pattern = likeEscape(value);
   switch (filter.operator) {
     case "isEmpty":
@@ -129,7 +150,15 @@ function filterMatches(text: SQL, filter: GridFilter<string>): SQL {
     case "contains":
       return sql`coalesce(${text} ilike ${`%${pattern}%`}, false)`;
     case "equals":
+    case "is":
       return sql`coalesce(lower(${text}) = lower(${value}), false)`;
+    case "not":
+      return sql`coalesce(lower(${text}) <> lower(${value}), true)`;
+    case "isAnyOf":
+      return sql`coalesce(lower(${text}) in (${sql.join(
+        values.map((v) => sql`lower(${v})`),
+        sql`, `
+      )}), false)`;
     case "startsWith":
       return sql`coalesce(${text} ilike ${`${pattern}%`}, false)`;
     case "endsWith":
@@ -141,6 +170,7 @@ function filterMatches(text: SQL, filter: GridFilter<string>): SQL {
 function fieldMatches(field: SQL | GridListField, filter: GridFilter<string>): SQL {
   if (!("values" in field)) return filterMatches(field, filter);
   if (filter.operator === "isEmpty" || filter.operator === "isNotEmpty") return filterMatches(field.text, filter);
+  if (filter.operator === "not") return sql`not ${fieldMatches(field, { ...filter, operator: "is" })}`;
   return sql`exists (select 1 from ${field.values} as grid_value(v) where ${filterMatches(sql`grid_value.v`, filter)})`;
 }
 

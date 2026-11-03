@@ -23,7 +23,8 @@ export type PaidDirectView = (typeof PAID_DIRECT_VIEWS)[number];
 /** The two kinds of ledger record; each has its own receipt and confirm link. */
 export const RECORD_TYPES = ["payment", "adjustment"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
-export type PeriodStatus = "pending" | "partially_paid" | "paid";
+export const PERIOD_STATUSES = ["pending", "partially_paid", "paid"] as const;
+export type PeriodStatus = (typeof PERIOD_STATUSES)[number];
 export const PAYMENT_MODES = ["cash", "bank_transfer", "upi", "cheque", "other"] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 export type LedgerStatus = "pending" | "confirmed";

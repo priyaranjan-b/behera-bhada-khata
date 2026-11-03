@@ -1,7 +1,7 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { APP_TIME_ZONE, currentMonthKey, isDateKey } from "@/lib/dates";
-import { statusLabel } from "@/lib/domain/status";
+import { LEDGER_STATUS_LABELS } from "@/lib/domain/tenantLedger";
 import type { TenantLedgerDbRow } from "@/lib/types";
 import type { DbPage, TenantLedgerFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
@@ -28,14 +28,6 @@ import { dateLabel, labelOf, monthLabel, paymentTagsOf } from "./text";
 // A payment row carries its tags (0030, D34), searched with the rest.
 // The payment line keeps the SQL function's wording, raw mode included
 // ("Payment received (bank transfer)"); changing it is a separate change.
-
-/** The Status column's text (status_label as the SQL used it): blank for a billed charge. */
-const LEDGER_STATUS_LABELS: Record<TenantLedgerDbRow["status"], string> = {
-  billed: "",
-  upcoming: statusLabel("not_due_yet"),
-  confirmed: statusLabel("confirmed"),
-  pending: statusLabel("pending"),
-};
 
 function ledgerRows(tenantId: string): SQL {
   const thisMonth = currentMonthKey();

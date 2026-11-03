@@ -10,11 +10,11 @@ import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "@/components/ui/Link";
-import DataTable, { type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, { selectColumn, type DataTableColDef } from "@/components/ui/DataTable";
 import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { DetailList, DetailRow, GridCell } from "@/components/ui";
 import AuditTimeline from "./AuditTimeline";
-import { UNIT_TYPE_LABELS, formatFloor } from "@/lib/domain/tenant";
+import { UNIT_TYPE_LABELS, UNIT_TYPE_OPTIONS, formatFloor } from "@/lib/domain/tenant";
 import type { UnitRow } from "@/lib/contracts";
 import { HOUSE_FILTERS, matchesHouseFilter, type HouseFilter } from "@/lib/domain/houses";
 import { formatDateKey } from "@/lib/dates";
@@ -131,17 +131,14 @@ export default function UnitsGrid({
       minWidth: 110,
       valueFormatter: (value: string | null) => formatFloor(value) || "—",
     },
-    {
-      field: "unitType",
-      headerName: "Type",
+    selectColumn<UnitRow>("unitType", "Type", UNIT_TYPE_OPTIONS, {
       minWidth: 120,
-      valueFormatter: (_value, row) => UNIT_TYPE_LABELS[row.unitType],
       renderCell: ({ row }) => (
         <GridCell>
           <TagPill label={UNIT_TYPE_LABELS[row.unitType]} />
         </GridCell>
       ),
-    },
+    }),
     {
       field: "currentTenant",
       headerName: "Occupant",
