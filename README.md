@@ -20,6 +20,10 @@ Twilio for SMS OTP + WhatsApp/SMS delivery.
    `rent-register` storage bucket, `0006` the site → tower → house master
    data and dated tenancies, `0007` draft tenants. The design and its reasons are in
    `docs/database-design.md`.
+   - `0029` drops SQL functions that older releases of the app call. A new
+     project runs it with the rest. On a database already in use, hold it
+     back until the steps in its header are met (D33), and undo it with
+     `supabase/rollback/0029_restore_replaced_functions.sql`.
    - `0006` refuses to run if properties or tenants already exist. On a
      project with only **test data**, first run
      `supabase/scripts/reset_owner_data.sql` (it deletes every property,

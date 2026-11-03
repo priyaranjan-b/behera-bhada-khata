@@ -5,7 +5,7 @@ import type { TenantAccountSummaryDb } from "@/lib/types";
 import type { Tx } from "../client";
 import { adjustments, payments, rentPeriods, tenants } from "../schema";
 
-// Replaces tenant_account_summary() (0022, D29): the tenant page's account
+// Replaces tenant_account_summary() (0022, D29; dropped in 0029, D33): the tenant page's account
 // figures as one aggregate statement. Same rules as summarizeBalance
 // (src/lib/domain/allocation.ts): a month is owed once it has ended (before
 // this month in APP_TIME_ZONE), and only what is still unpaid counts; this
@@ -14,8 +14,9 @@ import { adjustments, payments, rentPeriods, tenants } from "../schema";
 //
 // "This month" comes from the app server's clock (currentMonthKey), on
 // purpose: the same clock summarizeBalance and the pages use, rather than
-// the SQL function's app_current_month() (database clock). The two can only
-// disagree for seconds around midnight on the 1st.
+// the database clock the dropped app_current_month() read. The two can only
+// disagree for seconds around midnight on the 1st (the parity test's oracle
+// still reads it).
 
 export async function tenantAccountSummary(tx: Tx, tenantId: string): Promise<TenantAccountSummaryDb> {
   const r = rentPeriods;

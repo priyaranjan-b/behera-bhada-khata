@@ -10,11 +10,11 @@ import { db, placements, tenantsList } from "./loaders";
 import { paidDirectPeriods } from "./periods";
 
 // The Payments page (A18): every tenant's recorded payments by the day they
-// were received, paged, searched and totalled per mode in SQL
-// (payments_page, 0026), plus government rent paid direct (A11) on its own
+// were received, paged, searched and totalled per mode in the database
+// (A15, A19), plus government rent paid direct (A11) on its own
 // call - it has no date received, so it counts by rent month.
 
-// The grid's fields → the columns payments_page reads.
+// The grid's fields → the columns the Payments query reads.
 const SORT_COLUMNS = {
   paymentDate: "payment_date",
   receiptNo: "receipt_no",

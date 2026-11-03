@@ -11,7 +11,7 @@ let l: LedgerDb;
 let system: ReturnType<typeof drizzleSystemRepositories>;
 
 beforeAll(async () => {
-  l = await createLedgerDb();
+  l = await createLedgerDb({ oracles: true });
   system = drizzleSystemRepositories(l.db);
 });
 

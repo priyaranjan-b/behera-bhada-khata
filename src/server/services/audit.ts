@@ -80,7 +80,7 @@ function toEntry(row: AuditLogEntry, tenantName: string | null): AuditEntry {
   };
 }
 
-// The table's field names → the columns audit_history_page reads.
+// The table's field names → the columns the history query reads.
 const HISTORY_COLUMNS = {
   at: "at",
   actorName: "actor_name",

@@ -9,7 +9,7 @@ You review database changes to this repo. You never edit files; you report
 findings.
 
 ## Rules to apply
-Read these first: `docs/database-design.md` (D1–D29 and its checklists for
+Read these first: `docs/database-design.md` (D1–D33 and its checklists for
 adding tables and functions; it is the authority) and the "Ledger design"
 section of `CLAUDE.md`. Read the earlier migrations a change builds on.
 

@@ -18,7 +18,7 @@ let l: LedgerDb;
 const tenants: Record<string, string> = {};
 
 beforeAll(async () => {
-  l = await createLedgerDb();
+  l = await createLedgerDb({ oracles: true });
   await l.pg.exec(`
     insert into properties (property_code, location_code, name) values ('AC-T2', 'AC', 'Tower 2');
     insert into units (unit_code, property_code, floor, unit_type) values ('AC-T2-101', 'AC-T2', '1', 'residential');

@@ -59,6 +59,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0025_correct_rent.sql` | `correct_rent()`: fix a rent entered wrongly from a month on, paid months included (D31) |
 | `0026_payments_page.sql` | `payments_page()`: every payment by day received, paged in SQL with totals per mode (A18); `payment_mode_label()`; index `payments (payment_date)` |
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
+| `0029_drop_replaced_functions.sql` | drops the 30 functions the Drizzle adapter replaced: the `…_page()` functions of 0018-0026, their grid and label helpers, `tenant_account_summary()`, `hit_rate_limit()` / `prune_rate_limits()` (D33). The indexes they used stay |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -235,15 +236,19 @@ with `revoke all on function … from public, anon, authenticated` and a narrow
 **Who may run what:**
 - **Owner-facing (`authenticated`):** `create_*` (`SECURITY DEFINER` with
   the owner check since 0010) and the tenant lifecycle functions.
-- **Service role only:** `acknowledge_*`, `ensure_rent_periods`, the
-  rate-limit functions, `rent_for_month`.
+- **Service role only:** `acknowledge_*`, `ensure_rent_periods`,
+  `rent_for_month` (and the rate-limit functions until 0029 dropped them,
+  D33).
 
 ### D12 — Rate limits live in Postgres
 
-The `rate_limits (key, window_start, count)` table plus `hit_rate_limit()`
-form a fixed-window counter, written only by the service role and pruned by
-the daily cron. This avoids adding Redis for a small app. It's used for OTP
-sends, confirm attempts and magic-link emails.
+The `rate_limits (key, window_start, count)` table is a fixed-window
+counter, written only by the service role and pruned by the daily cron.
+Since A19 the counting is one `insert … on conflict do update … returning`
+in the Drizzle adapter (`tables/rateLimits.ts`); `hit_rate_limit()` and
+`prune_rate_limits()` were dropped in 0029 (D33). This avoids adding Redis
+for a small app. It's used for OTP sends, confirm attempts and magic-link
+emails.
 
 ### D13 — Indexes match real queries; no duplicates
 
@@ -687,8 +692,9 @@ can't be updated afterwards.
 
 ### D28 — Growing tables are built, paged and searched in SQL
 
-**Decision (0019-0021).** The tables whose rows grow every month each have
-one `security invoker` SQL function. Each returns
+**Decision (0019-0021).** The tables whose rows grow every month each had
+one `security invoker` SQL function (since A19 one TS query each, and the
+functions below were dropped in 0029, D33). Each returns
 `{rows, total, all, page}` for one page, after "Show", search, the grid's
 text filters and sort (A15 in `docs/design-decisions.md`):
 
@@ -699,7 +705,7 @@ text filters and sort (A15 in `docs/design-decisions.md`):
 | `billing_page` + `billing_totals` (0021) | Billing grid and its stat cards | stored months in the range, plus government paid-direct months (A11), with tower, houses and "Paid by" |
 
 How they're built:
-- **Shared helpers (0019):** `grid_check` (refuses unknown sorts, fields,
+- **Shared helpers (0019; dropped in 0029, now `grid/`):** `grid_check` (refuses unknown sorts, fields,
   operators and page sizes with `BBK00`), `grid_words`, `grid_active_filters`
   and `grid_row_matches`. Each row is passed as `{field: shown text}`, and
   the search and filters run on that text (`like_escape` and
@@ -736,8 +742,9 @@ How they're built:
   database) holds, but the query is built in TypeScript: the `grid/`
   builder and `queries/*Page.ts` in the Drizzle adapter, one statement per
   page, as the SQL function was. The app no longer calls the SQL
-  `…_page()` functions; each stays as the oracle the parity tests compare
-  against, until the last item of A19 drops it.
+  `…_page()` functions; 0029 dropped them (D33), and their rollback script
+  (`supabase/rollback/0029_restore_replaced_functions.sql`) stays the oracle the parity
+  tests compare against.
 - **A new growing table** gets only a `queries/<x>Page.ts` on the `grid/`
   builder: no SQL `…_page()` function, so its tests in
   `test/adapters/drizzle/queries/` use fixed expected values (paging and
@@ -856,6 +863,57 @@ grant is allowed there: run 0027 on a branch or inside `begin; ...;
 rollback;` first, then check `select pg_has_role('app_drizzle',
 'authenticated', 'SET')`. On this project the corrected file was run as
 `postgres` in the SQL editor (Nov 2026), and the app reads through it.
+
+### D33 — The SQL functions the Drizzle adapter replaced are dropped; tests keep a frozen copy
+
+**Decision (0029).** The 30 functions the app stopped calling when Drizzle
+became the only data adapter (A19) are dropped: the paged tables'
+`…_page` / `…_matching` / `…_rows` functions (D28), `billing_totals` and
+`tenant_account_summary` (D29), the grid helpers (`grid_check`,
+`grid_words`, `grid_active_filters`, `grid_row_matches`, `like_escape`,
+`audit_text_matches`, `audit_matches`, `audit_field`), the label helpers
+(`status_label`, `payment_mode_label`, `period_display_status`,
+`app_current_month`, `tenant_placement_now`) and the rate-limit counter
+(`hit_rate_limit`, `prune_rate_limits`, D12).
+- **What stays:** everything an A19 "keep" covers, and `allocation_rows`
+  (0020), which `create_payment` and `create_adjustment` call. A check of
+  every function body, view and RLS policy found nothing else that stays
+  calling a dropped one.
+- **Plain `drop function if exists`** with exact signatures, callers first,
+  no `cascade`, in one transaction: safe to run again, and nothing
+  unexpected goes with it. `test/schema.test.ts` checks, on a database
+  migrated without the frozen copy, that every one is gone, the kept ones
+  are there, and no remaining function body, view or RLS policy names a
+  dropped one; the Drizzle procedure, table and write tests run on that
+  same schema.
+- **`audit_date` and `audit_month` stay** (0017/0024): `audit_describe` uses
+  them, though the app no longer reads them directly (`queries/text.ts`
+  builds the same text in TS). The frozen copy uses them too.
+- **One frozen copy is both the rollback and the tests' oracle**
+  (`supabase/rollback/0029_restore_replaced_functions.sql`, outside `migrations/`, dumped with
+  `pg_get_functiondef` as 0028 left them, with their grants; a schema test
+  checks a 0029 + rollback database has the same definitions and grants as
+  one migrated to 0028). `loadOracles()` loads it only into test databases: the parity tests
+  (`createLedgerDb({ oracles: true })`) and `test/schema.test.ts`. The
+  fixed-value cases there pin what they answer (and that they agree with
+  `summarizeBalance`, `paidDirectMonths` and the label maps), and the
+  parity tests pin the TS queries to them over whole matrices of filters,
+  sorts and pages. Never edit the copy to make a test pass: when a page's
+  rules change on purpose, change the query and give that case fixed
+  expected values.
+- **When to run it:** only once no deployment older than the Drizzle-only
+  release (commit `24be8bd`) can serve traffic again, after a few clean
+  days with the daily cron; a Vercel rollback past it would call functions
+  that no longer exist, and fail every owner call at its rate limit. The
+  migration's header has the pg_cron check to run first and the query that
+  proves it worked. Undo with `supabase/rollback/0029_restore_replaced_functions.sql`.
+
+**Why.** Dead SQL kept a second copy of every page's rules in the database,
+where a later change to the TS could drift from it unnoticed, and kept
+callable functions that nothing needs. Switching the parity tests to fixed
+values instead was rejected: their data is dated relative to today, and
+ties sort by random uuids, so fixed values would drift with the calendar
+and flake.
 
 ---
 

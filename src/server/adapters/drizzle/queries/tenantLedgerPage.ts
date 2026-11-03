@@ -9,7 +9,7 @@ import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type G
 import { dateLabel, labelOf, monthLabel } from "./text";
 
 // Replaces tenant_ledger_page() (0020, A15, D28) and its tenant_ledger_rows
-// / tenant_ledger_matching: a tenant's rent charges, payments and
+// / tenant_ledger_matching (all dropped in 0029, D33): a tenant's rent charges, payments and
 // adjustments as one journal with a running balance, one page. The rules:
 //   * charge: one per rent month, dated the month, debit = amount due;
 //     "upcoming" (shown, not counted) for this month and later, else "billed";

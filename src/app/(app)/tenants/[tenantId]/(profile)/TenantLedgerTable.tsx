@@ -86,7 +86,7 @@ function blankZero(value: number | null | undefined) {
 /**
  * A tenant's ledger, one page at a time: the journal, its running balance
  * (all-time, whatever the page or filter), paging, sort, search and the
- * date filters all come from SQL (tenant_ledger_page, A15). Loads its first
+ * date filters all come from the database (A15). Loads its first
  * page when mounted (the Ledger tab, A16).
  */
 export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {

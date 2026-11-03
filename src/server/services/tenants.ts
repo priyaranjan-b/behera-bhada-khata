@@ -155,7 +155,7 @@ export async function getTenantAccount(_ctx: OwnerContext, tenantId: string): Pr
   };
 }
 
-// The Months table's fields → the columns tenant_months_page reads.
+// The Months table's fields → the columns the Months query reads.
 const MONTH_SORT_COLUMNS = {
   periodMonth: "period_month",
   amountDue: "amount_due",
@@ -196,7 +196,7 @@ export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, quer
   };
 }
 
-// The Ledger table's fields → the columns tenant_ledger_page reads (the same names).
+// The Ledger table's fields → the columns the ledger query reads (the same names).
 const LEDGER_FILTER_COLUMNS = { date: "date", description: "description", status: "status" } as const;
 
 /**

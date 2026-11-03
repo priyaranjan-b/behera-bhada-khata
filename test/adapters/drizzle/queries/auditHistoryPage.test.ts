@@ -17,7 +17,7 @@ let asha: string;
 let chai: string;
 
 beforeAll(async () => {
-  l = await createLedgerDb();
+  l = await createLedgerDb({ oracles: true });
   asha = await l.createTenant({ name: "Asha", rent: 5000, leaseStart: "2026-01-01", units: ["AC-T1-G01"] });
   chai = await l.createTenant({ name: "Chai", rent: 3000, leaseStart: "2026-01-01", units: ["AC-T1-G02"] });
   await l.pg.query(`update tenants set business_name = 'Chai Point Pvt Ltd' where id = $1`, [chai]);
