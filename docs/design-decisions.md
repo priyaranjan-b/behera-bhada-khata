@@ -718,7 +718,7 @@ today.
 
 **Decision.** The Overview's Collected card is what was credited to the
 selected month's rent (`buildMonthlyReport`, `amount_allocated`), so it pairs
-with Expected. The Billing vs collection chart is cash received in each month
+with Expected. The Billing vs Received chart is cash received in each month
 by payment date (`buildBillingCollectionTrend`) and is labelled "Received".
 The card shows the month's received amount on a second line, and its
 sparkline is the received series.

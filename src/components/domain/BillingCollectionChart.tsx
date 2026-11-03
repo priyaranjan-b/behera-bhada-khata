@@ -45,7 +45,7 @@ export default function BillingCollectionChart({
       <CardContent>
         <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
           <Typography component="h2" variant="subtitle2" gutterBottom>
-            Billing vs collection
+            Billing vs Received
           </Typography>
           <Stack direction="row" spacing={0.5}>
             <Button size="small" variant="text" onClick={() => setShowTable((v) => !v)} aria-pressed={showTable}>
@@ -73,7 +73,7 @@ export default function BillingCollectionChart({
         </Stack>
 
         {showTable ? (
-          <Table size="small" sx={{ mt: 2 }} aria-label="Billing vs collection by month">
+          <Table size="small" sx={{ mt: 2 }} aria-label="Billing vs Received by month">
             <TableHead>
               <TableRow>
                 <TableCell>Month</TableCell>

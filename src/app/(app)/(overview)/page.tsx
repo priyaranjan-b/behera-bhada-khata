@@ -78,7 +78,7 @@ export default async function DashboardPage({
         </AsyncSection>
       }
       trend={
-        <AsyncSection key={paidDirect} title="Billing vs collection" fallback={SKELETON.trend}>
+        <AsyncSection key={paidDirect} title="Billing vs Received" fallback={SKELETON.trend}>
           <TrendSection trend={trend} />
         </AsyncSection>
       }
