@@ -569,13 +569,18 @@ Each of these was found broken somewhere; keep them when adding code.
   (`AccountStatsSkeleton`), shared by its fallback and `loading.tsx`.
 - **Phones:** `PageTabs` shows a "Section" select instead of tabs, and
   `ActionStack phone="primaryOnTop"` puts the primary (last) button on top
-  with the rest two to a row. A `DataTable` toolbar is one row on phones:
-  the count, then search (expands across the row), a filter button opening
-  a panel with the "Show" selects, `toolbarExtra` (pass
-  `toolbarExtraActive` so its badge counts set dates) and column filters,
-  then columns and Excel. A destructive button is `variant="outlined"
-  color="error"` (red via the theme variant in `app.ts`; the template's
-  outlined style alone greys it).
+  with the rest two to a row. On phones a `DataTable` toolbar puts the
+  title and count on their own line (inside `PageTabs`, where the title is
+  hidden, just the count starts the icons' row). Then come search (it
+  expands across the row), a filter button opening a panel with the "Show"
+  selects, `toolbarExtra` (pass `toolbarExtraActive` so its badge counts set
+  dates) and column filters, then columns and Excel. Touch screens get no
+  column ⋮ menu; tapping the header sorts. A standalone icon button is 44px
+  on touch screens. One embedded in a field (a picker's calendar, a search
+  clear) or a grid header is a plain small icon (`MuiInputAdornment` in
+  `app.ts`, `dataTableSx`); never size those by hand. A destructive button is
+  `variant="outlined" color="error"` (red via the theme variant in `app.ts`;
+  the template's outlined style alone greys it).
 - Payments (`/payments`, A18, `src/server/services/paymentsReport.ts`):
   every tenant's payments by day received (default last month), paged in
   the database (`paymentsPage`, A19) with the per-mode cards in the same call so

@@ -16,12 +16,16 @@ export const pillControlSx = {
 /** Class on toolbar icon buttons (ToolbarButton takes no `sx`). */
 export const TOOL_BUTTON = "data-table-tool";
 
+/** 36px round toolbar icons (40px on touch screens), over the theme's 44px standalone touch size. */
 export const toolbarIconButtonSx = {
   width: 36,
   height: 36,
+  minWidth: 0,
+  minHeight: 0,
   borderRadius: 999,
   border: 1,
   borderColor: "divider",
+  "@media (pointer: coarse)": { width: 40, height: 40 },
 };
 
 /** The "Clean SaaS" table: tinted header band, zebra rows, hover edge, compact footer. */
@@ -76,6 +80,23 @@ export const dataTableSx = (theme: Theme) => ({
   // Right-aligned headers are row-reverse, so flex-start keeps them on the right.
   [`& .${gridClasses.columnHeaderTitleContainer}`]: { justifyContent: "flex-start", gap: 0.5 },
   [`& .${gridClasses.columnSeparator}`]: { display: "none" },
+  // The sort arrow and column menu are plain small icons, not the theme's
+  // bordered 44px touch buttons, which on phones squeezed the header text to
+  // "D..". On touch screens the column menu goes: tap the header to sort,
+  // and the toolbar's Filters and Columns buttons do the rest.
+  [`& .${gridClasses.columnHeader} .MuiIconButton-root`]: {
+    width: 28,
+    height: 28,
+    minWidth: 0,
+    minHeight: 0,
+    padding: 0.5,
+    border: 0,
+    backgroundColor: "transparent",
+    "&:hover": { backgroundColor: (theme.vars || theme).palette.action.hover },
+  },
+  "@media (pointer: coarse)": {
+    [`& .${gridClasses.menuIcon}`]: { display: "none" },
+  },
 
   // Rows
   [`& .${gridClasses.cell}`]: {

@@ -46,8 +46,9 @@ import { useTableFilters } from "./useTableFilters";
  * One row: title + count on the left; "Show" filters, extra inputs, search,
  * filter and columns on the right. Wraps under the title on narrow screens.
  *
- * Phones get one short row instead: the count (and the title, unless a
- * `PageTabs` section already names the table), then icons. The "Show"
+ * Phones get short rows instead: the title and count on their own line
+ * (unless a `PageTabs` section already names the table, then only the
+ * count, on the icons' row), then the icons. The "Show"
  * selects, `toolbarExtra` and the column filters move into a panel the
  * filter icon opens (its badge counts what's active), and search expands
  * across the whole row.
@@ -71,6 +72,8 @@ export default function DataTableToolbar() {
   // On a phone an open search takes the whole row.
   const searchOnly = compact && searchOpen;
   const showTitle = !(compact && inTabs);
+  // On a phone a shown title gets its own line, so it isn't cut to "Payments rec…".
+  const titleLine = compact && showTitle && Boolean(config.title);
 
   return (
     <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -78,7 +81,7 @@ export default function DataTableToolbar() {
         direction="row"
         sx={{
           alignItems: "center",
-          flexWrap: compact ? "nowrap" : "wrap",
+          flexWrap: compact && !titleLine ? "nowrap" : "wrap",
           columnGap: compact ? 1 : 2,
           rowGap: 1.25,
           px: 2,
@@ -87,7 +90,7 @@ export default function DataTableToolbar() {
         }}
       >
         {searchOnly ? null : (
-          <Box sx={{ minWidth: 0, flex: "1 1 auto" }}>
+          <Box sx={{ minWidth: 0, flex: titleLine ? "1 1 100%" : "1 1 auto" }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
               {config.title ? (
                 <Typography
@@ -101,7 +104,12 @@ export default function DataTableToolbar() {
                   {config.title}
                 </Typography>
               ) : null}
-              <Chip size="small" label={count} aria-label={`${count} rows`} sx={{ height: 22, fontWeight: 500 }} />
+              <Chip
+                size="small"
+                label={count}
+                aria-label={`${count} rows`}
+                sx={{ height: 22, fontWeight: 500, flexShrink: 0 }}
+              />
             </Stack>
             {config.subtitle && !compact ? (
               <Typography variant="caption" color="textSecondary" component="p" noWrap>
@@ -120,6 +128,8 @@ export default function DataTableToolbar() {
             justifyContent: "flex-end",
             minWidth: 0,
             flex: searchOnly ? "1 1 auto" : undefined,
+            // Under the title line: right-aligned, like the wide layout.
+            ml: titleLine && !searchOnly ? "auto" : undefined,
           }}
         >
           {compact

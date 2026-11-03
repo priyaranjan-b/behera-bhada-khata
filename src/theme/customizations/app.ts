@@ -4,6 +4,7 @@
 import { alpha, type Components, type Theme } from "@mui/material/styles";
 import { alertClasses } from "@mui/material/Alert";
 import { chipClasses } from "@mui/material/Chip";
+import { iconButtonClasses } from "@mui/material/IconButton";
 import { brand, gray, orange, red } from "../themePrimitives";
 import { cardShadows, lightSurfaces, slate } from "../appTokens";
 
@@ -243,7 +244,33 @@ export const appCustomizations: Components<Theme> = {
     ],
   },
   MuiToggleButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
+  // The 44px touch size is for standalone icon buttons (header bar, row actions).
   MuiIconButton: {
     variants: [{ props: {}, style: { "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 } } }],
+  },
+  // An icon button inside a field (a date or month picker's calendar, a
+  // search field's clear/close, a password toggle) is a plain icon that fits
+  // the 36-40px field: no border or fill, and not the 44px standalone size,
+  // which on phones overflowed the field.
+  MuiInputAdornment: {
+    variants: [
+      {
+        props: {},
+        style: ({ theme }) => ({
+          [`& .${iconButtonClasses.root}`]: {
+            width: 32,
+            height: 32,
+            minWidth: 0,
+            minHeight: 0,
+            padding: 4,
+            border: 0,
+            backgroundColor: "transparent",
+            color: (theme.vars || theme).palette.text.secondary,
+            "&:hover, &:active": { backgroundColor: (theme.vars || theme).palette.action.hover },
+            "@media (pointer: coarse)": { width: 36, height: 36 },
+          },
+        }),
+      },
+    ],
   },
 };
