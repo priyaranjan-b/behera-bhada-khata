@@ -77,7 +77,8 @@ test instead.
   (A17), the Payments page: payments by day received, cards that
   follow the table (A18), and the Drizzle adapter: which SQL functions
   move to TS and which stay in Postgres (A19), and the Overview's
-  "Collected" (per rent month) vs the chart's "Received" (cash, A20). Read it before changing
+  "Collected" (per rent month) vs the chart's "Received" (cash, A20), and the
+  phone app as a PWA whose service worker caches no owner data (A21). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -332,7 +333,10 @@ Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-or
   public ones** (`isProtectedPath` in `src/lib/routes.ts`: `/login`,
   `/auth/*`, `/confirm/*` and `/api/*`, which answers 401 itself). It fails
   closed, so a new page is protected without listing it. It also refreshes
-  the session cookie (`src/server/adapters/supabase/proxy.ts`).
+  the session cookie (`src/server/adapters/supabase/proxy.ts`). Static files
+  skip it through its `matcher`, including the installed-app files
+  (`manifest.webmanifest`, `sw.js`, `offline.html`, `icons/`; A21), which
+  the browser fetches while signed out.
 - **Owner pages have no URL prefix (A13).** They live in the `src/app/(app)/`
   route group, which carries the shell layout but adds nothing to the URL:
   `/` (Overview), `/tenants/…`, `/properties/…`, `/billing`. Old

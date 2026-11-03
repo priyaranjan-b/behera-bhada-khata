@@ -91,6 +91,10 @@ export const routes = {
  * is protected unless it is listed here). API routes answer 401 themselves,
  * and the tenant's confirm link carries its own token.
  */
+// Static files never reach this check: the matcher in src/proxy.ts skips them
+// (it can't import a constant). It also lists the installed-app files
+// (manifest, sw.js, offline.html, icons/, A21); keep it in step with
+// public/ and the sw.js headers in next.config.ts.
 const PUBLIC_PREFIXES = ["/login", "/auth/", "/confirm/", "/api/"] as const;
 
 /** Does `pathname` need the owner signed in? */

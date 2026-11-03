@@ -17,6 +17,7 @@ import { DateField, GridCell, MonthField } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
 import ProofsButton from "@/components/domain/ProofsButton";
+import ShareReceiptButton from "@/components/domain/ShareReceiptButton";
 import { api, apiHref, apiPaths } from "@/lib/api-client";
 import { routes } from "@/lib/routes";
 import LinkButton from "@/components/ui/Loading/LinkButton";
@@ -52,21 +53,18 @@ function toQuery(grid: GridQueryParams, extra: Extra): TenantLedgerQuery {
 // sent a link to acknowledge it until they have.
 function ActionsCell({ row, tenantId, tenantMessaging }: { row: LedgerRow; tenantId: string; tenantMessaging: boolean }) {
   if (row.type === "charge" || !row.refId) return null;
+  const receiptHref = apiHref(
+    row.type === "payment"
+      ? apiPaths.dashboard.payments.receipt(row.refId)
+      : apiPaths.dashboard.adjustments.receipt(row.refId)
+  );
   return (
     <GridCell align="end">
       {row.type === "payment" ? <ProofsButton paymentId={row.refId} proofs={row.proofs ?? []} /> : null}
-      <Button
-        size="small"
-        startIcon={<DownloadRoundedIcon />}
-        href={apiHref(
-          row.type === "payment"
-            ? apiPaths.dashboard.payments.receipt(row.refId)
-            : apiPaths.dashboard.adjustments.receipt(row.refId)
-        )}
-        download
-      >
+      <Button size="small" startIcon={<DownloadRoundedIcon />} href={receiptHref} download>
         Receipt
       </Button>
+      <ShareReceiptButton href={receiptHref} receiptNo={row.receiptNo} />
       {row.type === "payment" && row.status === "confirmed" ? (
         <LinkButton size="small" href={routes.payments.adjust(row.refId)}>
           Adjust

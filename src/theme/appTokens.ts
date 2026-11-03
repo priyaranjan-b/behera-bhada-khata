@@ -22,6 +22,18 @@ export const lightSurfaces = {
 } as const;
 
 /**
+ * The browser and phone chrome around the app (`theme-color`, the installed
+ * app's splash screen): the header's paper colour per scheme, so the status
+ * bar runs into the header. `dark` is the dark scheme's paper,
+ * hsl(220, 30%, 7%) in themePrimitives.ts, as hex for older Android.
+ */
+export const appChrome = {
+  light: lightSurfaces.paper,
+  dark: "#0D1017",
+  splash: lightSurfaces.canvas,
+} as const;
+
+/**
  * Layered card shadows for `<AppCard>` (Card `variant="raised"`): a tight
  * contact shadow plus a soft, wide ambient one, so cards read as lifted off
  * the canvas. Dark mode adds a faint top highlight since black shadows barely

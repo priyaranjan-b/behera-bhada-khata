@@ -727,3 +727,26 @@ sparkline is the received series.
 card and ₹83,310 on the chart: every payment received that month paid
 earlier months' arrears. Both figures are useful, so we kept both and gave
 them different names.
+
+### A21 — Phone app: an installable web app (PWA) that caches nothing
+
+**Decision.** The app installs to the phone's home screen as a PWA instead
+of a separate native app. `src/app/manifest.ts` (icons from
+`scripts/generate-pwa-icons.mjs` into `public/icons/`), `viewport.themeColor`
+and `appleWebApp` in `app/layout.tsx`. `public/sw.js` handles only page
+loads: network first, and `public/offline.html` when there is no
+connection. It never caches pages, API responses or files.
+`ServiceWorkerRegistration` registers it in production builds only. The
+manifest, worker, offline page and icons are excluded from the proxy
+matcher, because the browser fetches them signed out. Phone extras:
+`ShareReceiptButton` in the Ledger hands the receipt PDF to the share
+sheet (WhatsApp). If the tap has expired while the PDF loads, it asks for
+one more tap. `FileAttachmentsField` shows "Take photo" (camera capture) on
+touch screens.
+
+**Why.** The layout was already built for phones, and a PWA keeps one
+codebase with instant updates. Native (React Native) would mean rebuilding
+every screen and adding bearer-token auth. Nothing is cached because rent
+figures must be live, and nothing of the owner's may remain on a shared
+phone after sign-out. A Play Store listing, if wanted, wraps this same PWA
+as a Trusted Web Activity.

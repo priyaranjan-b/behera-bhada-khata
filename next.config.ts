@@ -40,6 +40,15 @@ const nextConfig: NextConfig = {
       // site as a Referer.
       { source: "/confirm/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
       { source: "/api/confirm/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      // The service worker is checked for updates on every visit; never let a
+      // CDN or the browser serve an old copy of it.
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
     ];
   },
 };
