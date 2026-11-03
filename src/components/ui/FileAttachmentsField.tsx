@@ -6,7 +6,9 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import { formatBytes } from "@/lib/proofImages";
@@ -18,7 +20,9 @@ import Loader from "@/components/ui/Loading/Loader";
  * Section for attaching several files (photos, PDFs): a picker that also
  * takes drag-and-drop, then a removable list with image thumbnails. The
  * parent owns the list; `prepare` can transform each picked file first
- * (e.g. downscale a photo). Limits are shown and enforced on pick.
+ * (e.g. downscale a photo). Limits are shown and enforced on pick. On a
+ * touch screen, when photos are accepted, "Take photo" opens the camera
+ * straight away (the picked JPEG goes through the same checks).
  */
 export function FileAttachmentsField({
   title,
@@ -42,6 +46,10 @@ export function FileAttachmentsField({
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  // Phones and tablets; false on the server, so the first render matches.
+  const touch = useMediaQuery("(pointer: coarse)");
+  const camera = touch && accept.split(",").some((type) => type.startsWith("image/"));
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +91,12 @@ export function FileAttachmentsField({
     }
   }
 
+  function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = [...(e.target.files ?? [])];
+    e.target.value = "";
+    void add(picked);
+  }
+
   return (
     <SectionCard
       title={title}
@@ -114,31 +128,36 @@ export function FileAttachmentsField({
           bgcolor: dragging ? "action.hover" : "transparent",
         }}
       >
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          multiple
-          hidden
-          onChange={(e) => {
-            const picked = [...(e.target.files ?? [])];
-            e.target.value = "";
-            void add(picked);
-          }}
-        />
+        <input ref={inputRef} type="file" accept={accept} multiple hidden onChange={pick} />
+        {camera ? <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} /> : null}
         <Stack spacing={1} sx={{ alignItems: "center" }}>
-          <LoadingButton
-            variant="outlined"
-            startIcon={<AttachFileRoundedIcon />}
-            onClick={() => inputRef.current?.click()}
-            disabled={disabled || full}
-            loading={busy}
-          >
-            {full ? "Limit reached" : "Add photos or PDFs"}
-          </LoadingButton>
-          <Typography variant="caption" color="textSecondary">
-            or drop files here
-          </Typography>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", justifyContent: "center" }}>
+            {camera ? (
+              <LoadingButton
+                variant="outlined"
+                startIcon={<PhotoCameraRoundedIcon />}
+                onClick={() => cameraRef.current?.click()}
+                disabled={disabled || full}
+                loading={busy}
+              >
+                Take photo
+              </LoadingButton>
+            ) : null}
+            <LoadingButton
+              variant="outlined"
+              startIcon={<AttachFileRoundedIcon />}
+              onClick={() => inputRef.current?.click()}
+              disabled={disabled || full}
+              loading={busy}
+            >
+              {full ? "Limit reached" : "Add photos or PDFs"}
+            </LoadingButton>
+          </Stack>
+          {touch ? null : (
+            <Typography variant="caption" color="textSecondary">
+              or drop files here
+            </Typography>
+          )}
         </Stack>
       </Box>
 

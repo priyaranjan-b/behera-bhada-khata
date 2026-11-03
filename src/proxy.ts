@@ -17,6 +17,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Static files and app icons never need a session.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png).*)"],
+  // Static files, app icons and the installed-app files (manifest, service
+  // worker, offline page) never need a session: the browser fetches them on
+  // the login page too, and a redirect to /login would break install.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|sw.js|offline.html|icons/).*)",
+  ],
 };
