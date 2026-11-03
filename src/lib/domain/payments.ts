@@ -38,7 +38,7 @@ export function paymentModeLabel(mode: string): string {
 
 /** The Payments grid's sortable and filterable columns (queries/paymentsPage.ts). */
 export const PAYMENTS_SORT_FIELDS = ["paymentDate", "receiptNo", "tenantName", "mode", "amount"] as const;
-export const PAYMENTS_FILTER_FIELDS = ["paymentDate", "receiptNo", "tenantName", "mode", "monthsText", "note"] as const;
+export const PAYMENTS_FILTER_FIELDS = ["paymentDate", "receiptNo", "tenantName", "mode", "monthsText", "note", "tags"] as const;
 
 /** Days received, both included (yyyy-MM-dd). */
 export interface DayRange {

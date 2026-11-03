@@ -43,7 +43,9 @@ type FirstPage<P> =
 /**
  * State and handlers for a `DataTable` that pages, sorts, searches and
  * filters on the server (A15). Spread `gridProps` on the table; render the
- * table's own inputs from `extra` and change them with `setExtra`.
+ * table's own inputs from `extra` and change them with `setExtra`; call
+ * `reload` after a write changes the rows (a `router.refresh()` doesn't
+ * reach them: `initial` is read once).
  *
  * Without `initial` the table loads its first page itself on mount, showing
  * `empty` with the grid's skeleton rows meanwhile, so it can sit in a lazy
@@ -162,5 +164,8 @@ export function useServerGrid<P extends ServerGridPage, E extends object, Q exte
     [data.total, data.all, loading, view, onPaginationModelChange, onSortModelChange, onFilterModelChange]
   );
 
-  return { data, error, extra: view.extra, setExtra, gridProps };
+  /** Fetches the current view again, e.g. after a write changed its rows. */
+  const reload = useCallback(() => run(viewRef.current), [run]);
+
+  return { data, error, extra: view.extra, setExtra, reload, gridProps };
 }

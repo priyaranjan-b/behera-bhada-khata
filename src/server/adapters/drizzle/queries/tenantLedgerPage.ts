@@ -6,7 +6,7 @@ import type { TenantLedgerDbRow } from "@/lib/types";
 import type { DbPage, TenantLedgerFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
-import { dateLabel, labelOf, monthLabel } from "./text";
+import { dateLabel, labelOf, monthLabel, paymentTagsOf } from "./text";
 
 // Replaces tenant_ledger_page() (0020, A15, D28) and its tenant_ledger_rows
 // / tenant_ledger_matching (all dropped in 0029, D33): a tenant's rent charges, payments and
@@ -25,6 +25,7 @@ import { dateLabel, labelOf, monthLabel } from "./text";
 // are exact in Postgres and print at most two decimals, so JSON.parse gives
 // the same number Number() would (paymentsPage reads text only because it
 // adds the per-mode sums in JS, through round2).
+// A payment row carries its tags (0030, D34), searched with the rest.
 // The payment line keeps the SQL function's wording, raw mode included
 // ("Payment received (bank transfer)"); changing it is a separate change.
 
@@ -44,7 +45,8 @@ function ledgerRows(tenantId: string): SQL {
         'Rent due — ' || ${monthLabel(sql`r.period_month`)} as description,
         r.amount_due as debit, 0::numeric as credit,
         case when r.period_month < ${thisMonth}::date then 'billed' else 'upcoming' end as status,
-        null::uuid as ref_id, null::text as receipt_no, null::boolean as acknowledged, r.created_at as recorded_at
+        null::uuid as ref_id, null::text as receipt_no, null::boolean as acknowledged, r.created_at as recorded_at,
+        '[]'::json as tags, '' as tags_text
       from rent_periods r
       where r.tenant_id = ${tenantId}::uuid
       union all
@@ -52,8 +54,10 @@ function ledgerRows(tenantId: string): SQL {
         'Payment received (' || replace(p.mode, '_', ' ') || ')' || coalesce(' — ' || nullif(p.note, ''), ''),
         0, p.amount,
         case when p.status = 'confirmed' then 'confirmed' else 'pending' end,
-        p.id, p.receipt_no, p.acknowledged_at is not null, p.created_at
+        p.id, p.receipt_no, p.acknowledged_at is not null, p.created_at,
+        tags.names, tags.text
       from payments p
+      left join lateral (${paymentTagsOf(sql`p.id`)}) as tags on true
       where p.tenant_id = ${tenantId}::uuid
       union all
       select 'adjustment-' || a.id, 'adjustment', (coalesce(a.confirmed_at, a.created_at) at time zone ${APP_TIME_ZONE})::date,
@@ -61,7 +65,8 @@ function ledgerRows(tenantId: string): SQL {
         case when a.delta_amount < 0 then -a.delta_amount else 0 end,
         case when a.delta_amount > 0 then a.delta_amount else 0 end,
         case when a.status = 'confirmed' then 'confirmed' else 'pending' end,
-        a.id, a.receipt_no, a.acknowledged_at is not null, a.created_at
+        a.id, a.receipt_no, a.acknowledged_at is not null, a.created_at,
+        '[]'::json, ''
       from adjustments a
       where a.tenant_id = ${tenantId}::uuid
     ),
@@ -78,7 +83,7 @@ function ledgerRows(tenantId: string): SQL {
       sum(case when o.status in ('pending', 'upcoming') then 0 else o.debit - o.credit end) over (order by o.ord) as balance,
       o.status, ${labelOf(sql`o.status`, LEDGER_STATUS_LABELS, "")} as status_label,
       ${dateLabel(sql`o.date`)} as date_label,
-      o.ref_id, o.receipt_no, o.acknowledged, o.ord
+      o.ref_id, o.receipt_no, o.acknowledged, o.tags, o.tags_text, o.ord
     from ordered o`;
 }
 
@@ -99,7 +104,7 @@ const LEDGER_TABLE: GridTable<TenantLedgerFilter["sort"], TenantLedgerFilter["fi
     description: sql`r.description || ${NL} || r.caption`,
     status: sql`r.status_label`,
   },
-  searchText: sql`concat_ws(${NL}, r.date_label, r.description, r.caption, r.status_label)`,
+  searchText: sql`concat_ws(${NL}, r.date_label, r.description, r.caption, r.status_label, r.tags_text)`,
   tieBreak: [sql`r.ord desc`],
 };
 
@@ -130,7 +135,7 @@ export async function tenantLedgerPage(tx: Tx, filter: TenantLedgerFilter): Prom
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'type', o.type, 'date', o.date, 'description', o.description, 'caption', o.caption,
             'debit', o.debit, 'credit', o.credit, 'balance', o.balance, 'status', o.status,
-            'ref_id', o.ref_id, 'receipt_no', o.receipt_no, 'acknowledged', o.acknowledged
+            'ref_id', o.ref_id, 'receipt_no', o.receipt_no, 'acknowledged', o.acknowledged, 'tags', o.tags
           ) order by o.n), '[]'::json)
           from ordered o
           where o.n > shown.page * ${filter.pageSize} and o.n <= (shown.page + 1) * ${filter.pageSize}) as rows

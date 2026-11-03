@@ -115,3 +115,83 @@ describe("simple writes on Drizzle", () => {
     expect(await stranger.tenantDocuments.tenantIdsWithDocuments!()).toEqual([]);
   });
 });
+
+describe("payment tags on Drizzle (0030)", () => {
+  const tagsOf = async (paymentId: string) =>
+    (
+      await l.rows<{ name: string }>(
+        asService,
+        sql`select name from payment_record_tags where payment_id = ${paymentId}::uuid order by lower(name)`
+      )
+    ).map((r) => r.name);
+  const suggestions = async () => (await owner.paymentTags.list!()).map((t) => t.name);
+
+  let months: { id: string }[];
+  let n = 0;
+  /** A new payment through payments.create, with `tags`; its id. */
+  async function record(tags: string[], amount = 100) {
+    const id = `00000000-0000-4000-8000-${String(900 + ++n).padStart(12, "0")}`;
+    await owner.payments.create!(
+      {
+        id,
+        tenant_id: asha,
+        amount,
+        payment_date: "2026-01-10",
+        mode: "cash",
+        note: null,
+        owner_signature_path: "sig.png",
+        token_hash: `hash-${id}`,
+        token_expires_at: "2027-01-01T00:00:00Z",
+      },
+      [{ rent_period_id: months[0].id, amount }],
+      [],
+      tags
+    );
+    return id;
+  }
+
+  beforeAll(async () => {
+    await l.bill([asha], "2026-03-01");
+    months = await l.months(asha);
+  });
+
+  it("records a payment with its tags in one go; a new name joins the suggestions, a known one keeps its spelling", async () => {
+    const id = await record(["padma", "Ravi"]);
+    expect(await tagsOf(id)).toEqual(["Padma", "Ravi"]);
+    expect(await suggestions()).toEqual(["Malati", "Padma", "Priyaranjan", "RameshSutar", "Ravi", "Sankarshan"]);
+    expect((await owner.paymentTags.list!()).find((t) => t.name === "Padma")?.payment_count).toBe(1);
+  });
+
+  it("a payment the database refuses leaves no tags and no new suggestion", async () => {
+    // More than the month's rent: create_payment refuses it, so the whole transaction goes.
+    await expect(record(["Nobody"], 999_999)).rejects.toMatchObject({ status: 400 });
+    expect(await suggestions()).not.toContain("Nobody");
+    expect((await l.rows<{ c: number }>(asService, sql`select count(*)::int as c from payment_record_tags`))[0].c).toBe(2);
+  });
+
+  it("setTags adds and removes; the payment keeps its names when a suggestion is renamed or deleted", async () => {
+    const id = await record(["Malati"]);
+    expect(await owner.payments.setTags!(id, ["malati", "Sankarshan"])).toEqual(["Malati", "Sankarshan"]);
+    expect(await owner.payments.setTags!(id, ["Sankarshan"])).toEqual(["Sankarshan"]);
+
+    const sankarshan = (await owner.paymentTags.list!()).find((t) => t.name === "Sankarshan")!;
+    expect(await owner.paymentTags.update!(sankarshan.id, "Sankarshan B")).toBe(true);
+    expect(await tagsOf(id)).toEqual(["Sankarshan"]);
+    expect(await owner.paymentTags.remove!(sankarshan.id)).toBe(true);
+    expect(await tagsOf(id)).toEqual(["Sankarshan"]);
+    // Re-saving the payment doesn't bring the deleted suggestion back.
+    expect(await owner.payments.setTags!(id, ["Sankarshan", "Padma"])).toEqual(["Padma", "Sankarshan"]);
+    expect(await suggestions()).not.toContain("Sankarshan");
+    expect(await owner.payments.setTags!(id, [])).toEqual([]);
+  });
+
+  it("suggestions: a duplicate in any case is a 409; unknown payment null; another account changes nothing", async () => {
+    await expect(owner.paymentTags.create!("PADMA")).rejects.toMatchObject({ status: 409 });
+    expect(await owner.payments.setTags!("00000000-0000-4000-8000-000000000999", ["Padma"])).toBeNull();
+    const id = await record(["Padma"]);
+    expect(await stranger.payments.setTags!(id, [])).toBeNull();
+    expect(await tagsOf(id)).toEqual(["Padma"]);
+    expect(await stranger.paymentTags.list!()).toEqual([]);
+    await expect(stranger.paymentTags.create!("spam")).rejects.toMatchObject({ status: 403 });
+  });
+});

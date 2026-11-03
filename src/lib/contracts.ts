@@ -40,6 +40,8 @@ import type {
   ownerProfileSchema,
   paymentsQuerySchema,
   paymentNotePresetSchema,
+  paymentTagSchema,
+  setPaymentTagsSchema,
   updateTenantSchema,
 } from "@/lib/validation";
 
@@ -209,6 +211,8 @@ export interface PaymentListRow {
   note: string;
   /** The tenant signed for it. */
   acknowledged: boolean;
+  /** Its tags (0030), alphabetical. */
+  tags: string[];
 }
 
 /** Money per mode for every payment that matches the search and filters, whatever the page. */
@@ -307,6 +311,22 @@ export interface PaymentNotePresetView {
 
 export type UpdateOwnerProfileInput = z.input<typeof ownerProfileSchema>;
 export type PaymentNotePresetInput = z.input<typeof paymentNotePresetSchema>;
+
+/** A suggested payment tag (0030), managed on the Profile page. */
+export interface PaymentTagView {
+  id: string;
+  name: string;
+  /** How many payments carry the name; they keep it if it's renamed or deleted here. */
+  paymentCount: number;
+}
+
+export type PaymentTagInput = z.input<typeof paymentTagSchema>;
+export type SetPaymentTagsInput = z.input<typeof setPaymentTagsSchema>;
+
+/** A payment's tags after a change, alphabetical. */
+export interface PaymentTagsView {
+  tags: string[];
+}
 
 /** The signature a payment/adjustment form can use instead of drawing one. */
 export interface SavedSignature {
@@ -611,9 +631,11 @@ export interface NewPaymentForm {
   tenantMessaging: boolean;
   /** Quick-select notes from the Profile page, alphabetical; any other text is fine too. */
   noteSuggestions: string[];
+  /** Suggested tag names, alphabetical; a new one may be typed too. */
+  tagSuggestions: string[];
 }
 
-export type CreatePaymentInput = Omit<z.infer<typeof createPaymentSchema>, "tenantId">;
+export type CreatePaymentInput = Omit<z.input<typeof createPaymentSchema>, "tenantId">;
 
 // ---- /api/dashboard/payments & /api/dashboard/adjustments ------------------
 

@@ -32,6 +32,8 @@ export const apiPaths = {
     profilePassword: "/api/dashboard/profile/password",
     paymentNotes: "/api/dashboard/profile/payment-notes",
     paymentNote: (noteId: string) => `/api/dashboard/profile/payment-notes/${e(noteId)}`,
+    paymentTags: "/api/dashboard/profile/payment-tags",
+    paymentTag: (tagId: string) => `/api/dashboard/profile/payment-tags/${e(tagId)}`,
     properties: {
       list: "/api/dashboard/properties",
       new: "/api/dashboard/properties/new",
@@ -69,6 +71,8 @@ export const apiPaths = {
     payments: {
       list: "/api/dashboard/payments",
       paidDirect: "/api/dashboard/payments/paid-direct",
+      tagSuggestions: "/api/dashboard/payments/tags",
+      tags: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/tags`,
       adjust: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/adjust`,
       adjustments: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/adjustments`,
       resend: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/resend`,

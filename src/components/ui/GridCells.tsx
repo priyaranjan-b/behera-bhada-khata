@@ -49,3 +49,22 @@ export function UnitCell({ unitMix, unitCodes }: { unitMix: UnitMix | null; unit
     </GridCell>
   );
 }
+
+/** A row of tag pills; `action` (e.g. an edit button) goes after them. Empty: a dash. */
+export function TagsCell({ tags, action }: { tags: readonly string[]; action?: React.ReactNode }) {
+  return (
+    <GridCell spacing={0.5}>
+      {tags.length === 0 && !action ? (
+        <Typography variant="caption" color="textSecondary">
+          —
+        </Typography>
+      ) : null}
+      <Stack direction="row" spacing={0.5} sx={{ minWidth: 0, overflow: "hidden" }}>
+        {tags.map((t) => (
+          <TagPill key={t} label={t} />
+        ))}
+      </Stack>
+      {action}
+    </GridCell>
+  );
+}

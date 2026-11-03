@@ -308,6 +308,29 @@ export const paymentNotePresetSchema = z.object({
   text: z.string().trim().min(1, "Enter the note").max(PAYMENT_NOTE_LIMITS.maxLength),
 });
 
+/**
+ * Payment tags (0030, D34): the name's length (the table's check), how many
+ * one payment carries, and how many suggestions the Profile page keeps, so the list stays
+ * short enough to pick from.
+ */
+export const PAYMENT_TAG_LIMITS = { maxLength: 40, maxPerPayment: 10, maxTags: 50 } as const;
+
+export const paymentTagNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Enter the tag")
+  .max(PAYMENT_TAG_LIMITS.maxLength, `A tag is at most ${PAYMENT_TAG_LIMITS.maxLength} characters`);
+
+/** A payment's tags: names, one of each whatever the case (the first spelling wins). */
+export const paymentTagsSchema = z
+  .array(paymentTagNameSchema)
+  .max(PAYMENT_TAG_LIMITS.maxPerPayment, `At most ${PAYMENT_TAG_LIMITS.maxPerPayment} tags on a payment`)
+  .transform((names) => names.filter((n, i) => names.findIndex((m) => m.toLowerCase() === n.toLowerCase()) === i));
+
+export const paymentTagSchema = z.object({ name: paymentTagNameSchema });
+
+export const setPaymentTagsSchema = z.object({ tags: paymentTagsSchema });
+
 export const createPaymentSchema = z.object({
   tenantId: z.uuid(),
   amount: positiveMoneySchema,
@@ -315,6 +338,8 @@ export const createPaymentSchema = z.object({
   mode: z.enum(PAYMENT_MODES),
   note: optionalText(PAYMENT_NOTE_LIMITS.maxLength),
   allocations: z.array(paymentAllocationInputSchema).min(1, "Select at least one period").max(240),
+  /** Optional labels (0030); a new name joins the suggestions. */
+  tags: paymentTagsSchema.default([]),
   /** Drawn for this payment; omitted = the saved signature (owner_profile, 0013). */
   ownerSignaturePng: signaturePngSchema.optional(),
   /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */

@@ -1,19 +1,23 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Grid from "@mui/material/Grid";
+import IconButton from "@mui/material/IconButton";
 import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, {
   moneyColumn,
   SERVER_TEXT_OPERATORS,
+  tagsColumn,
   useServerGrid,
   type DataTableColDef,
 } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
+import { TagsCell } from "@/components/ui/GridCells";
 import StatCard from "@/components/ui/StatCard";
 import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
@@ -23,9 +27,12 @@ import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { paymentModeLabel, type DayRange } from "@/lib/domain/payments";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
+import EditPaymentTagsDialog from "@/components/domain/EditPaymentTagsDialog";
 import { PAYMENT_STAT_CELL } from "./paymentStatCell";
 
-const columns: DataTableColDef<PaymentListRow>[] = [
+const tagsOf = (row: PaymentListRow) => row.tags;
+
+const baseColumns: DataTableColDef<PaymentListRow>[] = [
   {
     field: "paymentDate",
     headerName: "Date received",
@@ -84,6 +91,30 @@ const columns: DataTableColDef<PaymentListRow>[] = [
   },
 ];
 
+/** The Tags column with an edit button per row, which opens the tag editor for that payment. */
+function columnsWithTags(onEdit: (row: PaymentListRow) => void): DataTableColDef<PaymentListRow>[] {
+  return [
+    ...baseColumns,
+    tagsColumn<PaymentListRow>("tags", "Tags", tagsOf, {
+      minWidth: 200,
+      renderCell: ({ row }) => (
+        <TagsCell
+          tags={row.tags}
+          action={
+            <IconButton
+              size="small"
+              aria-label={`Edit tags of receipt ${row.receiptNo ?? ""} for ${row.tenantName}`}
+              onClick={() => onEdit(row)}
+            >
+              <EditRoundedIcon fontSize="small" />
+            </IconButton>
+          }
+        />
+      ),
+    }),
+  ];
+}
+
 const DEFAULT_EXTRA = {};
 const DEFAULT_SORT: GridSortModel = [{ field: "paymentDate", sort: "desc" }];
 const getRowId = (row: PaymentListRow) => row.id;
@@ -103,15 +134,21 @@ export default function PaymentsView({
   range,
   rangeLabel,
   paidDirectCard,
+  tagSuggestions,
 }: {
   initial: PaymentsPage;
   range: DayRange;
   rangeLabel: string;
   paidDirectCard: React.ReactNode;
+  /** Suggested tag names for the tag editor (Profile page). */
+  tagSuggestions: string[];
 }) {
   const { from, to } = range;
+  const [editing, setEditing] = useState<PaymentListRow | null>(null);
+  const [suggestions, setSuggestions] = useState(tagSuggestions);
+  const columns = useMemo(() => columnsWithTags(setEditing), []);
   const load = useCallback((q: PaymentsPageQuery) => api.dashboard.payments.list({ from, to, ...q }), [from, to]);
-  const { data, error, gridProps } = useServerGrid({
+  const { data, error, reload, gridProps } = useServerGrid({
     initial,
     load,
     toQuery,
@@ -164,7 +201,7 @@ export default function PaymentsView({
         {...gridProps}
         columns={columns}
         getRowId={getRowId}
-        search={{ placeholder: "Search tenant, receipt, note…" }}
+        search={{ placeholder: "Search tenant, receipt, note, tag…" }}
         rowDensity="standard"
         noRowsLabel="No payments match."
         emptyState={
@@ -175,6 +212,22 @@ export default function PaymentsView({
           />
         }
       />
+      {editing ? (
+        <EditPaymentTagsDialog
+          key={editing.id}
+          payment={editing}
+          suggestions={suggestions}
+          onClose={() => setEditing(null)}
+          onSaved={(saved) => {
+            // A new name now shows among the suggestions, as on the server.
+            setSuggestions((known) => {
+              const added = saved.filter((t) => !known.some((k) => k.toLowerCase() === t.toLowerCase()));
+              return added.length > 0 ? [...known, ...added].sort((a, b) => a.localeCompare(b)) : known;
+            });
+            void reload();
+          }}
+        />
+      ) : null}
     </Stack>
   );
 }

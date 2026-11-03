@@ -26,6 +26,7 @@ import {
 import { recordEvent } from "./audit";
 import { checkProofFiles, storeProofs } from "./proofs";
 import { paymentNoteSuggestions } from "./paymentNotes";
+import { checkNewTags, paymentTagSuggestions } from "./paymentTags";
 import { ownerSignatureBytes, savedSignatureFor } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
 import { ensureRentPeriodsFor } from "./periods";
@@ -36,10 +37,11 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
   const tenant = await requireTenant(db, tenantId);
 
   await ensureRentPeriodsFor([tenantId]);
-  const [periods, savedSignature, noteSuggestions] = await Promise.all([
+  const [periods, savedSignature, noteSuggestions, tagSuggestions] = await Promise.all([
     db.rentPeriods.listForTenants([tenantId], { openOnly: true }),
     savedSignatureFor(db, ctx),
     paymentNoteSuggestions(db),
+    paymentTagSuggestions(db),
   ]);
 
   return {
@@ -54,6 +56,7 @@ export async function getNewPaymentForm(ctx: OwnerContext, tenantId: string): Pr
     savedSignature,
     tenantMessaging: tenantMessagingEnabled(),
     noteSuggestions,
+    tagSuggestions,
   };
 }
 
@@ -68,6 +71,7 @@ export async function createPayment(
   const proofFiles = checkProofFiles(proofs);
   const db = await ownerDb();
   const tenant = await requireTenant(db, tenantId);
+  await checkNewTags(db, input.tags);
 
   const signature = await ownerSignatureBytes(db, input.ownerSignaturePng);
   const { id, ownerSignaturePath } = await storeOwnerSignature("payments", tenant, signature);
@@ -93,7 +97,8 @@ export async function createPayment(
         token_expires_at: expiresAt,
       },
       input.allocations.map((a) => ({ rent_period_id: a.rentPeriodId, amount: a.amountAllocated })),
-      proofRows
+      proofRows,
+      input.tags
     )
   );
 

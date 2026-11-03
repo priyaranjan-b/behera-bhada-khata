@@ -19,6 +19,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const range = dayRangeFromParams(await searchParams, PAYMENTS_LIMITS.maxDays);
   const grid = serverApi.dashboard.payments.list(range);
   const paidDirect = serverApi.dashboard.payments.paidDirect(range);
+  const tagSuggestions = serverApi.dashboard.payments.tagSuggestions();
   const rangeLabel = dayRangeLabel(range);
   const view = `${range.from}-${range.to}`;
 
@@ -43,6 +44,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           grid={grid}
           range={range}
           rangeLabel={rangeLabel}
+          tagSuggestions={tagSuggestions}
           paidDirectCard={
             <AsyncSection key={view} title="Govt paid direct" fallback={SKELETON.stat}>
               <PaidDirectStat paidDirect={paidDirect} />

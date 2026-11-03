@@ -154,6 +154,20 @@ export interface Database {
         Update: { text?: string };
         Relationships: [];
       };
+      /** Suggested payment tags (0030, D34), managed on the Profile page. */
+      payment_tags: {
+        Row: { id: string; name: string; created_at: string; updated_at: string };
+        Insert: { name: string };
+        Update: { name?: string };
+        Relationships: [];
+      };
+      /** The tags on a payment, each a copy of the name (0030); inserted and deleted, never updated. */
+      payment_record_tags: {
+        Row: { payment_id: string; name: string; created_at: string };
+        Insert: { payment_id: string; name: string };
+        Update: never;
+        Relationships: [];
+      };
       locations: {
         Row: {
           location_code: string;
@@ -694,7 +708,7 @@ export interface BillingDbRow {
 
 /** The Payments page query (paymentsPage; was payments_page, 0026): the columns it sorts and matches by. */
 export type PaymentsSortColumn = "payment_date" | "receipt_no" | "tenant_name" | "mode" | "amount";
-export type PaymentsFilterColumn = "date" | "receipt" | "tenant" | "mode" | "months" | "note";
+export type PaymentsFilterColumn = "date" | "receipt" | "tenant" | "mode" | "months" | "note" | "tags";
 
 /** A row of the Payments page query (was payments_page, 0026): one confirmed payment. */
 export interface PaymentsDbRow {
@@ -710,6 +724,8 @@ export interface PaymentsDbRow {
   months_text: string;
   note: string;
   acknowledged: boolean;
+  /** Its tags' names (0030), alphabetical. */
+  tags: string[];
 }
 
 /** The Payments page totals (was payments_page, 0026): every matching row, whatever the page. */
@@ -755,6 +771,8 @@ export interface TenantLedgerDbRow {
   ref_id: string | null;
   receipt_no: string | null;
   acknowledged: boolean | null;
+  /** A payment's tags (0030), alphabetical; [] for other rows. */
+  tags: string[];
 }
 
 /** The text columns the history query searches and filters (auditHistoryPage; was audit_history_page, 0018); tenant_name is read from tenants. */
@@ -762,6 +780,7 @@ export type AuditTextColumn = "actor_name" | "title" | "tenant_name" | "unit_cod
 
 export type OwnerProfile = Database["public"]["Tables"]["owner_profile"]["Row"];
 export type PaymentNotePreset = Database["public"]["Tables"]["payment_note_presets"]["Row"];
+export type PaymentTag = Database["public"]["Tables"]["payment_tags"]["Row"];
 export type Location = Database["public"]["Tables"]["locations"]["Row"];
 export type Property = Database["public"]["Tables"]["properties"]["Row"];
 export type Unit = Database["public"]["Tables"]["units"]["Row"];

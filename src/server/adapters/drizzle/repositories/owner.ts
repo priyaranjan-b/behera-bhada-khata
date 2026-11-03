@@ -49,6 +49,7 @@ import {
   saveOwnerProfile,
   updatePaymentNotePreset,
 } from "../tables/owner";
+import { createPaymentTag, listPaymentTags, removePaymentTag, setPaymentTags, updatePaymentTag } from "../tables/paymentTags";
 import { createProperty, createUnit, getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
 import { getTenant, listRentRates, listTenants } from "../tables/tenants";
 
@@ -105,6 +106,12 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       create: (text) => write("add payment note preset", (tx) => createPaymentNotePreset(tx, text)),
       update: (id, text) => write(`edit payment note preset ${id}`, (tx) => updatePaymentNotePreset(tx, id, text)),
       remove: (id) => write(`delete payment note preset ${id}`, (tx) => removePaymentNotePreset(tx, id)),
+    },
+    paymentTags: {
+      list: () => read("list payment tags", listPaymentTags),
+      create: (name) => write("add payment tag", (tx) => createPaymentTag(tx, name)),
+      update: (id, name) => write(`rename payment tag ${id}`, (tx) => updatePaymentTag(tx, id, name)),
+      remove: (id) => write(`delete payment tag ${id}`, (tx) => removePaymentTag(tx, id)),
     },
     locations: {
       list: () => read("list locations", listLocations),
@@ -178,10 +185,11 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       listProofs: (ids) => read(`list proofs of ${ids.length} payments`, (tx) => listPaymentProofs(tx, ids)),
       getProof: (id) => read(`get payment proof ${id}`, (tx) => getPaymentProof(tx, id)),
       page: (filter) => read(`read payments page ${pageLabel(filter)}`, (tx) => paymentsPage(tx, filter)),
-      create: (payment, allocations, proofs) =>
+      create: (payment, allocations, proofs, tags) =>
         write(`create payment ${payment.id} for tenant ${payment.tenant_id}`, (tx) =>
-          createPayment(tx, payment, allocations, proofs)
+          createPayment(tx, payment, allocations, proofs, tags)
         ),
+      setTags: (id, names) => write(`set tags of payment ${id}`, (tx) => setPaymentTags(tx, id, names)),
       rotateToken: (id, tokenHash, expiresAt) =>
         write(`rotate payment link ${id}`, (tx) => rotateToken(tx, "payment", id, tokenHash, expiresAt)),
     },

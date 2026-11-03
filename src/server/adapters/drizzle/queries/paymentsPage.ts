@@ -8,9 +8,10 @@ import { PAYMENTS_LIMITS } from "@/lib/validation";
 import type { DbPage, PaymentsFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
-import { dateLabel, labelOf, monthLabel, tenantDisplayName, towersNow } from "./text";
+import { dateLabel, labelOf, monthLabel, paymentTagsOf, tenantDisplayName, towersNow } from "./text";
 
-// Replaces payments_page() (0026, A18) and its payments_rows /
+// Replaces payments_page() (0026, A18), plus each payment's tags (0030, D34,
+// searched and filtered like the rest of the text) and its payments_rows /
 // payments_matching / payment_mode_label (all dropped in 0029, D33): every tenant's confirmed payments
 // by the day received, one page, with the money per mode of every row that
 // passes the search and filters (the stat cards follow the table). Runs
@@ -27,7 +28,7 @@ function paymentRows(from: string, to: string): SQL {
       ${towersNow(sql`p.tenant_id`, todayKey())} as property_name,
       p.mode, ${labelOf(sql`p.mode`, PAYMENT_MODE_LABELS, PAYMENT_MODE_LABELS.other)} as mode_label,
       p.amount, coalesce(months.text, '') as months_text, coalesce(p.note, '') as note,
-      p.acknowledged_at is not null as acknowledged
+      p.acknowledged_at is not null as acknowledged, tags.names as tags, tags.text as tags_text
     from payments p
     left join tenants t on t.id = p.tenant_id
     left join lateral (
@@ -36,6 +37,7 @@ function paymentRows(from: string, to: string): SQL {
       join rent_periods r on r.id = pa.rent_period_id
       where pa.payment_id = p.id
     ) as months on true
+    left join lateral (${paymentTagsOf(sql`p.id`)}) as tags on true
     where p.status = 'confirmed' and p.payment_date between ${from}::date and ${to}::date`;
 }
 
@@ -57,8 +59,11 @@ const PAYMENTS_TABLE: GridTable<PaymentsFilter["sort"], PaymentsFilter["filters"
     mode: sql`r.mode_label`,
     months: sql`r.months_text`,
     note: sql`r.note`,
+    // Name by name, not the joined text: "equals Padma" finds a payment tagged Malati and Padma, and no
+    // filter matches across the ", " between two names.
+    tags: { text: sql`r.tags_text`, values: sql`json_array_elements_text(r.tags)` },
   },
-  searchText: sql`concat_ws(${NL}, r.date_label, r.receipt_no, r.tenant_name, r.property_name, r.mode_label, r.months_text, r.note)`,
+  searchText: sql`concat_ws(${NL}, r.date_label, r.receipt_no, r.tenant_name, r.property_name, r.mode_label, r.months_text, r.note, r.tags_text)`,
   tieBreak: [sql`r.payment_date desc`, sql`r.receipt_no desc`, sql`r.id`],
 };
 
@@ -104,7 +109,7 @@ export async function paymentsPage(
             'id', o.id, 'receipt_no', o.receipt_no, 'payment_date', to_char(o.payment_date, 'YYYY-MM-DD'),
             'tenant_id', o.tenant_id, 'tenant_name', o.tenant_name, 'property_name', o.property_name,
             'mode', o.mode, 'amount', o.amount::text, 'months_text', o.months_text, 'note', o.note,
-            'acknowledged', o.acknowledged
+            'acknowledged', o.acknowledged, 'tags', o.tags
           ) order by o.n), '[]'::json)
           from ordered o
           where o.n > shown.page * ${filter.pageSize} and o.n <= (shown.page + 1) * ${filter.pageSize}) as rows

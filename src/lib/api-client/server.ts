@@ -30,6 +30,7 @@ import {
   listPropertyTenants,
 } from "@/server/services/properties";
 import { listPaymentNotePresets } from "@/server/services/paymentNotes";
+import { getPaymentTagSuggestions, listPaymentTags } from "@/server/services/paymentTags";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getPaymentsPage, getPaymentsPaidDirect } from "@/server/services/paymentsReport";
 import { getSearchIndex } from "@/server/services/search";
@@ -76,6 +77,7 @@ const inProcessApi: ApiQueries = {
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),
     paymentNotes: async () => listPaymentNotePresets(await owner()),
+    paymentTags: async () => listPaymentTags(await owner()),
     properties: {
       list: async () => listProperties(await owner()),
       newForm: async () => getNewPropertyForm(await owner()),
@@ -106,6 +108,7 @@ const inProcessApi: ApiQueries = {
       list: async (query) => getPaymentsPage(await owner(), query),
       paidDirect: async (query) => getPaymentsPaidDirect(await owner(), query),
       adjust: async (id) => getAdjustPaymentForm(await owner(), id),
+      tagSuggestions: async () => getPaymentTagSuggestions(await owner()),
     },
   },
   confirm: {

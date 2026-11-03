@@ -60,6 +60,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0026_payments_page.sql` | `payments_page()`: every payment by day received, paged in SQL with totals per mode (A18); `payment_mode_label()`; index `payments (payment_date)` |
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 | `0029_drop_replaced_functions.sql` | drops the 30 functions the Drizzle adapter replaced: the `…_page()` functions of 0018-0026, their grid and label helpers, `tenant_account_summary()`, `hit_rate_limit()` / `prune_rate_limits()` (D33). The indexes they used stay |
+| `0030_payment_tags.sql` | `payment_tags` (suggested tags, managed on /profile) and `payment_record_tags` (each payment's own copy of its tag names, editable on /payments) (D34) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -914,6 +915,44 @@ callable functions that nothing needs. Switching the parity tests to fixed
 values instead was rejected: their data is dated relative to today, and
 ties sort by random uuids, so fixed values would drift with the calendar
 and flake.
+
+### D34 — Payment tags: each payment keeps its own copy of the names
+
+**Decision (0030).** The owner labels payments with tags, starting with who
+collected the money. Two tables, both plain owner writes under RLS with
+`is_app_owner()` (D5):
+- **`payment_tags`** (uuid, `name`, unique on `lower(name)`) holds the
+  **suggestions** offered under Tags on Record payment and in the Payments
+  page's tag editor, seeded with the five people who collect rent and
+  managed on /profile. A name typed on a payment that isn't there yet joins
+  it.
+- **`payment_record_tags`** (`payment_id`, `name`; one of each name per
+  payment whatever the case) holds the tags a payment carries, each **its
+  own copy of the name**, as a payment copies its note (D30). There is no
+  foreign key to `payment_tags`: renaming or deleting a suggestion never
+  changes a payment, so "Padma" stays on what Padma collected. Rows are
+  inserted and deleted, never updated (UPDATE revoked).
+- **Not on `payments`:** the ledger stays append-only (D4) and
+  `create_payment` is unchanged. The adapter writes a new payment's tags in
+  the same transaction as `create_payment` (`procedures/ledger.ts`), so a
+  refused payment leaves none; editing them later is
+  `payments.setTags` (`tables/paymentTags.ts`). A name new to the payment
+  takes a suggestion's spelling; one it already has stays as it is, so
+  re-saving it never brings back a deleted suggestion.
+- **No audit trigger** on either table: a tag never moves money (the owner's
+  choice, like D30).
+- **Read:** `paymentTagsOf` (`queries/text.ts`) in the Payments and tenant
+  Ledger queries; the names are part of the searched text and the Payments
+  grid's `tags` filter. The parity tests leave `tags` out when comparing with
+  the frozen functions (D33), which predate it.
+- **Limits:** `PAYMENT_TAG_LIMITS` (40 characters, 10 per payment, 50
+  suggestions).
+
+**Why.** Tags record who received cash, so changing the list must not
+quietly rewrite who collected an old payment. A comma-separated or array
+column on `payments` was rejected: it would open an UPDATE on the ledger
+table and fire its audit trigger for a label. Comma-separated text would
+also match "Padma" inside "Padmavati" and couldn't keep one of each.
 
 ---
 

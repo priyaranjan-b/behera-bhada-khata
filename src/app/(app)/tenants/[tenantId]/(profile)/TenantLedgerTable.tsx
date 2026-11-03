@@ -12,7 +12,7 @@ import type { TenantLedgerQuery, TenantLedgerView } from "@/lib/contracts";
 import { formatDateKey, monthDayRange } from "@/lib/dates";
 import { statusLabel } from "@/lib/domain/status";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
-import DataTable, { moneyColumn, SERVER_TEXT_OPERATORS, useServerGrid, type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, SERVER_TEXT_OPERATORS, tagsColumn, useServerGrid, type DataTableColDef } from "@/components/ui/DataTable";
 import { DateField, GridCell, MonthField } from "@/components/ui";
 import { StatusChip } from "@/components/domain/StatusChip";
 import ResendButton from "@/components/domain/ResendButton";
@@ -78,6 +78,8 @@ function ActionsCell({ row, tenantId, tenantMessaging }: { row: LedgerRow; tenan
     </GridCell>
   );
 }
+
+const ledgerTagsOf = (row: LedgerRow) => row.tags ?? [];
 
 function blankZero(value: number | null | undefined) {
   return value ? value : null;
@@ -150,6 +152,8 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
       moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false }),
       moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero, filterable: false }),
       moneyColumn<LedgerRow>("balance", "Balance", { filterable: false }),
+      // Searched, not filtered: the ledger query has no tag filter field.
+      tagsColumn<LedgerRow>("tags", "Tags", ledgerTagsOf, { filterable: false }),
       {
         field: "actions",
         headerName: "Actions",

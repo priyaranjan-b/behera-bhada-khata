@@ -23,6 +23,7 @@ import type {
   Location,
   OwnerProfile,
   PaymentNotePreset,
+  PaymentTag,
   PaymentsDbRow,
   PaymentsFilterColumn,
   PaymentsSortColumn,
@@ -283,6 +284,20 @@ export interface OwnerRepositories {
     /** False if no such note. */
     remove(id: string): Promise<boolean>;
   };
+  /**
+   * Suggested payment tags (0030, D34). Duplicates (any case) are a 409.
+   * Payments keep their own copy of each name, so renaming or removing one
+   * never changes a payment.
+   */
+  paymentTags: {
+    /** Alphabetical (any case), with how many payments carry the name. */
+    list(): Promise<(PaymentTag & { payment_count: number })[]>;
+    create(name: string): Promise<void>;
+    /** False if no such tag. */
+    update(id: string, name: string): Promise<boolean>;
+    /** False if no such tag. */
+    remove(id: string): Promise<boolean>;
+  };
   locations: {
     /** By code. */
     list(): Promise<Location[]>;
@@ -387,7 +402,13 @@ export interface OwnerRepositories {
      * another tenant, or exceed what's still owed on a period, and proofs
      * stored outside the payment's own folder.
      */
-    create(payment: NewPayment, allocations: NewAllocation[], proofs?: NewPaymentProof[]): Promise<void>;
+    create(payment: NewPayment, allocations: NewAllocation[], proofs?: NewPaymentProof[], tags?: string[]): Promise<void>;
+    /**
+     * Makes `names` the payment's tags (0030), stored on the payment: a name
+     * new to it takes a suggestion's spelling (any case) or joins the
+     * suggestions. Its tags after, alphabetical; null if no such payment.
+     */
+    setTags(paymentId: string, names: string[]): Promise<string[] | null>;
     listAllocations(paymentId: string): Promise<PaymentAllocation[]>;
     /** What each payment put towards these rent months (the Billing page's receipts per month). */
     listAllocationsForPeriods(periodIds: string[]): Promise<PaymentAllocation[]>;
