@@ -34,6 +34,7 @@ export default function StatCard({
   title,
   value,
   caption,
+  note,
   badge,
   sparkline,
   href,
@@ -41,6 +42,8 @@ export default function StatCard({
   title: string;
   value: string;
   caption?: string;
+  /** A second caption line, e.g. a related figure that differs from `value`. */
+  note?: string;
   badge?: { label: string; tone: BadgeTone };
   // `format` is a key, not a function, because Server Components render this.
   sparkline?: { data: number[]; labels: string[]; trend: Trend; format?: "money" };
@@ -75,6 +78,11 @@ export default function StatCard({
             {caption && (
               <Typography variant="caption" color="textSecondary">
                 {caption}
+              </Typography>
+            )}
+            {note && (
+              <Typography variant="caption" color="textSecondary">
+                {note}
               </Typography>
             )}
           </Stack>

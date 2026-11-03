@@ -64,11 +64,11 @@ export default function BillingCollectionChart({
               {formatMoney(totalCollected)}
             </Typography>
             {rate !== null && (
-              <StatusBadge tone={collectionRateTone(rate)} label={`${rate}% collected`} />
+              <StatusBadge tone={collectionRateTone(rate)} label={`${rate}% received`} />
             )}
           </Stack>
           <Typography variant="caption" color="textSecondary">
-            Cash collected vs. billed, last {data.length} months
+            Cash received (by payment date) vs. billed, last {data.length} months
           </Typography>
         </Stack>
 
@@ -78,7 +78,7 @@ export default function BillingCollectionChart({
               <TableRow>
                 <TableCell>Month</TableCell>
                 <TableCell align="right">Billed</TableCell>
-                <TableCell align="right">Collected</TableCell>
+                <TableCell align="right">Received</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -98,7 +98,7 @@ export default function BillingCollectionChart({
             yAxis={[{ width: 56, valueFormatter: (v: number) => compact.format(v) }]}
             series={[
               { id: "billed", label: "Billed", data: data.map((d) => d.billed), color: palette.primary.main, valueFormatter: (v) => formatMoney(v ?? 0) },
-              { id: "collected", label: "Collected", data: data.map((d) => d.collected), color: palette.success.main, valueFormatter: (v) => formatMoney(v ?? 0) },
+              { id: "collected", label: "Received", data: data.map((d) => d.collected), color: palette.success.main, valueFormatter: (v) => formatMoney(v ?? 0) },
             ]}
             height={260}
             margin={{ left: 0, right: 0, top: 20, bottom: 0 }}

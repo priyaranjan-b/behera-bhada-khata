@@ -76,7 +76,8 @@ test instead.
   limit, client IP from the last `x-forwarded-for` hop, statement timeouts
   (A17), the Payments page: payments by day received, cards that
   follow the table (A18), and the Drizzle adapter: which SQL functions
-  move to TS and which stay in Postgres (A19). Read it before changing
+  move to TS and which stay in Postgres (A19), and the Overview's
+  "Collected" (per rent month) vs the chart's "Received" (cash, A20). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 

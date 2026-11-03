@@ -713,3 +713,17 @@ PostgREST RPCs, without losing the integrity the ledger functions and RLS
 give. Moving the money writes into app code would mean granting the app's
 role writes on the ledger, and taking several round trips where one does
 today.
+
+### A20 — Overview: "Collected" is per rent month, "Received" is cash
+
+**Decision.** The Overview's Collected card is what was credited to the
+selected month's rent (`buildMonthlyReport`, `amount_allocated`), so it pairs
+with Expected. The Billing vs collection chart is cash received in each month
+by payment date (`buildBillingCollectionTrend`) and is labelled "Received".
+The card shows the month's received amount on a second line, and its
+sparkline is the received series.
+
+**Why.** Both were labelled "Collected", so October 2026 read as ₹0 on the
+card and ₹83,310 on the chart: every payment received that month paid
+earlier months' arrears. Both figures are useful, so we kept both and gave
+them different names.

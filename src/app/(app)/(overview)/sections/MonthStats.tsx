@@ -36,6 +36,9 @@ export default async function MonthStats({
   const monthBilling = routes.billing({ from: yearMonthOf(monthKey), to: yearMonthOf(monthKey) });
   const collectionRate = report.expected > 0 ? Math.round((report.collected / report.expected) * 100) : null;
   const activeTenants = report.rows.length;
+  // "Collected" is what was credited to this month's rent; the chart's bars are
+  // cash received in the month, which differs whenever arrears are paid (A20).
+  const received = points.find((p) => p.monthKey === yearMonthOf(monthKey))?.collected;
 
   return (
     <>
@@ -53,7 +56,8 @@ export default async function MonthStats({
         <StatCard
           title="Collected"
           value={formatMoney(report.collected)}
-          caption={`Allocated to ${monthLabel}`}
+          caption={`For ${monthLabel}'s rent`}
+          note={received === undefined ? undefined : `${formatMoney(received)} received in the month`}
           badge={
             collectionRate === null
               ? undefined
