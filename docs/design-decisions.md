@@ -501,8 +501,9 @@ sharing a row below (`ActionStack phone="primaryOnTop"`).
   several cells exports `<Name>Skeleton` from its own file (e.g.
   `AccountStatsSkeleton`), built from the kit primitives in `Skeletons.tsx`.
   The page's fallback and the `(profile)/loading.tsx` both use it.
-- The account read returns figures, not rows: one SQL aggregate,
-  `tenant_account_summary` (0022, D29), gives the balance, the ended and
+- The account read returns figures, not rows: one aggregate statement,
+  `queries/tenantAccountSummary.ts` (A19; was `tenant_account_summary`,
+  0022, D29, dropped in 0029), gives the balance, the ended and
   paid month counts and whether tracking can stop. The page no longer reads
   any tenant's full months, payments or adjustments; those are in their
   tabs, one page at a time.
@@ -621,7 +622,12 @@ Services, routes, contracts and the UI didn't change.
   deleted, `DATA_ADAPTER` with them, and `DATABASE_URL` is required. A
   rollback is now a revert of that commit. `ownerDb()` with no session is a
   401 (it used to fall back to the Supabase session client, which saw
-  nothing). The replaced SQL functions are dropped by a later migration.
+  nothing).
+- **The replaced SQL functions are dropped** (0029, D33): 30 functions the
+  app no longer calls. Their rollback script
+  (`supabase/rollback/0029_restore_replaced_functions.sql`) is also the parity tests'
+  frozen oracle. Run 0029 only once no older deployment can
+  serve traffic again.
 - **Server-paged tables (`grid/`).** One builder turns the grid query
   (search words, text filters, and / or, sort, page) into the where and
   order by, replacing `grid_words`, `grid_check`, `grid_active_filters`,
@@ -683,10 +689,12 @@ Services, routes, contracts and the UI didn't change.
   and nullability against a migrated PGlite. `drizzle.config.ts` is for
   `drizzle-kit pull`/`check` only, never `push`/`migrate`.
 - **Each moved method has a parity test:** on PGlite, its result must equal
-  the SQL function it replaces. The SQL function stays while the test uses
-  it as its oracle, and while a deployed older release may still call it.
-  It is dropped by a later migration, with the parity test switched to
-  fixed expected values.
+  the SQL function it replaces. 0029 dropped those functions from the
+  database; a frozen copy, loaded only into test databases, stays the
+  oracle (D33). Fixed expected values were the plan, but the test data is
+  dated relative to today and ties sort by random uuids, so they would
+  drift and flake. A case gets fixed values when its rules change on
+  purpose.
 - **Connection.** `DATABASE_URL` is Supabase's shared pooler in transaction
   mode (port 6543, IPv4, the serverless option), logged in as
   `app_drizzle.<project-ref>` (0027, D32): a role that can do nothing until

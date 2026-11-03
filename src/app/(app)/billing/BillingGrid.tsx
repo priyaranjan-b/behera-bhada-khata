@@ -123,8 +123,8 @@ const toQuery = (grid: GridQueryParams, extra: Extra): BillingPageQuery => ({ ..
 
 /**
  * Every tenant's rent for each month in the range, with what paid it - one
- * page at a time: paging, sort, search and "Show" run in SQL (billing_page,
- * A15). The range and the paid-direct view come from the page.
+ * page at a time: paging, sort, search and "Show" run in the database
+ * (A15). The range and the paid-direct view come from the page.
  */
 export default function BillingGrid({
   initial,

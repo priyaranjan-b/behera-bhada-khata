@@ -21,7 +21,7 @@ let asha: string;
 let bimal: string;
 
 beforeAll(async () => {
-  l = await createLedgerDb();
+  l = await createLedgerDb({ oracles: true });
   asha = await l.createTenant({ name: "Asha", rent: 5000, leaseStart: month(-3), units: ["AC-T1-G01"] });
   bimal = await l.createTenant({ name: "Bimal", rent: 4000, leaseStart: month(-1), units: ["AC-T1-G02"] });
   await l.bill([asha, bimal], billedThroughMonth());

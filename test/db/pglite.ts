@@ -35,12 +35,27 @@ export const SUPABASE_STUBS = `
   );
 `;
 
-/** A fresh PGlite with the Supabase stubs and every migration, in order. */
-export async function createMigratedDb(): Promise<PGlite> {
+/**
+ * A fresh PGlite with the Supabase stubs and every migration, in order;
+ * `through` ("0028") stops after that one, to compare with an earlier state.
+ */
+export async function createMigratedDb(opts: { through?: string } = {}): Promise<PGlite> {
   const db = new PGlite({ extensions: { btree_gist } });
   await db.exec(SUPABASE_STUBS);
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort()) {
+  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
+  for (const file of files.filter((f) => !opts.through || f.slice(0, 4) <= opts.through)) {
     await db.exec(readFileSync(path.join(MIGRATIONS, file), "utf8"));
   }
   return db;
+}
+
+/** 0029's rollback: the 30 functions it dropped, frozen as 0028 left them (D33). */
+export const ORACLES = path.resolve(__dirname, "../../supabase/rollback/0029_restore_replaced_functions.sql");
+
+/**
+ * Loads the SQL functions 0029 dropped (its rollback script) into a test
+ * database, as reference answers for the parity and fixed-value tests.
+ */
+export async function loadOracles(db: PGlite): Promise<void> {
+  await db.exec(readFileSync(ORACLES, "utf8"));
 }

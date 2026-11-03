@@ -7,7 +7,7 @@ import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
 
 // Replaces audit_history_page() (0018, A14) and its audit_matches /
-// audit_field / audit_text_matches: one page of the audit log, the whole
+// audit_field / audit_text_matches (all dropped in 0029, D33): one page of the audit log, the whole
 // log (Activity) or one tenant's (Change history), with the stored text
 // (D27) as written; nothing is rebuilt. The tenant's name is read from
 // tenants, so it is the current one. Days are APP_TIME_ZONE days. One

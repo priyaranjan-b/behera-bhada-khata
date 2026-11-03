@@ -7,7 +7,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { executeRows, inScope, type Db, type Scope } from "@/server/adapters/drizzle/client";
 import * as schema from "@/server/adapters/drizzle/schema";
-import { createMigratedDb } from "../../db/pglite";
+import { createMigratedDb, loadOracles } from "../../db/pglite";
 
 export const OWNER = "00000000-0000-4000-8000-00000000000a";
 export const STRANGER = "00000000-0000-4000-8000-00000000000b";
@@ -43,8 +43,15 @@ export interface LedgerDb {
   close(): Promise<void>;
 }
 
-export async function createLedgerDb(): Promise<LedgerDb> {
+/**
+ * A migrated PGlite with an owner, a stranger, one site and tower and its
+ * houses. `oracles`: also load the SQL functions 0029 dropped
+ * (0029's rollback script), for a parity test to compare with; every other
+ * test runs on the schema as migrated.
+ */
+export async function createLedgerDb(opts: { oracles?: boolean } = {}): Promise<LedgerDb> {
   const pg = await createMigratedDb();
+  if (opts.oracles) await loadOracles(pg);
   await pg.exec(`
     insert into auth.users (id, email) values ('${OWNER}', 'a@example.com'), ('${STRANGER}', 'b@example.com');
     insert into app_owner (user_id) values ('${OWNER}');

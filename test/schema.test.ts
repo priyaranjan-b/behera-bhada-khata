@@ -22,7 +22,7 @@ import {
 } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import { AUDIT_ACTIONS } from "@/lib/types";
-import { MIGRATIONS, createMigratedDb } from "./db/pglite";
+import { MIGRATIONS, ORACLES, createMigratedDb, loadOracles } from "./db/pglite";
 
 const SEED = path.resolve(__dirname, "../supabase/seed/arnapal_master_data.sql");
 const TENANT_SEED = path.resolve(__dirname, "../supabase/seed/arnapal_tenants.sql");
@@ -133,6 +133,11 @@ async function allocated(periodId: string): Promise<number> {
 
 beforeAll(async () => {
   db = await createMigratedDb();
+  // The functions 0029 dropped, frozen in its rollback script: the fixed-value
+  // cases below for the paged tables, the account figures and the rate limit
+  // pin what they answer, and the Drizzle parity tests pin the TS queries to
+  // them. The 0029 case checks a database without them.
+  await loadOracles(db);
 });
 
 afterAll(async () => {
@@ -2301,5 +2306,95 @@ describe("payments_page (0026)", () => {
     expect(await errorCode(payments({ from: "2024-01-01", to: "2026-03-31" }))).toBe("BBK00");
     expect(await payments({}, owner(OWNER_B))).toMatchObject({ rows: [], total: 0, all: 0 });
     expect(await errorCode(payments({}, { role: "anon" } as unknown as Role))).toBe("42501");
+  });
+});
+
+describe("dropping the replaced functions (0029)", () => {
+  /** The functions the Drizzle adapter replaced (A19): 0029 drops them all. */
+  const DROPPED = [
+    "payments_page", "payments_matching", "payments_rows",
+    "billing_page", "billing_totals", "billing_matching", "billing_rows",
+    "tenant_ledger_page", "tenant_ledger_matching", "tenant_ledger_rows",
+    "tenant_months_page", "tenant_months_matching", "tenant_month_rows",
+    "audit_history_page", "audit_matches", "audit_field",
+    "grid_check", "grid_row_matches", "grid_words", "grid_active_filters",
+    "audit_text_matches", "like_escape", "period_display_status", "status_label", "payment_mode_label",
+    "tenant_placement_now", "tenant_account_summary", "app_current_month",
+    "hit_rate_limit", "prune_rate_limits",
+  ];
+  /** What stays in Postgres (A19), allocation_rows included: create_payment / create_adjustment use it. */
+  const KEPT = [
+    "allocation_rows", "create_payment", "create_adjustment", "next_receipt_no", "correct_rent",
+    "create_tenant", "update_tenant", "move_out_tenant", "correct_paid_through",
+    "start_rent_tracking", "stop_rent_tracking", "ensure_rent_periods", "rent_for_month",
+    "acknowledge_payment", "acknowledge_adjustment", "log_event", "is_app_owner",
+    "audit_describe", "audit_row_change", "audit_log_fill_text",
+  ];
+  const present = async (fresh: PGlite, names: string[]) =>
+    (
+      await fresh.query<{ proname: string }>(
+        `select distinct proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and proname = any($1::text[]) order by 1`,
+        [names]
+      )
+    ).rows.map((r) => r.proname);
+
+  it("leaves none of them, keeps what stays, and can run again", async () => {
+    const fresh = await createMigratedDb();
+    try {
+      expect(await present(fresh, DROPPED)).toEqual([]);
+      expect(await present(fresh, KEPT)).toEqual([...KEPT].sort());
+      await fresh.exec(readFileSync(path.join(MIGRATIONS, "0029_drop_replaced_functions.sql"), "utf8"));
+      expect(await present(fresh, DROPPED)).toEqual([]);
+    } finally {
+      await fresh.close();
+    }
+  });
+
+  it("leaves no remaining function, view or policy naming a dropped one", async () => {
+    // PL/pgSQL bodies are only checked when they run, so a stale call would
+    // otherwise surface in production first.
+    const fresh = await createMigratedDb();
+    try {
+      const calls = new RegExp(`\\b(${DROPPED.join("|")})\\s*[(]`);
+      const { rows: fns } = await fresh.query<{ name: string; def: string }>(
+        `select p.proname as name, pg_get_functiondef(p.oid) as def from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind = 'f'`
+      );
+      const { rows: views } = await fresh.query<{ name: string; def: string }>(
+        `select viewname as name, definition as def from pg_views where schemaname = 'public'`
+      );
+      const { rows: policies } = await fresh.query<{ name: string; def: string }>(
+        `select policyname as name, coalesce(qual, '') || ' ' || coalesce(with_check, '') as def from pg_policies`
+      );
+      const naming = [...fns, ...views, ...policies].filter((r) => calls.test(r.def)).map((r) => r.name);
+      expect(naming).toEqual([]);
+      expect(fns.length).toBeGreaterThan(KEPT.length);
+    } finally {
+      await fresh.close();
+    }
+  });
+
+  it("is undone by its rollback script: the same definitions and grants as 0028 left", async () => {
+    const snapshot = async (pg: PGlite) =>
+      (
+        await pg.query<{ sig: string; def: string; acl: string | null }>(
+          `select p.oid::regprocedure::text as sig, pg_get_functiondef(p.oid) as def, p.proacl::text as acl
+           from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = any($1::text[]) order by 1`,
+          [DROPPED]
+        )
+      ).rows;
+    const before = await createMigratedDb({ through: "0028" });
+    const restored = await createMigratedDb();
+    try {
+      await restored.exec(readFileSync(ORACLES, "utf8"));
+      const expected = await snapshot(before);
+      expect(expected.map((r) => r.sig.replace(/\(.*/, "")).sort()).toEqual([...DROPPED].sort());
+      expect(await snapshot(restored)).toEqual(expected);
+    } finally {
+      await before.close();
+      await restored.close();
+    }
   });
 });

@@ -645,11 +645,6 @@ export interface Database {
       };
       acknowledge_payment: { Args: AcknowledgeArgs; Returns: boolean };
       acknowledge_adjustment: { Args: AcknowledgeArgs; Returns: boolean };
-      hit_rate_limit: {
-        Args: { p_key: string; p_limit: number; p_window_seconds: number };
-        Returns: boolean;
-      };
-      prune_rate_limits: { Args: Record<string, never>; Returns: number };
       /** 0015: app events; the service role may name the actor, the owner logs as themselves. */
       log_event: {
         Args: {
@@ -663,101 +658,11 @@ export interface Database {
         };
         Returns: undefined;
       };
-      /** 0018: one page of history (a tenant's, or all of it), searched, filtered and sorted in SQL (A14). */
-      audit_history_page: {
-        Args: {
-          p_tenant_id?: string | null;
-          p_actions?: AuditAction[] | null;
-          p_from?: string | null;
-          p_to?: string | null;
-          p_search?: string | null;
-          p_filters?: { field: AuditTextColumn; operator: string; value?: string }[];
-          p_logic?: "and" | "or";
-          p_sort?: "at" | Exclude<AuditTextColumn, "details">;
-          p_dir?: "asc" | "desc";
-          p_page?: number;
-          p_page_size?: number;
-        };
-        Returns: { rows: AuditLogEntry[]; total: number; all: number; page: number };
-      };
-      /** 0021: one page of the Billing grid: tenants × months in the range, plus paid-direct months (A15). */
-      billing_page: {
-        Args: {
-          p_from: string;
-          p_to: string;
-          p_paid_direct?: boolean;
-          p_show?: string;
-          p_search?: string | null;
-          p_filters?: { field: "month" | "tenant" | "status" | "payments"; operator: string; value?: string }[];
-          p_logic?: "and" | "or";
-          p_sort?: "period_month" | "tenant_name" | "amount_due" | "amount_allocated" | "balance" | "status";
-          p_dir?: "asc" | "desc";
-          p_page?: number;
-          p_page_size?: number;
-        };
-        Returns: { rows: BillingDbRow[]; total: number; all: number; page: number };
-      };
-      /** 0026: the Payments page - payments by day received, one page, with totals per mode. */
-      payments_page: {
-        Args: {
-          p_from: string;
-          p_to: string;
-          p_search?: string | null;
-          p_filters?: { field: PaymentsFilterColumn; operator: string; value?: string }[];
-          p_logic?: "and" | "or";
-          p_sort?: PaymentsSortColumn;
-          p_dir?: "asc" | "desc";
-          p_page?: number;
-          p_page_size?: number;
-        };
-        Returns: { rows: PaymentsDbRow[]; total: number; all: number; page: number; totals: PaymentsTotalsDb };
-      };
-      /** 0021: the Billing stat cards for the whole range. */
-      billing_totals: {
-        Args: { p_from: string; p_to: string; p_paid_direct?: boolean };
-        Returns: BillingTotalsDb;
-      };
-      /** 0022: the tenant page's account figures (D29). */
-      tenant_account_summary: {
-        Args: { p_tenant_id: string };
-        Returns: TenantAccountSummaryDb;
-      };
-      /** 0020: one page of a tenant's ledger, with the all-time running balance (A15). */
-      tenant_ledger_page: {
-        Args: {
-          p_tenant_id: string;
-          p_from?: string | null;
-          p_to?: string | null;
-          p_search?: string | null;
-          p_filters?: { field: "date" | "description" | "status"; operator: string; value?: string }[];
-          p_logic?: "and" | "or";
-          p_sort?: "date" | "description" | "status" | "debit" | "credit" | "balance";
-          p_dir?: "asc" | "desc";
-          p_page?: number;
-          p_page_size?: number;
-        };
-        Returns: { rows: TenantLedgerDbRow[]; total: number; all: number; page: number };
-      };
-      /** 0019: one page of a tenant's rent months (A15). */
-      tenant_months_page: {
-        Args: {
-          p_tenant_id: string;
-          p_show?: string;
-          p_search?: string | null;
-          p_filters?: { field: "month" | "status"; operator: string; value?: string }[];
-          p_logic?: "and" | "or";
-          p_sort?: "period_month" | "amount_due" | "amount_allocated" | "status";
-          p_dir?: "asc" | "desc";
-          p_page?: number;
-          p_page_size?: number;
-        };
-        Returns: { rows: TenantMonthDbRow[]; total: number; all: number; page: number };
-      };
     };
   };
 }
 
-/** A row of tenant_months_page (0019): a rent month as the Months table shows it. */
+/** A row of the Months table query (tenantMonthsPage; was tenant_months_page, 0019): a rent month as it shows it. */
 export interface TenantMonthDbRow {
   id: string;
   period_month: string;
@@ -769,7 +674,7 @@ export interface TenantMonthDbRow {
   month_label: string;
 }
 
-/** A row of billing_page (0021): one tenant's rent for one month, or a paid-direct month. */
+/** A row of the Billing grid query (billingPage; was billing_page, 0021): one tenant's rent for one month, or a paid-direct month. */
 export interface BillingDbRow {
   id: string;
   tenant_id: string;
@@ -787,11 +692,11 @@ export interface BillingDbRow {
   payments: { payment_id: string; receipt_no: string | null; payment_date: string; mode: PaymentMode; amount: number }[];
 }
 
-/** payments_page (0026): the columns it sorts and matches by. */
+/** The Payments page query (paymentsPage; was payments_page, 0026): the columns it sorts and matches by. */
 export type PaymentsSortColumn = "payment_date" | "receipt_no" | "tenant_name" | "mode" | "amount";
 export type PaymentsFilterColumn = "date" | "receipt" | "tenant" | "mode" | "months" | "note";
 
-/** A row of payments_page (0026): one confirmed payment. */
+/** A row of the Payments page query (was payments_page, 0026): one confirmed payment. */
 export interface PaymentsDbRow {
   id: string;
   receipt_no: string | null;
@@ -807,14 +712,14 @@ export interface PaymentsDbRow {
   acknowledged: boolean;
 }
 
-/** payments_page totals (0026): every matching row, whatever the page. */
+/** The Payments page totals (was payments_page, 0026): every matching row, whatever the page. */
 export interface PaymentsTotalsDb {
   amount: number;
   count: number;
   by_mode: Record<PaymentMode, number>;
 }
 
-/** billing_totals (0021): the range's stat cards. */
+/** The Billing stat cards for the range (billingTotals; was billing_totals, 0021). */
 export interface BillingTotalsDb {
   billed: number;
   collected: number;
@@ -824,7 +729,7 @@ export interface BillingTotalsDb {
   tenants: number;
 }
 
-/** tenant_account_summary (0022): the tenant page's account figures. */
+/** The tenant page's account figures (tenantAccountSummary; was tenant_account_summary, 0022). */
 export interface TenantAccountSummaryDb {
   /** Unpaid on months that have ended. */
   total_outstanding: number;
@@ -836,7 +741,7 @@ export interface TenantAccountSummaryDb {
   can_stop_rent_tracking: boolean;
 }
 
-/** A row of tenant_ledger_page (0020). */
+/** A row of the tenant ledger query (tenantLedgerPage; was tenant_ledger_page, 0020). */
 export interface TenantLedgerDbRow {
   id: string;
   type: "charge" | "payment" | "adjustment";
@@ -852,7 +757,7 @@ export interface TenantLedgerDbRow {
   acknowledged: boolean | null;
 }
 
-/** The text columns audit_history_page searches and filters (0018); tenant_name is read from tenants. */
+/** The text columns the history query searches and filters (auditHistoryPage; was audit_history_page, 0018); tenant_name is read from tenants. */
 export type AuditTextColumn = "actor_name" | "title" | "tenant_name" | "unit_code" | "details";
 
 export type OwnerProfile = Database["public"]["Tables"]["owner_profile"]["Row"];

@@ -10,7 +10,7 @@ import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type G
 import { labelOf, monthLabel } from "./text";
 
 // Replaces tenant_months_page() (0019, A15, D28) and its tenant_month_rows /
-// tenant_months_matching / period_display_status: a tenant's rent months as
+// tenant_months_matching / period_display_status (all dropped in 0029, D33): a tenant's rent months as
 // the Months table shows them, one page. A month that hasn't ended and isn't
 // fully paid shows as "not due yet" (periodDisplayStatus in
 // src/lib/domain/billing.ts), with "this month" from the app's clock. One

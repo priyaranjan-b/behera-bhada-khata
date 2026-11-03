@@ -18,7 +18,7 @@ let government: string;
 let governmentPaid: string;
 
 beforeAll(async () => {
-  l = await createLedgerDb();
+  l = await createLedgerDb({ oracles: true });
   // Billed two months ahead of today, as the app does.
   const ahead = addMonthsToKey(currentMonthKey(), 2);
   partlyPaid = await l.createTenant({ name: "Asha", rent: 5000, leaseStart: "2026-01-15", units: ["AC-T1-G01"] });

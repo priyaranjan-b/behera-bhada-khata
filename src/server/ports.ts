@@ -162,7 +162,7 @@ export interface DbPage<R> {
   page: number;
 }
 
-/** One page of a tenant's rent months: tenant_months_page (0019, A15), or queries/tenantMonthsPage.ts on Drizzle (A19). */
+/** One page of a tenant's rent months (A15): queries/tenantMonthsPage.ts (A19; was tenant_months_page, 0019). */
 export interface TenantMonthsFilter {
   tenantId: string;
   show: TenantMonthShow;
@@ -175,7 +175,7 @@ export interface TenantMonthsFilter {
   pageSize: number;
 }
 
-/** One page of the Billing grid, run by billing_page (0021, A15). */
+/** One page of the Billing grid (A15): queries/billingPage.ts (A19; was billing_page, 0021). */
 export interface BillingFilter {
   /** Month keys, both included. */
   from: string;
@@ -191,7 +191,7 @@ export interface BillingFilter {
   pageSize: number;
 }
 
-/** One page of the Payments grid, run by payments_page (0026, A15). */
+/** One page of the Payments grid (A15): queries/paymentsPage.ts (A19; was payments_page, 0026). */
 export interface PaymentsFilter {
   /** Days received, yyyy-MM-dd, both included. */
   from: string;
@@ -205,7 +205,7 @@ export interface PaymentsFilter {
   pageSize: number;
 }
 
-/** One page of a tenant's ledger: tenant_ledger_page (0020, A15), or queries/tenantLedgerPage.ts on Drizzle (A19). */
+/** One page of a tenant's ledger (A15): queries/tenantLedgerPage.ts (A19; was tenant_ledger_page, 0020). */
 export interface TenantLedgerFilter {
   tenantId: string;
   /** yyyy-MM-dd, inclusive. */
@@ -220,7 +220,7 @@ export interface TenantLedgerFilter {
   pageSize: number;
 }
 
-/** One page of history: audit_history_page (0018, A14), or queries/auditHistoryPage.ts on Drizzle (A19). */
+/** One page of history (A14): queries/auditHistoryPage.ts (A19; was audit_history_page, 0018). */
 export interface AuditHistoryFilter {
   /** One tenant's history; none = every change (Activity). */
   tenantId?: string;

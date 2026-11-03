@@ -7,7 +7,9 @@ import { GRID_LIMITS } from "@/lib/validation";
 // The server-paged tables' search, filters, sort and page (A15, D28): the
 // TypeScript twin of the SQL grid helpers in 0019 (grid_words, grid_check,
 // grid_active_filters, grid_row_matches) and like_escape /
-// audit_text_matches (0017), which it replaces. A query describes its table
+// audit_text_matches (0017), which it replaced; 0029 dropped them (D33), and
+// the names below point at their frozen copy in
+// supabase/rollback/0029_restore_replaced_functions.sql. A query describes its table
 // as SQL expressions over one row (`fields` for the filters, `searchText`
 // for the search box, `sorts`); this builds the where and order by from the
 // user's choices. Every value is a bound parameter; sort and field names

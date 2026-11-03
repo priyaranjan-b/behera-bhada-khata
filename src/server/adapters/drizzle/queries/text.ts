@@ -6,8 +6,9 @@ import { NOT_SET } from "@/lib/domain/tenant";
 // What the server-paged tables show, written as SQL so search, filters and
 // sort run on the same text the user sees. Each one is built from the app's
 // own source of truth (src/lib/dates.ts, src/lib/domain/*), replacing the
-// SQL copies (audit_date and audit_month as used by the page functions,
-// payment_mode_label, status_label, tenant_placement_now). A test
+// SQL copies (audit_date and audit_month as used by the page functions, which
+// stay for audit_describe; payment_mode_label, status_label and
+// tenant_placement_now, dropped in 0029, D33). A test
 // compares each with the TS function the UI uses.
 
 /**
@@ -30,7 +31,7 @@ export const tenantDisplayName = (businessName: SQL, name: SQL) => sql`coalesce(
 
 /**
  * The houses a tenant holds on `today` (yyyy-MM-dd), or held last once moved
- * out (tenant_placement_now, 0021; currentPlacement in
+ * out (as the dropped tenant_placement_now did, 0021; currentPlacement in
  * src/server/services/placements.ts), as rows (unit_code, property_name) to
  * select from. `today` comes from the app's clock (todayKey), like every page.
  */

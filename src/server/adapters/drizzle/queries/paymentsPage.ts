@@ -11,7 +11,7 @@ import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type G
 import { dateLabel, labelOf, monthLabel, tenantDisplayName, towersNow } from "./text";
 
 // Replaces payments_page() (0026, A18) and its payments_rows /
-// payments_matching / payment_mode_label: every tenant's confirmed payments
+// payments_matching / payment_mode_label (all dropped in 0029, D33): every tenant's confirmed payments
 // by the day received, one page, with the money per mode of every row that
 // passes the search and filters (the stat cards follow the table). Runs
 // under RLS, so anyone but the owner gets nothing.

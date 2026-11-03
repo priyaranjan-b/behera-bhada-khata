@@ -95,7 +95,7 @@ const shareOf = (part: number, totals: PaymentTotals) =>
 
 /**
  * Every tenant's payments in the days, one page at a time: paging, sort,
- * search and filters run in SQL (payments_page, A15), and the cards add up
+ * search and filters run in the database (A15), and the cards add up
  * every payment the search and filters find, whatever the page.
  */
 export default function PaymentsView({

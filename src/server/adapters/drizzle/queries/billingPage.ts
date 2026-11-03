@@ -19,16 +19,17 @@ import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type G
 import { dateLabel, labelOf, monthLabel, tenantDisplayName, towersNow, unitCodesNow } from "./text";
 
 // Replaces billing_page() and billing_totals() (0021, A15, D28) and their
-// billing_rows / billing_matching / period_display_status / status_label:
+// billing_rows / billing_matching / period_display_status / status_label
+// (all dropped in 0029, D33):
 // a row is one tenant's rent for one month in the range, plus (when shown)
 // government rent paid to the owner directly (A11), computed and never
 // stored as paidDirectMonths does (src/lib/domain/billing.ts). Runs under
 // RLS, so anyone but the owner gets nothing. Each call is one statement.
 //
 // "Today", "this month" and the horizon come from one read of the app's
-// clock (todayKey), as the pages use, not the database's
-// (app_current_month()); the parity tests rely on the two agreeing, which
-// they do but for the moment either side of midnight in APP_TIME_ZONE.
+// clock (todayKey), as the pages use, not the database's (the dropped
+// app_current_month() used that); the parity tests rely on the two agreeing,
+// which they do but for the moment either side of midnight in APP_TIME_ZONE.
 
 /** Labels from statusLabel, as the grid shows them. */
 const STATUS_LABELS = Object.fromEntries(BILLING_DISPLAY_STATUSES.map((s) => [s, statusLabel(s)]));

@@ -25,7 +25,7 @@ function parseQuery(query: unknown): { range: MonthRange; latestMonth: string; s
   };
 }
 
-// The grid's fields → the columns billing_page reads.
+// The grid's fields → the columns the Billing query reads.
 const SORT_COLUMNS = {
   periodMonth: "period_month",
   tenantName: "tenant_name",
@@ -39,7 +39,7 @@ const FILTER_COLUMNS = { periodMonth: "month", tenantName: "tenant", status: "st
 /**
  * One page of the Billing grid: every tenant's rent for each month in the
  * range (plus government rent paid direct, A11), with what paid it - paged,
- * sorted, searched and filtered in SQL (billing_page, A15).
+ * sorted, searched and filtered in the database (A15, A19).
  */
 export async function getBillingPage(_ctx: OwnerContext, query: unknown = {}): Promise<BillingPage> {
   const input = parseInput(billingPageQuerySchema, query ?? {});

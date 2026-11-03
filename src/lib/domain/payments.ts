@@ -36,7 +36,7 @@ export function paymentModeLabel(mode: string): string {
 
 // ---- The Payments page (0026): payments by the day received ------------------
 
-/** The Payments grid's sortable and filterable columns (payments_page). */
+/** The Payments grid's sortable and filterable columns (queries/paymentsPage.ts). */
 export const PAYMENTS_SORT_FIELDS = ["paymentDate", "receiptNo", "tenantName", "mode", "amount"] as const;
 export const PAYMENTS_FILTER_FIELDS = ["paymentDate", "receiptNo", "tenantName", "mode", "monthsText", "note"] as const;
 

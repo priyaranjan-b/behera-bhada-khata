@@ -34,7 +34,11 @@ Tests: pure modules have a colocated `*.test.ts`; service tests live in
 `vi.mock("@/server/infra", …)`); `test/schema.test.ts` applies every
 migration to an in-process Postgres (PGlite) with stubs for Supabase's
 `auth`/`storage` schemas and roles, then exercises the ledger functions under
-RLS. Any migration change needs a case there. CI (`.github/workflows/ci.yml`)
+RLS. Any migration change needs a case there. The SQL functions 0029
+dropped live on only in their rollback script (`supabase/rollback/0029_restore_replaced_functions.sql`,
+D33), which the tests load as a frozen reference: the Drizzle parity tests
+compare against it; never edit it to pass a test.
+CI (`.github/workflows/ci.yml`)
 runs lint, typecheck, test and build.
 
 Local setup requires a Supabase project (run `supabase/migrations/*` in
@@ -58,7 +62,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D29), see below.
+- **Database:** `docs/database-design.md` (D1–D33), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -236,9 +240,8 @@ both together.
   only `SELECT` ledger tables (`INSERT` revoked in 0010, so writes go through
   `create_*`; `UPDATE`/`DELETE` revoked outright), with a narrow re-grant of
   just `token_hash`/`token_expires_at` (for sending a link until the tenant
-  acknowledges). The acknowledge functions,
-  `ensure_rent_periods` and the rate-limit functions are executable by
-  `service_role` only; `create_*` and the tenant lifecycle functions by
+  acknowledges). The acknowledge functions and `ensure_rent_periods` are
+  executable by `service_role` only; `create_*` and the tenant lifecycle functions by
   `authenticated` (each starts with `if not is_app_owner()`). Supabase grants
   EXECUTE on new functions to everyone by default, so every new function's
   migration must revoke and re-grant explicitly.

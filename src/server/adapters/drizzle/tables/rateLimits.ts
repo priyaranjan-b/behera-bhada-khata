@@ -2,13 +2,14 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { executeRows, type Tx } from "../client";
 
-// Replaces hit_rate_limit() and prune_rate_limits() (0004, D12) for valid
+// Replaces hit_rate_limit() and prune_rate_limits() (0004, D12; dropped in
+// 0029, D33) for valid
 // limits: fixed-window counters in rate_limits, which only service_role may
 // touch (RLS on, no policies). Each is one atomic statement, so concurrent
 // hits never lose a count. Windows are cut on the database's clock, the one
 // clock every app instance shares.
 
-/** How long a finished window is kept; the same as prune_rate_limits() (0004) while both exist. */
+/** How long a finished window is kept: a day, as the dropped prune_rate_limits() (0004) kept it. */
 const KEEP = sql`interval '1 day'`;
 
 /**

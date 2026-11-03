@@ -47,7 +47,7 @@ const getRowId = (row: AuditEntry) => row.id;
 
 /**
  * A history table, one page at a time: paging, sorting, search, column
- * filters, "Show" and dates are one database query (audit_history_page, A14)
+ * filters, "Show" and dates are one database query (A14)
  * over the text stored with each change, so they cover the whole history.
  * Download Excel saves the page on screen. Without `initial` it loads its
  * first page when mounted (the tenant's Change history tab, A16).

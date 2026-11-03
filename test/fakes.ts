@@ -196,7 +196,7 @@ function build() {
           )
           .slice(0, f.limit)
       ),
-      // audit_history_page, simplified: tenant, actions, search, newest first, one page.
+      // The history query, simplified: tenant, actions, search, newest first, one page.
       // Its full SQL behaviour is in test/schema.test.ts.
       historyPage: vi.fn(async (f: AuditHistoryFilter) => {
         const all = [...state.audit].reverse().filter((e) => !f.tenantId || e.tenant_id === f.tenantId);
@@ -277,7 +277,7 @@ function build() {
     rentPeriods: {
       listForTenants: vi.fn(async () => [period]),
       listByIds: vi.fn(async () => [period]),
-      // tenant_months_page; its SQL behaviour is in test/schema.test.ts.
+      // The Months query; its real behaviour is in test/adapters/drizzle/queries.
       page: vi.fn(async () => ({
         rows: [
           {
@@ -295,7 +295,7 @@ function build() {
         page: 0,
       })),
     },
-    // billing_page / billing_totals; their SQL behaviour is in test/schema.test.ts.
+    // The Billing query and totals; their real behaviour is in test/adapters/drizzle/queries.
     billing: {
       page: vi.fn(async () => ({
         rows: [
@@ -337,7 +337,7 @@ function build() {
         tenants: 1,
       })),
     },
-    // tenant_ledger_page, simplified to the tenant's payments; its SQL behaviour is in test/schema.test.ts.
+    // The ledger query, simplified to the tenant's payments; its real behaviour is in test/adapters/drizzle/queries.
     ledger: {
       page: vi.fn(async () => {
         const rows = [...state.payments.values()].map((p) => ({

@@ -469,7 +469,7 @@ export const billingQuerySchema = z.object({
   paidDirect: paidDirectViewSchema,
 });
 
-/** The Payments page (0026): at most two years of days in one view (payments_page refuses more). */
+/** The Payments page (A18): at most two years of days in one view (the query refuses more). */
 export const PAYMENTS_LIMITS = { maxDays: 731 } as const;
 
 /** `?from=yyyy-MM-dd&to=yyyy-MM-dd` on /payments: days received; either may be missing (default: last month). */
