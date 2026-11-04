@@ -773,7 +773,7 @@ export interface NewPaymentForm {
   savedSignature: SavedSignature | null;
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
-  /** Quick-select notes from the Profile page, alphabetical; any other text is fine too. */
+  /** Quick-select notes from the Settings page, alphabetical; any other text is fine too. */
   noteSuggestions: string[];
   /** Suggested tag names, alphabetical; a new one may be typed too. */
   tagSuggestions: string[];

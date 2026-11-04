@@ -8,7 +8,7 @@ import { notFound, parseInput, requireId, type OwnerContext } from "./context";
 
 // Payment tags (0030, D34): labels the owner puts on payments (who collected
 // it, ...). Each payment keeps its own copy of its tag names; the list here
-// only offers them. It's managed on the Profile page, and a name typed while
+// only offers them. It's managed on the Settings page, and a name typed while
 // recording or editing a payment joins it. Renaming or deleting one never
 // changes a payment.
 
@@ -81,7 +81,7 @@ export async function checkNewTags(db: OwnerRepositories, names: string[]): Prom
 
 function refuseFullList(count: number) {
   if (count > PAYMENT_TAG_LIMITS.maxTags) {
-    throw new ApiError(400, `Keep at most ${PAYMENT_TAG_LIMITS.maxTags} tags; delete an unused one on the Profile page first`);
+    throw new ApiError(400, `Keep at most ${PAYMENT_TAG_LIMITS.maxTags} tags; delete an unused one on the Settings page first`);
   }
 }
 

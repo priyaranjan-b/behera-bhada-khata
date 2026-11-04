@@ -50,9 +50,9 @@ export default function PaymentForm({
   savedSignature: SavedSignature | null;
   /** Twilio is set up, so the tenant can be sent a link. */
   tenantMessaging: boolean;
-  /** Quick notes from the Profile page; the owner may type anything else. */
+  /** Quick notes from the Settings page; the owner may type anything else. */
   noteSuggestions: string[];
-  /** Suggested tag names (Profile page); the owner may type a new one. */
+  /** Suggested tag names (Settings page); the owner may type a new one. */
   tagSuggestions: string[];
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;

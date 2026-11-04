@@ -8,11 +8,10 @@ import { routes } from "@/lib/routes";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
-import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 
-/** Grid cell of one stat card; the Vacant card (its own section) sits in the same row. */
-export const STAT_CELL = { xs: 6, lg: "grow" } as const;
+/** Grid cell of one stat card: four in a row from `md` (Vacant, its own section, is the fourth), two on phones. */
+export const STAT_CELL = { xs: 6, md: 3 } as const;
 
 // Direction of the last month vs the one before, for sparkline colouring.
 function trendOf(values: number[]): Trend {
@@ -26,7 +25,7 @@ function sparklineFor(trend: MonthlyTrendPoint[], key: "billed" | "collected") {
   return { data, labels: trend.map((p) => p.label), trend: trendOf(data), format: "money" as const };
 }
 
-/** Overview: Expected, Collected, Outstanding and Tenants overdue - four grid cells. */
+/** Overview: Expected, Collected and Outstanding - three grid cells (Vacant, its own section, makes four). */
 export default async function MonthStats({
   month,
   trend,
@@ -82,20 +81,6 @@ export default async function MonthStats({
           caption="Rent unpaid to the end of last month"
           badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
           href={routes.defaulters}
-        />
-      </Grid>
-      <Grid size={STAT_CELL}>
-        <StatCard
-          title="Tenants overdue"
-          icon={<PeopleAltRoundedIcon />}
-          value={String(report.overdueTenantCount)}
-          caption="With at least one month past due"
-          href={routes.tenants.list({ show: "overdue" })}
-          badge={
-            report.overdueTenantCount > 0
-              ? { label: "Follow up", tone: "danger" }
-              : { label: "On track", tone: "success" }
-          }
         />
       </Grid>
     </>

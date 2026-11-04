@@ -23,11 +23,10 @@ import { OwnerAvatar } from "./OwnerMenu";
 import { Search } from "./Search";
 import { useSignOut } from "./useSignOut";
 import { shellSurfaceSx } from "./surface";
-import type { AppTab } from "./nav";
+import { MOBILE_NAVBAR_HEIGHT, type AppTab } from "./nav";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 import { routes } from "@/lib/routes";
 
-export const MOBILE_NAVBAR_HEIGHT = 64;
 
 /**
  * Phone/tablet top bar with a right-hand slide-out menu (template AppNavbar +
