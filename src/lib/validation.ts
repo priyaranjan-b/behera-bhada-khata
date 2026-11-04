@@ -318,7 +318,7 @@ export const paymentNotePresetSchema = z.object({
 
 /**
  * Payment tags (0030, D34): the name's length (the table's check), how many
- * one payment carries, and how many suggestions the Profile page keeps, so the list stays
+ * one payment carries, and how many suggestions Settings keeps, so the list stays
  * short enough to pick from.
  */
 export const PAYMENT_TAG_LIMITS = { maxLength: 40, maxPerPayment: 10, maxTags: 50 } as const;

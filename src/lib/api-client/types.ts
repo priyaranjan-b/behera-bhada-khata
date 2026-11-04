@@ -123,9 +123,9 @@ export interface ApiQueries {
     search(): Promise<SearchIndex>;
     /** The owner's name and saved signature (Profile page, app shell). */
     profile(): Promise<OwnerProfileView>;
-    /** Quick-select notes for Record payment (Profile page). */
+    /** Quick-select notes for Record payment (Settings). */
     paymentNotes(): Promise<PaymentNotePresetView[]>;
-    /** Suggested payment tags with usage counts (Profile page). */
+    /** Suggested payment tags with usage counts (Settings). */
     paymentTags(): Promise<PaymentTagView[]>;
     properties: {
       list(): Promise<LocationGroup[]>;

@@ -5,16 +5,19 @@ import Box from "@mui/material/Box";
 import AppCard from "@/components/ui/AppCard";
 import Stack, { type StackProps } from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { toneTintSx, type Tone } from "./tone";
 
 /**
  * The one card-with-a-heading used across forms, summaries and detail panels:
  * outlined Card, subtitle2 heading (+ optional caption/icon), an optional
- * right-aligned action, then the body with consistent spacing.
+ * right-aligned action, then the body with consistent spacing. With a
+ * `tone`, the icon sits in a tinted tile in that colour (Profile, Settings).
  */
 export function SectionCard({
   title,
   caption,
   icon,
+  tone,
   action,
   sticky = false,
   fill = false,
@@ -23,6 +26,8 @@ export function SectionCard({
   title: string;
   caption?: React.ReactNode;
   icon?: React.ReactNode;
+  /** Draws `icon` in a tinted tile of this colour instead of a plain grey glyph. */
+  tone?: Tone;
   /** Right side of the heading row: a badge, a Clear button, a filter… */
   action?: React.ReactNode;
   /** Stick to the top of the viewport on desktop (side summaries). */
@@ -40,8 +45,10 @@ export function SectionCard({
     >
       <Stack spacing={2}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
-            {icon ? (
+          <Stack direction="row" spacing={tone ? 1.5 : 1} sx={{ alignItems: "center", minWidth: 0 }}>
+            {icon && tone ? (
+              <IconTile icon={icon} tone={tone} look="tinted" size="compact" />
+            ) : icon ? (
               <Box
                 component="span"
                 aria-hidden
@@ -82,32 +89,41 @@ export function InsetBox({ direction = "row", children }: { direction?: StackPro
   );
 }
 
-const TILE_SIZE = { sm: 40, md: 48 } as const;
+const TILE_SIZE = { compact: { xs: 32, sm: 40 }, sm: 40, md: 48 } as const;
 
-/** Rounded square holding an icon (property cards, empty states, dropzones). */
+/**
+ * Rounded square holding an icon (property cards, empty states, dropzones).
+ * `outlined` (default) is a bordered tile in primary or neutral; `tinted`
+ * fills it softly in any `Tone` (stat cards). `compact` is 32px on phones.
+ */
 export function IconTile({
   icon,
   size = "md",
   tone = "primary",
+  look = "outlined",
 }: {
   icon: React.ReactNode;
   size?: keyof typeof TILE_SIZE;
-  tone?: "primary" | "neutral";
+  tone?: Tone;
+  look?: "outlined" | "tinted";
 }) {
   return (
     <Box
       aria-hidden
-      sx={{
-        width: TILE_SIZE[size],
-        height: TILE_SIZE[size],
-        flexShrink: 0,
-        borderRadius: 1.5,
-        display: "grid",
-        placeItems: "center",
-        border: "1px solid",
-        borderColor: "divider",
-        color: tone === "primary" ? "primary.main" : "text.secondary",
-      }}
+      sx={[
+        {
+          width: TILE_SIZE[size],
+          height: TILE_SIZE[size],
+          flexShrink: 0,
+          borderRadius: 1.5,
+          display: "grid",
+          placeItems: "center",
+          "& .MuiSvgIcon-root": size === "compact" ? { fontSize: { xs: 18, sm: 22 } } : {},
+        },
+        look === "tinted"
+          ? (theme) => toneTintSx(theme, tone)
+          : { border: "1px solid", borderColor: "divider", color: tone === "neutral" ? "text.secondary" : "primary.main" },
+      ]}
     >
       {icon}
     </Box>

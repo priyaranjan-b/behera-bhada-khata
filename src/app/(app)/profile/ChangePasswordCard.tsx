@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useAppRouter } from "@/components/ui/Loading";
 import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import { FormActions, SectionCard } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
 import { routes } from "@/lib/routes";
@@ -35,29 +37,46 @@ export default function ChangePasswordCard() {
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
-      <SectionCard title="Password" caption="Sign in with your email and this password instead of an email link.">
-        <TextField
-          type="password"
-          label="New password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          fullWidth
-          autoComplete="new-password"
-          helperText={`At least ${PASSWORD_LIMITS.minLength} characters.`}
-          slotProps={{ htmlInput: { minLength: PASSWORD_LIMITS.minLength, maxLength: PASSWORD_LIMITS.maxLength } }}
+      <SectionCard
+        title="Security"
+        caption="Set a password to sign in with your email and password instead of an email link."
+        icon={<LockRoundedIcon />}
+        tone="warning"
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          <TextField
+            type="password"
+            label="New password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            fullWidth
+            autoComplete="new-password"
+            helperText={`At least ${PASSWORD_LIMITS.minLength} characters.`}
+            slotProps={{
+              htmlInput: {
+                minLength: PASSWORD_LIMITS.minLength,
+                maxLength: PASSWORD_LIMITS.maxLength,
+              },
+            }}
+          />
+          <TextField
+            type="password"
+            label="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            fullWidth
+            autoComplete="new-password"
+            slotProps={{ htmlInput: { maxLength: PASSWORD_LIMITS.maxLength } }}
+          />
+        </Stack>
+        <FormActions
+          error={error}
+          submitLabel="Set password"
+          pendingLabel="Saving…"
+          pending={submitting}
         />
-        <TextField
-          type="password"
-          label="Confirm new password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          fullWidth
-          autoComplete="new-password"
-          slotProps={{ htmlInput: { maxLength: PASSWORD_LIMITS.maxLength } }}
-        />
-        <FormActions error={error} submitLabel="Set password" pendingLabel="Saving…" pending={submitting} />
       </SectionCard>
     </Box>
   );

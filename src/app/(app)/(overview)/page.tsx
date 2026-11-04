@@ -2,8 +2,8 @@ import { serverApi } from "@/lib/api-client/server";
 import { addMonthsToKey, formatMonth, monthKeyFromParam, yearMonthOf } from "@/lib/dates";
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
-import { ActionStack } from "@/components/ui";
 import AsyncSection from "@/components/ui/AsyncSection";
+import ContextBar from "@/components/ui/ContextBar";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import OverviewLayout from "./OverviewLayout";
@@ -43,14 +43,10 @@ export default async function DashboardPage({
   return (
     <OverviewLayout
       header={
-        <PageHeader
-          title="Overview"
-          subtitle="How rent is tracking across every property."
-          action={
-            <ActionStack>
-              <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
-                <PaidDirectSwitch state={paidDirectState} />
-              </AsyncSection>
+        <>
+          <PageHeader title="Overview" subtitle="How rent is tracking across every property." />
+          <ContextBar
+            period={
               <PeriodSwitcher
                 label={formatMonth(monthKey)}
                 prevHref={routes.dashboard({
@@ -62,9 +58,16 @@ export default async function DashboardPage({
                   ...paidDirectQuery(paidDirect),
                 })}
               />
-            </ActionStack>
-          }
-        />
+            }
+            options={
+              <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
+                <PaidDirectSwitch state={paidDirectState} />
+              </AsyncSection>
+            }
+            activeCount={paidDirect === "show" ? 1 : 0}
+            resetHref={routes.dashboard()}
+          />
+        </>
       }
       stats={
         <AsyncSection key={monthView} title="This month" fallback={SKELETON.stats}>

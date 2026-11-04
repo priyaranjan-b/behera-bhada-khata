@@ -1,5 +1,6 @@
 import type { PaymentsPaidDirect } from "@/lib/contracts";
 import { formatMoney } from "@/lib/money";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import StatCard from "@/components/ui/StatCard";
 
 /** Govt rent paid to the bank directly (A11): by rent month, so the table's search doesn't apply. */
@@ -8,6 +9,8 @@ export default async function PaidDirectStat({ paidDirect }: { paidDirect: Promi
   return (
     <StatCard
       title="Govt paid direct"
+      icon={<AccountBalanceWalletRoundedIcon />}
+      tone="info"
       value={formatMoney(amount)}
       caption={
         months === 0

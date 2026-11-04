@@ -2,6 +2,9 @@ import Grid from "@mui/material/Grid";
 import type { BillingTotalsView } from "@/lib/contracts";
 import { collectionRateTone } from "@/lib/domain/overview";
 import { formatMoney } from "@/lib/money";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import StatCard from "@/components/ui/StatCard";
 
 /** Grid cell of one Billing stat card. */
@@ -22,6 +25,8 @@ export default async function BillingStats({
       <Grid size={BILLING_STAT_CELL}>
         <StatCard
           title="Billed"
+          icon={<ReceiptLongRoundedIcon />}
+          tone="primary"
           value={formatMoney(totals.billed)}
           caption={`${rangeLabel} · ${tenantCount} tenant${tenantCount === 1 ? "" : "s"}`}
         />
@@ -29,6 +34,7 @@ export default async function BillingStats({
       <Grid size={BILLING_STAT_CELL}>
         <StatCard
           title="Collected"
+          icon={<SavingsRoundedIcon />}
           value={formatMoney(totals.collected)}
           caption="Paid towards these months"
           badge={
@@ -41,6 +47,8 @@ export default async function BillingStats({
       <Grid size={BILLING_STAT_CELL}>
         <StatCard
           title="Balance"
+          icon={<AccountBalanceWalletRoundedIcon />}
+          variant="gradient"
           value={formatMoney(totals.balance)}
           caption={totals.overdue > 0 ? `${formatMoney(totals.overdue)} overdue` : "Nothing overdue"}
           badge={totals.balance > 0 ? { label: "To collect", tone: "warning" } : { label: "Settled", tone: "success" }}

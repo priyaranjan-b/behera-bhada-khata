@@ -5,6 +5,10 @@ import { collectionRateTone } from "@/lib/domain/overview";
 import type { MonthlyTrendPoint } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
+import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 
 /** Grid cell of one stat card; the Vacant card (its own section) sits in the same row. */
@@ -45,6 +49,7 @@ export default async function MonthStats({
       <Grid size={STAT_CELL}>
         <StatCard
           title="Expected"
+          icon={<ReceiptLongRoundedIcon />}
           value={formatMoney(report.expected)}
           caption={`Rent due for ${monthLabel}`}
           badge={{ label: `${activeTenants} tenant${activeTenants === 1 ? "" : "s"}`, tone: "info" }}
@@ -55,6 +60,7 @@ export default async function MonthStats({
       <Grid size={STAT_CELL}>
         <StatCard
           title="Collected"
+          icon={<SavingsRoundedIcon />}
           value={formatMoney(report.collected)}
           caption={`For ${monthLabel}'s rent`}
           note={received === undefined ? undefined : `${formatMoney(received)} received in the month`}
@@ -70,6 +76,8 @@ export default async function MonthStats({
       <Grid size={STAT_CELL}>
         <StatCard
           title="Outstanding"
+          icon={<PendingActionsRoundedIcon />}
+          variant={report.outstanding > 0 ? "highlighted" : "default"}
           value={formatMoney(report.outstanding)}
           caption="Rent unpaid to the end of last month"
           badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
@@ -79,6 +87,7 @@ export default async function MonthStats({
       <Grid size={STAT_CELL}>
         <StatCard
           title="Tenants overdue"
+          icon={<PeopleAltRoundedIcon />}
           value={String(report.overdueTenantCount)}
           caption="With at least one month past due"
           href={routes.tenants.list({ show: "overdue" })}

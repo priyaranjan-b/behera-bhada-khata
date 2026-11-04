@@ -1,5 +1,6 @@
 import type { BillingReceived } from "@/lib/contracts";
 import { formatMoney } from "@/lib/money";
+import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import StatCard from "@/components/ui/StatCard";
 
 /** Billing: cash dated in the range's months, whatever months it paid for. */
@@ -8,6 +9,8 @@ export default async function ReceivedStat({ received, months }: { received: Pro
   return (
     <StatCard
       title="Received"
+      icon={<PaymentsRoundedIcon />}
+      tone="primary"
       value={formatMoney(amount)}
       caption={
         `${payments} payment${payments === 1 ? "" : "s"} dated in ${months === 1 ? "this month" : "these months"}` +

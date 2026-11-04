@@ -14,6 +14,7 @@ import Typography from "@mui/material/Typography";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import Link from "@/components/ui/Link";
 import { ownerInitials } from "@/lib/domain/owner";
 import { routes } from "@/lib/routes";
@@ -76,6 +77,12 @@ export function OwnerCard({ email, name }: { email?: string; name?: string }) {
           <ListItemText>Profile</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: "0 !important" }}>
             <PersonRoundedIcon fontSize="small" />
+          </ListItemIcon>
+        </MenuItem>
+        <MenuItem component={Link} href={routes.settings} onClick={() => setAnchorEl(null)}>
+          <ListItemText>Settings</ListItemText>
+          <ListItemIcon sx={{ ml: "auto", minWidth: "0 !important" }}>
+            <SettingsRoundedIcon fontSize="small" />
           </ListItemIcon>
         </MenuItem>
         <MenuItem onClick={signOut} disabled={signingOut}>

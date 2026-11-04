@@ -19,6 +19,11 @@ import DataTable, {
 } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
 import { TagsCell } from "@/components/ui/GridCells";
+import LocalAtmRoundedIcon from "@mui/icons-material/LocalAtmRounded";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import StatCard from "@/components/ui/StatCard";
 import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
@@ -143,7 +148,7 @@ export default function PaymentsView({
   range: DayRange;
   rangeLabel: string;
   paidDirectCard: React.ReactNode;
-  /** Suggested tag names for the tag editor (Profile page). */
+  /** Suggested tag names for the tag editor (Settings). */
   tagSuggestions: string[];
 }) {
   const { from, to } = range;
@@ -169,6 +174,9 @@ export default function PaymentsView({
         <Grid size={PAYMENT_STAT_CELL}>
           <StatCard
             title="Received"
+            icon={<PaymentsRoundedIcon />}
+            tone="primary"
+            variant="gradient"
             value={formatMoney(totals.amount)}
             caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
               byMode.set_off > 0 ? ` · + ${formatMoney(byMode.set_off)} set off` : ""
@@ -176,14 +184,15 @@ export default function PaymentsView({
           />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard title="Cash" value={formatMoney(byMode.cash)} caption={shareOf(byMode.cash, totals)} />
+          <StatCard title="Cash" icon={<LocalAtmRoundedIcon />} value={formatMoney(byMode.cash)} caption={shareOf(byMode.cash, totals)} />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard title="UPI" value={formatMoney(byMode.upi)} caption={shareOf(byMode.upi, totals)} />
+          <StatCard title="UPI" icon={<QrCode2RoundedIcon />} value={formatMoney(byMode.upi)} caption={shareOf(byMode.upi, totals)} />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>
           <StatCard
             title="Bank transfer"
+            icon={<AccountBalanceRoundedIcon />}
             value={formatMoney(byMode.bank_transfer)}
             caption={shareOf(byMode.bank_transfer, totals)}
           />
@@ -191,12 +200,13 @@ export default function PaymentsView({
         <Grid size={PAYMENT_STAT_CELL}>
           <StatCard
             title="Cheque & other"
+            icon={<DescriptionRoundedIcon />}
             value={formatMoney(byMode.cheque + byMode.other)}
             caption={shareOf(byMode.cheque + byMode.other, totals)}
           />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard title="Set-off" value={formatMoney(byMode.set_off)} caption="Not cash · kept back by tenants" />
+          <StatCard title="Set-off" icon={<SwapHorizRoundedIcon />} value={formatMoney(byMode.set_off)} caption="Not cash · kept back by tenants" />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>{paidDirectCard}</Grid>
       </Grid>

@@ -1,32 +1,24 @@
-import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { FLASH } from "@/lib/routes";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import FlashAlert from "@/components/ui/FlashAlert";
+import ProfileSummary from "@/components/domain/ProfileSummary";
 import ChangePasswordCard from "./ChangePasswordCard";
-import PaymentNotesCard from "./PaymentNotesCard";
-import PaymentTagsCard from "./PaymentTagsCard";
 import ProfileForm from "./ProfileForm";
 
+// The owner as a person: name, signature, password. The rent book's shared
+// lists (tags, quick notes) are on Settings (A25).
 export default async function ProfilePage({
   searchParams,
 }: {
   searchParams: Promise<{ saved?: string; passwordChanged?: string }>;
 }) {
-  const [profile, paymentNotes, paymentTags, { saved, passwordChanged }] = await Promise.all([
-    serverApi.dashboard.profile(),
-    serverApi.dashboard.paymentNotes(),
-    serverApi.dashboard.paymentTags(),
-    searchParams,
-  ]);
+  const [profile, { saved, passwordChanged }] = await Promise.all([serverApi.dashboard.profile(), searchParams]);
 
   return (
     <Stack spacing={2}>
-      <PageHeader
-        title="Profile"
-        subtitle={`The owner's name and the saved signature printed on receipts. Signed in as ${profile.email ?? "the owner"}.`}
-      />
+      <PageHeader title="Profile" subtitle="Your name and signature on every receipt, and how you sign in." />
       {saved ? (
         <FlashAlert param={FLASH.saved} severity="success">
           Profile saved.
@@ -37,19 +29,10 @@ export default async function ProfilePage({
           Password set. You can now sign in with your email and this password.
         </FlashAlert>
       ) : null}
+      <ProfileSummary profile={profile} />
       {/* Remount on save so the form starts from what was stored. */}
       <ProfileForm key={`${profile.displayName}|${profile.signatureName}|${profile.signatureUrl}`} profile={profile} />
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <ChangePasswordCard />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <PaymentNotesCard notes={paymentNotes} />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <PaymentTagsCard tags={paymentTags} />
-        </Grid>
-      </Grid>
+      <ChangePasswordCard />
     </Stack>
   );
 }

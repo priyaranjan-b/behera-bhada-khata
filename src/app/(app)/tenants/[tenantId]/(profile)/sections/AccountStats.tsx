@@ -2,6 +2,8 @@ import Grid from "@mui/material/Grid";
 import type { TenantAccount } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, formatMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 import StatCard from "@/components/ui/StatCard";
 import { StatCardSkeleton } from "@/components/ui/Skeletons";
 
@@ -26,6 +28,8 @@ export default async function AccountStats({ account }: { account: Promise<Tenan
       <Grid size={ACCOUNT_STAT_CELL}>
         <StatCard
           title="Outstanding"
+          icon={<AccountBalanceWalletRoundedIcon />}
+          variant={balance.totalOutstanding > 0 ? "highlighted" : "default"}
           value={formatMoney(balance.totalOutstanding)}
           caption={
             balance.notYetDue > 0
@@ -40,6 +44,7 @@ export default async function AccountStats({ account }: { account: Promise<Tenan
       <Grid size={ACCOUNT_STAT_CELL}>
         <StatCard
           title="Months overdue"
+          icon={<EventBusyRoundedIcon />}
           value={String(balance.overdueMonths)}
           caption={`${paidEndedMonths} of ${endedMonths} ended month${endedMonths === 1 ? "" : "s"} paid`}
           badge={

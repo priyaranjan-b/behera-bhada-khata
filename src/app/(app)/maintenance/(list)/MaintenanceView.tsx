@@ -20,6 +20,9 @@ import DataTable, {
 import { EmptyState, StatusBadge } from "@/components/ui/DataDisplay";
 import { GridCell, TagsCell } from "@/components/ui/GridCells";
 import Link from "@/components/ui/Link";
+import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
+import LabelOffRoundedIcon from "@mui/icons-material/LabelOffRounded";
 import StatCard from "@/components/ui/StatCard";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
 import { api } from "@/lib/api-client";
@@ -192,6 +195,9 @@ export default function MaintenanceView({
         <Grid size={MAINTENANCE_STAT_CELL}>
           <StatCard
             title="Spent"
+            icon={<HandymanRoundedIcon />}
+            tone="primary"
+            variant="gradient"
             value={formatMoney(totals.amount)}
             caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
               totals.cash < totals.amount ? ` · ${formatMoney(totals.amount - totals.cash)} by set-off` : ""
@@ -201,6 +207,7 @@ export default function MaintenanceView({
         <Grid size={MAINTENANCE_STAT_CELL}>
           <StatCard
             title={categories[0] ? `Most on ${categories[0].label}` : "Biggest category"}
+            icon={<CategoryRoundedIcon />}
             value={formatMoney(categories[0]?.amount ?? 0)}
             caption={
               categories[1]
@@ -212,6 +219,7 @@ export default function MaintenanceView({
         <Grid size={MAINTENANCE_STAT_CELL}>
           <StatCard
             title={topPayer ? `Paid by ${topPayer.name}` : "Paid by"}
+            icon={<PersonRoundedIcon />}
             value={formatMoney(topPayer?.amount ?? 0)}
             caption={
               otherPayers.length > 0
@@ -226,7 +234,13 @@ export default function MaintenanceView({
           />
         </Grid>
         <Grid size={MAINTENANCE_STAT_CELL}>
-          <StatCard title="Payer not tagged" value={formatMoney(totals.untagged)} caption={shareOf(totals.untagged, totals.amount)} />
+          <StatCard
+            title="Payer not tagged"
+            icon={<LabelOffRoundedIcon />}
+            tone={totals.untagged > 0 ? "warning" : "neutral"}
+            value={formatMoney(totals.untagged)}
+            caption={shareOf(totals.untagged, totals.amount)}
+          />
         </Grid>
       </Grid>
 

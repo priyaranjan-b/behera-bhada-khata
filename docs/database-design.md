@@ -65,7 +65,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0026_payments_page.sql` | `payments_page()`: every payment by day received, paged in SQL with totals per mode (A18); `payment_mode_label()`; index `payments (payment_date)` |
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 | `0029_drop_replaced_functions.sql` | drops the 30 functions the Drizzle adapter replaced: the `…_page()` functions of 0018-0026, their grid and label helpers, `tenant_account_summary()`, `hit_rate_limit()` / `prune_rate_limits()` (D33). The indexes they used stay |
-| `0030_payment_tags.sql` | `payment_tags` (suggested tags, managed on /profile) and `payment_record_tags` (each payment's own copy of its tag names, editable on /payments) (D34) |
+| `0030_payment_tags.sql` | `payment_tags` (suggested tags, managed on /settings) and `payment_record_tags` (each payment's own copy of its tag names, editable on /payments) (D34) |
 | `0032_set_off_mode.sql` | payment mode `set_off`: rent the tenant settled by keeping back what the owner owed them; counted as paid, never as cash received (A22, D36); `maintenance_expenses.settled_by_payment_id` for an expense a set-off paid for, taken by `create_maintenance_expense(…, p_settled_by_payment_id)` |
 | `0031_maintenance.sql` | `maintenance_expenses`, `maintenance_expense_units` (equal split per house), `maintenance_expense_tags` (who paid), `maintenance_files`; `create_/update_/void_maintenance_expense()`, `maintenance_shares()`; audit actions `maintenance.*`, the `category` audit format, index `audit_log (entity_type, entity_id)` (D35) |
 
@@ -795,7 +795,7 @@ tenant's age; one aggregate returns one row however long the history is.
 
 **Decision (0024).** `payment_note_presets` (uuid, `text`, unique on
 `lower(text)`) holds the notes offered under Note on Record payment. The
-owner adds, edits and deletes them on /profile; RLS with `is_app_owner()`
+owner adds, edits and deletes them on /settings; RLS with `is_app_owner()`
 for all four, plain table writes (D5: single rows). The form gets them in
 its one GET (`noteSuggestions` on `…/payments/new`).
 - **No audit trigger:** a payment copies the note's text into
@@ -931,7 +931,7 @@ collected the money. Two tables, both plain owner writes under RLS with
 - **`payment_tags`** (uuid, `name`, unique on `lower(name)`) holds the
   **suggestions** offered under Tags on Record payment and in the Payments
   page's tag editor, seeded with the five people who collect rent and
-  managed on /profile. A name typed on a payment that isn't there yet joins
+  managed on /settings. A name typed on a payment that isn't there yet joins
   it.
 - **`payment_record_tags`** (`payment_id`, `name`; one of each name per
   payment whatever the case) holds the tags a payment carries, each **its
@@ -986,7 +986,7 @@ society charges, tax) is a `maintenance_expenses` row (uuid, `expense_date`,
   may stay after it is retired.
 - **Who paid** reuses payment tags (D34): `maintenance_expense_tags` holds
   each expense's own copy of the names, and the suggestions are the same
-  `payment_tags` list (the same family pays and collects), so /profile keeps
+  `payment_tags` list (the same family pays and collects), so /settings keeps
   one list. Written by the adapter in the same transaction
   (`setRecordTags(tx, "maintenance", …)`). Not audited, as D34.
 - **Files** (`maintenance_files`) follow D21: added and deleted, never

@@ -6,6 +6,7 @@ import { dayRangeLabel, dayRangeUnit, shiftDayRange } from "@/lib/domain/payment
 import { routes } from "@/lib/routes";
 import { MAINTENANCE_LIMITS } from "@/lib/validation";
 import AsyncSection from "@/components/ui/AsyncSection";
+import ContextBar from "@/components/ui/ContextBar";
 import DayRangeForm from "@/components/ui/DayRangeForm";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
@@ -32,20 +33,27 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
         subtitle="What was spent on the houses, by the day it was paid."
         action={
           <ActionStack phone="primaryOnTop">
-            <PeriodSwitcher
-              label={rangeLabel}
-              unit={dayRangeUnit(range)}
-              prevHref={routes.maintenance.list(shiftDayRange(range, -1))}
-              nextHref={routes.maintenance.list(shiftDayRange(range, 1))}
-            />
             <LinkButton href={routes.maintenance.new()} variant="contained" startIcon={<AddRoundedIcon />}>
               Record maintenance
             </LinkButton>
           </ActionStack>
         }
       />
-      {/* Remount on a new range so the inputs show it. Sibling keys must differ, or React keeps the old form. */}
-      <DayRangeForm key={`form-${view}`} from={range.from} to={range.to} path={routes.maintenance.list()} fromLabel="Spent from" />
+      <ContextBar
+        period={
+          <PeriodSwitcher
+            label={rangeLabel}
+            unit={dayRangeUnit(range)}
+            prevHref={routes.maintenance.list(shiftDayRange(range, -1))}
+            nextHref={routes.maintenance.list(shiftDayRange(range, 1))}
+          />
+        }
+        options={
+          // Remount on a new range so the inputs show it. Sibling keys must differ, or React keeps the old form.
+          <DayRangeForm key={`form-${view}`} from={range.from} to={range.to} path={routes.maintenance.list()} fromLabel="Spent from" />
+        }
+        resetHref={routes.maintenance.list()}
+      />
       <AsyncSection key={`grid-${view}`} title="Maintenance" fallback={SKELETON.view}>
         <MaintenanceSection grid={grid} tagSuggestions={tagSuggestions} range={range} rangeLabel={rangeLabel} />
       </AsyncSection>

@@ -4,6 +4,7 @@ import { serverApi } from "@/lib/api-client/server";
 import { formatMonth } from "@/lib/dates";
 import { AGING_BAND_TONE } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import StatCard from "@/components/ui/StatCard";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import DefaultersList from "./DefaultersList";
@@ -25,6 +26,7 @@ export default async function DefaultersPage() {
           <Grid key={group.key} size={{ xs: 6, lg: 3 }}>
             <StatCard
               title={`${group.label} behind`}
+              icon={<ScheduleRoundedIcon />}
               value={formatMoney(group.outstanding)}
               caption={tenants(group.tenantCount)}
               badge={

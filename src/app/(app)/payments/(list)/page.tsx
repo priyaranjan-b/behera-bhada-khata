@@ -4,6 +4,7 @@ import { dayRangeFromParams, dayRangeLabel, dayRangeUnit, shiftDayRange } from "
 import { routes } from "@/lib/routes";
 import { PAYMENTS_LIMITS } from "@/lib/validation";
 import AsyncSection from "@/components/ui/AsyncSection";
+import ContextBar from "@/components/ui/ContextBar";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import DayRangeForm from "@/components/ui/DayRangeForm";
@@ -25,10 +26,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
 
   return (
     <Stack spacing={2}>
-      <PageHeader
-        title="Payments"
-        subtitle="Every payment received from all tenants, by the day it came in."
-        action={
+      <PageHeader title="Payments" subtitle="Every payment received from all tenants, by the day it came in." />
+      <ContextBar
+        period={
           <PeriodSwitcher
             label={rangeLabel}
             unit={dayRangeUnit(range)}
@@ -36,9 +36,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             nextHref={routes.payments.list(shiftDayRange(range, 1))}
           />
         }
+        options={
+          // Remount on a new range so the inputs show it. Sibling keys must differ, or React keeps the old form.
+          <DayRangeForm key={`form-${view}`} from={range.from} to={range.to} path={routes.payments.list()} fromLabel="Received from" />
+        }
+        resetHref={routes.payments.list()}
       />
-      {/* Remount on a new range so the inputs show it. Sibling keys must differ, or React keeps the old form. */}
-      <DayRangeForm key={`form-${view}`} from={range.from} to={range.to} path={routes.payments.list()} fromLabel="Received from" />
       <AsyncSection key={`grid-${view}`} title="Payments" fallback={SKELETON.view}>
         <PaymentsSection
           grid={grid}

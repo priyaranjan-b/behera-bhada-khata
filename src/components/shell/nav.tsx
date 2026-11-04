@@ -11,6 +11,7 @@ import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import HandymanRoundedIcon from "@mui/icons-material/HandymanRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import BuildCircleRoundedIcon from "@mui/icons-material/BuildCircleRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { routes } from "@/lib/routes";
 
 export type AppTab =
@@ -24,6 +25,7 @@ export type AppTab =
   | "maintenance"
   | "earnings"
   | "activity"
+  | "settings"
   | "addTenant"
   | "addHouse"
   | "addMaintenance";
@@ -39,6 +41,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
   { tab: "earnings", href: routes.earnings(), label: "Earnings", icon: <TrendingUpRoundedIcon /> },
   { tab: "defaulters", href: routes.defaulters, label: "Defaulters", icon: <PendingActionsRoundedIcon /> },
   { tab: "activity", href: routes.activity, label: "Activity", icon: <HistoryRoundedIcon /> },
+  { tab: "settings", href: routes.settings, label: "Settings", icon: <SettingsRoundedIcon /> },
 ];
 
 /** Shortcuts under the main menu: start a form without first opening a tower. */
