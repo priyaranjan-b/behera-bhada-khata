@@ -30,6 +30,14 @@ import type {
   EditTenantForm,
   HouseCounts,
   LocationGroup,
+  CreateMaintenanceInput,
+  MaintenanceDetail,
+  MaintenanceFilesSaved,
+  MaintenanceForm,
+  MaintenancePage,
+  MaintenancePageQuery,
+  UpdateMaintenanceInput,
+  VoidMaintenanceInput,
   MoveOutInput,
   NewHouseForm,
   NewPropertyForm,
@@ -160,6 +168,15 @@ export interface ApiQueries {
       /** The tag names the Payments page's tag editor offers, alphabetical. */
       tagSuggestions(): Promise<string[]>;
     };
+    maintenance: {
+      /** Every expense spent in the days, one page, with totals (0031). */
+      list(query?: MaintenancePageQuery): Promise<MaintenancePage>;
+      /** The Record / Edit maintenance form's houses and who-paid suggestions. */
+      newForm(): Promise<MaintenanceForm>;
+      detail(expenseId: string): Promise<MaintenanceDetail>;
+      /** One expense's change history; `before` = AuditPage.nextBefore. */
+      history(expenseId: string, before?: number): Promise<AuditPage>;
+    };
   };
   confirm: {
     detail(token: string): Promise<ConfirmView>;
@@ -214,6 +231,16 @@ export interface ApiCommands {
     };
     adjustments: {
       resend(adjustmentId: string): Promise<LinkResent>;
+    };
+    maintenance: {
+      /** `files`: receipts or photos, sent as multipart (MAINTENANCE_FILE_LIMITS). */
+      create(input: CreateMaintenanceInput, files?: File[]): Promise<Created>;
+      update(expenseId: string, input: UpdateMaintenanceInput): Promise<void>;
+      void(expenseId: string, input: VoidMaintenanceInput): Promise<void>;
+      /** Replaces who paid; a new name joins the suggestions. */
+      setTags(expenseId: string, input: SetPaymentTagsInput): Promise<PaymentTagsView>;
+      addFiles(expenseId: string, files: File[]): Promise<MaintenanceFilesSaved>;
+      deleteFile(expenseId: string, fileId: string): Promise<void>;
     };
   };
   confirm: {

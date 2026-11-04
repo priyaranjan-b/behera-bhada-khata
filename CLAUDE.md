@@ -203,11 +203,20 @@ both together.
   the text.
 - **Payment tags** (`0030_payment_tags.sql`, D34): optional labels on a
   payment (who received it, ...), set on Record payment and edited on
-  `/payments` (`EditPaymentTagsDialog`, `PUT …/payments/[id]/tags`). Each
+  `/payments` (`EditTagsDialog`, `PUT …/payments/[id]/tags`). Each
   payment keeps its own copy of the names (`payment_record_tags`); the
   suggestions (`payment_tags`, managed on `/profile`, `PaymentTagsCard`)
   never change a payment. Searched with the Payments and Ledger tables.
   Services in `src/server/services/paymentTags.ts`; not audited.
+- **Maintenance expenses** (`0031_maintenance.sql`, D35): money spent on
+  the houses, on one house or several split equally (each house's
+  `share_amount`, `maintenance_shares()` = `splitEqually`), with a fixed
+  `category`, who paid (tags copied from the shared `payment_tags`
+  suggestions) and receipts under `maintenance/<id>/files/`. Edited
+  (`update_maintenance_expense`) or voided (kept, counted nowhere), never
+  deleted; every change audited under the expense. `/maintenance` (paged in
+  the database, cards follow the table), `/maintenance/new`,
+  `/maintenance/[id]`; services in `src/server/services/maintenance.ts`.
 - **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
   agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,
   `src/server/services/tenantDocuments.ts`), one `tenant_documents` row per

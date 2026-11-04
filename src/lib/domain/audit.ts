@@ -5,7 +5,7 @@ import { AUDIT_ACTIONS, type AuditAction } from "@/lib/types";
 // the row is inserted (0017, D27); audit_action_label() there must give the
 // same labels as ACTIONS here (test/schema.test.ts checks it).
 
-export const AUDIT_CATEGORIES = ["tenants", "rent", "houses", "money", "documents", "messages", "access"] as const;
+export const AUDIT_CATEGORIES = ["tenants", "rent", "houses", "money", "maintenance", "documents", "messages", "access"] as const;
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
 export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
@@ -13,6 +13,7 @@ export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
   rent: "Rent",
   houses: "Houses",
   money: "Payments",
+  maintenance: "Maintenance",
   documents: "Documents",
   messages: "Messages",
   access: "Sign-ins & profile",
@@ -51,6 +52,14 @@ const ACTIONS: Record<AuditAction, { label: string; category: AuditCategory }> =
   "adjustment.recorded": { label: "Correction recorded", category: "money" },
   "adjustment.acknowledged": { label: "Correction acknowledged by tenant", category: "money" },
   "adjustment.changed": { label: "Correction changed", category: "money" },
+  "maintenance.recorded": { label: "Maintenance recorded", category: "maintenance" },
+  "maintenance.updated": { label: "Maintenance changed", category: "maintenance" },
+  "maintenance.voided": { label: "Maintenance voided", category: "maintenance" },
+  "maintenance.house_added": { label: "Maintenance: house added", category: "maintenance" },
+  "maintenance.house_removed": { label: "Maintenance: house removed", category: "maintenance" },
+  "maintenance.share_changed": { label: "Maintenance: share changed", category: "maintenance" },
+  "maintenance.file_added": { label: "Maintenance file added", category: "maintenance" },
+  "maintenance.file_removed": { label: "Maintenance file deleted", category: "maintenance" },
   "owner.created": { label: "Owner account set", category: "access" },
   "owner.updated": { label: "Owner account changed", category: "access" },
   "owner.deleted": { label: "Owner account removed", category: "access" },

@@ -1,0 +1,87 @@
+import { currentMonthKey, isDateKey, monthDayRange } from "@/lib/dates";
+import { MAINTENANCE_CATEGORIES, type MaintenanceCategory } from "@/lib/types";
+import { resolveDayRange, type DayRange } from "./payments";
+
+// Maintenance expenses (0031, D35): what the owner spends on the houses.
+// Client-safe: the form's split preview, the list and the history share it.
+
+/** How each category reads; audit_value() in 0031 gives the same text (test/schema.test.ts). */
+export const MAINTENANCE_CATEGORY_LABELS: Record<MaintenanceCategory, string> = {
+  plumbing: "Plumbing",
+  electrical: "Electrical",
+  painting: "Painting",
+  carpentry: "Carpentry",
+  civil_repair: "Civil & masonry",
+  appliance: "Appliances",
+  cleaning: "Cleaning",
+  utilities: "Water & electricity bills",
+  society_charges: "Society / common charges",
+  property_tax: "Property tax",
+  other: "Other",
+};
+
+/** For a `<select>`: every category in display order. */
+export const MAINTENANCE_CATEGORY_OPTIONS = MAINTENANCE_CATEGORIES.map((value) => ({
+  value,
+  label: MAINTENANCE_CATEGORY_LABELS[value],
+}));
+
+export function isMaintenanceCategory(value: string): value is MaintenanceCategory {
+  return (MAINTENANCE_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** Never shows the raw value; an unknown category reads "Other". */
+export function maintenanceCategoryLabel(category: string): string {
+  return isMaintenanceCategory(category) ? MAINTENANCE_CATEGORY_LABELS[category] : MAINTENANCE_CATEGORY_LABELS.other;
+}
+
+/** One house's part of an expense. */
+export interface HouseShare {
+  unitCode: string;
+  share: number;
+}
+
+/**
+ * The amount split equally over the houses, as maintenance_shares() in 0031
+ * does it: everyone gets the same whole paise, and the paise left over go
+ * one each to the first houses by code, so the shares add up to the amount.
+ * Duplicates count once; the result is in code order.
+ */
+export function splitEqually(amount: number, unitCodes: readonly string[]): HouseShare[] {
+  const codes = [...new Set(unitCodes)].sort();
+  if (codes.length === 0 || !Number.isFinite(amount) || amount <= 0) return codes.map((unitCode) => ({ unitCode, share: 0 }));
+  const paise = Math.round(amount * 100);
+  const base = Math.floor(paise / codes.length);
+  const extra = paise - base * codes.length;
+  return codes.map((unitCode, i) => ({ unitCode, share: (base + (i < extra ? 1 : 0)) / 100 }));
+}
+
+// ---- The Maintenance page: expenses by the day spent ----------------------------
+
+/** The Maintenance grid's sortable and filterable columns (queries/maintenancePage.ts). */
+export const MAINTENANCE_SORT_FIELDS = ["expenseDate", "description", "category", "amount", "unitsText"] as const;
+export const MAINTENANCE_FILTER_FIELDS = [
+  "expenseDate",
+  "description",
+  "category",
+  "unitsText",
+  "vendor",
+  "note",
+  "tags",
+  "status",
+] as const;
+
+/**
+ * The days a request or page URL asks for: as resolveDayRange (malformed
+ * dates ignored), but no input = this month, where a new expense lands.
+ */
+export function maintenanceRange(params: { from?: string; to?: string }, maxDays: number, now: Date = new Date()): DayRange {
+  const valid = (key: string | undefined) => (key && isDateKey(key) ? key : undefined);
+  const from = valid(params.from);
+  const to = valid(params.to);
+  if (!from && !to) return monthDayRange(currentMonthKey(now));
+  return resolveDayRange({ from, to }, maxDays, now);
+}
+
+/** Status column values, as shown (the grid filters on the label). */
+export const MAINTENANCE_STATUS_LABELS = { counted: "Counted", voided: "Voided" } as const;

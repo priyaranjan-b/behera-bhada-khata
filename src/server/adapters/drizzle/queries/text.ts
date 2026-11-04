@@ -72,9 +72,18 @@ export function unitCodesNow(tenantId: SQL, today: string): SQL {
  * ", ", both alphabetical (any case), as the Tags column shows them.
  */
 export function paymentTagsOf(paymentId: SQL): SQL {
+  return tagsOf(sql`payment_record_tags`, sql`payment_id`, paymentId);
+}
+
+/** A maintenance expense's "paid by" tags (0031), as paymentTagsOf. */
+export function maintenanceTagsOf(expenseId: SQL): SQL {
+  return tagsOf(sql`maintenance_expense_tags`, sql`expense_id`, expenseId);
+}
+
+function tagsOf(table: SQL, key: SQL, id: SQL): SQL {
   return sql`
-    select coalesce(json_agg(prt.name order by lower(prt.name), prt.name), '[]'::json) as names,
-      coalesce(string_agg(prt.name, ', ' order by lower(prt.name), prt.name), '') as text
-    from payment_record_tags prt
-    where prt.payment_id = ${paymentId}`;
+    select coalesce(json_agg(rt.name order by lower(rt.name), rt.name), '[]'::json) as names,
+      coalesce(string_agg(rt.name, ', ' order by lower(rt.name), rt.name), '') as text
+    from ${table} rt
+    where rt.${key} = ${id}`;
 }

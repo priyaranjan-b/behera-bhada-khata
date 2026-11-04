@@ -25,7 +25,7 @@ import { suggestAllocations, summarizeBalance, type PeriodLike } from "@/lib/dom
 import { currentMonthKey, formatDateKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
-import PaymentTagsField from "@/components/domain/PaymentTagsField";
+import TagsField from "@/components/domain/TagsField";
 import { prepareProofFile } from "@/lib/proofImages";
 import { PAYMENT_NOTE_LIMITS, PROOF_LIMITS } from "@/lib/validation";
 import { PAYMENT_MODE_OPTIONS, recentDayPicks } from "@/lib/domain/payments";
@@ -193,7 +193,7 @@ export default function PaymentForm({
                 fullWidth
               />
 
-              <PaymentTagsField value={tags} onChange={setTags} suggestions={tagSuggestions} disabled={submitting} />
+              <TagsField value={tags} onChange={setTags} suggestions={tagSuggestions} disabled={submitting} />
             </SectionCard>
 
             <FileAttachmentsField

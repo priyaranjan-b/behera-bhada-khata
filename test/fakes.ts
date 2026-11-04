@@ -4,7 +4,14 @@
 // and call resetFakes() in beforeEach. Services read the bindings at call
 // time, so the getters below always hand out the current fakes.
 import { vi } from "vitest";
-import type { AuditEvent, AuditFilter, AuditHistoryFilter } from "@/server/ports";
+import type {
+  AuditEvent,
+  AuditFilter,
+  AuditHistoryFilter,
+  MaintenanceExpenseFields,
+  MaintenanceExpenseRecord,
+  NewMaintenanceFile,
+} from "@/server/ports";
 import { auditActionLabel } from "@/lib/domain/audit";
 import { ApiError } from "@/lib/errors";
 import type {
@@ -161,6 +168,8 @@ function build() {
     tagsAdded: 0,
     /** Each payment's own copy of its tag names (payment_record_tags). */
     paymentTags: new Map<string, string[]>(),
+    /** Maintenance expenses (0031) by id, with their houses, tags and files. */
+    maintenance: new Map<string, MaintenanceExpenseRecord>(),
     rateLimitAllows: true,
     /** Newest last; list() returns newest first like the database. */
     audit: [] as AuditLogEntry[],
@@ -300,6 +309,92 @@ function build() {
     properties: { list: vi.fn(async () => [property]), get: vi.fn(async () => property), create: vi.fn() },
     units: { list: vi.fn(async () => units), create: vi.fn() },
     occupancy: { list: vi.fn(async () => occupancy) },
+    maintenance: {
+      page: vi.fn(async () => ({
+        rows: [],
+        total: 0,
+        all: 0,
+        page: 0,
+        totals: { amount: 0, count: 0, by_category: {}, by_tag: [], untagged: 0 },
+      })),
+      get: vi.fn(async (id: string) => state.maintenance.get(id) ?? null),
+      create: vi.fn(
+        async (id: string, f: MaintenanceExpenseFields, unitCodes: string[], tags: string[], files: NewMaintenanceFile[]) => {
+          const share = Math.round((f.amount * 100) / unitCodes.length) / 100;
+          state.maintenance.set(id, {
+            expense: {
+              ...f,
+              id,
+              voided_at: null,
+              void_reason: null,
+              recorded_by: OWNER_ID,
+              created_at: "2026-10-24T00:00:00Z",
+              updated_at: "2026-10-24T00:00:00Z",
+            },
+            units: [...unitCodes].sort().map((unit_code) => ({
+              unit_code,
+              share_amount: share,
+              property_code: "AC-T1",
+              property_name: "Tower 1",
+              label: null,
+            })),
+            tags: [...tags].sort(byName),
+            files: files.map((r, i) => ({
+              ...r,
+              id: `00000000-0000-4000-8000-${String(900 + i).padStart(12, "0")}`,
+              recorded_by: OWNER_ID,
+              created_at: "2026-10-24T00:00:00Z",
+            })),
+          });
+        }
+      ),
+      update: vi.fn(async (id: string, f: MaintenanceExpenseFields) => {
+        const record = state.maintenance.get(id);
+        if (!record) throw new ApiError(404, "Expense not found");
+        if (record.expense.voided_at) throw new ApiError(409, "This expense was voided and can't be changed");
+        record.expense = { ...record.expense, ...f };
+      }),
+      void: vi.fn(async (id: string, reason: string) => {
+        const record = state.maintenance.get(id);
+        if (!record) throw new ApiError(404, "Expense not found");
+        if (record.expense.voided_at) throw new ApiError(409, "This expense is already voided");
+        record.expense = { ...record.expense, voided_at: "2026-10-25T00:00:00Z", void_reason: reason };
+      }),
+      setTags: vi.fn(async (id: string, names: string[]) => {
+        const record = state.maintenance.get(id);
+        if (!record) return null;
+        record.tags = [...names].sort(byName);
+        return record.tags;
+      }),
+      addFiles: vi.fn(async (rows: NewMaintenanceFile[]) => {
+        for (const row of rows) {
+          const record = state.maintenance.get(row.expense_id)!;
+          record.files.push({
+            ...row,
+            id: `00000000-0000-4000-8000-${String(950 + record.files.length).padStart(12, "0")}`,
+            recorded_by: OWNER_ID,
+            created_at: "2026-10-24T00:00:00Z",
+          });
+        }
+      }),
+      getFile: vi.fn(async (fileId: string) => {
+        for (const r of state.maintenance.values()) {
+          const file = r.files.find((f) => f.id === fileId);
+          if (file) return file;
+        }
+        return null;
+      }),
+      removeFile: vi.fn(async (fileId: string) => {
+        for (const r of state.maintenance.values()) {
+          const i = r.files.findIndex((f) => f.id === fileId);
+          if (i >= 0) {
+            r.files.splice(i, 1);
+            return true;
+          }
+        }
+        return false;
+      }),
+    },
     tenantDocuments: {
       list: vi.fn(async (tenantId: string) => [...state.documents.values()].filter((d) => d.tenant_id === tenantId)),
       tenantIdsWithDocuments: vi.fn(async () => [...new Set([...state.documents.values()].map((d) => d.tenant_id))]),

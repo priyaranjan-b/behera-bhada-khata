@@ -16,6 +16,8 @@ export const FLASH = {
   paymentCreated: "paymentCreated",
   notifyFailed: "notifyFailed",
   resent: "resent",
+  maintenanceSaved: "maintenanceSaved",
+  maintenanceVoided: "maintenanceVoided",
   error: "error",
 } as const;
 
@@ -82,6 +84,13 @@ export const routes = {
     /** `from`/`to` are days received, yyyy-MM-dd; none = last month. */
     list: (query?: { from?: string; to?: string }) => withQuery("/payments", query),
     adjust: (id: string) => `/payments/${e(id)}/adjust`,
+  },
+  maintenance: {
+    /** `from`/`to` are days spent, yyyy-MM-dd; none = this month. */
+    list: (query?: { from?: string; to?: string }) => withQuery("/maintenance", query),
+    new: "/maintenance/new",
+    detail: (id: string, flash?: Flash) => withQuery(`/maintenance/${e(id)}`, flash),
+    edit: (id: string) => `/maintenance/${e(id)}/edit`,
   },
 } as const;
 

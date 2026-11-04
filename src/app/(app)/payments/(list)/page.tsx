@@ -6,7 +6,7 @@ import { PAYMENTS_LIMITS } from "@/lib/validation";
 import AsyncSection from "@/components/ui/AsyncSection";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import { PageHeader } from "@/components/ui/DataDisplay";
-import PaymentsRangeForm from "./PaymentsRangeForm";
+import DayRangeForm from "@/components/ui/DayRangeForm";
 import { PAYMENTS_SKELETONS as SKELETON } from "./paymentsSkeletons";
 import PaidDirectStat from "./sections/PaidDirectStat";
 import PaymentsSection from "./sections/PaymentsSection";
@@ -38,7 +38,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         }
       />
       {/* Remount on a new range so the inputs show it. Sibling keys must differ, or React keeps the old form. */}
-      <PaymentsRangeForm key={`form-${view}`} from={range.from} to={range.to} />
+      <DayRangeForm key={`form-${view}`} from={range.from} to={range.to} path={routes.payments.list()} fromLabel="Received from" />
       <AsyncSection key={`grid-${view}`} title="Payments" fallback={SKELETON.view}>
         <PaymentsSection
           grid={grid}

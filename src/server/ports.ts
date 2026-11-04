@@ -21,6 +21,13 @@ import type {
   Database,
   LedgerStatus,
   Location,
+  MaintenanceCategory,
+  MaintenanceDbRow,
+  MaintenanceExpense,
+  MaintenanceFile,
+  MaintenanceFilterColumn,
+  MaintenanceSortColumn,
+  MaintenanceTotalsDb,
   OwnerProfile,
   PaymentNotePreset,
   PaymentTag,
@@ -58,6 +65,30 @@ export interface NewProperty {
 
 /** A file kept on a tenant (0011); recorded_by and created_at come from the database. */
 export type NewTenantDocument = Insert<"tenant_documents">;
+
+/** A maintenance expense's fields (0031); the houses and the split are separate. */
+export interface MaintenanceExpenseFields {
+  expense_date: string;
+  amount: number;
+  category: MaintenanceCategory;
+  description: string;
+  vendor: string | null;
+  note: string | null;
+}
+
+/** A file on a maintenance expense (0031), stored under maintenance/<expense_id>/files/. */
+export type NewMaintenanceFile = Insert<"maintenance_files">;
+
+/** One expense with its houses (and their towers), who paid and its files. */
+export interface MaintenanceExpenseRecord {
+  expense: MaintenanceExpense;
+  /** In code order. */
+  units: { unit_code: string; share_amount: number; property_code: string; property_name: string; label: string | null }[];
+  /** Alphabetical. */
+  tags: string[];
+  /** Oldest first. */
+  files: MaintenanceFile[];
+}
 
 export interface NewUnit {
   unit_code: string;
@@ -144,6 +175,8 @@ export interface AuditFilter {
   tenantId?: string;
   unitCode?: string;
   propertyCode?: string;
+  /** One record's own history (a maintenance expense, 0031): its entity type and id. */
+  entity?: { type: string; id: string };
   actions?: readonly AuditAction[];
   /** yyyy-MM-dd, inclusive, in the app time zone. */
   fromDate?: string;
@@ -201,6 +234,20 @@ export interface PaymentsFilter {
   filters: { field: PaymentsFilterColumn; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;
   sort: PaymentsSortColumn;
+  dir: SortDirection;
+  page: number;
+  pageSize: number;
+}
+
+/** One page of the Maintenance grid (A15): queries/maintenancePage.ts. */
+export interface MaintenanceFilter {
+  /** Days spent, yyyy-MM-dd, both included. */
+  from: string;
+  to: string;
+  search?: string;
+  filters: { field: MaintenanceFilterColumn; operator: GridOperator; value?: GridFilterValue }[];
+  logic: FilterLogic;
+  sort: MaintenanceSortColumn;
   dir: SortDirection;
   page: number;
   pageSize: number;
@@ -297,6 +344,28 @@ export interface OwnerRepositories {
     update(id: string, name: string): Promise<boolean>;
     /** False if no such tag. */
     remove(id: string): Promise<boolean>;
+  };
+  /**
+   * Maintenance expenses (0031, D35). The expense and its houses change only
+   * through create / update / void (SQL functions: the split always adds up);
+   * tags and files are plain writes. Refusals are ApiErrors (400/404/409).
+   */
+  maintenance: {
+    /** The expenses spent in the days, one page, with totals of every matching expense that isn't voided. */
+    page(filter: MaintenanceFilter): Promise<DbPage<MaintenanceDbRow> & { totals: MaintenanceTotalsDb }>;
+    get(id: string): Promise<MaintenanceExpenseRecord | null>;
+    /** The expense, its houses split equally, who paid and its files, in one transaction. */
+    create(id: string, fields: MaintenanceExpenseFields, unitCodes: string[], tags: string[], files: NewMaintenanceFile[]): Promise<void>;
+    /** Every field and the houses (re-split); refused (409) once voided. */
+    update(id: string, fields: MaintenanceExpenseFields, unitCodes: string[]): Promise<void>;
+    /** Refused (409) if already voided. */
+    void(id: string, reason: string): Promise<void>;
+    /** As payments.setTags. Null if no such expense. */
+    setTags(id: string, names: string[]): Promise<string[] | null>;
+    addFiles(rows: NewMaintenanceFile[]): Promise<void>;
+    getFile(fileId: string): Promise<MaintenanceFile | null>;
+    /** False if no such file. */
+    removeFile(fileId: string): Promise<boolean>;
   };
   locations: {
     /** By code. */

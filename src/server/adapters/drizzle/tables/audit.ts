@@ -22,6 +22,7 @@ export function listAudit(tx: Tx, filter: AuditFilter): Promise<AuditLogEntry[]>
         filter.tenantId ? eq(auditLog.tenant_id, filter.tenantId) : undefined,
         filter.unitCode ? eq(auditLog.unit_code, filter.unitCode) : undefined,
         filter.propertyCode ? eq(auditLog.property_code, filter.propertyCode) : undefined,
+        filter.entity ? and(eq(auditLog.entity_type, filter.entity.type), eq(auditLog.entity_id, filter.entity.id)) : undefined,
         filter.actions?.length ? inArray(auditLog.action, [...filter.actions]) : undefined,
         filter.fromDate ? gte(auditLog.at, dayStart(filter.fromDate)) : undefined,
         // The whole of the last day: before the next one starts.

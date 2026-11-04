@@ -3,10 +3,10 @@ import { asc, eq, sql } from "drizzle-orm";
 import type { PaymentTag } from "@/lib/types";
 import { executeRows, type Tx } from "../client";
 import { textArray } from "../procedures/params";
-import { paymentTags, payments } from "../schema";
+import { paymentTags } from "../schema";
 
-// Payment tags (0030, D34): the suggestions, and each payment's own copy of
-// its tag names (payment_record_tags), plain owner writes under RLS
+// Payment tags (0030, D34): the suggestions, and each payment's (and, 0031,
+// each maintenance expense's) own copy of its tag names, plain owner writes under RLS
 // (is_app_owner()). Renaming or removing a suggestion never touches a
 // payment. Not audited, like the quick payment notes (D30).
 
@@ -42,44 +42,56 @@ export async function removePaymentTag(tx: Tx, id: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+/** The records that carry tags: each keeps its own copy of the names; the suggestions are payment_tags. */
+const RECORD_TAGS = {
+  payment: { tags: sql.identifier("payment_record_tags"), key: sql.identifier("payment_id"), parent: sql.identifier("payments") },
+  maintenance: {
+    tags: sql.identifier("maintenance_expense_tags"),
+    key: sql.identifier("expense_id"),
+    parent: sql.identifier("maintenance_expenses"),
+  },
+} as const;
+
+export type TaggedRecord = keyof typeof RECORD_TAGS;
+
 /**
- * Makes `names` the payment's tags. A name it already has (any case) stays
+ * Makes `names` the record's tags. A name it already has (any case) stays
  * as it is; a new one takes a suggestion's spelling if one matches, and joins
- * the suggestions if none does. Null if the payment doesn't exist (or isn't
+ * the suggestions if none does. Null if the record doesn't exist (or isn't
  * visible); else its tags, alphabetical. Part of the caller's transaction.
  */
-export async function setPaymentTags(tx: Tx, paymentId: string, names: string[]): Promise<string[] | null> {
-  const [payment] = await tx.select({ id: payments.id }).from(payments).where(eq(payments.id, paymentId));
-  if (!payment) return null;
+export async function setRecordTags(tx: Tx, kind: TaggedRecord, recordId: string, names: string[]): Promise<string[] | null> {
+  const { tags, key, parent } = RECORD_TAGS[kind];
+  const [record] = await executeRows<{ id: string }>(tx, sql`select id from ${parent} where id = ${recordId}::uuid`);
+  if (!record) return null;
   const wanted = sql`(select lower(n) from unnest(${textArray(names)}) as n)`;
-  await executeRows(
-    tx,
-    sql`delete from payment_record_tags
-      where payment_id = ${paymentId}::uuid and lower(name) not in ${wanted}`
-  );
+  await executeRows(tx, sql`delete from ${tags} where ${key} = ${recordId}::uuid and lower(name) not in ${wanted}`);
   if (names.length > 0) {
-    // Only the names new to this payment: re-saving one whose tag was removed
+    // Only the names new to this record: re-saving one whose tag was removed
     // from the suggestions doesn't bring it back.
     await executeRows(
       tx,
       sql`with added as (
           select n from unnest(${textArray(names)}) as n
           where not exists (
-            select 1 from payment_record_tags prt where prt.payment_id = ${paymentId}::uuid and lower(prt.name) = lower(n)
+            select 1 from ${tags} rt where rt.${key} = ${recordId}::uuid and lower(rt.name) = lower(n)
           )
         ),
         suggested as (
           insert into payment_tags (name) select n from added on conflict ((lower(name))) do nothing
         )
-        insert into payment_record_tags (payment_id, name)
-        select ${paymentId}::uuid, coalesce((select pt.name from payment_tags pt where lower(pt.name) = lower(a.n)), a.n)
+        insert into ${tags} (${key}, name)
+        select ${recordId}::uuid, coalesce((select pt.name from payment_tags pt where lower(pt.name) = lower(a.n)), a.n)
         from added a
         on conflict do nothing`
     );
   }
   const rows = await executeRows<{ name: string }>(
     tx,
-    sql`select name from payment_record_tags where payment_id = ${paymentId}::uuid order by lower(name), name`
+    sql`select name from ${tags} where ${key} = ${recordId}::uuid order by lower(name), name`
   );
   return rows.map((r) => r.name);
 }
+
+/** setRecordTags for a payment (0030). */
+export const setPaymentTags = (tx: Tx, paymentId: string, names: string[]) => setRecordTags(tx, "payment", paymentId, names);

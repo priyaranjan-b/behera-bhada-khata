@@ -28,7 +28,7 @@ import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/domain/payments";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
-import EditPaymentTagsDialog from "@/components/domain/EditPaymentTagsDialog";
+import EditTagsDialog from "@/components/domain/EditTagsDialog";
 import { PAYMENT_STAT_CELL } from "./paymentStatCell";
 
 const tagsOf = (row: PaymentListRow) => row.tags;
@@ -216,10 +216,15 @@ export default function PaymentsView({
         }
       />
       {editing ? (
-        <EditPaymentTagsDialog
+        <EditTagsDialog
           key={editing.id}
-          payment={editing}
+          title="Payment tags"
+          summary={`${editing.tenantName} · ${formatMoney(editing.amount)} on ${formatDateKey(editing.paymentDate)}${
+            editing.receiptNo ? ` · #${editing.receiptNo}` : ""
+          }`}
+          tags={editing.tags}
           suggestions={suggestions}
+          save={async (tags) => (await api.dashboard.payments.setTags(editing.id, { tags })).tags}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
             // A new name now shows among the suggestions, as on the server.

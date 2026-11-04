@@ -28,6 +28,21 @@ export type PeriodStatus = (typeof PERIOD_STATUSES)[number];
 export const PAYMENT_MODES = ["cash", "bank_transfer", "upi", "cheque", "other"] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 export type LedgerStatus = "pending" | "confirmed";
+/** What a maintenance expense was for (0031, D35). Labels in src/lib/domain/maintenance.ts. */
+export const MAINTENANCE_CATEGORIES = [
+  "plumbing",
+  "electrical",
+  "painting",
+  "carpentry",
+  "civil_repair",
+  "appliance",
+  "cleaning",
+  "utilities",
+  "society_charges",
+  "property_tax",
+  "other",
+] as const;
+export type MaintenanceCategory = (typeof MAINTENANCE_CATEGORIES)[number];
 /** Who made an audited change (0015). */
 export const AUDIT_ACTOR_KINDS = ["owner", "tenant", "system", "visitor"] as const;
 export type AuditActorKind = (typeof AUDIT_ACTOR_KINDS)[number];
@@ -77,6 +92,14 @@ export const AUDIT_ACTIONS = [
   "adjustment.recorded",
   "adjustment.acknowledged",
   "adjustment.changed",
+  "maintenance.recorded",
+  "maintenance.updated",
+  "maintenance.voided",
+  "maintenance.house_added",
+  "maintenance.house_removed",
+  "maintenance.share_changed",
+  "maintenance.file_added",
+  "maintenance.file_removed",
   "owner.created",
   "owner.updated",
   "owner.deleted",
@@ -105,6 +128,18 @@ export type ProofArg = {
   file_name: string;
   content_type: ProofContentType;
   size_bytes: number;
+};
+
+/** create_maintenance_expense / update_maintenance_expense (0031). */
+export type MaintenanceExpenseArgs = {
+  p_id: string;
+  p_expense_date: string;
+  p_amount: number;
+  p_category: MaintenanceCategory;
+  p_description: string;
+  p_vendor: string | null;
+  p_note: string | null;
+  p_unit_codes: string[];
 };
 
 /** acknowledge_payment / acknowledge_adjustment (0010): the tenant's optional signature + OTP. */
@@ -166,6 +201,63 @@ export interface Database {
       payment_record_tags: {
         Row: { payment_id: string; name: string; created_at: string };
         Insert: { payment_id: string; name: string };
+        Update: never;
+        Relationships: [];
+      };
+      /** Money spent on the houses (0031, D35); written by the maintenance functions only. */
+      maintenance_expenses: {
+        Row: {
+          id: string;
+          expense_date: string;
+          amount: number;
+          category: MaintenanceCategory;
+          description: string;
+          vendor: string | null;
+          note: string | null;
+          voided_at: string | null;
+          void_reason: string | null;
+          recorded_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** The houses an expense covers and each one's share (0031). */
+      maintenance_expense_units: {
+        Row: { expense_id: string; unit_code: string; share_amount: number };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** Who paid an expense, each a copy of the name (0031); inserted and deleted, never updated. */
+      maintenance_expense_tags: {
+        Row: { expense_id: string; name: string; created_at: string };
+        Insert: { expense_id: string; name: string };
+        Update: never;
+        Relationships: [];
+      };
+      /** Receipts and photos on an expense (0031); added and deleted, never updated. */
+      maintenance_files: {
+        Row: {
+          id: string;
+          expense_id: string;
+          storage_path: string;
+          file_name: string;
+          content_type: ProofContentType;
+          size_bytes: number;
+          recorded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          expense_id: string;
+          storage_path: string;
+          file_name: string;
+          content_type: ProofContentType;
+          size_bytes: number;
+        };
         Update: never;
         Relationships: [];
       };
@@ -658,6 +750,12 @@ export interface Database {
         };
         Returns: undefined;
       };
+      /** 0031: an expense on one or more houses, split equally. */
+      create_maintenance_expense: { Args: MaintenanceExpenseArgs; Returns: undefined };
+      /** 0031: every field and the houses (re-split); refused once voided. */
+      update_maintenance_expense: { Args: MaintenanceExpenseArgs; Returns: undefined };
+      /** 0031: keeps the expense, leaves it out of every total. */
+      void_maintenance_expense: { Args: { p_id: string; p_reason: string }; Returns: undefined };
       acknowledge_payment: { Args: AcknowledgeArgs; Returns: boolean };
       acknowledge_adjustment: { Args: AcknowledgeArgs; Returns: boolean };
       /** 0015: app events; the service role may name the actor, the owner logs as themselves. */
@@ -736,6 +834,38 @@ export interface PaymentsTotalsDb {
   by_mode: Record<PaymentMode, number>;
 }
 
+/** The Maintenance page query (maintenancePage, 0031): the columns it sorts and matches by. */
+export type MaintenanceSortColumn = "expense_date" | "description" | "category" | "amount" | "units_text";
+export type MaintenanceFilterColumn = "date" | "description" | "category" | "units" | "vendor" | "note" | "tags" | "status";
+
+/** A row of the Maintenance page query: one expense, voided ones included. */
+export interface MaintenanceDbRow {
+  id: string;
+  expense_date: string;
+  amount: number;
+  category: MaintenanceCategory;
+  description: string;
+  vendor: string | null;
+  note: string | null;
+  voided: boolean;
+  /** Its houses' codes, in code order. */
+  unit_codes: string[];
+  /** Who paid (0031), alphabetical. */
+  tags: string[];
+  file_count: number;
+}
+
+/** The Maintenance page totals: every matching expense that isn't voided, whatever the page. */
+export interface MaintenanceTotalsDb {
+  amount: number;
+  count: number;
+  by_category: Partial<Record<MaintenanceCategory, number>>;
+  /** Per payer; an expense with several payers counts in full for each. */
+  by_tag: { name: string; amount: number }[];
+  /** Amount with no payer tag. */
+  untagged: number;
+}
+
 /** The Billing stat cards for the range (billingTotals; was billing_totals, 0021). */
 export interface BillingTotalsDb {
   billed: number;
@@ -797,3 +927,6 @@ export type PaymentProof = Database["public"]["Tables"]["payment_proofs"]["Row"]
 export type Adjustment = Database["public"]["Tables"]["adjustments"]["Row"];
 export type AdjustmentAllocation = Database["public"]["Tables"]["adjustment_allocations"]["Row"];
 export type AuditLogEntry = Database["public"]["Tables"]["audit_log"]["Row"];
+export type MaintenanceExpense = Database["public"]["Tables"]["maintenance_expenses"]["Row"];
+export type MaintenanceExpenseUnit = Database["public"]["Tables"]["maintenance_expense_units"]["Row"];
+export type MaintenanceFile = Database["public"]["Tables"]["maintenance_files"]["Row"];

@@ -16,6 +16,14 @@ import type { AuditEntry } from "@/lib/contracts";
 import { formatDateTime } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 
+/** Whose history: a house's (its details and tenancies) or a maintenance expense's (0031). */
+export type AuditSubject = { kind: "house"; unitCode: string } | { kind: "maintenance"; expenseId: string };
+
+function loadHistory(subject: AuditSubject, before?: number) {
+  return subject.kind === "house"
+    ? api.dashboard.houses.history(subject.unitCode, before)
+    : api.dashboard.maintenance.history(subject.expenseId, before);
+}
 
 /** Consecutive entries written in one transaction are one change (a move-out and the months it dropped). */
 function groupByChange(entries: AuditEntry[]): AuditEntry[][] {
@@ -30,15 +38,11 @@ function groupByChange(entries: AuditEntry[]): AuditEntry[][] {
 
 /**
  * A history timeline from audit_log, newest first, with "Show older"; loads
- * on mount (the house History dialog). `showTenant` links each change to its tenant.
+ * on mount (the house History dialog, an expense's page). `showTenant` links
+ * each change to its tenant.
  */
-export default function AuditTimeline({
-  unitCode,
-  showTenant = false,
-}: {
-  unitCode: string;
-  showTenant?: boolean;
-}) {
+export default function AuditTimeline({ subject, showTenant = false }: { subject: AuditSubject; showTenant?: boolean }) {
+  const key = subject.kind === "house" ? subject.unitCode : subject.expenseId;
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [nextBefore, setNextBefore] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +50,7 @@ export default function AuditTimeline({
 
   useEffect(() => {
     let cancelled = false;
-    api.dashboard.houses.history(unitCode)
+    loadHistory(subject)
       .then((page) => {
         if (cancelled) return;
         setEntries(page.entries);
@@ -56,12 +60,14 @@ export default function AuditTimeline({
     return () => {
       cancelled = true;
     };
-  }, [unitCode]);
+    // `key` names the subject; the object itself is rebuilt on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject.kind, key]);
 
   async function showOlder() {
     if (nextBefore === null) return;
     try {
-      const page = await api.dashboard.houses.history(unitCode, nextBefore);
+      const page = await loadHistory(subject, nextBefore);
       setEntries((current) => [...(current ?? []), ...page.entries]);
       setNextBefore(page.nextBefore);
     } catch (err) {

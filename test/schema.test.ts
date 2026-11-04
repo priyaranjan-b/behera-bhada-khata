@@ -12,6 +12,7 @@ import { addMonthsToKey, currentMonthKey, formatDateKey, formatDateTime, formatM
 import { monthsIn, paidDirectMonths } from "@/lib/domain/billing";
 import { summarizeBalance } from "@/lib/domain/allocation";
 import { auditActionLabel } from "@/lib/domain/audit";
+import { MAINTENANCE_CATEGORY_LABELS, splitEqually } from "@/lib/domain/maintenance";
 import { PAYMENT_MODE_LABELS } from "@/lib/domain/payments";
 import {
   PREFERRED_CHANNEL_LABELS,
@@ -148,7 +149,7 @@ beforeEach(async () => {
   await db.exec(`
     truncate adjustment_allocations, adjustments, payment_allocations, payments, receipt_counters, rent_periods,
       tenant_units, tenant_rent_rates, tenants, units, properties, locations, rate_limits, app_owner, auth.users,
-      audit_log cascade;
+      audit_log, maintenance_files, maintenance_expense_tags, maintenance_expense_units, maintenance_expenses cascade;
     insert into auth.users (id, email) values ('${OWNER_A}', 'a@example.com'), ('${OWNER_B}', 'b@example.com');
     insert into app_owner (user_id) values ('${OWNER_A}');
 
@@ -1545,6 +1546,7 @@ describe("stored audit text (0017)", () => {
     for (const [k, label] of Object.entries(PREFERRED_CHANNEL_LABELS)) expect(await value(k, "channel")).toBe(label);
     for (const [k, label] of Object.entries(UNIT_TYPE_LABELS)) expect(await value(k, "unitType")).toBe(label);
     for (const [k, label] of Object.entries(PAYMENT_MODE_LABELS)) expect(await value(k, "mode")).toBe(label);
+    for (const [k, label] of Object.entries(MAINTENANCE_CATEGORY_LABELS)) expect(await value(k, "category")).toBe(label);
     for (const floor of ["G", "B", "B2", "1", "12"]) expect(await value(floor, "floor")).toBe(formatFloor(floor));
   });
 
@@ -2471,5 +2473,167 @@ describe("dropping the replaced functions (0029)", () => {
       await before.close();
       await restored.close();
     }
+  });
+});
+
+describe("maintenance expenses (0031)", () => {
+  const ID = "00000000-0000-4000-8000-0000000000e1";
+  const anon = { role: "anon" } as unknown as Role;
+  type Args = { id?: string; date?: string; amount?: number; category?: string; units?: string[]; vendor?: string | null };
+  const args = (a: Args) => [
+    a.id ?? ID,
+    a.date ?? "2026-03-05",
+    a.amount ?? 1000,
+    a.category ?? "plumbing",
+    "Tap repair",
+    a.vendor === undefined ? "Ramesh" : a.vendor,
+    null,
+    a.units ?? ["AC-T1-G03", "AC-T1-G01", "AC-T1-G02"],
+  ];
+  const CALL = `($1::uuid, $2::date, $3::numeric, $4::text, $5::text, $6::text, $7::text, $8::text[])`;
+  const create = (who: Role, a: Args = {}) => as(who, `select create_maintenance_expense${CALL}`, args(a));
+  const update = (who: Role, a: Args = {}) => as(who, `select update_maintenance_expense${CALL}`, args(a));
+  const shares = async (id = ID) =>
+    (
+      await as<{ unit_code: string; share: string }>(
+        owner(OWNER_A),
+        `select unit_code, share_amount::text as share from maintenance_expense_units where expense_id = $1 order by unit_code`,
+        [id]
+      )
+    ).map((r) => ({ unitCode: r.unit_code, share: Number(r.share) }));
+
+  it("splits the amount equally, the odd paise to the first houses, as splitEqually does", async () => {
+    await create(owner(OWNER_A));
+    expect(await shares()).toEqual(splitEqually(1000, ["AC-T1-G01", "AC-T1-G02", "AC-T1-G03"]));
+    expect((await shares()).map((s) => s.share)).toEqual([333.34, 333.33, 333.33]);
+    for (const [amount, n] of [
+      [0.05, 6],
+      [777.77, 4],
+    ] as const) {
+      const id = `00000000-0000-4000-8000-00000000${String(n).padStart(4, "0")}`;
+      const units = Array.from({ length: n }, (_, i) => `AC-T1-G0${i + 1}`);
+      await create(owner(OWNER_A), { id, amount, units });
+      expect(await shares(id)).toEqual(splitEqually(amount, units));
+    }
+  });
+
+  it("refuses no house, a repeated, unknown or retired house, a bad amount and a bad category", async () => {
+    expect(await errorCode(create(owner(OWNER_A), { units: [] }))).toBe("BBK00");
+    expect(await errorCode(create(owner(OWNER_A), { units: ["AC-T1-G01", "AC-T1-G01"] }))).toBe("BBK00");
+    expect(await errorCode(create(owner(OWNER_A), { units: ["AC-T1-G99"] }))).toBe("BBK00");
+    await db.exec(`update units set is_active = false where unit_code = 'AC-T1-G06'`);
+    expect(await errorCode(create(owner(OWNER_A), { units: ["AC-T1-G06"] }))).toBe("BBK00");
+    expect(await errorCode(create(owner(OWNER_A), { amount: 0 }))).toBe("BBK00");
+    expect(await errorCode(create(owner(OWNER_A), { category: "garden" }))).toBe("23514");
+    expect(await errorCode(create(owner(OWNER_A), { vendor: " padded" }))).toBe("23514");
+    const [{ n }] = await as<{ n: number }>(owner(OWNER_A), `select count(*)::int as n from maintenance_expenses`);
+    expect(n).toBe(0);
+  });
+
+  it("edits the fields and houses, re-splitting; a retired house already on it may stay", async () => {
+    await create(owner(OWNER_A));
+    await db.exec(`update units set is_active = false where unit_code = 'AC-T1-G01'`);
+    await update(owner(OWNER_A), { amount: 500, units: ["AC-T1-G01", "AC-T1-G04"], category: "painting" });
+    expect(await shares()).toEqual([
+      { unitCode: "AC-T1-G01", share: 250 },
+      { unitCode: "AC-T1-G04", share: 250 },
+    ]);
+    const [row] = await as<{ amount: string; category: string }>(
+      owner(OWNER_A),
+      `select amount::text, category from maintenance_expenses where id = $1`,
+      [ID]
+    );
+    expect(row).toEqual({ amount: "500.00", category: "painting" });
+    expect(await errorCode(update(owner(OWNER_A), { units: ["AC-T1-G01", "AC-T1-G06"] }))).toBe("ok");
+    await db.exec(`update units set is_active = false where unit_code = 'AC-T1-G05'`);
+    expect(await errorCode(update(owner(OWNER_A), { units: ["AC-T1-G05"] }))).toBe("BBK00");
+    expect(await errorCode(update(owner(OWNER_A), { id: "00000000-0000-4000-8000-000000000999" }))).toBe("BBK04");
+  });
+
+  it("voids once, with a reason; a voided expense can't be edited", async () => {
+    await create(owner(OWNER_A));
+    const voidIt = (reason: string, id = ID) => as(owner(OWNER_A), `select void_maintenance_expense($1, $2)`, [id, reason]);
+    expect(await errorCode(voidIt(""))).toBe("23514");
+    await voidIt("Entered twice");
+    expect(await errorCode(voidIt("Again"))).toBe("BBK09");
+    expect(await errorCode(voidIt("x", "00000000-0000-4000-8000-000000000999"))).toBe("BBK04");
+    expect(await errorCode(update(owner(OWNER_A)))).toBe("BBK09");
+    const [row] = await as<{ void_reason: string; voided: boolean }>(
+      owner(OWNER_A),
+      `select void_reason, voided_at is not null as voided from maintenance_expenses where id = $1`,
+      [ID]
+    );
+    expect(row).toEqual({ void_reason: "Entered twice", voided: true });
+  });
+
+  it("is written only through the functions; tags and files are owner writes kept in the expense's folder", async () => {
+    await create(owner(OWNER_A));
+    expect(
+      await errorCode(
+        as(
+          owner(OWNER_A),
+          `insert into maintenance_expenses (expense_date, amount, category, description) values ('2026-03-01', 1, 'other', 'x')`
+        )
+      )
+    ).toBe("42501");
+    expect(await errorCode(as(owner(OWNER_A), `update maintenance_expenses set amount = 1`))).toBe("42501");
+    expect(await errorCode(as(owner(OWNER_A), `delete from maintenance_expense_units`))).toBe("42501");
+
+    const tag = (name: string) =>
+      as(owner(OWNER_A), `insert into maintenance_expense_tags (expense_id, name) values ($1, $2)`, [ID, name]);
+    await tag("Padma");
+    expect(await errorCode(tag("PADMA"))).toBe("23505");
+    const file = (path: string) =>
+      as(
+        owner(OWNER_A),
+        `insert into maintenance_files (expense_id, storage_path, file_name, content_type, size_bytes)
+         values ($1, $2, 'bill.pdf', 'application/pdf', 10)`,
+        [ID, path]
+      );
+    expect(await errorCode(file(`maintenance/${ID}/files/1-bill.pdf`))).toBe("ok");
+    expect(await errorCode(file(`maintenance/${ID}/files/`))).toBe("23514");
+    expect(await errorCode(file(`tenants/${ID}/files/1-bill.pdf`))).toBe("23514");
+    expect(await errorCode(as(owner(OWNER_A), `update maintenance_files set file_name = 'x'`))).toBe("42501");
+    await as(owner(OWNER_A), `delete from maintenance_files where expense_id = $1`, [ID]);
+  });
+
+  it("shows another account nothing and lets it change nothing", async () => {
+    await create(owner(OWNER_A));
+    expect(await errorCode(create(owner(OWNER_B), { id: "00000000-0000-4000-8000-0000000000e2" }))).toBe("BBK04");
+    expect(await errorCode(update(owner(OWNER_B)))).toBe("BBK04");
+    expect(await errorCode(as(owner(OWNER_B), `select void_maintenance_expense($1, 'nope')`, [ID]))).toBe("BBK04");
+    for (const table of ["maintenance_expenses", "maintenance_expense_units", "maintenance_expense_tags", "maintenance_files"]) {
+      expect(await as(owner(OWNER_B), `select * from ${table}`)).toEqual([]);
+      expect(await errorCode(as(anon, `select * from ${table}`))).toBe("42501");
+    }
+    expect(await errorCode(as(anon, `select create_maintenance_expense${CALL}`, args({})))).toBe("42501");
+  });
+
+  it("logs every change under the expense, each house in its own history", async () => {
+    await db.exec(`truncate audit_log`);
+    await create(owner(OWNER_A), { units: ["AC-T1-G01", "AC-T1-G02"] });
+    await update(owner(OWNER_A), { amount: 600, units: ["AC-T1-G02", "AC-T1-G03"] });
+    await as(owner(OWNER_A), `select void_maintenance_expense($1, 'Entered twice')`, [ID]);
+    const rows = (
+      await db.query<{ action: string; entity_id: string; unit_code: string | null; property_code: string | null; details: string }>(
+        `select action, entity_id, unit_code, property_code, details from audit_log order by id`
+      )
+    ).rows;
+    expect(rows.every((r) => r.entity_id === ID)).toBe(true);
+    expect(rows.map((r) => r.action)).toEqual([
+      "maintenance.recorded",
+      "maintenance.house_added",
+      "maintenance.house_added",
+      "maintenance.updated",
+      "maintenance.house_removed",
+      "maintenance.share_changed",
+      "maintenance.house_added",
+      "maintenance.voided",
+    ]);
+    expect(rows[0].details).toBe("For: Tap repair · Category: Plumbing · Spent on: 05/03/2026 · Amount: ₹1,000.00 · Paid to: Ramesh");
+    expect(rows[1]).toMatchObject({ unit_code: "AC-T1-G01", property_code: "AC-T1", details: "House: AC-T1-G01 · Share: ₹500.00" });
+    expect(rows[3].details).toBe("Amount: ₹1,000.00 → ₹600.00");
+    expect(rows[5].details).toBe("Share: ₹500.00 → ₹300.00");
+    expect(rows[7].details).toBe("Reason: Entered twice");
   });
 });
