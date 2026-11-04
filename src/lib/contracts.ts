@@ -6,6 +6,7 @@ import type * as z from "zod";
 import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "@/lib/domain/reports";
 import type { KindBreakdown, SiteCollection } from "@/lib/domain/overview";
 import type { BillingTotals } from "@/lib/domain/billing";
+import type { EarningsMonth, EarningsTotals } from "@/lib/domain/earnings";
 import type { LedgerRow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
@@ -30,6 +31,7 @@ import type {
   confirmSchema,
   createAdjustmentSchema,
   createMaintenanceSchema,
+  earningsQuerySchema,
   maintenanceQuerySchema,
   updateMaintenanceSchema,
   voidMaintenanceSchema,
@@ -356,6 +358,19 @@ export type VoidMaintenanceInput = z.input<typeof voidMaintenanceSchema>;
 export interface MaintenanceFilesSaved {
   /** All of the expense's files after the upload. */
   files: MaintenanceFileView[];
+}
+
+// ---- /api/dashboard/earnings (effective earning per month, A23) ---------------
+
+/** `?from&to` (yyyy-MM) and the paid-direct view. */
+export type EarningsQuery = z.input<typeof earningsQuerySchema>;
+
+export interface EarningsView {
+  /** Month keys (yyyy-MM-01), both included. */
+  from: string;
+  to: string;
+  months: EarningsMonth[];
+  totals: EarningsTotals;
 }
 
 /** GET /api/dashboard/payments/paid-direct: Govt rent paid to the bank directly for the rent months the days touch (A11). */

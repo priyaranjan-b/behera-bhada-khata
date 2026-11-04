@@ -51,7 +51,13 @@ import {
   saveOwnerProfile,
   updatePaymentNotePreset,
 } from "../tables/owner";
-import { addMaintenanceFiles, getMaintenanceExpense, getMaintenanceFile, removeMaintenanceFile } from "../tables/maintenance";
+import {
+  addMaintenanceFiles,
+  getMaintenanceExpense,
+  getMaintenanceFile,
+  maintenanceMonthly,
+  removeMaintenanceFile,
+} from "../tables/maintenance";
 import {
   createPaymentTag,
   listPaymentTags,
@@ -124,6 +130,8 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       remove: (id) => write(`delete payment tag ${id}`, (tx) => removePaymentTag(tx, id)),
     },
     maintenance: {
+      monthly: (fromMonth, toMonth) =>
+        read(`read maintenance per month ${fromMonth}..${toMonth}`, (tx) => maintenanceMonthly(tx, fromMonth, toMonth)),
       page: (filter) => read(`read maintenance page ${pageLabel(filter)}`, (tx) => maintenancePage(tx, filter)),
       get: (id) => read(`get maintenance expense ${id}`, (tx) => getMaintenanceExpense(tx, id)),
       create: (id, fields, unitCodes, tags, files, settledByPaymentId) =>

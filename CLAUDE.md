@@ -79,7 +79,8 @@ test instead.
   move to TS and which stay in Postgres (A19), and the Overview's
   "Collected" (per rent month) vs the chart's "Received" (cash, A20), and the
   phone app as a PWA whose service worker caches no owner data (A21), and
-  set-off payments: rent paid by deduction, never counted as cash (A22). Read it before changing
+  set-off payments: rent paid by deduction, never counted as cash (A22), and the
+  Earnings page's two nets, by rent month and as cash (A23). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 

@@ -66,14 +66,17 @@ export const paymentsFrom = cache(async (fromDate: string) => {
 /** Confirmed payments dated in the recent window. */
 export const recentPayments = () => paymentsFrom(recentMonthKeys()[0]);
 
-/** Confirmed adjustments dated in the recent window. */
-export const recentAdjustments = cache(async () => {
+/** Confirmed adjustments confirmed on or after `fromDate` (yyyy-MM-dd). */
+export const adjustmentsFrom = cache(async (fromDate: string) => {
   const [tenants, repos] = await Promise.all([tenantsList(), db()]);
   return repos.adjustments.listForTenants(
     tenants.map((t) => t.id),
-    { status: "confirmed", fromDate: recentMonthKeys()[0] }
+    { status: "confirmed", fromDate }
   );
 });
+
+/** Confirmed adjustments dated in the recent window. */
+export const recentAdjustments = () => adjustmentsFrom(recentMonthKeys()[0]);
 
 // ---- One tenant (the tenant page's sections) --------------------------------
 // Ids are checked first (malformed = 404) so the reads that don't need the

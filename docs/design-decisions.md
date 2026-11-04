@@ -792,3 +792,34 @@ received and said nothing on the receipt. Recording only the cash left the
 tenant owing money they had in fact settled. A separate deduction column on
 payments was rejected: two payments keep the ledger and allocations
 unchanged, and each part gets its own receipt.
+
+### A23 — Earnings: two nets, by rent month and as cash
+
+**Decision.** `/earnings` (`src/server/services/earnings.ts`,
+`buildEarnings` / `earningsTotals` in `src/lib/domain/earnings.ts`) shows,
+per month for a range of months (default: the last 12, at most 24,
+`EARNINGS_LIMITS`), what the rent book brings in once maintenance is paid:
+- **Net (rent month)** = Collected (`amount_allocated` per rent month, the
+  Overview's "Collected", A20) − every maintenance expense dated that month.
+  It answers "did this month's rent cover the upkeep?".
+- **Net cash** = Received (cash by payment date, A20, set-offs excluded, A22)
+  − maintenance paid in cash (expenses not paid by a set-off, D36). It answers
+  "what did I keep?". A set-off is in neither side, so the money a tenant
+  kept back for goods the owner bought is never subtracted twice.
+- **Spent of collected** = maintenance ÷ collected, of the totals.
+- Govt rent paid direct counts as billed, collected and received in its own
+  month (A11) unless the switch hides it, as on Billing.
+
+It is one call (cards, chart and table are the same months) and one row per
+month. With a cap of 24 rows, the table pages in the browser: an exception
+to A15's "grows every month" rule, because the rows are monthly totals.
+Maintenance per month is one grouped query (`maintenance.monthly`). Rent
+months, payments and adjustments come through the shared loaders
+(`periodsFrom`, `paymentsFrom`, `adjustmentsFrom`).
+
+**Why.** Collected and cash differ whenever arrears are paid late, so
+either one alone misleads: October can show a loss by rent month (nothing
+credited to October yet) and a healthy net in cash. Per-tower and
+per-house earnings need each tenant's rent split over their houses month by
+month (the next step). Until then the page is for the whole rent book only.
+

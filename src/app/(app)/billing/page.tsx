@@ -11,7 +11,7 @@ import AsyncSection from "@/components/ui/AsyncSection";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import { ActionStack } from "@/components/ui";
 import { PageHeader } from "@/components/ui/DataDisplay";
-import BillingRangeForm from "./BillingRangeForm";
+import MonthRangeForm from "@/components/ui/MonthRangeForm";
 import { BILLING_SKELETONS as SKELETON } from "./billingSkeletons";
 import BillingGridSection from "./sections/BillingGridSection";
 import BillingStats, { BILLING_STAT_CELL } from "./sections/BillingStats";
@@ -60,11 +60,12 @@ export default async function BillingPage({
         }
       />
       {/* Remount on a new range so the inputs show it. */}
-      <BillingRangeForm
+      <MonthRangeForm
         key={`${range.from}-${range.to}`}
         from={yearMonthOf(range.from)}
         to={yearMonthOf(range.to)}
-        paidDirect={paidDirect}
+        path={routes.billing()}
+        query={paidDirectQuery(paidDirect)}
       />
 
       <Grid container spacing={2} columns={12}>

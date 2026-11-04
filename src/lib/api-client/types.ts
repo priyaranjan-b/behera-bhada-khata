@@ -35,6 +35,8 @@ import type {
   MaintenanceFilesSaved,
   MaintenanceForm,
   MaintenanceFormQuery,
+  EarningsQuery,
+  EarningsView,
   MaintenancePage,
   MaintenancePageQuery,
   UpdateMaintenanceInput,
@@ -169,6 +171,8 @@ export interface ApiQueries {
       /** The tag names the Payments page's tag editor offers, alphabetical. */
       tagSuggestions(): Promise<string[]>;
     };
+    /** Effective earning per month: collected / received less maintenance (A23). */
+    earnings(query?: EarningsQuery): Promise<EarningsView>;
     maintenance: {
       /** Every expense spent in the days, one page, with totals (0031). */
       list(query?: MaintenancePageQuery): Promise<MaintenancePage>;

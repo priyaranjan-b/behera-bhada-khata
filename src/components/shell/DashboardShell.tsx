@@ -21,6 +21,7 @@ function tabForPath(pathname: string): AppTab | undefined {
   if (under(routes.billing())) return "billing";
   if (under(routes.payments.list())) return "payments";
   if (under(routes.maintenance.list())) return "maintenance";
+  if (under(routes.earnings())) return "earnings";
   if (under(routes.activity)) return "activity";
   return undefined;
 }

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { inScope, type Scope } from "@/server/adapters/drizzle/client";
 import { createMaintenanceExpense, voidMaintenanceExpense } from "@/server/adapters/drizzle/procedures/maintenance";
 import { maintenancePage } from "@/server/adapters/drizzle/queries/maintenancePage";
-import { getMaintenanceExpense } from "@/server/adapters/drizzle/tables/maintenance";
+import { getMaintenanceExpense, maintenanceMonthly } from "@/server/adapters/drizzle/tables/maintenance";
 import { setRecordTags } from "@/server/adapters/drizzle/tables/paymentTags";
 import type { MaintenanceExpenseFields, MaintenanceFilter } from "@/server/ports";
 import { asOwner, asStranger, createLedgerDb, type LedgerDb } from "../fixtures";
@@ -160,5 +160,17 @@ describe("maintenance record", () => {
     const [{ n }] = await l.pg.query<{ n: number }>(`select count(*)::int as n from payment_tags where name = 'Gopal'`).then((r) => r.rows);
     expect(n).toBe(1);
     expect(await inScope(l.db, asOwner, (tx) => setRecordTags(tx, "maintenance", "00000000-0000-4000-8000-000000000999", []))).toBeNull();
+  });
+});
+
+describe("maintenanceMonthly (A23)", () => {
+  it("adds each month's expenses, voided ones left out, and returns only months with any", async () => {
+    const months = await inScope(l.db, asOwner, (tx) => maintenanceMonthly(tx, "2026-01-01", "2026-03-01"));
+    expect(months).toEqual([
+      { month: "2026-01-01", amount: 1000, cash: 1000 },
+      { month: "2026-03-01", amount: 12400, cash: 12400 },
+    ]);
+    expect(await inScope(l.db, asOwner, (tx) => maintenanceMonthly(tx, "2026-02-01", "2026-02-01"))).toEqual([]);
+    expect(await inScope(l.db, asStranger, (tx) => maintenanceMonthly(tx, "2026-01-01", "2026-03-01"))).toEqual([]);
   });
 });

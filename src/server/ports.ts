@@ -353,6 +353,13 @@ export interface OwnerRepositories {
    * tags and files are plain writes. Refusals are ApiErrors (400/404/409).
    */
   maintenance: {
+    /**
+     * Per month (yyyy-MM-01) of `expense_date`, from `fromMonth` to `toMonth`
+     * (both month keys, included): what was spent, voided expenses excluded,
+     * and of it what was paid in cash (not by a set-off, A22). Months with
+     * nothing are left out.
+     */
+    monthly(fromMonth: string, toMonth: string): Promise<{ month: string; amount: number; cash: number }[]>;
     /** The expenses spent in the days, one page, with totals of every matching expense that isn't voided. */
     page(filter: MaintenanceFilter): Promise<DbPage<MaintenanceDbRow> & { totals: MaintenanceTotalsDb }>;
     get(id: string): Promise<MaintenanceExpenseRecord | null>;

@@ -59,6 +59,8 @@ export const routes = {
   /** `from`/`to` are `yyyy-MM`; none = last month. */
   billing: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/billing", query),
   activity: "/activity",
+  /** Effective earning per month (A23); `from`/`to` are `yyyy-MM`, none = the last 12 months. */
+  earnings: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/earnings", query),
   profile: (flash?: Flash) => withQuery("/profile", flash),
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
   properties: {
