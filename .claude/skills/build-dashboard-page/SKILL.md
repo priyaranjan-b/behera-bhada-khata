@@ -157,10 +157,9 @@ the master data?**
 - **Fixed by master data → client-side** (the default `DataTable`): the
   service returns every row, and the grid pages, sorts, searches, filters
   and exports in the browser. Use this for one row per tenant, house,
-  tower or site: Tenants, a tower's tenants, Houses (`UnitsGrid`), the
-  Overview tenant status grid, Defaulters (one row per tenant), Properties,
-  and bulk upload. These stay in the hundreds however long the book is
-  kept.
+  tower or site: Tenants, a tower's tenants, Houses (`UnitsGrid`),
+  Defaulters (one row per tenant), Properties, and bulk upload. These
+  stay in the hundreds however long the book is kept.
 - **Grows every month → server-side** (`paginationMode="server"`): anything
   that gains rows as months are billed, payments recorded or changes made.
   That covers history (`audit_log`), payments and adjustments, rent months

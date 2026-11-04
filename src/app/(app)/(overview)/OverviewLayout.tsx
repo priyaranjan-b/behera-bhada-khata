@@ -17,7 +17,6 @@ export default function OverviewLayout(slots: {
   sites: React.ReactNode;
   tenantTypes: React.ReactNode;
   portfolio: React.ReactNode;
-  tenants: React.ReactNode;
 }) {
   return (
     <Stack spacing={2}>
@@ -46,7 +45,6 @@ export default function OverviewLayout(slots: {
           {slots.portfolio}
         </Grid>
       </Grid>
-      {slots.tenants}
     </Stack>
   );
 }

@@ -11,7 +11,6 @@ import { OVERVIEW_SKELETONS as SKELETON } from "./overviewSkeletons";
 import AttentionSection from "./sections/AttentionSection";
 import DefaultersSection from "./sections/DefaultersSection";
 import MonthStats from "./sections/MonthStats";
-import MonthTenantsSection from "./sections/MonthTenantsSection";
 import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
 import PortfolioSection from "./sections/PortfolioSection";
 import SitesSection from "./sections/SitesSection";
@@ -26,9 +25,9 @@ import VacantStat from "./sections/VacantStat";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; show?: string; paidDirect?: string }>;
+  searchParams: Promise<{ month?: string; paidDirect?: string }>;
 }) {
-  const { month, show, paidDirect: paidDirectParam } = await searchParams;
+  const { month, paidDirect: paidDirectParam } = await searchParams;
   const paidDirect = paidDirectViewOf(paidDirectParam);
   const monthKey = monthKeyFromParam(month);
   const monthView = `${monthKey}-${paidDirect}`;
@@ -105,11 +104,6 @@ export default async function DashboardPage({
       portfolio={
         <AsyncSection key={paidDirect} title="Portfolio" fallback={SKELETON.portfolio}>
           <PortfolioSection portfolio={portfolio} houses={houses} />
-        </AsyncSection>
-      }
-      tenants={
-        <AsyncSection key={monthView} title="Tenants this month" fallback={SKELETON.tenants}>
-          <MonthTenantsSection month={monthData} show={show} />
         </AsyncSection>
       }
     />

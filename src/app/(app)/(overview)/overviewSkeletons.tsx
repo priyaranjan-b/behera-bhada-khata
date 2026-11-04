@@ -3,7 +3,6 @@ import {
   ChartCardSkeleton,
   DetailCardSkeleton,
   PageHeaderSkeleton,
-  PanelSkeleton,
   StatCardSkeleton,
 } from "@/components/ui/Skeletons";
 import { STAT_CELL } from "./sections/MonthStats";
@@ -28,5 +27,4 @@ export const OVERVIEW_SKELETONS = {
   sites: <DetailCardSkeleton rows={3} />,
   tenantTypes: <ChartCardSkeleton height={220} />,
   portfolio: <DetailCardSkeleton rows={5} />,
-  tenants: <PanelSkeleton rows={5} />,
 } satisfies Record<string, React.ReactNode>;

@@ -10,10 +10,8 @@ describe("routes", () => {
 
   it("adds flash and query params, skipping undefined ones", () => {
     expect(routes.tenants.detail("t-1", { saved: "1" })).toBe("/tenants/t-1?saved=1");
-    expect(routes.dashboard({ month: "2026-10", show: undefined })).toBe("/?month=2026-10");
-    expect(routes.dashboard({ month: "2026-10", show: "unpaid" }, "tenants")).toBe(
-      "/?month=2026-10&show=unpaid#tenants"
-    );
+    expect(routes.dashboard({ month: "2026-10", paidDirect: undefined })).toBe("/?month=2026-10");
+    expect(routes.dashboard({ month: "2026-10", paidDirect: "show" }, "trend")).toBe("/?month=2026-10&paidDirect=show#trend");
     expect(routes.login({ error: "owner" })).toBe("/login?error=owner");
   });
 
