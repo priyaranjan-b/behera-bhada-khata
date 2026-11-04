@@ -240,6 +240,9 @@ collected** for each month it holds its houses:
   on the page keep it (`paidDirectQuery`). Nothing is remembered: opening the
   page again starts off. The API default is "hide" too
   (`paidDirectViewSchema`). This replaced a one-year cookie that kept it on.
+  Since A24 the side menu's links between Overview, Billing and Earnings
+  keep it on (`carryPaidDirect`); any other page, or a fresh visit, starts
+  off again.
 
 **Why.** The owner wanted this rent visible in the totals because it does
 arrive every month. Rejected alternatives:
@@ -823,3 +826,58 @@ credited to October yet) and a healthy net in cash. Per-tower and
 per-house earnings need each tenant's rent split over their houses month by
 month (the next step). Until then the page is for the whole rent book only.
 
+### A24 — Report pages: a sticky context bar, not a global header control
+
+**Decision.** The period switcher (‹ month ›), the range form and "Include
+Govt paid direct" live in `ContextBar` (`src/components/ui/ContextBar.tsx`),
+which the report pages render under their `PageHeader`: Overview, Billing,
+Earnings, Payments and Maintenance. It is sticky under the top bar
+(`TOPBAR_HEIGHT` / `MOBILE_NAVBAR_HEIGHT`), frosted like it, and full width
+of the content column.
+- **Desktop (`md`+):** the period on the left, the options inline on the
+  right, wrapping to a second row when narrow.
+- **Phones:** one row: the period and a "View options" button whose badge
+  counts options switched on that the bar doesn't show (paid direct). It
+  opens a `BottomSheet` with the options, stretched full width, and "Reset
+  to defaults" while the URL has params. The sheet belongs to the URL it
+  was opened on, so applying an option (a navigation) closes it.
+- **Paid direct between pages:** the side menu's links to Overview,
+  Billing and Earnings keep `?paidDirect=show` while the current page has it
+  (`carryPaidDirect`, `src/lib/preferences.ts`). The period is not carried:
+  each page's period is a different thing (one month, a month range with
+  its own default, days).
+
+**Why.** Asked to move both controls into the global top bar for every
+page, disabled where they don't apply. Rejected because:
+- they apply on 5 of about 27 pages, and controls greyed out on the rest
+  read as broken;
+- one global "month" can't stand for the Overview's month, Billing's and
+  Earnings' ranges (different defaults) and the day ranges without
+  translation rules that surprise;
+- a remembered switch is what A11 removed (figures misread while it was
+  left on);
+- the top bar has no room: at `md` its side columns are ~90px, and the
+  phone bar already holds brand, search, colour mode and menu;
+- next to the page it reads as that page's view, not an app setting.
+The sticky bar keeps what was wanted: the controls stay in reach while the
+figures scroll, and the switch no longer resets between the report pages.
+
+### A25 — Profile is the person; Settings holds the shared lists
+
+**Decision.** `/profile` keeps only what belongs to the owner as a person:
+a summary card (avatar, name, sign-in email, signature status, who signs
+receipts), Owner details (name and signer, with a live "On receipts" line),
+Receipt signature, and Security (password). The rent book's shared lists
+move to a new `/settings` page (side menu, owner menu): **Payment tags**
+(D34, offered on Record payment, Payments and Maintenance) and **Quick
+payment notes** (D30). Both are `ListSettingCard`
+(`src/components/domain/ListSettingCard.tsx`): where the list is used, the
+add field first, a count against its limit, then the entries with rename
+and delete. The API follows the pages: `/api/dashboard/settings/payment-
+{notes,tags}` (the `apiPaths` keys kept their names). Section headings take
+a coloured tile through `SectionCard tone`.
+
+**Why.** The lists aren't about the owner, and under Profile they were hard
+to find and mixed into one grid with the password form. A new list (e.g.
+maintenance categories, if they ever become editable) goes on Settings as
+another `ListSettingCard`.

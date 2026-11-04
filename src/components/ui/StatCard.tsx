@@ -10,6 +10,8 @@ import Typography from "@mui/material/Typography";
 import { SparkLineChart } from "@mui/x-charts/SparkLineChart";
 import { lineClasses } from "@mui/x-charts/LineChart";
 import { StatusBadge, type BadgeTone } from "@/components/ui/DataDisplay";
+import { IconTile } from "@/components/ui/Surfaces";
+import { toneMain, type Tone } from "@/components/ui/tone";
 import { formatMoney } from "@/lib/money";
 
 export type Trend = "up" | "down" | "neutral";
@@ -26,9 +28,17 @@ function AreaGradient({ color, id }: { color: string; id: string }) {
 }
 
 /**
- * Template StatCard: title, big value, a badge, and an optional sparkline.
- * Compact on phones, where pages lay them out two per row: a smaller value
- * with the badge under it, and no sparkline (it would be too narrow to read).
+ * One figure on a card: title and a tone-tinted icon on top, the value (with
+ * an optional badge), captions pinned to the bottom so cards in a row line
+ * up, and a sparkline only when one is given.
+ *
+ * - `tone` colours the icon tile, the accent bar and the wash; left out, it
+ *   follows the badge (neutral without one). The value keeps the text colour.
+ * - `variant`: `highlighted` adds a tone bar down the left edge (needs
+ *   attention; a danger card also shows the value in red), `gradient` a
+ *   faint tone wash (the page's headline figure).
+ * - Compact on phones, where pages lay them out two per row: a 32px icon, a
+ *   smaller value with the badge under it, and no sparkline.
  */
 export default function StatCard({
   title,
@@ -38,6 +48,9 @@ export default function StatCard({
   badge,
   sparkline,
   href,
+  icon,
+  tone,
+  variant = "default",
 }: {
   title: string;
   value: string;
@@ -49,9 +62,14 @@ export default function StatCard({
   sparkline?: { data: number[]; labels: string[]; trend: Trend; format?: "money" };
   /** Makes the whole card a link (it lifts on hover), e.g. to a pre-filtered list. */
   href?: string;
+  /** Decorative icon in the top-right tile, e.g. `<ReceiptLongRoundedIcon />`. */
+  icon?: React.ReactNode;
+  tone?: Tone;
+  variant?: "default" | "highlighted" | "gradient";
 }) {
   const theme = useTheme();
   const gradientId = useId().replace(/:/g, "");
+  const cardTone: Tone = tone ?? badge?.tone ?? "neutral";
   // theme.vars resolve to CSS variables, so the line follows light/dark mode.
   const palette = (theme.vars || theme).palette;
   const chartColor = sparkline
@@ -59,22 +77,64 @@ export default function StatCard({
     : undefined;
 
   return (
-    <AppCard href={href} sx={{ height: "100%", flexGrow: 1 }}>
-      <CardContent>
-        <Typography component="h2" variant="subtitle2" gutterBottom>
-          {title}
-        </Typography>
-        <Stack sx={{ justifyContent: "space-between", flexGrow: 1, gap: 1 }}>
-          <Stack>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 0.5, sm: 1 } }}
-            >
-              <Typography variant="h4" component="p" noWrap sx={{ typography: { xs: "h6", sm: "h4" }, maxWidth: "100%" }}>
-                {value}
-              </Typography>
-              {badge && <StatusBadge tone={badge.tone} label={badge.label} />}
-            </Stack>
+    <AppCard
+      href={href}
+      sx={[
+        { height: "100%", flexGrow: 1, position: "relative" },
+        variant === "highlighted" && {
+          "&::before": { content: '""', position: "absolute", inset: "0 auto 0 0", width: 3, bgcolor: toneMain(theme, cardTone) },
+        },
+        // Light mode: a faint glow of the tone from the icon's corner, so a white
+        // card isn't blank (the dark card needs none).
+        variant !== "gradient" &&
+          theme.applyStyles("light", {
+            backgroundImage: `radial-gradient(circle at 100% 0%, color-mix(in srgb, ${toneMain(theme, cardTone)} 10%, transparent), transparent 60%)`,
+          }),
+        variant === "gradient" && {
+          // Over the card's own background, so both schemes keep their surface.
+          backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${toneMain(theme, cardTone)} 18%, transparent) 0%, transparent 75%)`,
+          ...theme.applyStyles("light", {
+            backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${toneMain(theme, cardTone)} 22%, transparent) 0%, transparent 80%)`,
+          }),
+        },
+      ]}
+    >
+      <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", gap: 1 }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+          <Typography
+            component="h2"
+            variant="subtitle2"
+            color="textSecondary"
+            // Two lines at most: narrow cards (seven in a row, two on phones) keep the whole title.
+            sx={{ fontWeight: 600, minWidth: 0, pt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+          >
+            {title}
+          </Typography>
+          {icon ? <IconTile icon={icon} tone={cardTone} look="tinted" size="compact" /> : null}
+        </Stack>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          // The badge wraps under the value rather than cutting the figure short.
+          sx={{ flexWrap: "wrap", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 0.5, sm: 1 } }}
+        >
+          <Typography
+            variant="h4"
+            component="p"
+            noWrap
+            sx={{
+              typography: { xs: "h6", sm: "h4" },
+              fontWeight: 700,
+              maxWidth: "100%",
+              flexShrink: 0,
+              color: variant === "highlighted" && cardTone === "danger" ? "error.main" : "text.primary",
+            }}
+          >
+            {value}
+          </Typography>
+          {badge && <StatusBadge tone={badge.tone} label={badge.label} />}
+        </Stack>
+        {caption || note ? (
+          <Stack sx={{ mt: "auto" }}>
             {caption && (
               <Typography variant="caption" color="textSecondary">
                 {caption}
@@ -86,23 +146,23 @@ export default function StatCard({
               </Typography>
             )}
           </Stack>
+        ) : null}
+        {sparkline && chartColor && (
           <Box sx={{ width: "100%", height: 50, display: { xs: "none", sm: "block" } }}>
-            {sparkline && chartColor && (
-              <SparkLineChart
-                color={chartColor}
-                data={sparkline.data}
-                area
-                showHighlight
-                showTooltip
-                valueFormatter={(v) => (v == null ? "" : sparkline.format === "money" ? formatMoney(v) : String(v))}
-                xAxis={{ scaleType: "band", data: sparkline.labels }}
-                sx={{ [`& .${lineClasses.area}`]: { fill: `url(#${gradientId})` } }}
-              >
-                <AreaGradient color={chartColor} id={gradientId} />
-              </SparkLineChart>
-            )}
+            <SparkLineChart
+              color={chartColor}
+              data={sparkline.data}
+              area
+              showHighlight
+              showTooltip
+              valueFormatter={(v) => (v == null ? "" : sparkline.format === "money" ? formatMoney(v) : String(v))}
+              xAxis={{ scaleType: "band", data: sparkline.labels }}
+              sx={{ [`& .${lineClasses.area}`]: { fill: `url(#${gradientId})` } }}
+            >
+              <AreaGradient color={chartColor} id={gradientId} />
+            </SparkLineChart>
           </Box>
-        </Stack>
+        )}
       </CardContent>
     </AppCard>
   );

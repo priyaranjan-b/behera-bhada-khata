@@ -6,6 +6,7 @@ import { alertClasses } from "@mui/material/Alert";
 import { autocompleteClasses } from "@mui/material/Autocomplete";
 import { chipClasses } from "@mui/material/Chip";
 import { iconButtonClasses } from "@mui/material/IconButton";
+import { switchClasses } from "@mui/material/Switch";
 import type {} from "@mui/x-date-pickers/themeAugmentation";
 import { pickersInputBaseClasses } from "@mui/x-date-pickers/PickersTextField";
 import { brand, gray, orange, red } from "../themePrimitives";
@@ -31,6 +32,17 @@ declare module "@mui/material/Avatar" {
     soft: true;
   }
 }
+
+/** A Material icon path as a CSS mask image (the switch thumb's ✕ / ✓). */
+const iconMask = (path: string) =>
+  `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='${path}'/></svg>")`;
+// CloseRounded and CheckRounded from @mui/icons-material.
+const SWITCH_CLOSE = iconMask(
+  "M18.3 5.71a.996.996 0 0 0-1.41 0L12 10.59 7.11 5.7a.996.996 0 0 0-1.41 0c-.39.39-.39 1.02 0 1.41L10.59 12 5.7 16.89c-.39.39-.39 1.02 0 1.41s1.02.39 1.41 0L12 13.41l4.89 4.89c.39.39 1.02.39 1.41 0s.39-1.02 0-1.41L13.41 12l4.89-4.89c.38-.38.38-1.02 0-1.4",
+);
+const SWITCH_CHECK = iconMask(
+  "M9 16.17 5.53 12.7a.996.996 0 0 0-1.41 0c-.39.39-.39 1.02 0 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71c.39-.39.39-1.02 0-1.41a.996.996 0 0 0-1.41 0z",
+);
 
 // WCAG 2.5.5-ish: comfortable tap targets on touch devices only.
 const coarsePointerTarget = { "@media (pointer: coarse)": { minHeight: 44 } };
@@ -262,6 +274,90 @@ export const appCustomizations: Components<Theme> = {
     },
   },
   MuiToggleButton: { variants: [{ props: {}, style: coarsePointerTarget }] },
+  // iOS-style switch: a pill track with a white thumb that slides across,
+  // filled with the brand colour when on. Replaces Material's thin track with
+  // an overhanging thumb. Medium 44×26, small 36×22. The thumb carries a ✕
+  // (off) or ✓ (on), drawn as a CSS mask so no call site passes icons, and
+  // the track glows softly when on.
+  MuiSwitch: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        width: 44,
+        height: 26,
+        padding: 0,
+        overflow: "visible",
+        [`&.${switchClasses.sizeSmall}`]: {
+          width: 36,
+          height: 22,
+          [`& .${switchClasses.thumb}`]: { width: 18, height: 18, "&::before": { inset: 3 } },
+          [`& .${switchClasses.switchBase}.${switchClasses.checked}`]: { transform: "translateX(14px)" },
+        },
+        [`& .${switchClasses.switchBase}`]: {
+          padding: 0,
+          margin: 2,
+          transitionDuration: "200ms",
+          "&:hover": { backgroundColor: "transparent" },
+          [`&.${switchClasses.checked}`]: {
+            transform: "translateX(18px)",
+            color: (theme.vars || theme).palette.common.white,
+            [`& + .${switchClasses.track}`]: {
+              opacity: 1,
+              backgroundColor: brand[500],
+              border: 0,
+              boxShadow: `0 0 0 4px ${alpha(brand[400], 0.22)}`,
+            },
+            [`& .${switchClasses.thumb}::before`]: { maskImage: SWITCH_CHECK, WebkitMaskImage: SWITCH_CHECK, backgroundColor: brand[600] },
+          },
+          [`&.${switchClasses.disabled} + .${switchClasses.track}`]: { opacity: 0.5 },
+          [`&.${switchClasses.disabled} .${switchClasses.thumb}`]: { opacity: 0.8 },
+          // Keyboard focus: a ring around the whole pill.
+          [`&.Mui-focusVisible + .${switchClasses.track}`]: {
+            outline: `2px solid ${brand[400]}`,
+            outlineOffset: 2,
+          },
+        },
+        [`& .${switchClasses.thumb}`]: {
+          width: 22,
+          height: 22,
+          boxShadow: `0 1px 3px ${alpha(gray[900], 0.3)}, 0 1px 1px ${alpha(gray[900], 0.08)}`,
+          backgroundColor: (theme.vars || theme).palette.common.white,
+          position: "relative",
+          // The ✕ / ✓ on the thumb, in the icon's colour.
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            inset: 4,
+            backgroundColor: gray[400],
+            maskImage: SWITCH_CLOSE,
+            WebkitMaskImage: SWITCH_CLOSE,
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+            transition: theme.transitions.create("background-color", { duration: 200 }),
+          },
+        },
+        [`& .${switchClasses.track}`]: {
+          borderRadius: 999,
+          opacity: 1,
+          backgroundColor: gray[300],
+          transition: theme.transitions.create(["background-color", "box-shadow"], { duration: 200 }),
+          ...theme.applyStyles("dark", { backgroundColor: gray[700] }),
+        },
+      }),
+    },
+  },
+  // A label beside the switch above: the stock -11px offsets assume
+  // Material's padded switch, so drop them and space it with a gap instead.
+  MuiFormControlLabel: {
+    styleOverrides: {
+      root: {
+        [`&:has(.${switchClasses.root})`]: { marginLeft: 0, marginRight: 0, gap: 10 },
+      },
+    },
+  },
   // The 44px touch size is for standalone icon buttons (header bar, row actions).
   MuiIconButton: {
     variants: [{ props: {}, style: { "@media (pointer: coarse)": { minWidth: 44, minHeight: 44 } } }],

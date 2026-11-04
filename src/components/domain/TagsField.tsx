@@ -12,7 +12,7 @@ const QUICK_TAGS = 5;
 
 /**
  * A record's tags (payments 0030, D34; who paid a maintenance expense, 0031):
- * the shared suggestions (Profile page); pick one or type a new one
+ * the shared suggestions (Settings); pick one or type a new one
  * (Enter, or leave the field, adds it). One of each whatever the case, and a
  * typed name that matches a known tag takes its spelling. The first
  * QUICK_TAGS suggestions also show as chips under the field: one tap adds a
@@ -28,7 +28,7 @@ export default function TagsField({
 }: {
   value: string[];
   onChange: (tags: string[]) => void;
-  /** The suggested names (Profile page), alphabetical. */
+  /** The suggested names (Settings), alphabetical. */
   suggestions: string[];
   disabled?: boolean;
   label?: string;

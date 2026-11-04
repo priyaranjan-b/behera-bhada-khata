@@ -20,7 +20,7 @@ describe("routes", () => {
   });
 
   it("protects every page but sign-in, the tenant's confirm link and the API (fail closed)", () => {
-    for (const path of ["/", "/tenants", "/tenants/t-1/edit", "/properties/AC-T1", "/billing", "/profile", "/some-new-page"]) {
+    for (const path of ["/", "/tenants", "/tenants/t-1/edit", "/properties/AC-T1", "/billing", "/profile", "/settings", "/some-new-page"]) {
       expect(isProtectedPath(path)).toBe(true);
     }
     for (const path of ["/login", "/auth/callback", "/confirm/abc123", "/api/dashboard/tenants", "/api/confirm/abc"]) {

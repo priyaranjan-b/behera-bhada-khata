@@ -8,9 +8,9 @@ import { routes } from "@/lib/routes";
 import { EARNINGS_LIMITS } from "@/lib/validation";
 import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
 import AsyncSection from "@/components/ui/AsyncSection";
+import ContextBar from "@/components/ui/ContextBar";
 import MonthRangeForm from "@/components/ui/MonthRangeForm";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
-import { ActionStack } from "@/components/ui";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import { EARNINGS_SKELETONS as SKELETON } from "./earningsSkeletons";
 import EarningsSection from "./sections/EarningsSection";
@@ -36,30 +36,33 @@ export default async function EarningsPage({
 
   return (
     <Stack spacing={2}>
-      <PageHeader
-        title="Earnings"
-        subtitle="What the rent brings in once maintenance is paid, by rent month and as cash."
-        action={
-          <ActionStack>
+      <PageHeader title="Earnings" subtitle="What the rent brings in once maintenance is paid, by rent month and as cash." />
+      <ContextBar
+        period={
+          <PeriodSwitcher
+            label={rangeLabel}
+            unit={months === 1 ? "month" : `${months} months`}
+            prevHref={routes.earnings({ ...rangeQuery(shiftRange(range, -1)), ...paidDirectQuery(paidDirect) })}
+            nextHref={routes.earnings({ ...rangeQuery(shiftRange(range, 1)), ...paidDirectQuery(paidDirect) })}
+          />
+        }
+        options={
+          <>
+            {/* Remount on a new range so the inputs show it. */}
+            <MonthRangeForm
+              key={`${range.from}-${range.to}`}
+              from={yearMonthOf(range.from)}
+              to={yearMonthOf(range.to)}
+              path={routes.earnings()}
+              query={paidDirectQuery(paidDirect)}
+            />
             <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
               <PaidDirectSwitch state={paidDirectState} />
             </AsyncSection>
-            <PeriodSwitcher
-              label={rangeLabel}
-              unit={months === 1 ? "month" : `${months} months`}
-              prevHref={routes.earnings({ ...rangeQuery(shiftRange(range, -1)), ...paidDirectQuery(paidDirect) })}
-              nextHref={routes.earnings({ ...rangeQuery(shiftRange(range, 1)), ...paidDirectQuery(paidDirect) })}
-            />
-          </ActionStack>
+          </>
         }
-      />
-      {/* Remount on a new range so the inputs show it. */}
-      <MonthRangeForm
-        key={`${range.from}-${range.to}`}
-        from={yearMonthOf(range.from)}
-        to={yearMonthOf(range.to)}
-        path={routes.earnings()}
-        query={paidDirectQuery(paidDirect)}
+        activeCount={paidDirect === "show" ? 1 : 0}
+        resetHref={routes.earnings()}
       />
       <AsyncSection key={view} title="Earnings" fallback={SKELETON.view}>
         <EarningsSection earnings={earnings} rangeLabel={rangeLabel} />

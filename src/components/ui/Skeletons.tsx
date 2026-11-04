@@ -39,6 +39,30 @@ export function PageHeaderSkeleton({ action = false }: { action?: boolean }) {
   );
 }
 
+/** Matches `ContextBar`: the full-width strip with the period switcher, and the options from `md`. */
+export function ContextBarSkeleton() {
+  return (
+    <Stack
+      aria-hidden
+      direction="row"
+      sx={{
+        mx: { xs: -2, sm: -3 },
+        px: { xs: 2, sm: 3 },
+        py: 1,
+        borderTop: "1px solid",
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}
+    >
+      <Skeleton variant="rounded" width={216} height={44} />
+      <Skeleton variant="rounded" width={240} height={40} sx={{ display: { xs: "none", md: "block" } }} />
+      <Skeleton variant="circular" width={44} height={44} sx={{ display: { xs: "block", md: "none" } }} />
+    </Stack>
+  );
+}
+
 /** Matches `PageTabs`: the "Section" select on phones, a row of tab labels over a divider from `sm`. */
 export function TabsSkeleton({ tabs = 4 }: { tabs?: number }) {
   return (
@@ -53,31 +77,30 @@ export function TabsSkeleton({ tabs = 4 }: { tabs?: number }) {
   );
 }
 
-/** Matches `StatCard`: title, value + badge, caption, 50px sparkline. */
-export function StatCardSkeleton() {
+/** Matches `StatCard`: title + icon tile, value + badge, caption, and the 50px sparkline only with `sparkline`. */
+export function StatCardSkeleton({ sparkline = false }: { sparkline?: boolean }) {
   return (
     <AppCard aria-hidden sx={{ height: "100%", flexGrow: 1 }}>
-      <CardContent>
-        <Typography variant="subtitle2" gutterBottom>
-          <Skeleton width="40%" />
-        </Typography>
-        <Stack sx={{ gap: 1 }}>
-          <Stack>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 0.5, sm: 1 } }}
-            >
-              <Typography variant="h4" sx={{ flexGrow: 1, width: "100%", typography: { xs: "h6", sm: "h4" } }}>
-                <Skeleton width="60%" />
-              </Typography>
-              <Skeleton variant="rounded" width={64} height={24} />
-            </Stack>
-            <Typography variant="caption">
-              <Skeleton width="70%" />
-            </Typography>
-          </Stack>
-          <Skeleton variant="rounded" height={50} sx={{ display: { xs: "none", sm: "block" } }} />
+      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
+          <Typography variant="subtitle2" sx={{ flexGrow: 1, pt: 0.5 }}>
+            <Skeleton width="50%" />
+          </Typography>
+          <Skeleton variant="rounded" sx={{ width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, borderRadius: 1.5 }} />
         </Stack>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 0.5, sm: 1 } }}
+        >
+          <Typography variant="h4" sx={{ flexGrow: 1, width: "100%", typography: { xs: "h6", sm: "h4" } }}>
+            <Skeleton width="60%" />
+          </Typography>
+          <Skeleton variant="rounded" width={64} height={24} />
+        </Stack>
+        <Typography variant="caption">
+          <Skeleton width="70%" />
+        </Typography>
+        {sparkline ? <Skeleton variant="rounded" height={50} sx={{ display: { xs: "none", sm: "block" } }} /> : null}
       </CardContent>
     </AppCard>
   );

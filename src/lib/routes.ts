@@ -62,6 +62,8 @@ export const routes = {
   /** Effective earning per month (A23); `from`/`to` are `yyyy-MM`, none = the last 12 months. */
   earnings: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/earnings", query),
   profile: (flash?: Flash) => withQuery("/profile", flash),
+  /** The rent book's shared lists: payment tags, quick notes (A25). */
+  settings: "/settings",
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
   properties: {
     list: "/properties",

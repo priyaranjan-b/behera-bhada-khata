@@ -23,6 +23,7 @@ function tabForPath(pathname: string): AppTab | undefined {
   if (under(routes.maintenance.list())) return "maintenance";
   if (under(routes.earnings())) return "earnings";
   if (under(routes.activity)) return "activity";
+  if (under(routes.settings)) return "settings";
   return undefined;
 }
 

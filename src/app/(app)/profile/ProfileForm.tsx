@@ -8,7 +8,9 @@ import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { FormActions, SectionCard, SignatureField, SignaturePreview } from "@/components/ui";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
+import DrawRoundedIcon from "@mui/icons-material/DrawRounded";
+import { FormActions, InsetBox, SectionCard, SignatureField, SignaturePreview } from "@/components/ui";
 import type { SignaturePadHandle } from "@/components/ui/SignaturePad";
 import { api, errorMessage } from "@/lib/api-client";
 import type { OwnerProfileView } from "@/lib/contracts";
@@ -79,8 +81,14 @@ export default function ProfileForm({ profile }: { profile: OwnerProfileView }) 
     <Box component="form" onSubmit={handleSubmit}>
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Stack spacing={2}>
-            <SectionCard title="Owner" caption="The landlord, printed on every receipt.">
+          <SectionCard
+            title="Owner details"
+            caption="The landlord printed on every receipt, and who signs for them."
+            icon={<BadgeRoundedIcon />}
+            tone="primary"
+            fill
+          >
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
                 label="First name"
                 value={firstName}
@@ -96,22 +104,24 @@ export default function ProfileForm({ profile }: { profile: OwnerProfileView }) 
                 fullWidth
                 slotProps={{ htmlInput: { maxLength: 60 } }}
               />
-            </SectionCard>
-            <SectionCard title="Signed by" caption="Who signs receipts, if not the owner.">
-              <TextField
-                label="Signer's name"
-                value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
-                fullWidth
-                helperText={
-                  signatureName.trim()
-                    ? `Receipts read "${signer}, on behalf of ${ownerName}".`
-                    : "Leave empty if the owner signs."
-                }
-                slotProps={{ htmlInput: { maxLength: 120 } }}
-              />
-            </SectionCard>
-          </Stack>
+            </Stack>
+            <TextField
+              label="Signer's name"
+              value={signatureName}
+              onChange={(e) => setSignatureName(e.target.value)}
+              fullWidth
+              helperText="Leave empty if the owner signs."
+              slotProps={{ htmlInput: { maxLength: 120 } }}
+            />
+            <InsetBox direction="column">
+              <Typography variant="caption" color="textSecondary">
+                On receipts
+              </Typography>
+              <Typography variant="body2">
+                {signatureName.trim() ? `${signer}, on behalf of ${ownerName}` : ownerName}
+              </Typography>
+            </InsetBox>
+          </SectionCard>
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
@@ -130,8 +140,11 @@ export default function ProfileForm({ profile }: { profile: OwnerProfileView }) 
             </Stack>
           ) : (
             <SectionCard
-              title="Saved signature"
+              title="Receipt signature"
               caption={`${signer}'s signature, used on new payments and adjustments unless you sign by hand. Receipts already issued keep theirs.`}
+              icon={<DrawRoundedIcon />}
+              tone="info"
+              fill
             >
               {preview ? (
                 <SignaturePreview src={preview} height={96} />
@@ -180,7 +193,7 @@ export default function ProfileForm({ profile }: { profile: OwnerProfileView }) 
           <FormActions
             error={error}
             cancelHref={routes.home}
-            submitLabel="Save"
+            submitLabel="Save profile"
             pendingLabel="Saving…"
             pending={submitting}
           />

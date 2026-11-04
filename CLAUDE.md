@@ -80,7 +80,9 @@ test instead.
   "Collected" (per rent month) vs the chart's "Received" (cash, A20), and the
   phone app as a PWA whose service worker caches no owner data (A21), and
   set-off payments: rent paid by deduction, never counted as cash (A22), and the
-  Earnings page's two nets, by rent month and as cash (A23). Read it before changing
+  Earnings page's two nets, by rent month and as cash (A23), and the
+  report pages' sticky period/view bar instead of a global header control (A24),
+  and Profile (the person) vs Settings (the shared lists, A25). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -200,14 +202,14 @@ both together.
   (`src/server/services/profile.ts`).
 - **Quick payment notes** (`0024_payment_note_presets.sql`, D30): strings
   offered under Note on Record payment (`noteSuggestions` in the form's GET),
-  managed on `/profile` (`PaymentNotesCard`,
+  managed on `/settings` (`PaymentNotesCard`, A25,
   `src/server/services/paymentNotes.ts`). No audit trigger: a payment copies
   the text.
 - **Payment tags** (`0030_payment_tags.sql`, D34): optional labels on a
   payment (who received it, ...), set on Record payment and edited on
   `/payments` (`EditTagsDialog`, `PUT …/payments/[id]/tags`). Each
   payment keeps its own copy of the names (`payment_record_tags`); the
-  suggestions (`payment_tags`, managed on `/profile`, `PaymentTagsCard`)
+  suggestions (`payment_tags`, managed on `/settings`, `PaymentTagsCard`)
   never change a payment. Searched with the Payments and Ledger tables.
   Services in `src/server/services/paymentTags.ts`; not audited.
 - **Maintenance expenses** (`0031_maintenance.sql`, D35): money spent on
@@ -633,7 +635,11 @@ Each of these was found broken somewhere; keep them when adding code.
   forking it. The wrappers so far: `AppCard` (Card: raised 3D shadow, `href`
   makes the whole card a link, `depth="flat"` for dashed/inset surfaces),
   `DataTable` (Data Grid), `LoadingButton`/`LinkButton` (Button), `Loader`
-  (progress), `StatusBadge`/`TagPill` (Chip). Don't import
+  (progress), `StatusBadge`/`TagPill` (Chip), `StatCard` (a figure: `icon`
+  in a tinted `IconTile`, `tone` defaulting to the badge's, `variant`
+  `highlighted` for needs-attention or `gradient` for the page's headline
+  figure; tints come from `toneTintSx`/`toneMain` in `src/components/ui/tone.ts`,
+  CSS variables + `color-mix`, never hex). Don't import
   `@mui/material/Card` outside `AppCard`.
 - **Colours live in the theme.** No hex/rgba literals in components (the
   shell and `DataTable/styles.ts` included): add a token to

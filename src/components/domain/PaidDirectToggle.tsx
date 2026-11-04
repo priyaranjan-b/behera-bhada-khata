@@ -7,7 +7,7 @@ import { useAppRouter } from "@/components/ui/Loading";
 import { PAID_DIRECT_PARAM } from "@/lib/preferences";
 
 /**
- * "Include Govt paid direct" on Overview and Billing: whether government rent
+ * "Include Govt paid direct" on Overview, Billing and Earnings: whether government rent
  * paid to the owner directly (A11) counts in the figures. Off on every visit;
  * switching it sets `?paidDirect=show` on this page's URL (nothing is
  * remembered), and the page re-renders on the server with the new totals.
@@ -19,7 +19,6 @@ export default function PaidDirectToggle({ shown }: { shown: boolean }) {
     <FormControlLabel
       control={
         <Switch
-          size="small"
           checked={shown}
           disabled={pending}
           onChange={(e) => {
@@ -31,6 +30,8 @@ export default function PaidDirectToggle({ shown }: { shown: boolean }) {
         />
       }
       label="Include Govt paid direct"
+      // Label first, switch at the end, as in iOS settings rows.
+      labelPlacement="start"
       slotProps={{ typography: { variant: "body2", noWrap: true } }}
     />
   );

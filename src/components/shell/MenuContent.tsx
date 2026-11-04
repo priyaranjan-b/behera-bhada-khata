@@ -7,9 +7,14 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useSearchParams } from "next/navigation";
 import Link from "@/components/ui/Link";
+import { carryPaidDirect, PAID_DIRECT_PARAM } from "@/lib/preferences";
 import { brand } from "@/theme/themePrimitives";
 import { NAV_ITEMS, QUICK_ADD_ITEMS, type AppTab } from "./nav";
+
+/** The pages with "Include Govt paid direct": the menu keeps it on between them (A24). */
+const PAID_DIRECT_TABS: ReadonlySet<AppTab> = new Set<AppTab>(["summary", "billing", "earnings"]);
 
 /** CoreUI-style items on the dark desktop side menu (SideMenu); the phone drawer keeps the light look. */
 const contrastItemSx = {
@@ -38,6 +43,7 @@ export function MenuContent({
   /** Light-on-dark items for the desktop contrast side menu. */
   contrast?: boolean;
 }) {
+  const paidDirect = useSearchParams().get(PAID_DIRECT_PARAM);
   const heading = (label: string) =>
     contrast ? (
       <Typography
@@ -61,7 +67,7 @@ export function MenuContent({
           <ListItem key={item.tab} disablePadding sx={{ display: "block" }}>
             <ListItemButton
               component={Link}
-              href={item.href}
+              href={carryPaidDirect(item.href, PAID_DIRECT_TABS.has(item.tab), paidDirect)}
               selected={active}
               aria-current={active ? "page" : undefined}
               onClick={onNavigate}

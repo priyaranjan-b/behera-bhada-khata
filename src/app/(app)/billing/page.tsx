@@ -8,8 +8,8 @@ import { routes } from "@/lib/routes";
 import { BILLING_LIMITS } from "@/lib/validation";
 import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
 import AsyncSection from "@/components/ui/AsyncSection";
+import ContextBar from "@/components/ui/ContextBar";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
-import { ActionStack } from "@/components/ui";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import MonthRangeForm from "@/components/ui/MonthRangeForm";
 import { BILLING_SKELETONS as SKELETON } from "./billingSkeletons";
@@ -42,30 +42,33 @@ export default async function BillingPage({
 
   return (
     <Stack spacing={2}>
-      <PageHeader
-        title="Billing"
-        subtitle="Rent billed to each tenant per month, and what was collected for it."
-        action={
-          <ActionStack>
+      <PageHeader title="Billing" subtitle="Rent billed to each tenant per month, and what was collected for it." />
+      <ContextBar
+        period={
+          <PeriodSwitcher
+            label={rangeLabel}
+            unit={months === 1 ? "month" : `${months} months`}
+            prevHref={routes.billing({ ...rangeQuery(shiftRange(range, -1)), ...paidDirectQuery(paidDirect) })}
+            nextHref={routes.billing({ ...rangeQuery(shiftRange(range, 1)), ...paidDirectQuery(paidDirect) })}
+          />
+        }
+        options={
+          <>
+            {/* Remount on a new range so the inputs show it. */}
+            <MonthRangeForm
+              key={`${range.from}-${range.to}`}
+              from={yearMonthOf(range.from)}
+              to={yearMonthOf(range.to)}
+              path={routes.billing()}
+              query={paidDirectQuery(paidDirect)}
+            />
             <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
               <PaidDirectSwitch state={paidDirectState} />
             </AsyncSection>
-            <PeriodSwitcher
-              label={rangeLabel}
-              unit={months === 1 ? "month" : `${months} months`}
-              prevHref={routes.billing({ ...rangeQuery(shiftRange(range, -1)), ...paidDirectQuery(paidDirect) })}
-              nextHref={routes.billing({ ...rangeQuery(shiftRange(range, 1)), ...paidDirectQuery(paidDirect) })}
-            />
-          </ActionStack>
+          </>
         }
-      />
-      {/* Remount on a new range so the inputs show it. */}
-      <MonthRangeForm
-        key={`${range.from}-${range.to}`}
-        from={yearMonthOf(range.from)}
-        to={yearMonthOf(range.to)}
-        path={routes.billing()}
-        query={paidDirectQuery(paidDirect)}
+        activeCount={paidDirect === "show" ? 1 : 0}
+        resetHref={routes.billing()}
       />
 
       <Grid container spacing={2} columns={12}>

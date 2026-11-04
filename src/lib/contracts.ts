@@ -447,7 +447,7 @@ export interface OwnerProfileView {
   signatureUrl: string | null;
 }
 
-/** A quick-select note for the Record payment form (0024), managed on the Profile page. */
+/** A quick-select note for the Record payment form (0024), managed on Settings. */
 export interface PaymentNotePresetView {
   id: string;
   text: string;
@@ -456,7 +456,7 @@ export interface PaymentNotePresetView {
 export type UpdateOwnerProfileInput = z.input<typeof ownerProfileSchema>;
 export type PaymentNotePresetInput = z.input<typeof paymentNotePresetSchema>;
 
-/** A suggested payment tag (0030), managed on the Profile page. */
+/** A suggested payment tag (0030), managed on Settings. */
 export interface PaymentTagView {
   id: string;
   name: string;

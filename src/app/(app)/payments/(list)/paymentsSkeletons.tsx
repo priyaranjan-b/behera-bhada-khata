@@ -1,6 +1,6 @@
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
-import { PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
+import { ContextBarSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
 import { PAYMENT_STAT_CELL } from "./paymentStatCell";
 
 /**
@@ -8,7 +8,12 @@ import { PAYMENT_STAT_CELL } from "./paymentStatCell";
  * uses them as fallbacks, loading.tsx shows them all (A12).
  */
 export const PAYMENTS_SKELETONS = {
-  header: <PageHeaderSkeleton action />,
+  header: (
+    <>
+      <PageHeaderSkeleton />
+      <ContextBarSkeleton />
+    </>
+  ),
   stat: <StatCardSkeleton />,
   // Seven stat cards (received, four modes, set-off, Govt paid direct), then the table.
   view: (

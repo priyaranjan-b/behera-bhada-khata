@@ -1,11 +1,16 @@
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
-import { ChartCardSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
+import { ContextBarSkeleton, ChartCardSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
 import { EARNINGS_STAT_CELL } from "./earningsStatCell";
 
 /** The Earnings page's placeholders, sized like its cards: page.tsx's fallback and loading.tsx (A12). */
 export const EARNINGS_SKELETONS = {
-  header: <PageHeaderSkeleton action />,
+  header: (
+    <>
+      <PageHeaderSkeleton />
+      <ContextBarSkeleton />
+    </>
+  ),
   // Six stat cards, the chart, then the table.
   view: (
     <Stack spacing={2}>
