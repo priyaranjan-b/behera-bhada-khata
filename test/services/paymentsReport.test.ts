@@ -21,7 +21,7 @@ describe("Payments", () => {
   it("defaults to last month and asks the database for one page, as database columns", async () => {
     const page = await getPaymentsPage(ctx);
     expect(page).toMatchObject({ from: "2026-10-01", to: "2026-10-31", total: 0, page: 0 });
-    expect(page.totals).toEqual({ amount: 0, count: 0, byMode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0 } });
+    expect(page.totals).toEqual({ amount: 0, count: 0, byMode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 0 } });
     expect(fakes.owner.payments.page).toHaveBeenLastCalledWith({
       from: "2026-10-01",
       to: "2026-10-31",

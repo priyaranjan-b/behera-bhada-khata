@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAINTENANCE_CATEGORIES } from "@/lib/types";
-import { MAINTENANCE_CATEGORY_LABELS, maintenanceCategoryLabel, maintenanceRange, splitEqually } from "./maintenance";
+import { MAINTENANCE_CATEGORY_LABELS, isCashExpense, maintenanceCategoryLabel, maintenanceRange, splitEqually } from "./maintenance";
 
 describe("splitEqually", () => {
   it("gives the odd paise to the first houses by code", () => {
@@ -49,5 +49,12 @@ describe("maintenanceRange", () => {
     expect(maintenanceRange({ from: "bad" }, 731, now)).toEqual({ from: "2026-10-01", to: "2026-10-31" });
     expect(maintenanceRange({ from: "2026-03-01" }, 731, now)).toEqual({ from: "2026-03-01", to: "2026-03-01" });
     expect(maintenanceRange({ from: "2026-03-31", to: "2026-03-01" }, 731, now)).toEqual({ from: "2026-03-01", to: "2026-03-31" });
+  });
+});
+
+describe("isCashExpense (A22)", () => {
+  it("is false only for an expense a set-off paid for", () => {
+    expect(isCashExpense({ settledBy: null })).toBe(true);
+    expect(isCashExpense({ settledBy: { paymentId: "p-1", receiptNo: null } })).toBe(false);
   });
 });

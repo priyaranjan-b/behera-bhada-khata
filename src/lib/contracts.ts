@@ -222,6 +222,7 @@ export interface PaymentListRow {
 
 /** Money per mode for every payment that matches the search and filters, whatever the page. */
 export interface PaymentTotals {
+  /** Money that came in; set-offs are in byMode.set_off only (A22). */
   amount: number;
   count: number;
   byMode: Record<PaymentMode, number>;
@@ -266,6 +267,8 @@ export interface MaintenanceListRow {
 /** Every matching expense that isn't voided, whatever the page. */
 export interface MaintenanceTotals {
   amount: number;
+  /** Of it, paid in cash; the rest a set-off against rent paid (A22). Net cash subtracts only this. */
+  cash: number;
   count: number;
   byCategory: Partial<Record<MaintenanceCategory, number>>;
   /** Per payer, largest first; an expense with two payers counts in full for each. */
@@ -290,11 +293,32 @@ export interface MaintenanceHouseOption {
 }
 
 /** GET …/maintenance/new: the Record maintenance form's data. */
+/** `?fromPayment=` on /maintenance/new: start from a set-off payment (A22). */
+export interface MaintenanceFormQuery {
+  fromPayment?: string;
+}
+
+/** A new expense's starting values, from a set-off payment (A22): what the tenant kept back, when, and for what. */
+export interface MaintenancePrefill {
+  /** The set-off payment; the expense records it so it never counts as cash spent (A22). */
+  paymentId: string;
+  amount: number;
+  expenseDate: string;
+  description: string;
+  /** The tenant, who was paid in kind. */
+  vendor: string;
+  /** Who paid: the tenant, as a tag name. */
+  tags: string[];
+  note: string;
+}
+
 export interface MaintenanceForm {
   /** Grouped by tower, then by code. */
   houses: MaintenanceHouseOption[];
   /** Who-paid suggestions (the payment tags, 0030). */
   tagSuggestions: string[];
+  /** Set when started from a set-off payment; null otherwise. */
+  prefill: MaintenancePrefill | null;
 }
 
 export interface MaintenanceFileView {
@@ -317,6 +341,8 @@ export interface MaintenanceDetail {
   voidedAt: string | null;
   voidReason: string | null;
   recordedAt: string;
+  /** Paid by a set-off against rent (A22): no cash went out. Its receipt number, if it has one. */
+  settledBy: { paymentId: string; receiptNo: string | null } | null;
   /** In code order. */
   houses: (MaintenanceHouseOption & { share: number })[];
   tags: string[];

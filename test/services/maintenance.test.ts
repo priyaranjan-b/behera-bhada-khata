@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OWNER_ID, fakes, resetFakes } from "../fakes";
+import { OWNER_ID, fakes, payment, resetFakes } from "../fakes";
 import { MAINTENANCE_FILE_LIMITS } from "@/lib/validation";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
@@ -170,5 +170,43 @@ describe("getMaintenanceForm", () => {
     expect(form.tagSuggestions).toEqual(["Padma"]);
     expect(form.houses.length).toBeGreaterThan(0);
     for (const h of form.houses) expect(h).toMatchObject({ propertyCode: expect.any(String), propertyName: expect.any(String) });
+  });
+});
+
+describe("starting from a set-off payment (A22)", () => {
+  const SET_OFF = "00000000-0000-4000-8000-000000000203";
+
+  it("offers its amount, date, note and tenant", async () => {
+    fakes.state.payments.set(
+      SET_OFF,
+      payment({ id: SET_OFF, mode: "set_off", amount: 1200, note: "Paint from the shop", payment_date: "2026-10-02" })
+    );
+    const { prefill } = await getMaintenanceForm(ctx, { fromPayment: SET_OFF });
+    expect(prefill).toEqual({
+      paymentId: SET_OFF,
+      amount: 1200,
+      expenseDate: "2026-10-02",
+      description: "Paint from the shop",
+      vendor: "Asha",
+      tags: ["Asha"],
+      note: expect.stringMatching(/^Set off against rent/),
+    });
+  });
+
+  it("offers nothing for another mode, an unknown payment or a malformed id", async () => {
+    expect((await getMaintenanceForm(ctx, { fromPayment: "00000000-0000-4000-8000-000000000201" })).prefill).toBeNull();
+    expect((await getMaintenanceForm(ctx, { fromPayment: "00000000-0000-4000-8000-000000000999" })).prefill).toBeNull();
+    expect((await getMaintenanceForm(ctx, { fromPayment: "nope" })).prefill).toBeNull();
+    expect((await getMaintenanceForm(ctx)).prefill).toBeNull();
+  });
+});
+
+describe("an expense paid by a set-off (A22)", () => {
+  it("records the set-off it came from, for the database to check", async () => {
+    const SET_OFF = "00000000-0000-4000-8000-000000000203";
+    const { id } = await createMaintenanceExpense(ctx, input({ settledByPaymentId: SET_OFF }));
+    expect(fakes.owner.maintenance.create).toHaveBeenLastCalledWith(id, expect.anything(), expect.anything(), expect.anything(), [], SET_OFF);
+    expect((await getMaintenanceExpense(ctx, id)).settledBy).toEqual({ paymentId: SET_OFF, receiptNo: null });
+    await expect(createMaintenanceExpense(ctx, input({ settledByPaymentId: "nope" }))).rejects.toMatchObject({ status: 400 });
   });
 });

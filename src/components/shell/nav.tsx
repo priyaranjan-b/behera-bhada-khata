@@ -42,7 +42,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
 export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: React.ReactNode }[] = [
   { tab: "addTenant", href: routes.tenants.new, label: "Add tenant", icon: <PersonAddAltRoundedIcon /> },
   { tab: "addHouse", href: routes.houses.new, label: "Add house", icon: <AddHomeWorkRoundedIcon /> },
-  { tab: "addMaintenance", href: routes.maintenance.new, label: "Record maintenance", icon: <BuildCircleRoundedIcon /> },
+  { tab: "addMaintenance", href: routes.maintenance.new(), label: "Record maintenance", icon: <BuildCircleRoundedIcon /> },
 ];
 
 export const SIDEBAR_WIDTH = 240;

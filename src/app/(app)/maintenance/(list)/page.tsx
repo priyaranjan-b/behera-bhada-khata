@@ -38,7 +38,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
               prevHref={routes.maintenance.list(shiftDayRange(range, -1))}
               nextHref={routes.maintenance.list(shiftDayRange(range, 1))}
             />
-            <LinkButton href={routes.maintenance.new} variant="contained" startIcon={<AddRoundedIcon />}>
+            <LinkButton href={routes.maintenance.new()} variant="contained" startIcon={<AddRoundedIcon />}>
               Record maintenance
             </LinkButton>
           </ActionStack>

@@ -148,3 +148,11 @@ describe("scriptRuns", () => {
     ]);
   });
 });
+
+describe("set-off receipts (A22)", () => {
+  it("renders one with its note as what it was deducted for", async () => {
+    const bytes = await generateReceiptPdf({ ...receipt, mode: "set_off", note: "Paint bought from the shop" });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBe(1);
+  });
+});

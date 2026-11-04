@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { index, integer, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
 import { MAINTENANCE_CATEGORIES, type ProofContentType } from "@/lib/types";
 import { dateKey, money, timestamptz } from "./columns";
+import { payments } from "./ledger";
 import { units } from "./places";
 
 // 0031_maintenance.sql (D35): money spent on the houses. The expense and its
@@ -21,6 +22,11 @@ export const maintenanceExpenses = pgTable(
     note: text("note"),
     voided_at: timestamptz("voided_at"),
     void_reason: text("void_reason"),
+    /** 0032 (A22): the set-off payment that paid for it. */
+    settled_by_payment_id: uuid("settled_by_payment_id").references(() => payments.id, {
+      onDelete: "restrict",
+      onUpdate: "restrict",
+    }),
     recorded_by: uuid("recorded_by"),
     created_at: timestamptz("created_at").notNull().default(sql`now()`),
     updated_at: timestamptz("updated_at").notNull().default(sql`now()`),

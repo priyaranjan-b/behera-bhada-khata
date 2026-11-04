@@ -2326,7 +2326,8 @@ describe("payments_page (0026)", () => {
   });
 
   it("labels modes exactly as the app does", async () => {
-    for (const [mode, label] of Object.entries(PAYMENT_MODE_LABELS)) {
+    // The frozen function predates set_off (0032, A22), which it calls Other; never edit the rollback script.
+    for (const [mode, label] of Object.entries(PAYMENT_MODE_LABELS).filter(([m]) => m !== "set_off")) {
       expect((await as<{ v: string }>(owner(OWNER_A), `select payment_mode_label($1) as v`, [mode]))[0].v).toBe(label);
     }
   });
@@ -2635,5 +2636,64 @@ describe("maintenance expenses (0031)", () => {
     expect(rows[3].details).toBe("Amount: ₹1,000.00 → ₹600.00");
     expect(rows[5].details).toBe("Share: ₹500.00 → ₹300.00");
     expect(rows[7].details).toBe("Reason: Entered twice");
+  });
+});
+
+describe("set-off payments (0032)", () => {
+  const pay = (mode: string) =>
+    as(
+      owner(OWNER_A),
+      `select create_payment(gen_random_uuid(), $1, 1200, '2026-03-05', $2, 'Paint bought from the shop', 'sig.png',
+         md5(random()::text), now() + interval '14 days', $3::jsonb)`,
+      [fx.tenantA, mode, JSON.stringify([{ rent_period_id: fx.periods[0].id, amount: 1200 }])]
+    );
+
+  it("takes set_off like any mode: it pays the rent month", async () => {
+    expect(await errorCode(pay("set_off"))).toBe("ok");
+    expect(await allocated(fx.periods[0].id)).toBe(1200);
+    expect(await errorCode(pay("barter"))).toBe("23514");
+  });
+
+  it("can pay for one maintenance expense, up to its amount; nothing else can", async () => {
+    await pay("set_off");
+    const setOff = await latestPaymentId();
+    await pay("cash");
+    const cash = await latestPaymentId();
+    const expense = (id: string, amount: number, paymentId: string) =>
+      as(
+        owner(OWNER_A),
+        `select create_maintenance_expense($1::uuid, '2026-03-05', $2::numeric, 'painting', 'Paint', null, null,
+           array['AC-T1-G01'], $3::uuid)`,
+        [id, amount, paymentId]
+      );
+    const E1 = "00000000-0000-4000-8000-0000000000f1";
+    const E2 = "00000000-0000-4000-8000-0000000000f2";
+    expect(await errorCode(expense(E1, 1200, cash))).toBe("BBK00");
+    expect(await errorCode(expense(E1, 1200.01, setOff))).toBe("BBK00");
+    expect(await errorCode(expense(E1, 1200, setOff))).toBe("ok");
+    expect(await errorCode(expense(E2, 100, setOff))).toBe("BBK09");
+    // Edited, it stays within the set-off.
+    const edit = (amount: number) =>
+      as(
+        owner(OWNER_A),
+        `select update_maintenance_expense($1::uuid, '2026-03-05', $2::numeric, 'painting', 'Paint', null, null,
+           array['AC-T1-G01'])`,
+        [E1, amount]
+      );
+    expect(await errorCode(edit(1200.01))).toBe("BBK00");
+    expect(await errorCode(edit(1000))).toBe("ok");
+    // A voided expense frees the set-off; the link itself never changes.
+    await as(owner(OWNER_A), `select void_maintenance_expense($1, 'Wrong house')`, [E1]);
+    expect(await errorCode(expense(E2, 1200, setOff))).toBe("ok");
+    expect(
+      await errorCode(db.query(`update maintenance_expenses set settled_by_payment_id = null where id = $1`, [E2]))
+    ).toBe("BBK00");
+  });
+
+  it("labels it in the history", async () => {
+    await db.exec(`truncate audit_log`);
+    await pay("set_off");
+    const { rows } = await db.query<{ details: string }>(`select details from audit_log where action = 'payment.recorded'`);
+    expect(rows[0].details).toContain("Mode: Set-off (deducted by tenant)");
   });
 });

@@ -253,6 +253,15 @@ export default async function TenantPage({
           number, then use Send link in the Ledger tab - or download the receipt and send it yourself.
         </FlashAlert>
       ) : null}
+      {flash.setOff ? (
+        <FlashAlert param={FLASH.setOff} severity="info">
+          Recorded as a set-off: it pays the rent but isn&apos;t counted as cash received. Was it for something used on
+          the houses?{" "}
+          <MuiLink component={Link} href={routes.maintenance.new({ fromPayment: flash.setOff })}>
+            Record it as a maintenance expense
+          </MuiLink>
+        </FlashAlert>
+      ) : null}
       {flash.resent ? (
         <FlashAlert param={FLASH.resent} severity="success">
           Link sent to the tenant to acknowledge.

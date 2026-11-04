@@ -113,7 +113,7 @@ const inProcessApi: ApiQueries = {
     },
     maintenance: {
       list: async (query) => getMaintenancePage(await owner(), query),
-      newForm: async () => getMaintenanceForm(await owner()),
+      newForm: async (query) => getMaintenanceForm(await owner(), query ?? {}),
       detail: async (id) => getMaintenanceExpense(await owner(), id),
       history: async (id, before) => maintenanceHistory(await owner(), id, { before }),
     },

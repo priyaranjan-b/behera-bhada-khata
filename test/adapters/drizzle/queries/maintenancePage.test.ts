@@ -95,6 +95,7 @@ describe("maintenancePage", () => {
     expect(result.rows.find((r) => r.id === ids.tap)).toMatchObject({ file_count: 1, vendor: "Ramesh plumber", expense_date: "2026-03-05" });
     expect(result.totals).toEqual({
       amount: 12400,
+      cash: 12400,
       count: 3,
       by_category: { plumbing: 1000, painting: 9000, property_tax: 2400 },
       by_tag: [

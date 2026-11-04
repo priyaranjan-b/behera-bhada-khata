@@ -361,7 +361,10 @@ export async function generateReceiptPdf(input: ReceiptInput): Promise<Uint8Arra
   row(isPayment ? "Payment date" : "Date", formatDateKey(input.date));
   if (input.mode) row("Payment method", paymentModeLabel(input.mode));
   if (input.correctsReceiptNo) row("Corrects receipt", `#${input.correctsReceiptNo}`);
-  if (input.note) row(isPayment ? "Note" : "Reason", input.note, { maxLines: MAX_NOTE_LINES });
+  // A set-off's note says what the tenant kept back the money for (A22).
+  if (input.note) {
+    row(isPayment ? (input.mode === "set_off" ? "Deducted for" : "Note") : "Reason", input.note, { maxLines: MAX_NOTE_LINES });
+  }
   rule();
 
   // ---- Charges ------------------------------------------------------------------

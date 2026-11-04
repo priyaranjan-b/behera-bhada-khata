@@ -126,9 +126,10 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
     maintenance: {
       page: (filter) => read(`read maintenance page ${pageLabel(filter)}`, (tx) => maintenancePage(tx, filter)),
       get: (id) => read(`get maintenance expense ${id}`, (tx) => getMaintenanceExpense(tx, id)),
-      create: (id, fields, unitCodes, tags, files) =>
-        write(`record maintenance expense ${id} on ${unitCodes.length} houses`, (tx) =>
-          createMaintenanceExpense(tx, id, fields, unitCodes, tags, files)
+      create: (id, fields, unitCodes, tags, files, settledByPaymentId) =>
+        write(
+          `record maintenance expense ${id} on ${unitCodes.length} houses${settledByPaymentId ? ` settled by ${settledByPaymentId}` : ""}`,
+          (tx) => createMaintenanceExpense(tx, id, fields, unitCodes, tags, files, settledByPaymentId ?? null)
         ),
       update: (id, fields, unitCodes) =>
         write(`edit maintenance expense ${id}`, (tx) => updateMaintenanceExpense(tx, id, fields, unitCodes)),

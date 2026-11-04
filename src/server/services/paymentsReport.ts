@@ -77,6 +77,7 @@ export async function getPaymentsPage(_ctx: OwnerContext, query: unknown = {}): 
         upi: Number(t.by_mode.upi),
         cheque: Number(t.by_mode.cheque),
         other: Number(t.by_mode.other),
+        set_off: Number(t.by_mode.set_off),
       },
     },
   };

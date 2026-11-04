@@ -8,15 +8,19 @@ import type {
   MaintenanceForm,
   MaintenanceListRow,
   MaintenancePage,
+  MaintenancePrefill,
 } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
 import { maintenanceRange } from "@/lib/domain/maintenance";
+import { tenantDisplayName } from "@/lib/domain/tenant";
 import { ApiError } from "@/lib/errors";
 import type { MaintenanceFile } from "@/lib/types";
 import {
   MAINTENANCE_FILE_LIMITS,
   MAINTENANCE_LIMITS,
+  PAYMENT_TAG_LIMITS,
   createMaintenanceSchema,
+  maintenanceFormQuerySchema,
   maintenancePageQuerySchema,
   setPaymentTagsSchema,
   updateMaintenanceSchema,
@@ -91,14 +95,54 @@ export async function getMaintenancePage(_ctx: OwnerContext, query: unknown = {}
     total: result.total,
     all: result.all,
     page: result.page,
-    totals: { amount: t.amount, count: t.count, byCategory: t.by_category, byPaidBy: t.by_tag, untagged: t.untagged },
+    totals: {
+      amount: t.amount,
+      cash: t.cash,
+      count: t.count,
+      byCategory: t.by_category,
+      byPaidBy: t.by_tag,
+      untagged: t.untagged,
+    },
   };
 }
 
-/** The Record maintenance form: every house in use, by tower, and the who-paid suggestions. */
-export async function getMaintenanceForm(_ctx: OwnerContext): Promise<MaintenanceForm> {
+/**
+ * A set-off payment as a new expense's starting values (A22): the money the
+ * tenant kept back paid for something the owner bought from them. Null for
+ * any other payment, or one that doesn't exist.
+ */
+async function prefillFrom(db: OwnerRepositories, paymentId: string | undefined): Promise<MaintenancePrefill | null> {
+  if (!paymentId) return null;
+  const payment = await db.payments.get(paymentId);
+  if (!payment || payment.mode !== "set_off") {
+    console.warn(`maintenance prefill ignored: payment ${paymentId} ${payment ? `is ${payment.mode}, not a set-off` : "not found"}`);
+    return null;
+  }
+  const tenant = await db.tenants.get(payment.tenant_id);
+  if (!tenant) console.warn(`maintenance prefill: tenant ${payment.tenant_id} of payment ${paymentId} not found`);
+  const name = tenant ? tenantDisplayName(tenant) : "";
+  const receipt = payment.receipt_no ? `, receipt ${payment.receipt_no}` : "";
+  return {
+    paymentId: payment.id,
+    amount: payment.amount,
+    expenseDate: payment.payment_date,
+    description: (payment.note ?? "").slice(0, MAINTENANCE_LIMITS.descriptionMax),
+    vendor: name.slice(0, MAINTENANCE_LIMITS.vendorMax),
+    tags: name ? [name.slice(0, PAYMENT_TAG_LIMITS.maxLength)] : [],
+    note: `Set off against rent${receipt}`,
+  };
+}
+
+/** The Record maintenance form: every house in use, by tower, the who-paid suggestions, and a set-off's values if started from one. */
+export async function getMaintenanceForm(_ctx: OwnerContext, query: unknown = {}): Promise<MaintenanceForm> {
+  const { fromPayment } = parseInput(maintenanceFormQuerySchema, query ?? {});
   const db = await ownerDb();
-  const [units, properties, tagSuggestions] = [await db.units.list(), await db.properties.list(), await paymentTagSuggestions(db)];
+  const [units, properties, tagSuggestions, prefill] = [
+    await db.units.list(),
+    await db.properties.list(),
+    await paymentTagSuggestions(db),
+    await prefillFrom(db, fromPayment),
+  ];
   const towerName = new Map(properties.map((p) => [p.property_code, p.name]));
   return {
     houses: units
@@ -111,6 +155,7 @@ export async function getMaintenanceForm(_ctx: OwnerContext): Promise<Maintenanc
       }))
       .sort((a, b) => a.propertyCode.localeCompare(b.propertyCode) || a.unitCode.localeCompare(b.unitCode)),
     tagSuggestions,
+    prefill,
   };
 }
 
@@ -131,6 +176,7 @@ function toDetail(r: MaintenanceExpenseRecord): MaintenanceDetail {
     voidedAt: e.voided_at,
     voidReason: e.void_reason,
     recordedAt: e.created_at,
+    settledBy: e.settled_by_payment_id ? { paymentId: e.settled_by_payment_id, receiptNo: r.settled_by_receipt_no } : null,
     houses: r.units.map((u) => ({
       unitCode: u.unit_code,
       propertyCode: u.property_code,
@@ -192,7 +238,7 @@ export async function createMaintenanceExpense(_ctx: OwnerContext, body: unknown
   const rows = await storeExpenseFiles(id, files);
   await withUploadedFile(
     rows.map((r) => r.storage_path),
-    () => db.maintenance.create(id, fields, input.unitCodes, input.tags, rows)
+    () => db.maintenance.create(id, fields, input.unitCodes, input.tags, rows, input.settledByPaymentId ?? null)
   );
   return { id };
 }

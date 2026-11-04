@@ -25,7 +25,8 @@ export const RECORD_TYPES = ["payment", "adjustment"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
 export const PERIOD_STATUSES = ["pending", "partially_paid", "paid"] as const;
 export type PeriodStatus = (typeof PERIOD_STATUSES)[number];
-export const PAYMENT_MODES = ["cash", "bank_transfer", "upi", "cheque", "other"] as const;
+/** set_off (0032, A22): rent the tenant settled by keeping back money the owner owed them - pays rent, never cash. */
+export const PAYMENT_MODES = ["cash", "bank_transfer", "upi", "cheque", "other", "set_off"] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 export type LedgerStatus = "pending" | "confirmed";
 /** What a maintenance expense was for (0031, D35). Labels in src/lib/domain/maintenance.ts. */
@@ -216,6 +217,8 @@ export interface Database {
           note: string | null;
           voided_at: string | null;
           void_reason: string | null;
+          /** The set-off payment that paid for it (0032, A22): no cash went out. */
+          settled_by_payment_id: string | null;
           recorded_by: string | null;
           created_at: string;
           updated_at: string;
@@ -751,7 +754,10 @@ export interface Database {
         Returns: undefined;
       };
       /** 0031: an expense on one or more houses, split equally. */
-      create_maintenance_expense: { Args: MaintenanceExpenseArgs; Returns: undefined };
+      create_maintenance_expense: {
+        Args: MaintenanceExpenseArgs & { p_settled_by_payment_id?: string | null };
+        Returns: undefined;
+      };
       /** 0031: every field and the houses (re-split); refused once voided. */
       update_maintenance_expense: { Args: MaintenanceExpenseArgs; Returns: undefined };
       /** 0031: keeps the expense, leaves it out of every total. */
@@ -829,6 +835,7 @@ export interface PaymentsDbRow {
 
 /** The Payments page totals (was payments_page, 0026): every matching row, whatever the page. */
 export interface PaymentsTotalsDb {
+  /** Money that came in: every mode but set_off (A22). */
   amount: number;
   count: number;
   by_mode: Record<PaymentMode, number>;
@@ -858,6 +865,8 @@ export interface MaintenanceDbRow {
 /** The Maintenance page totals: every matching expense that isn't voided, whatever the page. */
 export interface MaintenanceTotalsDb {
   amount: number;
+  /** Of it, paid in cash: every expense but those a set-off paid for (A22). */
+  cash: number;
   count: number;
   by_category: Partial<Record<MaintenanceCategory, number>>;
   /** Per payer; an expense with several payers counts in full for each. */

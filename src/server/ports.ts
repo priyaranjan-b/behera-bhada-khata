@@ -88,6 +88,8 @@ export interface MaintenanceExpenseRecord {
   tags: string[];
   /** Oldest first. */
   files: MaintenanceFile[];
+  /** The receipt number of the set-off that paid for it (A22), if any. */
+  settled_by_receipt_no: string | null;
 }
 
 export interface NewUnit {
@@ -354,8 +356,19 @@ export interface OwnerRepositories {
     /** The expenses spent in the days, one page, with totals of every matching expense that isn't voided. */
     page(filter: MaintenanceFilter): Promise<DbPage<MaintenanceDbRow> & { totals: MaintenanceTotalsDb }>;
     get(id: string): Promise<MaintenanceExpenseRecord | null>;
-    /** The expense, its houses split equally, who paid and its files, in one transaction. */
-    create(id: string, fields: MaintenanceExpenseFields, unitCodes: string[], tags: string[], files: NewMaintenanceFile[]): Promise<void>;
+    /**
+     * The expense, its houses split equally, who paid and its files, in one
+     * transaction. `settledByPaymentId`: the set-off that paid for it (A22);
+     * refused unless a set-off of at least the amount, not already used.
+     */
+    create(
+      id: string,
+      fields: MaintenanceExpenseFields,
+      unitCodes: string[],
+      tags: string[],
+      files: NewMaintenanceFile[],
+      settledByPaymentId?: string | null
+    ): Promise<void>;
     /** Every field and the houses (re-split); refused (409) once voided. */
     update(id: string, fields: MaintenanceExpenseFields, unitCodes: string[]): Promise<void>;
     /** Refused (409) if already voided. */

@@ -29,9 +29,14 @@ export async function createMaintenanceExpense(
   fields: MaintenanceExpenseFields,
   unitCodes: string[],
   tags: string[],
-  files: NewMaintenanceFile[]
+  files: NewMaintenanceFile[],
+  settledByPaymentId: string | null = null
 ): Promise<void> {
-  await executeRows(tx, sql`select create_maintenance_expense(${fieldArgs(id, fields, unitCodes)})`);
+  await executeRows(
+    tx,
+    sql`select create_maintenance_expense(${fieldArgs(id, fields, unitCodes)},
+      p_settled_by_payment_id => ${settledByPaymentId}::uuid)`
+  );
   if (tags.length > 0) await setRecordTags(tx, "maintenance", id, tags);
   await addMaintenanceFiles(tx, files);
 }

@@ -71,6 +71,15 @@ describe("createPayment", () => {
     expect(fakes.messaging.send).not.toHaveBeenCalled();
   });
 
+  it("needs a note on a set-off: what the tenant kept the money back for (A22)", async () => {
+    await expect(createPayment(ctx, tenantId, { ...body, mode: "set_off" })).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining("deducted it for"),
+    });
+    const result = await createPayment(ctx, tenantId, { ...body, mode: "set_off", note: "Paint from the shop" });
+    expect(result.id).toEqual(expect.any(String));
+  });
+
   it("passes allocations through for the database to check", async () => {
     const result = await createPayment(ctx, tenantId, body);
     expect(result.notified).toBe(true);

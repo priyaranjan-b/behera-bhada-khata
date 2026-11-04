@@ -170,7 +170,9 @@ export default function PaymentsView({
           <StatCard
             title="Received"
             value={formatMoney(totals.amount)}
-            caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}`}
+            caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
+              byMode.set_off > 0 ? ` · + ${formatMoney(byMode.set_off)} set off` : ""
+            }`}
           />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>
@@ -192,6 +194,9 @@ export default function PaymentsView({
             value={formatMoney(byMode.cheque + byMode.other)}
             caption={shareOf(byMode.cheque + byMode.other, totals)}
           />
+        </Grid>
+        <Grid size={PAYMENT_STAT_CELL}>
+          <StatCard title="Set-off" value={formatMoney(byMode.set_off)} caption="Not cash · kept back by tenants" />
         </Grid>
         <Grid size={PAYMENT_STAT_CELL}>{paidDirectCard}</Grid>
       </Grid>

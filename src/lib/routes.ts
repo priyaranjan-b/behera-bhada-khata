@@ -18,6 +18,8 @@ export const FLASH = {
   resent: "resent",
   maintenanceSaved: "maintenanceSaved",
   maintenanceVoided: "maintenanceVoided",
+  /** A set-off was recorded (A22); the value is its payment id, for "Record as maintenance expense". */
+  setOff: "setOff",
   error: "error",
 } as const;
 
@@ -87,7 +89,8 @@ export const routes = {
   maintenance: {
     /** `from`/`to` are days spent, yyyy-MM-dd; none = this month. */
     list: (query?: { from?: string; to?: string }) => withQuery("/maintenance", query),
-    new: "/maintenance/new",
+    /** `fromPayment`: a set-off payment's id, to start from its amount, date, note and tenant (A22). */
+    new: (query?: { fromPayment?: string }) => withQuery("/maintenance/new", query),
     detail: (id: string, flash?: Flash) => withQuery(`/maintenance/${e(id)}`, flash),
     edit: (id: string) => `/maintenance/${e(id)}/edit`,
   },

@@ -142,7 +142,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       },
       maintenance: {
         list: (query = {}) => get(withQuery(p.dashboard.maintenance.list, { ...query })),
-        newForm: () => get(p.dashboard.maintenance.new),
+        newForm: (query = {}) => get(withQuery(p.dashboard.maintenance.new, { ...query })),
         detail: (id) => get(p.dashboard.maintenance.detail(id)),
         history: (id, before) => get(withQuery(p.dashboard.maintenance.history(id), { before })),
         create: (input, files) => postWithFiles(p.dashboard.maintenance.list, input, "files", files),
