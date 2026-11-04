@@ -261,6 +261,8 @@ export interface TenantLedgerFilter {
   /** yyyy-MM-dd, inclusive. */
   fromDate?: string;
   toDate?: string;
+  /** Only rows with a credit (money in): the Ledger's "Credits only". */
+  creditsOnly?: boolean;
   search?: string;
   filters: { field: "date" | "description" | "status"; operator: GridOperator; value?: GridFilterValue }[];
   logic: FilterLogic;

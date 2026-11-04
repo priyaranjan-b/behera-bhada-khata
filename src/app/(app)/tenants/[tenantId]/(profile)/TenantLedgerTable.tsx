@@ -7,7 +7,7 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import { LEDGER_STATUS_LABELS, type LedgerRow } from "@/lib/domain/tenantLedger";
+import { LEDGER_SHOW_OPTIONS, LEDGER_STATUS_LABELS, type LedgerRow, type LedgerShow } from "@/lib/domain/tenantLedger";
 import type { TenantLedgerQuery, TenantLedgerView } from "@/lib/contracts";
 import { formatDateKey, monthDayRange } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
@@ -37,6 +37,8 @@ const FILTER_OPTIONS: { value: FilterMode; label: string }[] = [
 ];
 
 interface Extra {
+  /** "Credits only" by default: what the owner opens the ledger for is what came in. */
+  show: LedgerShow;
   mode: FilterMode;
   from: string;
   to: string;
@@ -44,14 +46,15 @@ interface Extra {
   month: string;
 }
 
-const DEFAULT_EXTRA: Extra = { mode: "all", from: "", to: "", month: "" };
+const DEFAULT_EXTRA: Extra = { show: "credits", mode: "all", from: "", to: "", month: "" };
 const DEFAULT_SORT: GridSortModel = [{ field: "date", sort: "desc" }];
 const EMPTY: TenantLedgerView = { rows: [], total: 0, all: 0, page: 0, tenantMessaging: false };
 
 function toQuery(grid: GridQueryParams, extra: Extra): TenantLedgerQuery {
-  if (extra.mode === "month" && extra.month) return { ...grid, ...monthDayRange(extra.month) };
-  if (extra.mode === "range") return { ...grid, from: extra.from || undefined, to: extra.to || undefined };
-  return grid;
+  const base = { ...grid, show: extra.show };
+  if (extra.mode === "month" && extra.month) return { ...base, ...monthDayRange(extra.month) };
+  if (extra.mode === "range") return { ...base, from: extra.from || undefined, to: extra.to || undefined };
+  return base;
 }
 
 // Every payment/adjustment counts once recorded (0010): its receipt can be
@@ -109,6 +112,9 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
   });
   const tenantMessaging = data.tenantMessaging;
 
+  // "Credits only" hides Debit (always empty there) and Balance: the running
+  // balance is all-time, so with the charges filtered out it jumps between rows.
+  const creditsOnly = extra.show === "credits";
   const columns = useMemo<DataTableColDef<LedgerRow>[]>(
     () => [
       {
@@ -151,9 +157,9 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
             <StatusChip status={row.status} />
           ),
       }),
-      moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false }),
+      ...(creditsOnly ? [] : [moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false })]),
       moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero, filterable: false }),
-      moneyColumn<LedgerRow>("balance", "Balance", { filterable: false }),
+      ...(creditsOnly ? [] : [moneyColumn<LedgerRow>("balance", "Balance", { filterable: false })]),
       // Searched, not filtered: the ledger query has no tag filter field.
       tagsColumn<LedgerRow>("tags", "Tags", ledgerTagsOf, [], { filterable: false }),
       {
@@ -169,11 +175,18 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
         renderCell: ({ row }) => <ActionsCell row={row} tenantId={tenantId} tenantMessaging={tenantMessaging} />,
       },
     ],
-    [tenantId, tenantMessaging]
+    [tenantId, tenantMessaging, creditsOnly]
   );
 
   const filters = useMemo(
     () => [
+      {
+        label: "Entries",
+        value: extra.show,
+        options: LEDGER_SHOW_OPTIONS,
+        onChange: (show: LedgerShow) => setExtra({ show }),
+        defaultValue: DEFAULT_EXTRA.show,
+      },
       {
         label: "Show",
         value: extra.mode,
@@ -182,7 +195,7 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
         defaultValue: "all" as FilterMode,
       },
     ],
-    [extra.mode, setExtra]
+    [extra.show, extra.mode, setExtra]
   );
 
   const dateInputs =
@@ -222,7 +235,7 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
         filters={filters}
         toolbarExtra={dateInputs}
         search={{ placeholder: "Search the ledger…" }}
-        noRowsLabel="No entries match this filter."
+        noRowsLabel={extra.show === "credits" ? "No payments or credits match this filter." : "No entries match this filter."}
       />
     </Stack>
   );

@@ -183,6 +183,22 @@ describe("tenantLedgerPage on Drizzle matches tenant_ledger_page()", () => {
     });
   });
 
+  // "Credits only" (the Ledger's default) is newer than tenant_ledger_page(),
+  // so it's checked against the full journal rather than the frozen function.
+  it("credits only: the money-in rows of the full journal, with the all-time balance", async () => {
+    const all = await viaDrizzle(asOwner, base());
+    const credits = await viaDrizzle(asOwner, { ...base(), creditsOnly: true });
+    const expected = all.rows.filter((r) => r.credit > 0);
+    // P1, P2, the pending 700 and the +200 adjustment.
+    expect(credits.total).toBe(4);
+    expect(credits.all).toBe(all.all);
+    expect(credits.rows).toEqual(expected);
+    expect(credits.rows.every((r) => r.type !== "charge")).toBe(true);
+    // Combined with the other filters.
+    const lastMonth = await viaDrizzle(asOwner, { ...base(), creditsOnly: true, fromDate: month(-1), toDate: day(-1, 28) });
+    expect(lastMonth.rows.map((r) => r.credit)).toEqual([700]);
+  });
+
   it("refuses what the table doesn't offer", async () => {
     for (const f of [{ sort: "amount" as TenantLedgerFilter["sort"] }, { pageSize: 0 }, { fromDate: "2026-13-01" }]) {
       await expect(viaDrizzle(asOwner, { ...base(), ...f })).rejects.toMatchObject({ status: 400 });

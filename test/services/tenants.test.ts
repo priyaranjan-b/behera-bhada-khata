@@ -326,6 +326,7 @@ describe("the Ledger table (A15)", () => {
       tenantId: id,
       fromDate: "2026-03-01",
       toDate: "2026-03-31",
+      creditsOnly: false,
       search: "neft",
       filters: [{ field: "status", operator: "equals", value: "Confirmed" }],
       logic: "and",
@@ -337,6 +338,13 @@ describe("the Ledger table (A15)", () => {
     expect(view).toMatchObject({ total: view.rows.length, page: 0, tenantMessaging: true });
     const pageIds = view.rows.map((r) => r.refId);
     for (const call of fakes.owner.payments.listProofs.mock.calls) expect(call[0]).toEqual(pageIds);
+  });
+
+  it('"credits" asks for money-in rows only; an unknown show is refused', async () => {
+    const id = "00000000-0000-4000-8000-000000000101";
+    await getTenantLedger(ctx, id, { show: "credits" });
+    expect(fakes.owner.ledger.page).toHaveBeenLastCalledWith(expect.objectContaining({ creditsOnly: true }));
+    await expect(getTenantLedger(ctx, id, { show: "debits" })).rejects.toMatchObject({ status: 400 });
   });
 
   it("rejects a reversed range or an unknown sort, and 404s a bad tenant id", async () => {

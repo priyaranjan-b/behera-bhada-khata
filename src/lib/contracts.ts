@@ -7,7 +7,7 @@ import type { AgingGroup, MonthlyReport, MonthlyTrendPoint, TenantAging } from "
 import type { KindBreakdown, SiteCollection } from "@/lib/domain/overview";
 import type { BillingTotals } from "@/lib/domain/billing";
 import type { EarningsMonth, EarningsTotals } from "@/lib/domain/earnings";
-import type { LedgerRow } from "@/lib/domain/tenantLedger";
+import type { LedgerRow, LedgerShow } from "@/lib/domain/tenantLedger";
 import type { PeriodLike, TenantBalanceSummary } from "@/lib/domain/allocation";
 import type { UnitMix } from "@/lib/domain/tenant";
 import type { AuditCategory } from "@/lib/domain/audit";
@@ -707,6 +707,8 @@ export interface TenantLedgerQuery extends GridQueryParams {
   /** yyyy-MM-dd, inclusive. */
   from?: string;
   to?: string;
+  /** "credits": only rows with money in (payments, adjustments in the tenant's favour). Default "all". */
+  show?: LedgerShow;
 }
 
 /** GET …/tenants/[id]/ledger: one page of charges, payments and adjustments, with their proofs (A15). */
