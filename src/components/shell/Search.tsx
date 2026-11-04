@@ -220,7 +220,9 @@ export function Search({
                   <SearchRoundedIcon fontSize="small" />
                 </InputAdornment>
               ),
-              endAdornment: loading ? (
+              // The index is prefetched silently on focus; the spinner shows only
+              // once there's a query waiting on it.
+              endAdornment: loading && query.trim() !== "" ? (
                 <Loader size="sm" />
               ) : showShortcut && !focused && !query ? (
                 <InputAdornment position="end">

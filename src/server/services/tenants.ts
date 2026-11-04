@@ -213,6 +213,7 @@ export async function getTenantLedger(_ctx: OwnerContext, tenantId: string, quer
     tenantId,
     fromDate: q.from,
     toDate: q.to,
+    creditsOnly: q.show === "credits",
     search: q.q || undefined,
     filters: q.filters.map((f) => ({ ...f, field: LEDGER_FILTER_COLUMNS[f.field] })),
     logic: q.logic,

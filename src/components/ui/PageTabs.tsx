@@ -6,6 +6,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { TAB_PARAM } from "@/lib/routes";
 import { InTabsContext } from "./inTabs";
 
@@ -33,12 +34,17 @@ export interface PageTab {
  * On phones the tab row is a full-width "Section" select instead (both are
  * rendered and switched by CSS, so server and browser agree). Panels provide
  * `InTabsContext`, so a table inside drops its own title on phones.
+ *
+ * `phoneDefault` opens another tab on phones when the URL names none (the
+ * tenant page opens Ledger there). The server can't know the screen, so it
+ * renders the first tab and the phone switches right after hydrating.
  */
 export default function PageTabs({
   tabs,
   value,
   version,
   label,
+  phoneDefault,
 }: {
   tabs: PageTab[];
   /** The tab to open; an unknown value opens the first. */
@@ -47,12 +53,18 @@ export default function PageTabs({
   version: string | number;
   /** Accessible name of the tab list. */
   label: string;
+  /** The tab phones open when `value` names none. */
+  phoneDefault?: string;
 }) {
   const id = useId();
   const valid = (v: string | undefined) => (tabs.some((t) => t.value === v) ? (v as string) : tabs[0].value);
   const [active, setActive] = useState(() => valid(value));
   const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set([active]));
   const [seen, setSeen] = useState({ value, version });
+  // False on the server and while hydrating, then the real answer.
+  const isPhone = useMediaQuery((theme) => theme.breakpoints.down("sm"));
+  // Applied once, and never after the owner has picked a tab themselves.
+  const [phoneSettled, setPhoneSettled] = useState(false);
 
   // Adjust state to new props during render (not in an effect): a new tab from
   // the server opens it; a new version forgets every kept tab but the open one.
@@ -62,8 +74,16 @@ export default function PageTabs({
     setActive(next);
     setVisited(new Set([next]));
   }
+  if (!phoneSettled && isPhone) {
+    setPhoneSettled(true);
+    if (value === undefined && phoneDefault && tabs.some((t) => t.value === phoneDefault)) {
+      setActive(phoneDefault);
+      setVisited((prev) => new Set(prev).add(phoneDefault));
+    }
+  }
 
   const open = (next: string) => {
+    setPhoneSettled(true);
     setActive(next);
     setVisited((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
     const url = new URL(window.location.href);

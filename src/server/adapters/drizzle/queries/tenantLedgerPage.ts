@@ -108,6 +108,8 @@ export async function tenantLedgerPage(tx: Tx, filter: TenantLedgerFilter): Prom
   const dates = [
     filter.fromDate ? sql`r.date >= ${filter.fromDate}::date` : sql`true`,
     filter.toDate ? sql`r.date <= ${filter.toDate}::date` : sql`true`,
+    // "Credits only": the balance is still the all-time one, computed before this.
+    filter.creditsOnly ? sql`r.credit > 0` : sql`true`,
   ];
 
   const [result] = await executeRows<{ all_count: number; total: number; page: number; rows: TenantLedgerDbRow[] }>(

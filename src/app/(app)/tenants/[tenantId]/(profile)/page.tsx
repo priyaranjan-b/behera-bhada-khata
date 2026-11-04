@@ -281,7 +281,8 @@ export default async function TenantPage({
         </Grid>
       ) : null}
 
-      <PageTabs tabs={tabs} value={flash.tab} version={version} label="Tenant sections" />
+      {/* Phones open the Ledger: on the go the question is "what has this tenant paid". */}
+      <PageTabs tabs={tabs} value={flash.tab} version={version} label="Tenant sections" phoneDefault="ledger" />
     </Stack>
   );
 }
