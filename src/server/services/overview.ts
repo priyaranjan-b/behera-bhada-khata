@@ -10,6 +10,7 @@ import {
   type AttentionItem,
 } from "@/lib/domain/overview";
 import { isVacant } from "@/lib/domain/houses";
+import { cashOnly } from "@/lib/domain/payments";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import type { RentPeriod, Tenant } from "@/lib/types";
@@ -132,8 +133,9 @@ export async function getOverviewTrend(_ctx: OwnerContext, options: { paidDirect
   ]);
   // Paid-direct months count as billed and as collected that month (A11).
   const direct = directPeriods(allTenants, placement, months, showPaidDirect);
+  // Received is cash: a set-off pays rent but no money came in (A22).
   const payments = [
-    ...recorded,
+    ...cashOnly(recorded),
     ...direct
       .filter((p) => p.period_month <= todayMonthKey)
       .map((p) => ({ amount: p.amount_allocated, payment_date: p.period_month })),

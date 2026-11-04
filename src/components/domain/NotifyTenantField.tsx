@@ -50,7 +50,8 @@ export default function NotifyTenantField({
  * The tenant page's query after saving: the flash, from the API's `notified`
  * (null = not asked), and the Ledger tab, where the new record is.
  */
-export function recordedFlash(notified: boolean | null): Flash & { tab: TenantTab } {
+export function recordedFlash(notified: boolean | null, setOffPaymentId?: string): Flash & { tab: TenantTab } {
   const flash: Flash = notified === null ? { paymentCreated: "1" } : notified ? { paymentCreated: "sent" } : { notifyFailed: "1" };
-  return { ...flash, tab: "ledger" };
+  // A set-off (A22) may have been for the houses: the tenant page offers to record it as maintenance.
+  return { ...flash, ...(setOffPaymentId ? { setOff: setOffPaymentId } : {}), tab: "ledger" };
 }

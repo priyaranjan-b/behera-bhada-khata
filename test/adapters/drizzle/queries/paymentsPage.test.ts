@@ -79,12 +79,22 @@ const viaSql = async (scope: Scope, f: PaymentsFilter) =>
   )[0].v;
 const viaDrizzle = (scope: Scope, f: PaymentsFilter) => inScope(l.db, scope, (tx) => paymentsPage(tx, f));
 
-/** Same answer both ways (bar the rows' tags, which payments_page() never had), and the Drizzle one returned. */
+/**
+ * Same answer both ways, and the Drizzle one returned. payments_page() never
+ * had the rows' tags (0030) or the set-off mode (0032), so the comparison
+ * leaves out the tags and a zero set_off total; no set-off is in its data.
+ */
 async function same(f: Partial<PaymentsFilter>, scope: Scope = asOwner) {
   const filter = { ...BASE, ...f };
   const drizzle = await viaDrizzle(scope, filter);
   expect(drizzle.rows.every((r) => Array.isArray(r.tags))).toBe(true);
-  expect({ ...drizzle, rows: drizzle.rows.map(({ tags: _tags, ...r }) => r) }).toEqual(await viaSql(scope, filter));
+  const { set_off: setOff, ...byMode } = drizzle.totals.by_mode;
+  expect(setOff).toBe(0);
+  expect({
+    ...drizzle,
+    rows: drizzle.rows.map(({ tags: _tags, ...r }) => r),
+    totals: { ...drizzle.totals, by_mode: byMode },
+  }).toEqual(await viaSql(scope, filter));
   return drizzle;
 }
 
@@ -96,7 +106,7 @@ describe("paymentsPage on Drizzle matches payments_page()", () => {
     expect(page.totals).toEqual({
       amount: 34500,
       count: 6,
-      by_mode: { cash: 3500, bank_transfer: 8000, upi: 10000, cheque: 4000, other: 9000 },
+      by_mode: { cash: 3500, bank_transfer: 8000, upi: 10000, cheque: 4000, other: 9000, set_off: 0 },
     });
     const bimal = page.rows.find((r) => r.tenant_id === tenants.bimal && r.mode === "cheque");
     expect(bimal).toMatchObject({ property_name: "Tower 1, Tower 2", months_text: "February 2026", amount: 4000 });
@@ -304,5 +314,32 @@ describe("tags (0030): on the rows, searched and filtered", () => {
 
   it("shows another signed-in account none", async () => {
     expect((await viaDrizzle(asStranger, { ...BASE, search: "padma" })).total).toBe(0);
+  });
+});
+
+describe("set-off payments (0032, A22)", () => {
+  it("count in their own mode, never in the money received", async () => {
+    // April's rent (unpaid) settled in May, apart from every range the tests above read:
+    // ₹3,800 in cash and ₹1,200 the tenant kept back.
+    const april = (await l.months(tenants.asha))[3];
+    for (const [mode, amount] of [["cash", 3800], ["set_off", 1200]] as const) {
+      await l.rows(
+        asOwner,
+        sql`select create_payment(gen_random_uuid(), ${tenants.asha}::uuid, ${amount}, '2026-05-10'::date, ${mode},
+              'Paint from the shop', 'sig.png', md5(random()::text), now() + interval '14 days',
+              ${JSON.stringify([{ rent_period_id: april.id, amount }])}::jsonb)`
+      );
+    }
+    const may = await viaDrizzle(asOwner, { ...BASE, from: "2026-05-01", to: "2026-05-31" });
+    expect(may.total).toBe(2);
+    expect(may.totals).toMatchObject({ amount: 3800, count: 2, by_mode: { cash: 3800, set_off: 1200 } });
+    const setOffOnly = await viaDrizzle(asOwner, {
+      ...BASE,
+      from: "2026-05-01",
+      to: "2026-05-31",
+      filters: [{ field: "mode", operator: "is", value: "Set-off (deducted by tenant)" }],
+    });
+    expect(setOffOnly.rows.map((r) => [r.mode, r.amount])).toEqual([["set_off", 1200]]);
+    expect(setOffOnly.totals.amount).toBe(0);
   });
 });

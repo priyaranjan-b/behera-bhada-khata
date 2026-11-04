@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { PAYMENT_MODES } from "@/lib/types";
 import {
+  cashOnly,
+  isCashMode,
   PAYMENT_MODE_OPTIONS,
   dayRangeLabel,
   isPaymentMode,
@@ -59,5 +61,18 @@ describe("recentDayPicks", () => {
       { label: "Today", value: "2026-11-01" },
       { label: "Yesterday", value: "2026-10-31" },
     ]);
+  });
+});
+
+describe("cash vs set-off (A22)", () => {
+  it("counts every mode as cash but a set-off", () => {
+    expect(PAYMENT_MODES.filter((m) => !isCashMode(m))).toEqual(["set_off"]);
+    const payments = [
+      { mode: "cash", amount: 3800 },
+      { mode: "set_off", amount: 1200 },
+      { mode: "upi", amount: 500 },
+    ];
+    expect(cashOnly(payments).map((p) => p.amount)).toEqual([3800, 500]);
+    expect(paymentModeLabel("set_off")).toBe("Set-off (deducted by tenant)");
   });
 });

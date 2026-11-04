@@ -13,7 +13,7 @@ import { useAppRouter } from "@/components/ui/Loading";
 import HousePicker from "@/components/domain/HousePicker";
 import TagsField from "@/components/domain/TagsField";
 import { api, errorMessage } from "@/lib/api-client";
-import type { MaintenanceDetail, MaintenanceHouseOption } from "@/lib/contracts";
+import type { MaintenanceDetail, MaintenanceHouseOption, MaintenancePrefill } from "@/lib/contracts";
 import { formatDateKey, todayKey } from "@/lib/dates";
 import { MAINTENANCE_CATEGORY_OPTIONS, splitEqually } from "@/lib/domain/maintenance";
 import { recentDayPicks } from "@/lib/domain/payments";
@@ -33,12 +33,15 @@ export default function MaintenanceForm({
   houses,
   tagSuggestions,
   expense,
+  prefill,
 }: {
   /** Every house in use, by tower. */
   houses: MaintenanceHouseOption[];
   tagSuggestions: string[];
   /** Edit mode. */
   expense?: MaintenanceDetail;
+  /** A new expense started from a set-off payment (A22). */
+  prefill?: MaintenancePrefill;
 }) {
   const router = useAppRouter();
   // An edited expense may cover a house since retired: keep it choosable.
@@ -49,14 +52,15 @@ export default function MaintenanceForm({
   const [chosen, setChosen] = useState<MaintenanceHouseOption[]>(
     options.filter((o) => expense?.houses.some((h) => h.unitCode === o.unitCode))
   );
-  const [amount, setAmount] = useState(expense ? String(expense.amount) : "");
+  const start = expense ?? prefill;
+  const [amount, setAmount] = useState(start ? String(start.amount) : "");
   // No default, as on Record payment: back entries kept getting saved as today.
-  const [expenseDate, setExpenseDate] = useState(expense?.expenseDate ?? "");
+  const [expenseDate, setExpenseDate] = useState(start?.expenseDate ?? "");
   const [category, setCategory] = useState<MaintenanceCategory | "">(expense?.category ?? "");
-  const [description, setDescription] = useState(expense?.description ?? "");
-  const [vendor, setVendor] = useState(expense?.vendor ?? "");
-  const [note, setNote] = useState(expense?.note ?? "");
-  const [tags, setTags] = useState<string[]>([]);
+  const [description, setDescription] = useState(start?.description ?? "");
+  const [vendor, setVendor] = useState(start?.vendor ?? "");
+  const [note, setNote] = useState(start?.note ?? "");
+  const [tags, setTags] = useState<string[]>(prefill?.tags ?? []);
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +97,10 @@ export default function MaintenanceForm({
         await api.dashboard.maintenance.update(expense.id, fields);
         router.push(routes.maintenance.detail(expense.id, { [FLASH.maintenanceSaved]: "1" }));
       } else {
-        const { id } = await api.dashboard.maintenance.create({ ...fields, tags }, files);
+        const { id } = await api.dashboard.maintenance.create(
+          { ...fields, tags, settledByPaymentId: prefill?.paymentId },
+          files
+        );
         router.push(routes.maintenance.detail(id, { [FLASH.maintenanceSaved]: "1" }));
       }
       router.refresh();

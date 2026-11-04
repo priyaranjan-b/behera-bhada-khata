@@ -31,11 +31,18 @@ export async function getMaintenanceExpense(tx: Tx, id: string): Promise<Mainten
     .from(maintenanceFiles)
     .where(eq(maintenanceFiles.expense_id, id))
     .orderBy(asc(maintenanceFiles.created_at), asc(maintenanceFiles.storage_path));
+  const [settledBy] = expense.settled_by_payment_id
+    ? await executeRows<{ receipt_no: string | null }>(
+        tx,
+        sql`select receipt_no from payments where id = ${expense.settled_by_payment_id}::uuid`
+      )
+    : [];
   return {
     expense,
     units: units.map((u) => ({ ...u, share_amount: Number(u.share_amount) })),
     tags: tags.map((t) => t.name),
     files,
+    settled_by_receipt_no: settledBy?.receipt_no ?? null,
   };
 }
 

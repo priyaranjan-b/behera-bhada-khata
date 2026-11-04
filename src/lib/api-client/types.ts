@@ -34,6 +34,7 @@ import type {
   MaintenanceDetail,
   MaintenanceFilesSaved,
   MaintenanceForm,
+  MaintenanceFormQuery,
   MaintenancePage,
   MaintenancePageQuery,
   UpdateMaintenanceInput,
@@ -172,7 +173,7 @@ export interface ApiQueries {
       /** Every expense spent in the days, one page, with totals (0031). */
       list(query?: MaintenancePageQuery): Promise<MaintenancePage>;
       /** The Record / Edit maintenance form's houses and who-paid suggestions. */
-      newForm(): Promise<MaintenanceForm>;
+      newForm(query?: MaintenanceFormQuery): Promise<MaintenanceForm>;
       detail(expenseId: string): Promise<MaintenanceDetail>;
       /** One expense's change history; `before` = AuditPage.nextBefore. */
       history(expenseId: string, before?: number): Promise<AuditPage>;

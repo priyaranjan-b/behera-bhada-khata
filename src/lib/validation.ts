@@ -352,6 +352,9 @@ export const createPaymentSchema = z.object({
   ownerSignaturePng: signaturePngSchema.optional(),
   /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */
   notifyTenant: z.boolean().optional(),
+}).refine((p) => p.mode !== "set_off" || Boolean(p.note), {
+  message: "Say what the tenant deducted it for",
+  path: ["note"],
 });
 
 export const adjustmentAllocationInputSchema = z.object({
@@ -560,7 +563,11 @@ const maintenanceFieldsSchema = z.object({
 });
 
 /** Record maintenance: the expense, its houses, who paid (payment tag names, 0030) and, as files, receipts. */
-export const createMaintenanceSchema = maintenanceFieldsSchema.extend({ tags: paymentTagsSchema.default([]) });
+export const createMaintenanceSchema = maintenanceFieldsSchema.extend({
+  tags: paymentTagsSchema.default([]),
+  /** The set-off payment that paid for it (A22); the database checks it is one. */
+  settledByPaymentId: z.uuid().optional(),
+});
 
 /** Edit maintenance: every field and the houses (the split is redone). Tags and files change on their own. */
 export const updateMaintenanceSchema = maintenanceFieldsSchema;
@@ -572,6 +579,9 @@ export const voidMaintenanceSchema = z.object({
     .min(3, "Say why it's being voided")
     .max(MAINTENANCE_LIMITS.voidReasonMax, `Keep it under ${MAINTENANCE_LIMITS.voidReasonMax} characters`),
 });
+
+/** `?fromPayment=` on /maintenance/new; anything but a uuid is ignored (no prefill). */
+export const maintenanceFormQuerySchema = z.object({ fromPayment: z.uuid().optional().catch(undefined) });
 
 /** `?from=yyyy-MM-dd&to=yyyy-MM-dd` on /maintenance: days spent; either may be missing (default: this month). */
 export const maintenanceQuerySchema = z.object({

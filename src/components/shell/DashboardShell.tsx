@@ -12,7 +12,7 @@ function tabForPath(pathname: string): AppTab | undefined {
   // Quick-add pages before their sections, so the shortcut is the one highlighted.
   if (pathname === routes.tenants.new) return "addTenant";
   if (pathname === routes.houses.new) return "addHouse";
-  if (pathname === routes.maintenance.new) return "addMaintenance";
+  if (pathname === routes.maintenance.new()) return "addMaintenance";
   const under = (section: string) => pathname === section || pathname.startsWith(`${section}/`);
   if (under(routes.properties.list)) return "properties";
   if (under(routes.houses.list())) return "houses";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
+import { OWNER_ID, fakes, payment, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
@@ -91,6 +91,14 @@ describe("Billing", () => {
       tenants: 1,
     });
     expect(fakes.owner.billing.totals).toHaveBeenLastCalledWith({ from: "2026-03-01", to: "2026-03-01", paidDirect: false });
+  });
+
+  it("leaves a set-off out of the cash received (A22)", async () => {
+    fakes.owner.payments.listForTenants.mockResolvedValue([
+      payment(),
+      payment({ id: "00000000-0000-4000-8000-000000000202", mode: "set_off", amount: 1200 }),
+    ]);
+    expect(await getBillingReceived(ctx, { from: "2026-03", to: "2026-03" })).toEqual({ amount: 5000, payments: 1, paidDirect: 0 });
   });
 
   it("counts the cash received in the range, government rent paid direct only when shown", async () => {

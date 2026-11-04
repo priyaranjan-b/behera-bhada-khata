@@ -2,6 +2,7 @@ import "server-only";
 import type { BillingPage, BillingReceived, BillingRow, BillingTotalsView } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, lastMonthKey, monthKeyOf } from "@/lib/dates";
 import { monthsIn, resolveRange, type MonthRange } from "@/lib/domain/billing";
+import { cashOnly } from "@/lib/domain/payments";
 import { round2 } from "@/lib/money";
 import { BILLING_LIMITS, billingPageQuerySchema, billingQuerySchema } from "@/lib/validation";
 import { parseInput, type OwnerContext } from "./context";
@@ -118,7 +119,8 @@ export async function getBillingReceived(_ctx: OwnerContext, query: unknown = {}
     paymentsFrom(range.from),
   ]);
   const afterRange = addMonthsToKey(range.to, 1);
-  const inRange = rangePayments.filter((p) => monthKeyOf(p.payment_date) < afterRange);
+  // Cash only: a set-off pays rent but no money came in (A22).
+  const inRange = cashOnly(rangePayments).filter((p) => monthKeyOf(p.payment_date) < afterRange);
   const direct = showPaidDirect ? paidDirectPeriods(allTenants, placement.ratesByTenant, monthsIn(range)) : [];
   const paidDirect = round2(
     direct.filter((p) => p.period_month <= latestMonth).reduce((sum, p) => sum + Number(p.amount_allocated), 0)

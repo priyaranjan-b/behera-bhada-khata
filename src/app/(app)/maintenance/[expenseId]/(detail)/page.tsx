@@ -5,7 +5,7 @@ import Stack from "@mui/material/Stack";
 import MuiLink from "@mui/material/Link";
 import { serverApi } from "@/lib/api-client/server";
 import { dateKeyOf, formatDateKey, formatDateTime } from "@/lib/dates";
-import { maintenanceCategoryLabel } from "@/lib/domain/maintenance";
+import { isCashExpense, maintenanceCategoryLabel } from "@/lib/domain/maintenance";
 import { formatMoney } from "@/lib/money";
 import { FLASH, routes, type Flash } from "@/lib/routes";
 import { ActionStack, DetailList, DetailRow, SectionCard, SummaryLine } from "@/components/ui";
@@ -57,6 +57,12 @@ export default async function MaintenanceExpensePage({
         <FlashAlert param={FLASH.maintenanceVoided} severity="success">
           Expense voided. It no longer counts in any total.
         </FlashAlert>
+      ) : null}
+      {!isCashExpense(expense) && expense.settledBy ? (
+        <Alert severity="info">
+          Paid by a set-off against rent{expense.settledBy.receiptNo ? ` (receipt ${expense.settledBy.receiptNo})` : ""}: the
+          tenant kept it back from their rent, so no cash went out.
+        </Alert>
       ) : null}
       {voided ? (
         <Alert severity="info">

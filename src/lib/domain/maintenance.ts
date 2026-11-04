@@ -35,6 +35,16 @@ export function maintenanceCategoryLabel(category: string): string {
   return isMaintenanceCategory(category) ? MAINTENANCE_CATEGORY_LABELS[category] : MAINTENANCE_CATEGORY_LABELS.other;
 }
 
+/**
+ * Whether cash went out for an expense (A22): not when a set-off against rent
+ * paid for it - the set-off is already left out of cash received, so a cash
+ * figure (Net cash) must leave the expense out too, or it is counted twice.
+ * Net per rent month still subtracts every expense.
+ */
+export function isCashExpense(expense: { settledBy: unknown }): boolean {
+  return expense.settledBy == null;
+}
+
 /** One house's part of an expense. */
 export interface HouseShare {
   unitCode: string;

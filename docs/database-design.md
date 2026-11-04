@@ -66,6 +66,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 | `0029_drop_replaced_functions.sql` | drops the 30 functions the Drizzle adapter replaced: the `…_page()` functions of 0018-0026, their grid and label helpers, `tenant_account_summary()`, `hit_rate_limit()` / `prune_rate_limits()` (D33). The indexes they used stay |
 | `0030_payment_tags.sql` | `payment_tags` (suggested tags, managed on /profile) and `payment_record_tags` (each payment's own copy of its tag names, editable on /payments) (D34) |
+| `0032_set_off_mode.sql` | payment mode `set_off`: rent the tenant settled by keeping back what the owner owed them; counted as paid, never as cash received (A22, D36); `maintenance_expenses.settled_by_payment_id` for an expense a set-off paid for, taken by `create_maintenance_expense(…, p_settled_by_payment_id)` |
 | `0031_maintenance.sql` | `maintenance_expenses`, `maintenance_expense_units` (equal split per house), `maintenance_expense_tags` (who paid), `maintenance_files`; `create_/update_/void_maintenance_expense()`, `maintenance_shares()`; audit actions `maintenance.*`, the `category` audit format, index `audit_log (entity_type, entity_id)` (D35) |
 
 Seeds, in order:
@@ -1009,6 +1010,34 @@ houses at the moment it is recorded; splitting on read would change old
 figures when houses change. Voiding instead of deleting keeps a mistake
 visible in the history and the list, as the ledger does, without the
 adjustment machinery a tenant-facing record needs.
+
+### D36 — Set-off payments, and the expenses they pay for
+
+**Decision (0032).** `payments.mode` takes `set_off`: rent the tenant
+settled by keeping back money the owner owed them (A22). It goes through
+`create_payment` like any mode, so the ledger stays append-only (D4) and the
+month is paid. The app leaves it out of cash figures (`cashOnly`).
+
+An expense that such a set-off paid for keeps it in
+`maintenance_expenses.settled_by_payment_id`:
+- **Only a set-off can be linked, and the expense can't be more than it.**
+  `create_maintenance_expense(…, p_settled_by_payment_id)` (the 0031 function
+  dropped and re-created with one more argument, re-granted) checks both, and
+  `update_maintenance_expense` keeps the cap on edits. Otherwise the excess
+  would count as never paid in cash.
+- **One live expense per set-off.** A partial unique index
+  (`where voided_at is null`) enforces it, so voiding frees the set-off. The
+  function locks the payment row first, so a second save at the same moment
+  waits and gets `BBK09` rather than the index's `23505`.
+- **Never changed** (`prevent_key_change`), like `recorded_by`.
+- **Cash spent** is every expense not linked to a set-off: the Maintenance
+  totals' `cash` (one SQL filter) and `isCashExpense`. A Net cash figure
+  subtracts only this from cash received, so the money kept back is never
+  subtracted twice.
+
+**Why.** No cash moves in either direction, so a cash figure must skip both
+sides. A boolean flag was rejected: it could be set without a real set-off
+behind it, and the amount couldn't be checked against one.
 
 ---
 

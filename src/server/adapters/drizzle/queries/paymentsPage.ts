@@ -1,7 +1,7 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { daysBetween, isDateKey, todayKey } from "@/lib/dates";
-import { PAYMENT_MODE_LABELS, isPaymentMode } from "@/lib/domain/payments";
+import { PAYMENT_MODE_LABELS, isCashMode, isPaymentMode } from "@/lib/domain/payments";
 import { round2 } from "@/lib/money";
 import { PAYMENT_MODES, type PaymentMode, type PaymentsDbRow, type PaymentsTotalsDb } from "@/lib/types";
 import { PAYMENTS_LIMITS } from "@/lib/validation";
@@ -125,7 +125,8 @@ export async function paymentsPage(
     // The table's CHECK allows only the app's modes; Other, as payment_mode_label, just in case.
     const mode: PaymentMode = isPaymentMode(m.mode) ? m.mode : "other";
     totals.by_mode[mode] = round2(totals.by_mode[mode] + Number(m.amount));
-    totals.amount = round2(totals.amount + Number(m.amount));
+    // "Received" is money that came in; a set-off pays rent but is its own figure (A22).
+    if (isCashMode(mode)) totals.amount = round2(totals.amount + Number(m.amount));
     totals.count += m.count;
   }
 

@@ -20,6 +20,7 @@ export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   upi: "UPI",
   cheque: "Cheque",
   other: "Other",
+  set_off: "Set-off (deducted by tenant)",
 };
 
 /** For a `<select>`: every mode in display order. */
@@ -27,6 +28,19 @@ export const PAYMENT_MODE_OPTIONS = PAYMENT_MODES.map((value) => ({ value, label
 
 export function isPaymentMode(value: string): value is PaymentMode {
   return (PAYMENT_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * Whether money actually came in (A22): every mode but a set-off, where the
+ * tenant kept back what the owner owed them. A set-off still pays rent.
+ */
+export function isCashMode(mode: string): boolean {
+  return mode !== "set_off";
+}
+
+/** The payments whose money came in: every "Received" / cash total goes through this (A22). */
+export function cashOnly<P extends { mode: string }>(payments: readonly P[]): P[] {
+  return payments.filter((p) => isCashMode(p.mode));
 }
 
 /** Never shows the raw value (`bank_transfer`); an unknown mode falls back to "Other". */

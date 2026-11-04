@@ -9,6 +9,7 @@ import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
+import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import {
@@ -70,6 +71,8 @@ export default function PaymentForm({
   const [error, setError] = useState<string | null>(null);
   const signatureHandle = useRef<OwnerSignatureHandle | null>(null);
 
+  // A22: rent the tenant settled by keeping back what the owner owed them.
+  const setOff = mode === "set_off";
   const amountNumber = Number(amount) || 0;
   const suggested = useMemo(() => suggestAllocations(periods, amountNumber), [periods, amountNumber]);
   const allocations = manualAllocations
@@ -108,7 +111,7 @@ export default function PaymentForm({
 
     setSubmitting(true);
     try {
-      const { notified } = await api.dashboard.tenants.createPayment(
+      const { id, notified } = await api.dashboard.tenants.createPayment(
         tenantId,
         {
           amount: amountNumber,
@@ -122,7 +125,7 @@ export default function PaymentForm({
         },
         proofs
       );
-      const href = routes.tenants.detail(tenantId, recordedFlash(notified));
+      const href = routes.tenants.detail(tenantId, recordedFlash(notified, setOff ? id : undefined));
       // In the dialog, replace the form's history entry so Back doesn't reopen it.
       if (inDialog) router.replace(href);
       else router.push(href);
@@ -172,6 +175,12 @@ export default function PaymentForm({
                   </MenuItem>
                 ))}
               </TextField>
+              {setOff ? (
+                <Alert severity="info">
+                  Only the part the tenant kept back for what you owed them. It pays the rent but isn&apos;t counted as
+                  cash received. Record the cash they handed over as its own payment.
+                </Alert>
+              ) : null}
 
               <Autocomplete
                 freeSolo
@@ -182,8 +191,9 @@ export default function PaymentForm({
                   <TextField
                     {...params}
                     id="note"
-                    label="Note (optional)"
-                    helperText="Pick a quick note or type your own"
+                    label={setOff ? "Deducted for" : "Note (optional)"}
+                    required={setOff}
+                    helperText={setOff ? "What you owed them, e.g. \"Paint bought from the shop, 02/11\"" : "Pick a quick note or type your own"}
                     slotProps={{
                       ...params.slotProps,
                       htmlInput: { ...params.slotProps.htmlInput, maxLength: PAYMENT_NOTE_LIMITS.maxLength },
@@ -198,7 +208,11 @@ export default function PaymentForm({
 
             <FileAttachmentsField
               title="Payment proof (optional)"
-              caption="UPI or bank screenshot, cheque photo, deposit slip - kept with this payment."
+              caption={
+                setOff
+                  ? "The bill for what you bought from the tenant - kept with this payment."
+                  : "UPI or bank screenshot, cheque photo, deposit slip - kept with this payment."
+              }
               files={proofs}
               onChange={setProofs}
               accept={PROOF_LIMITS.accept}

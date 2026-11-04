@@ -750,3 +750,45 @@ every screen and adding bearer-token auth. Nothing is cached because rent
 figures must be live, and nothing of the owner's may remain on a shared
 phone after sign-out. A Play Store listing, if wanted, wraps this same PWA
 as a Trusted Web Activity.
+
+### A22 — Set-off: rent the tenant settles by keeping back what the owner owes them
+
+**Decision (0032).** The payment mode `set_off` ("Set-off (deducted by
+tenant)") records the part of a rent the tenant kept back for money the
+owner owed them - typically goods the owner bought from the tenant's shop.
+The owner records the cash handed over as one payment and the amount kept
+back as a second payment in mode `set_off`, whose note ("Deducted for") is
+required. Both allocate to rent months through `create_payment` as usual,
+so the month is paid and arrears fall.
+
+- **Rent: counted. Cash: not.** Every "Received" figure is money that came
+  in, through `cashOnly` / `isCashMode` (`src/lib/domain/payments.ts`): the
+  Overview chart's Received bars and its "received in the month" note
+  (`getOverviewTrend`), the Billing page's received figure
+  (`getBillingReceived`), and the Payments page's Received card
+  (`paymentsPage` totals). Set-offs keep their own total
+  (`by_mode.set_off`, the Set-off card). Collected / allocated figures
+  include them, because the rent is paid.
+- **Not an adjustment.** An adjustment corrects a payment recorded wrongly
+  (D4). A set-off is a payment made in kind: nothing was wrong, and it has
+  its own receipt, which reads "Payment method: Set-off (deducted by
+  tenant)" and "Deducted for: …".
+- **To maintenance.** If what was bought went into the houses, the tenant
+  page's flash after a set-off links to `/maintenance/new?fromPayment=`.
+  That opens the form with the amount, date and note filled in, and the
+  tenant as Paid to and Paid by (`getMaintenanceForm`, only for a set-off
+  payment). The owner picks the houses and the category. The expense keeps
+  the set-off that paid for it (`maintenance_expenses.settled_by_payment_id`,
+  0032): only a set-off, for no more than its amount, one live expense per
+  set-off, never changed (D36). **No cash went out for it**, so cash spent
+  leaves it out: the Maintenance totals' `cash` (and `isCashExpense`,
+  `src/lib/domain/maintenance.ts`). The earnings page will compute Net cash as
+  cash received − that `cash`. Otherwise the ₹1,200 kept back would be
+  subtracted twice: once as missing cash and again as an expense. Net per
+  rent month still subtracts every expense.
+
+**Why.** Recording the deduction as "Other" made it look like cash
+received and said nothing on the receipt. Recording only the cash left the
+tenant owing money they had in fact settled. A separate deduction column on
+payments was rejected: two payments keep the ledger and allocations
+unchanged, and each part gets its own receipt.

@@ -315,11 +315,18 @@ function build() {
         total: 0,
         all: 0,
         page: 0,
-        totals: { amount: 0, count: 0, by_category: {}, by_tag: [], untagged: 0 },
+        totals: { amount: 0, cash: 0, count: 0, by_category: {}, by_tag: [], untagged: 0 },
       })),
       get: vi.fn(async (id: string) => state.maintenance.get(id) ?? null),
       create: vi.fn(
-        async (id: string, f: MaintenanceExpenseFields, unitCodes: string[], tags: string[], files: NewMaintenanceFile[]) => {
+        async (
+          id: string,
+          f: MaintenanceExpenseFields,
+          unitCodes: string[],
+          tags: string[],
+          files: NewMaintenanceFile[],
+          settledByPaymentId?: string | null
+        ) => {
           const share = Math.round((f.amount * 100) / unitCodes.length) / 100;
           state.maintenance.set(id, {
             expense: {
@@ -327,6 +334,7 @@ function build() {
               id,
               voided_at: null,
               void_reason: null,
+              settled_by_payment_id: settledByPaymentId ?? null,
               recorded_by: OWNER_ID,
               created_at: "2026-10-24T00:00:00Z",
               updated_at: "2026-10-24T00:00:00Z",
@@ -345,6 +353,7 @@ function build() {
               recorded_by: OWNER_ID,
               created_at: "2026-10-24T00:00:00Z",
             })),
+            settled_by_receipt_no: null,
           });
         }
       ),
@@ -530,7 +539,7 @@ function build() {
         total: 0,
         all: 0,
         page: 0,
-        totals: { amount: 0, count: 0, by_mode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0 } },
+        totals: { amount: 0, count: 0, by_mode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 0 } },
       })),
     },
     adjustments: {

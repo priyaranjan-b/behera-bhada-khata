@@ -78,7 +78,8 @@ test instead.
   follow the table (A18), and the Drizzle adapter: which SQL functions
   move to TS and which stay in Postgres (A19), and the Overview's
   "Collected" (per rent month) vs the chart's "Received" (cash, A20), and the
-  phone app as a PWA whose service worker caches no owner data (A21). Read it before changing
+  phone app as a PWA whose service worker caches no owner data (A21), and
+  set-off payments: rent paid by deduction, never counted as cash (A22). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -417,6 +418,11 @@ until the tenant-signed copy exists.
 - All money is `numeric(12,2)` columns, handled as plain JS numbers rounded
   through `round2()` in `src/lib/money.ts`; display via `formatMoney()`
   (`CURRENCY_SYMBOL` is the one thing to edit for a different currency).
+- **Cash received excludes set-offs** (A22, payment mode `set_off`: rent the
+  tenant settled by keeping back what the owner owed them). Any "Received" /
+  cash total goes through `cashOnly` / `isCashMode` in
+  `src/lib/domain/payments.ts`; allocations and arrears count set-offs as
+  paid.
 - `src/lib/domain/` (`allocation.ts` oldest-first allocation and balances,
   `reports.ts`, `billing.ts`, `tenant.ts`) is pure and framework-free
   with no `server-only` import — shared between services and client

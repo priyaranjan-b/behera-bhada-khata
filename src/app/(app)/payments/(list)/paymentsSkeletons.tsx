@@ -10,11 +10,11 @@ import { PAYMENT_STAT_CELL } from "./paymentStatCell";
 export const PAYMENTS_SKELETONS = {
   header: <PageHeaderSkeleton action />,
   stat: <StatCardSkeleton />,
-  // Six stat cards (total, four modes, Govt paid direct), then the table.
+  // Seven stat cards (received, four modes, set-off, Govt paid direct), then the table.
   view: (
     <Stack spacing={2}>
       <Grid container spacing={2} columns={12}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <Grid key={i} size={PAYMENT_STAT_CELL}>
             <StatCardSkeleton />
           </Grid>

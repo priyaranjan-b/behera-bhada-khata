@@ -193,7 +193,9 @@ export default function MaintenanceView({
           <StatCard
             title="Spent"
             value={formatMoney(totals.amount)}
-            caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}`}
+            caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
+              totals.cash < totals.amount ? ` · ${formatMoney(totals.amount - totals.cash)} by set-off` : ""
+            }`}
           />
         </Grid>
         <Grid size={MAINTENANCE_STAT_CELL}>

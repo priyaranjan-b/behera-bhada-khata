@@ -21,6 +21,7 @@ function expenseRows(from: string, to: string): SQL {
     select e.id, e.expense_date, ${dateLabel(sql`e.expense_date`)} as date_label, e.amount,
       e.category, ${labelOf(sql`e.category`, MAINTENANCE_CATEGORY_LABELS, MAINTENANCE_CATEGORY_LABELS.other)} as category_label,
       e.description, e.vendor, e.note, e.voided_at is not null as voided,
+      e.settled_by_payment_id is not null as settled_by_set_off,
       case when e.voided_at is null then ${MAINTENANCE_STATUS_LABELS.counted} else ${MAINTENANCE_STATUS_LABELS.voided} end as status_label,
       houses.codes as unit_codes, houses.text as units_text,
       tags.names as tags, tags.text as tags_text,
@@ -67,6 +68,7 @@ interface PageResult {
   total: number;
   page: number;
   amount: string | null;
+  cash_amount: string | null;
   count: number;
   by_category: { category: string; amount: string }[];
   by_tag: { name: string; amount: string }[];
@@ -102,6 +104,8 @@ export async function maintenancePage(
         counted.total,
         shown.page,
         (select sum(amount)::text from spent) as amount,
+        -- Cash out: a set-off paid the rest, and no money left for it (A22, isCashExpense).
+        (select sum(amount)::text from spent where not settled_by_set_off) as cash_amount,
         (select count(*)::int from spent) as count,
         (select coalesce(json_agg(json_build_object('category', c.category, 'amount', c.amount::text)), '[]'::json)
           from (select category, sum(amount) as amount from spent group by category) c) as by_category,
@@ -133,6 +137,7 @@ export async function maintenancePage(
     page: result.page,
     totals: {
       amount: round2(Number(result.amount ?? 0)),
+      cash: round2(Number(result.cash_amount ?? 0)),
       count: result.count,
       by_category: byCategory,
       by_tag: result.by_tag.map((t) => ({ name: t.name, amount: round2(Number(t.amount)) })),
