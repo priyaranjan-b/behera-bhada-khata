@@ -54,3 +54,5 @@ export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: 
 export const SIDEBAR_WIDTH = 240;
 /** Desktop top bar height; the side menu's brand block matches it so their bottom borders line up. */
 export const TOPBAR_HEIGHT = 64;
+/** Phone/tablet top bar height (AppNavbar); content and the report context bar start below it. */
+export const MOBILE_NAVBAR_HEIGHT = 64;

@@ -8,11 +8,12 @@ import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import useScrollTrigger from "@mui/material/useScrollTrigger";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
-import { MOBILE_NAVBAR_HEIGHT } from "@/components/shell/AppNavbar";
-import { TOPBAR_HEIGHT } from "@/components/shell/nav";
-import { topBarGlassSx } from "@/components/shell/surface";
-import BottomSheet from "./BottomSheet";
-import { LinkButton } from "./Loading";
+import Typography from "@mui/material/Typography";
+import BottomSheet from "@/components/ui/BottomSheet";
+import { InSheetContext } from "@/components/ui/inSheet";
+import { LinkButton } from "@/components/ui/Loading";
+import { MOBILE_NAVBAR_HEIGHT, TOPBAR_HEIGHT } from "./nav";
+import { topBarGlassSx } from "./surface";
 
 const SHEET_TITLE = "View options";
 
@@ -112,19 +113,15 @@ export default function ContextBar({
       </Stack>
       {options ? (
         <BottomSheet id={sheetId} title={SHEET_TITLE} open={open} onClose={() => setOpenOn(null)}>
-          <Stack
-            spacing={2}
-            sx={{
-              // Forms stretch across the sheet: two fields side by side, the button under them.
-              "& form": { width: "100%" },
-              "& form .MuiFormControl-root, & form .MuiPickersTextField-root": { flex: "1 1 140px", width: "auto", minWidth: 0 },
-              "& form > button": { flexBasis: "100%" },
-              // A section that turned out empty (no government tenants) leaves this.
-              "&:empty::before": { content: '"Nothing to change on this page."', color: "text.secondary" },
-            }}
-          >
-            {options}
-          </Stack>
+          <InSheetContext.Provider value>
+            {/* A section that turned out empty (no government tenants) shows the note after it. */}
+            <Stack spacing={2} sx={{ "&:empty + *": { display: "block" } }}>
+              {options}
+            </Stack>
+            <Typography variant="body2" color="textSecondary" sx={{ display: "none" }}>
+              Nothing to change on this page.
+            </Typography>
+          </InSheetContext.Provider>
           {resetHref && search ? (
             <LinkButton href={resetHref} variant="text" fullWidth sx={{ mt: 1 }}>
               Reset to defaults

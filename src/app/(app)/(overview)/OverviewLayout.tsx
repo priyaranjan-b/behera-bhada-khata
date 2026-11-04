@@ -5,7 +5,7 @@ import { STAT_CELL } from "./sections/MonthStats";
 /**
  * Where each Overview section goes. The page fills the slots with streamed
  * sections and loading.tsx with their skeletons, so the two can't drift (A12).
- * `stats` is four stat-card grid cells; every other slot is one card.
+ * `stats` is three stat-card grid cells (Vacant is the fourth); every other slot is one card.
  */
 export default function OverviewLayout(slots: {
   header: React.ReactNode;

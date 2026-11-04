@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import DateField from "./DateField";
+import { InSheetContext } from "./inSheet";
 import { useAppRouter } from "./Loading";
 import { withQuery } from "@/lib/routes";
 
@@ -13,6 +14,9 @@ import { withQuery } from "@/lib/routes";
  */
 export default function DayRangeForm({ from, to, path, fromLabel }: { from: string; to: string; path: string; fromLabel: string }) {
   const router = useAppRouter();
+  // In the phone sheet: fields share the row, the button takes its own.
+  const inSheet = useContext(InSheetContext);
+  const field = inSheet ? { flex: "1 1 140px", minWidth: 0 } : { width: 180 };
   const [start, setStart] = useState(from);
   const [end, setEnd] = useState(to);
 
@@ -22,15 +26,15 @@ export default function DayRangeForm({ from, to, path, fromLabel }: { from: stri
       direction="row"
       spacing={1}
       useFlexGap
-      sx={{ flexWrap: "wrap", alignItems: "center" }}
+      sx={{ flexWrap: "wrap", alignItems: "center", width: inSheet ? "100%" : undefined }}
       onSubmit={(e: React.FormEvent) => {
         e.preventDefault();
         router.push(withQuery(path, { from: start || end, to: end || start }));
       }}
     >
-      <DateField label={fromLabel} size="small" value={start} onChange={setStart} sx={{ width: 180 }} />
-      <DateField label="To" size="small" value={end} min={start || undefined} onChange={setEnd} sx={{ width: 180 }} />
-      <Button type="submit" variant="outlined" disabled={!start && !end}>
+      <DateField label={fromLabel} size="small" value={start} onChange={setStart} sx={field} />
+      <DateField label="To" size="small" value={end} min={start || undefined} onChange={setEnd} sx={field} />
+      <Button type="submit" variant="outlined" fullWidth={inSheet} disabled={!start && !end}>
         Show
       </Button>
     </Stack>

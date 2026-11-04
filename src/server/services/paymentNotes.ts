@@ -7,7 +7,7 @@ import type { OwnerRepositories } from "@/server/ports";
 import { notFound, parseInput, requireId, type OwnerContext } from "./context";
 
 // Quick-select notes for the Record payment form (payment_note_presets,
-// 0024), managed on the Profile page. A payment copies the note's text, so
+// 0024), managed on the Settings page. A payment copies the note's text, so
 // editing or deleting one here never changes a payment.
 
 export async function listPaymentNotePresets(_ctx: OwnerContext): Promise<PaymentNotePresetView[]> {

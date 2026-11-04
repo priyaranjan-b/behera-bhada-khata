@@ -4,7 +4,7 @@ import { dayRangeFromParams, dayRangeLabel, dayRangeUnit, shiftDayRange } from "
 import { routes } from "@/lib/routes";
 import { PAYMENTS_LIMITS } from "@/lib/validation";
 import AsyncSection from "@/components/ui/AsyncSection";
-import ContextBar from "@/components/ui/ContextBar";
+import ContextBar from "@/components/shell/ContextBar";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import DayRangeForm from "@/components/ui/DayRangeForm";

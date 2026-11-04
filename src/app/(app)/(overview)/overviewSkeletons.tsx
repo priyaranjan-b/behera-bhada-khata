@@ -20,8 +20,8 @@ export const OVERVIEW_SKELETONS = {
       <ContextBarSkeleton />
     </>
   ),
-  // Four stat-card grid cells; the Vacant slot is already a cell.
-  stats: Array.from({ length: 4 }, (_, i) => (
+  // Three stat-card grid cells; the Vacant slot is already a cell.
+  stats: Array.from({ length: 3 }, (_, i) => (
     <Grid key={i} size={STAT_CELL}>
       {/* Billed and Collected carry a sparkline. */}
       <StatCardSkeleton sparkline={i < 2} />
