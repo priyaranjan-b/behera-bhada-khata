@@ -7,6 +7,7 @@ import { routes } from "@/lib/routes";
 import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { listActivity, maintenanceHistory, tenantHistory, unitHistory } from "@/server/services/audit";
+import { getEarnings } from "@/server/services/earnings";
 import { getMaintenanceExpense, getMaintenanceForm, getMaintenancePage } from "@/server/services/maintenance";
 import { getConfirmView } from "@/server/services/confirm";
 import { getBillingPage, getBillingReceived, getBillingTotals } from "@/server/services/billing";
@@ -111,6 +112,7 @@ const inProcessApi: ApiQueries = {
       adjust: async (id) => getAdjustPaymentForm(await owner(), id),
       tagSuggestions: async () => getPaymentTagSuggestions(await owner()),
     },
+    earnings: async (query) => getEarnings(await owner(), query ?? {}),
     maintenance: {
       list: async (query) => getMaintenancePage(await owner(), query),
       newForm: async (query) => getMaintenanceForm(await owner(), query ?? {}),

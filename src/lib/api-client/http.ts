@@ -140,6 +140,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       adjustments: {
         resend: (id) => post(p.dashboard.adjustments.resend(id)),
       },
+      earnings: (query = {}) => get(withQuery(p.dashboard.earnings, { ...query })),
       maintenance: {
         list: (query = {}) => get(withQuery(p.dashboard.maintenance.list, { ...query })),
         newForm: (query = {}) => get(withQuery(p.dashboard.maintenance.new, { ...query })),

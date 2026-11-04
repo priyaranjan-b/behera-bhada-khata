@@ -46,6 +46,27 @@ export async function getMaintenanceExpense(tx: Tx, id: string): Promise<Mainten
   };
 }
 
+/** Spent per month of expense_date, and of it paid in cash (A22, A23); voided excluded. */
+export async function maintenanceMonthly(
+  tx: Tx,
+  fromMonth: string,
+  toMonth: string
+): Promise<{ month: string; amount: number; cash: number }[]> {
+  const rows = await executeRows<{ month: string; amount: string; cash: string }>(
+    tx,
+    sql`select to_char(date_trunc('month', expense_date), 'YYYY-MM-DD') as month,
+        sum(amount)::text as amount,
+        coalesce(sum(amount) filter (where settled_by_payment_id is null), 0)::text as cash
+      from maintenance_expenses
+      where voided_at is null
+        and expense_date >= ${fromMonth}::date
+        and expense_date < (${toMonth}::date + interval '1 month')
+      group by 1
+      order by 1`
+  );
+  return rows.map((r) => ({ month: r.month, amount: Number(r.amount), cash: Number(r.cash) }));
+}
+
 /** All in one insert: every row or none. */
 export async function addMaintenanceFiles(tx: Tx, rows: NewMaintenanceFile[]): Promise<void> {
   if (rows.length === 0) return;

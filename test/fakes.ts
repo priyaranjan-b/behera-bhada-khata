@@ -310,6 +310,7 @@ function build() {
     units: { list: vi.fn(async () => units), create: vi.fn() },
     occupancy: { list: vi.fn(async () => occupancy) },
     maintenance: {
+      monthly: vi.fn(async () => [] as { month: string; amount: number; cash: number }[]),
       page: vi.fn(async () => ({
         rows: [],
         total: 0,

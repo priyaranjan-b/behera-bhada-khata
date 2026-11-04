@@ -79,6 +79,7 @@ export const apiPaths = {
       receipt: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/receipt`,
       proof: (paymentId: string, proofId: string) => `/api/dashboard/payments/${e(paymentId)}/proofs/${e(proofId)}`,
     },
+    earnings: "/api/dashboard/earnings",
     maintenance: {
       list: "/api/dashboard/maintenance",
       new: "/api/dashboard/maintenance/new",

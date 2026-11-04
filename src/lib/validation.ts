@@ -516,6 +516,12 @@ export const billingQuerySchema = z.object({
   paidDirect: paidDirectViewSchema,
 });
 
+/** The Earnings page (A23): at most two years of months at once; one row per month. */
+export const EARNINGS_LIMITS = { maxMonths: 24, defaultMonths: 12 } as const;
+
+/** `?from=yyyy-MM&to=yyyy-MM&paidDirect=` on /earnings; either end may be missing (default: the last 12 months). */
+export const earningsQuerySchema = billingQuerySchema;
+
 /** The Payments page (A18): at most two years of days in one view (the query refuses more). */
 export const PAYMENTS_LIMITS = { maxDays: 731 } as const;
 

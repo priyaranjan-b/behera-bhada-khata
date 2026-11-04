@@ -38,6 +38,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/billing": "Billing",
   "/payments": "Payments",
   "/maintenance": "Maintenance",
+  "/earnings": "Earnings",
   "/maintenance/new": "Record maintenance",
   "/maintenance/:id": "Expense",
   "/maintenance/:id/edit": "Edit",
