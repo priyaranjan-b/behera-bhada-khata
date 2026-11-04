@@ -48,3 +48,10 @@ export const LEDGER_STATUS_LABELS: Record<LedgerRowStatus, string> = {
 // The Ledger table (A15): what it sorts and filters in SQL.
 export const LEDGER_SORT_FIELDS = ["date", "description", "status", "debit", "credit", "balance"] as const;
 export const LEDGER_FILTER_FIELDS = ["date", "description", "status"] as const;
+/** The Ledger's "Entries" choice: every row, or only money in (payments and adjustments in the tenant's favour). */
+export const LEDGER_SHOWS = ["all", "credits"] as const;
+export type LedgerShow = (typeof LEDGER_SHOWS)[number];
+export const LEDGER_SHOW_OPTIONS: { value: LedgerShow; label: string }[] = [
+  { value: "credits", label: "Credits only" },
+  { value: "all", label: "All entries" },
+];

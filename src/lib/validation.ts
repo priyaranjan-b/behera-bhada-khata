@@ -11,7 +11,7 @@ import {
   TENANT_MONTH_SORT_FIELDS,
 } from "@/lib/domain/billing";
 import { MAINTENANCE_FILTER_FIELDS, MAINTENANCE_SORT_FIELDS } from "@/lib/domain/maintenance";
-import { LEDGER_FILTER_FIELDS, LEDGER_SORT_FIELDS } from "@/lib/domain/tenantLedger";
+import { LEDGER_FILTER_FIELDS, LEDGER_SHOWS, LEDGER_SORT_FIELDS } from "@/lib/domain/tenantLedger";
 import { PAYMENTS_FILTER_FIELDS, PAYMENTS_SORT_FIELDS } from "@/lib/domain/payments";
 import {
   MAINTENANCE_CATEGORIES,
@@ -472,9 +472,9 @@ export const tenantMonthsQuerySchema = gridQuerySchema(TENANT_MONTH_SORT_FIELDS,
   dir: "desc",
 }).extend({ show: z.enum(TENANT_MONTH_SHOWS).default("all") });
 
-/** A tenant's Ledger table: paged, sorted, searched and filtered in SQL (A15). `from`/`to` are days, inclusive. */
+/** A tenant's Ledger table: paged, sorted, searched and filtered in SQL (A15). `from`/`to` are days, inclusive; `show` "credits" keeps only money in. */
 export const tenantLedgerQuerySchema = gridQuerySchema(LEDGER_SORT_FIELDS, LEDGER_FILTER_FIELDS, { sort: "date", dir: "desc" })
-  .extend({ from: dateKeySchema.optional(), to: dateKeySchema.optional() })
+  .extend({ from: dateKeySchema.optional(), to: dateKeySchema.optional(), show: z.enum(LEDGER_SHOWS).default("all") })
   .refine((q) => !q.from || !q.to || q.from <= q.to, "The start date must be on or before the end date");
 
 // ---- Audit history (0015) ----------------------------------------------------
