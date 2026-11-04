@@ -79,6 +79,16 @@ export const apiPaths = {
       receipt: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/receipt`,
       proof: (paymentId: string, proofId: string) => `/api/dashboard/payments/${e(paymentId)}/proofs/${e(proofId)}`,
     },
+    maintenance: {
+      list: "/api/dashboard/maintenance",
+      new: "/api/dashboard/maintenance/new",
+      detail: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}`,
+      void: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}/void`,
+      tags: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}/tags`,
+      history: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}/history`,
+      files: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}/files`,
+      file: (expenseId: string, fileId: string) => `/api/dashboard/maintenance/${e(expenseId)}/files/${e(fileId)}`,
+    },
     adjustments: {
       resend: (adjustmentId: string) => `/api/dashboard/adjustments/${e(adjustmentId)}/resend`,
       receipt: (adjustmentId: string) => `/api/dashboard/adjustments/${e(adjustmentId)}/receipt`,

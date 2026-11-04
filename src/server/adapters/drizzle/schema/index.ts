@@ -8,5 +8,6 @@ export * from "./tenants";
 export * from "./ledger";
 export * from "./documents";
 export * from "./tags";
+export * from "./maintenance";
 export * from "./audit";
 export * from "./system";

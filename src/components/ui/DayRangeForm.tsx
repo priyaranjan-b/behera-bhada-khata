@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { DateField } from "@/components/ui";
-import { useAppRouter } from "@/components/ui/Loading";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
-import { routes } from "@/lib/routes";
+import DateField from "./DateField";
+import { useAppRouter } from "./Loading";
+import { withQuery } from "@/lib/routes";
 
-/** From / To days received for the Payments page; Show opens that range. */
-export default function PaymentsRangeForm({ from, to }: { from: string; to: string }) {
+/**
+ * From / To days for a page listed by day (Payments, Maintenance); Show opens
+ * `path?from=&to=`. `path` is the page's own route (routes.payments.list()).
+ */
+export default function DayRangeForm({ from, to, path, fromLabel }: { from: string; to: string; path: string; fromLabel: string }) {
   const router = useAppRouter();
   const [start, setStart] = useState(from);
   const [end, setEnd] = useState(to);
@@ -22,10 +25,10 @@ export default function PaymentsRangeForm({ from, to }: { from: string; to: stri
       sx={{ flexWrap: "wrap", alignItems: "center" }}
       onSubmit={(e: React.FormEvent) => {
         e.preventDefault();
-        router.push(routes.payments.list({ from: start || end, to: end || start }));
+        router.push(withQuery(path, { from: start || end, to: end || start }));
       }}
     >
-      <DateField label="Received from" size="small" value={start} onChange={setStart} sx={{ width: 180 }} />
+      <DateField label={fromLabel} size="small" value={start} onChange={setStart} sx={{ width: 180 }} />
       <DateField label="To" size="small" value={end} min={start || undefined} onChange={setEnd} sx={{ width: 180 }} />
       <Button type="submit" variant="outlined" disabled={!start && !end}>
         Show

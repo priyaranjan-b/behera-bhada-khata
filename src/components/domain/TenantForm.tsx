@@ -3,17 +3,15 @@
 import { useMemo, useState } from "react";
 import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
-import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Grid from "@mui/material/Grid";
 import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
 import { DateField, FormActions, MonthField, SectionCard } from "@/components/ui";
+import HousePicker from "@/components/domain/HousePicker";
 import TenantDocumentsCard, { type PendingDocument } from "@/components/domain/TenantDocumentsCard";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AvailableUnit, EditTenantForm, TenantDocumentView } from "@/lib/contracts";
@@ -249,46 +247,17 @@ export default function TenantForm({
             {movedOut ? (
               <Alert severity="info">This tenant has moved out, so their houses and rent can no longer change.</Alert>
             ) : null}
-            <Autocomplete
-              multiple
+            <HousePicker
               options={options}
               value={units}
-              onChange={(_, value) => setUnits(value)}
+              onChange={setUnits}
               disabled={movedOut}
-              groupBy={(u) => `${u.propertyName} (${u.propertyCode})`}
-              getOptionLabel={(u) => u.unitCode}
-              isOptionEqualToValue={(a, b) => a.unitCode === b.unitCode}
-              filterSelectedOptions
-              renderOption={(props, u) => {
-                const { key, ...rest } = props;
-                return (
-                  <li key={key} {...rest}>
-                    <Stack>
-                      <Typography variant="body2">{u.unitCode}</Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        {unitCaption(u)}
-                      </Typography>
-                    </Stack>
-                  </li>
-                );
-              }}
-              renderValue={(value, getItemProps) =>
-                value.map((u, index) => {
-                  const { key, ...itemProps } = getItemProps({ index });
-                  return <Chip key={key} label={u.unitCode} size="small" {...itemProps} />;
-                })
+              caption={unitCaption}
+              helperText={
+                options.length === 0
+                  ? "No vacant houses - add a house to a tower first."
+                  : "Vacant houses only. A tenant can take several, across towers."
               }
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Houses"
-                  helperText={
-                    options.length === 0
-                      ? "No vacant houses - add a house to a tower first."
-                      : "Vacant houses only. A tenant can take several, across towers."
-                  }
-                />
-              )}
             />
             {unitsChanged && !movedOut ? (
               <DateField

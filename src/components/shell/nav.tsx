@@ -8,6 +8,8 @@ import AddHomeWorkRoundedIcon from "@mui/icons-material/AddHomeWorkRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
+import HandymanRoundedIcon from "@mui/icons-material/HandymanRounded";
+import BuildCircleRoundedIcon from "@mui/icons-material/BuildCircleRounded";
 import { routes } from "@/lib/routes";
 
 export type AppTab =
@@ -18,9 +20,11 @@ export type AppTab =
   | "defaulters"
   | "billing"
   | "payments"
+  | "maintenance"
   | "activity"
   | "addTenant"
-  | "addHouse";
+  | "addHouse"
+  | "addMaintenance";
 
 export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.ReactNode }[] = [
   { tab: "summary", href: routes.home, label: "Summary", icon: <SpaceDashboardRoundedIcon /> },
@@ -29,6 +33,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
   { tab: "tenants", href: routes.tenants.list(), label: "Tenants", icon: <PeopleRoundedIcon /> },
   { tab: "billing", href: routes.billing(), label: "Billing", icon: <ReceiptLongRoundedIcon /> },
   { tab: "payments", href: routes.payments.list(), label: "Payments", icon: <PaymentsRoundedIcon /> },
+  { tab: "maintenance", href: routes.maintenance.list(), label: "Maintenance Expense", icon: <HandymanRoundedIcon /> },
   { tab: "defaulters", href: routes.defaulters, label: "Defaulters", icon: <PendingActionsRoundedIcon /> },
   { tab: "activity", href: routes.activity, label: "Activity", icon: <HistoryRoundedIcon /> },
 ];
@@ -37,6 +42,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
 export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: React.ReactNode }[] = [
   { tab: "addTenant", href: routes.tenants.new, label: "Add tenant", icon: <PersonAddAltRoundedIcon /> },
   { tab: "addHouse", href: routes.houses.new, label: "Add house", icon: <AddHomeWorkRoundedIcon /> },
+  { tab: "addMaintenance", href: routes.maintenance.new, label: "Record maintenance", icon: <BuildCircleRoundedIcon /> },
 ];
 
 export const SIDEBAR_WIDTH = 240;

@@ -12,7 +12,7 @@ import type {
   SystemRepositories,
   AuditHistoryFilter,
 } from "@/server/ports";
-import { notFound, parseInput, requireTenant, type OwnerContext } from "./context";
+import { notFound, parseInput, requireId, requireTenant, type OwnerContext } from "./context";
 
 // History of every change (audit_log, 0015 / D25). The database writes the
 // table changes itself; this module reads them and adds the app events
@@ -133,4 +133,13 @@ export async function unitHistory(_ctx: OwnerContext, unitCode: string, query: u
   const db = await ownerDb();
   if ((await db.units.list({ unitCodes: [parsed.data] })).length === 0) notFound("House");
   return page(db, { unitCode: parsed.data, beforeId: before });
+}
+
+/** One maintenance expense's history (0031): the expense, its houses and files. */
+export async function maintenanceHistory(_ctx: OwnerContext, expenseId: string, query: unknown): Promise<AuditPage> {
+  requireId(expenseId, "Expense");
+  const { before } = parseInput(auditPageSchema, query);
+  const db = await ownerDb();
+  if (!(await db.maintenance.get(expenseId))) notFound("Expense");
+  return page(db, { entity: { type: "maintenance", id: expenseId }, beforeId: before });
 }

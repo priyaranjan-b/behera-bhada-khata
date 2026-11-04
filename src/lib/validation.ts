@@ -10,9 +10,11 @@ import {
   TENANT_MONTH_SHOWS,
   TENANT_MONTH_SORT_FIELDS,
 } from "@/lib/domain/billing";
+import { MAINTENANCE_FILTER_FIELDS, MAINTENANCE_SORT_FIELDS } from "@/lib/domain/maintenance";
 import { LEDGER_FILTER_FIELDS, LEDGER_SORT_FIELDS } from "@/lib/domain/tenantLedger";
 import { PAYMENTS_FILTER_FIELDS, PAYMENTS_SORT_FIELDS } from "@/lib/domain/payments";
 import {
+  MAINTENANCE_CATEGORIES,
   PAID_DIRECT_VIEWS,
   PAYMENT_MODES,
   PREFERRED_CHANNELS,
@@ -94,6 +96,12 @@ export type FileLimits = { maxFiles: number; maxTotalBytes: number; accept: stri
  * ceiling as proofs today, but kept separate so the two can change apart.
  */
 export const DOCUMENT_LIMITS: FileLimits = { ...PROOF_LIMITS };
+
+/**
+ * Receipts, bills and photos on a maintenance expense (0031), per save. Same
+ * request-size ceiling as proofs, kept separate so the two can change apart.
+ */
+export const MAINTENANCE_FILE_LIMITS: FileLimits = { ...PROOF_LIMITS };
 
 /** One type per uploaded file, in the order the files are sent. */
 export const uploadTenantDocumentsSchema = z.object({
@@ -519,6 +527,63 @@ export const paymentsPageQuerySchema = gridQuerySchema(PAYMENTS_SORT_FIELDS, PAY
   sort: "paymentDate",
   dir: "desc",
 }).extend(paymentsQuerySchema.shape);
+
+// ---- Maintenance expenses (0031, D35) -----------------------------------------
+
+/** Field lengths (the table's checks) and how many houses one expense may cover. */
+export const MAINTENANCE_LIMITS = {
+  descriptionMax: 120,
+  vendorMax: 80,
+  noteMax: 500,
+  voidReasonMax: 200,
+  maxUnits: 200,
+  /** The Maintenance page shows at most two years of days at once. */
+  maxDays: 731,
+} as const;
+
+const maintenanceFieldsSchema = z.object({
+  expenseDate: dateKeySchema,
+  amount: positiveMoneySchema,
+  category: z.enum(MAINTENANCE_CATEGORIES, "Choose a category"),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Say what it was for")
+    .max(MAINTENANCE_LIMITS.descriptionMax, `Keep it under ${MAINTENANCE_LIMITS.descriptionMax} characters`),
+  vendor: optionalText(MAINTENANCE_LIMITS.vendorMax),
+  note: optionalText(MAINTENANCE_LIMITS.noteMax),
+  unitCodes: z
+    .array(z.string().trim().toUpperCase())
+    .min(1, "Choose at least one house")
+    .max(MAINTENANCE_LIMITS.maxUnits, `Choose at most ${MAINTENANCE_LIMITS.maxUnits} houses`)
+    .refine((codes) => new Set(codes).size === codes.length, "Each house can only be chosen once"),
+});
+
+/** Record maintenance: the expense, its houses, who paid (payment tag names, 0030) and, as files, receipts. */
+export const createMaintenanceSchema = maintenanceFieldsSchema.extend({ tags: paymentTagsSchema.default([]) });
+
+/** Edit maintenance: every field and the houses (the split is redone). Tags and files change on their own. */
+export const updateMaintenanceSchema = maintenanceFieldsSchema;
+
+export const voidMaintenanceSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Say why it's being voided")
+    .max(MAINTENANCE_LIMITS.voidReasonMax, `Keep it under ${MAINTENANCE_LIMITS.voidReasonMax} characters`),
+});
+
+/** `?from=yyyy-MM-dd&to=yyyy-MM-dd` on /maintenance: days spent; either may be missing (default: this month). */
+export const maintenanceQuerySchema = z.object({
+  from: dateKeySchema.optional(),
+  to: dateKeySchema.optional(),
+});
+
+/** The Maintenance grid: the days, plus the grid's page, sort, search and filters (A15). */
+export const maintenancePageQuerySchema = gridQuerySchema(MAINTENANCE_SORT_FIELDS, MAINTENANCE_FILTER_FIELDS, {
+  sort: "expenseDate",
+  dir: "desc",
+}).extend(maintenanceQuerySchema.shape);
 
 /** The Billing grid: the range and paid-direct view, plus the grid's page, sort, search and filters (A15). */
 export const billingPageQuerySchema = gridQuerySchema(BILLING_SORT_FIELDS, BILLING_FILTER_FIELDS, {

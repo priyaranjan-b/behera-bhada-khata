@@ -52,7 +52,7 @@ function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () =>
               <Typography variant="subtitle2" component="h3">
                 Changes
               </Typography>
-              <AuditTimeline unitCode={unit.unitCode} showTenant />
+              <AuditTimeline subject={{ kind: "house", unitCode: unit.unitCode }} showTenant />
             </Stack>
           </Stack>
         ) : null}

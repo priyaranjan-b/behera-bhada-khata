@@ -30,6 +30,11 @@ tenants              uuid        a person, business or government office (D26)
   │            payment_proofs          │  (files attached to a payment)
   └ adjustments ─ adjustment_allocations ┘  confirmed when recorded (D20)
 
+maintenance_expenses uuid        money spent on the houses (D35; edited or voided, never deleted)
+  ├ maintenance_expense_units  the houses it covers, each one's equal share
+  ├ maintenance_expense_tags   who paid (copies of payment_tags names)
+  └ maintenance_files          receipts, bills, photos
+
 audit_log            every change to the tables above + app events (D25; append-only, no FKs)
 ```
 
@@ -61,6 +66,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0021_billing_page.sql` | `billing_page()` / `billing_totals()` for the Billing grid and cards, paid-direct months in SQL, `tenant_placement_now()`, index `rent_periods (period_month)` (D28) |
 | `0029_drop_replaced_functions.sql` | drops the 30 functions the Drizzle adapter replaced: the `…_page()` functions of 0018-0026, their grid and label helpers, `tenant_account_summary()`, `hit_rate_limit()` / `prune_rate_limits()` (D33). The indexes they used stay |
 | `0030_payment_tags.sql` | `payment_tags` (suggested tags, managed on /profile) and `payment_record_tags` (each payment's own copy of its tag names, editable on /payments) (D34) |
+| `0031_maintenance.sql` | `maintenance_expenses`, `maintenance_expense_units` (equal split per house), `maintenance_expense_tags` (who paid), `maintenance_files`; `create_/update_/void_maintenance_expense()`, `maintenance_shares()`; audit actions `maintenance.*`, the `category` audit format, index `audit_log (entity_type, entity_id)` (D35) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -953,6 +959,56 @@ quietly rewrite who collected an old payment. A comma-separated or array
 column on `payments` was rejected: it would open an UPDATE on the ledger
 table and fire its audit trigger for a label. Comma-separated text would
 also match "Padma" inside "Padmavati" and couldn't keep one of each.
+
+### D35 — Maintenance expenses: per-house shares, edited or voided, never deleted
+
+**Decision (0031).** What the owner spends on the houses (repairs, bills,
+society charges, tax) is a `maintenance_expenses` row (uuid, `expense_date`,
+`amount`, a fixed `category` list, `description`, optional `vendor` and
+`note`), with:
+- **`maintenance_expense_units`**: every house it covers and that house's
+  `share_amount`. Several houses split the amount **equally**: the same whole
+  paise each, the paise left over one each to the first houses by code
+  (`maintenance_shares()`; `splitEqually` in `src/lib/domain/maintenance.ts`
+  is the same rule for the form, and a schema test keeps them equal). The
+  shares always add up to the amount, so per-house and per-tower figures are
+  sums, never re-derived.
+- **Edited or voided, not append-only.** An expense isn't tenant money and
+  has no receipt a tenant holds, so a mistake is fixed in place
+  (`update_maintenance_expense`, which re-splits and writes only the houses
+  that change) or the record is **voided** (`void_maintenance_expense`:
+  `voided_at` + a required `void_reason`; kept, listed, counted nowhere; a
+  voided expense can't be edited). Never deleted. The three functions are
+  `SECURITY DEFINER` with the owner check first; INSERT/UPDATE/DELETE on the
+  two tables are revoked from `authenticated`, so the split can't drift from
+  the amount. A house must be in use when added; one already on the expense
+  may stay after it is retired.
+- **Who paid** reuses payment tags (D34): `maintenance_expense_tags` holds
+  each expense's own copy of the names, and the suggestions are the same
+  `payment_tags` list (the same family pays and collects), so /profile keeps
+  one list. Written by the adapter in the same transaction
+  (`setRecordTags(tx, "maintenance", …)`). Not audited, as D34.
+- **Files** (`maintenance_files`) follow D21: added and deleted, never
+  edited, kept under `maintenance/<expense_id>/files/` (a table CHECK). A new
+  expense's files are written in its transaction; the service uploads first
+  and removes them if the database refuses.
+- **Audit.** Triggers on the expense, its houses and its files, all logged
+  under the expense (`entity_type = 'maintenance'`, `entity_id` = the
+  expense) so its page shows one history (new index
+  `audit_log_entity_idx`); a house row's `unit_code` also puts it in that
+  house's and tower's history. Actions `maintenance.recorded / updated /
+  voided / house_added / house_removed / share_changed / file_added /
+  file_removed`; `audit_describe` lists values for the add/remove/void ones.
+- **The list** (`/maintenance`, `queries/maintenancePage.ts`) is paged in
+  the database (it grows every month, A15), voided rows included; its
+  totals (amount, per category, per payer, untagged) count only the
+  expenses that aren't voided.
+
+**Why.** Net earning per house or tower needs each expense attributed to
+houses at the moment it is recorded; splitting on read would change old
+figures when houses change. Voiding instead of deleting keeps a mistake
+visible in the history and the list, as the ledger does, without the
+adjustment machinery a tenant-facing record needs.
 
 ---
 

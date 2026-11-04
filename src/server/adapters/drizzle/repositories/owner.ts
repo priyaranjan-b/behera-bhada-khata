@@ -3,6 +3,7 @@ import type { OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must, mustWrite } from "../errors";
 import { createAdjustment, createPayment } from "../procedures/ledger";
+import { createMaintenanceExpense, updateMaintenanceExpense, voidMaintenanceExpense } from "../procedures/maintenance";
 import { logEvent } from "../procedures/system";
 import {
   correctPaidThrough,
@@ -16,6 +17,7 @@ import {
 import { listAudit } from "../tables/audit";
 import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
+import { maintenancePage } from "../queries/maintenancePage";
 import { paymentsPage } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
 import { tenantLedgerPage } from "../queries/tenantLedgerPage";
@@ -49,7 +51,15 @@ import {
   saveOwnerProfile,
   updatePaymentNotePreset,
 } from "../tables/owner";
-import { createPaymentTag, listPaymentTags, removePaymentTag, setPaymentTags, updatePaymentTag } from "../tables/paymentTags";
+import { addMaintenanceFiles, getMaintenanceExpense, getMaintenanceFile, removeMaintenanceFile } from "../tables/maintenance";
+import {
+  createPaymentTag,
+  listPaymentTags,
+  removePaymentTag,
+  setPaymentTags,
+  setRecordTags,
+  updatePaymentTag,
+} from "../tables/paymentTags";
 import { createProperty, createUnit, getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
 import { getTenant, listRentRates, listTenants } from "../tables/tenants";
 
@@ -112,6 +122,21 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       create: (name) => write("add payment tag", (tx) => createPaymentTag(tx, name)),
       update: (id, name) => write(`rename payment tag ${id}`, (tx) => updatePaymentTag(tx, id, name)),
       remove: (id) => write(`delete payment tag ${id}`, (tx) => removePaymentTag(tx, id)),
+    },
+    maintenance: {
+      page: (filter) => read(`read maintenance page ${pageLabel(filter)}`, (tx) => maintenancePage(tx, filter)),
+      get: (id) => read(`get maintenance expense ${id}`, (tx) => getMaintenanceExpense(tx, id)),
+      create: (id, fields, unitCodes, tags, files) =>
+        write(`record maintenance expense ${id} on ${unitCodes.length} houses`, (tx) =>
+          createMaintenanceExpense(tx, id, fields, unitCodes, tags, files)
+        ),
+      update: (id, fields, unitCodes) =>
+        write(`edit maintenance expense ${id}`, (tx) => updateMaintenanceExpense(tx, id, fields, unitCodes)),
+      void: (id, reason) => write(`void maintenance expense ${id}`, (tx) => voidMaintenanceExpense(tx, id, reason)),
+      setTags: (id, names) => write(`set tags of maintenance expense ${id}`, (tx) => setRecordTags(tx, "maintenance", id, names)),
+      addFiles: (rows) => write(`add ${rows.length} maintenance files`, (tx) => addMaintenanceFiles(tx, rows)),
+      getFile: (fileId) => read(`get maintenance file ${fileId}`, (tx) => getMaintenanceFile(tx, fileId)),
+      removeFile: (fileId) => write(`delete maintenance file ${fileId}`, (tx) => removeMaintenanceFile(tx, fileId)),
     },
     locations: {
       list: () => read("list locations", listLocations),

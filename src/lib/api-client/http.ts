@@ -140,6 +140,20 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       adjustments: {
         resend: (id) => post(p.dashboard.adjustments.resend(id)),
       },
+      maintenance: {
+        list: (query = {}) => get(withQuery(p.dashboard.maintenance.list, { ...query })),
+        newForm: () => get(p.dashboard.maintenance.new),
+        detail: (id) => get(p.dashboard.maintenance.detail(id)),
+        history: (id, before) => get(withQuery(p.dashboard.maintenance.history(id), { before })),
+        create: (input, files) => postWithFiles(p.dashboard.maintenance.list, input, "files", files),
+        update: (id, input) => put(p.dashboard.maintenance.detail(id), input),
+        void: (id, input) => post(p.dashboard.maintenance.void(id), input),
+        setTags: (id, input) => put(p.dashboard.maintenance.tags(id), input),
+        addFiles: (id, files) => postWithFiles(p.dashboard.maintenance.files(id), {}, "files", files),
+        deleteFile: async (id, fileId) => {
+          await request("DELETE", p.dashboard.maintenance.file(id, fileId));
+        },
+      },
     },
     confirm: {
       detail: (token) => get(p.confirm.detail(token)),

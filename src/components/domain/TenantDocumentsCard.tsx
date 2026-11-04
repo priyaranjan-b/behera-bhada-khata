@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
-import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -19,10 +18,9 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import { SectionCard } from "@/components/ui";
+import FileIcon from "@/components/ui/FileIcon";
 import { api, apiHref, apiPaths, errorMessage } from "@/lib/api-client";
 import type { TenantDocumentView } from "@/lib/contracts";
 import { dateKeyOf, formatDateKey } from "@/lib/dates";
@@ -35,18 +33,6 @@ import Loader from "@/components/ui/Loading/Loader";
 export interface PendingDocument {
   file: File;
   documentType: string;
-}
-
-function FileIcon({ contentType }: { contentType: string }) {
-  return (
-    <Avatar variant="soft" sx={{ width: 36, height: 36 }}>
-      {contentType === "application/pdf" ? (
-        <PictureAsPdfOutlinedIcon fontSize="small" />
-      ) : (
-        <ImageOutlinedIcon fontSize="small" />
-      )}
-    </Avatar>
-  );
 }
 
 /**

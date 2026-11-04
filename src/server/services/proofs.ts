@@ -73,30 +73,37 @@ export function checkProofFiles(
 }
 
 /**
- * Uploads checked proofs into `<recordFolder>/proofs/`, returning the rows
- * for create_payment. If one upload fails, the ones already stored are
- * removed and it throws.
+ * Uploads checked files into `folder`, named `<prefix><n>-<name>.<ext>`,
+ * returning their rows. If one upload fails, the ones already stored are
+ * removed and it throws (500 "Could not save the <what>").
  */
-export async function storeProofs(
-  recordFolder: string,
-  files: (UploadedFile & { type: ProofContentType })[]
+export async function storeFiles(
+  folder: string,
+  files: (UploadedFile & { type: ProofContentType })[],
+  what: string,
+  prefix = ""
 ): Promise<ProofArg[]> {
-  const proofs: ProofArg[] = [];
+  const stored: ProofArg[] = [];
   try {
     for (const [i, f] of files.entries()) {
-      const path = `${recordFolder}/proofs/${storageName(i, f.name, f.type)}`;
+      const path = `${folder}/${prefix}${storageName(i, f.name, f.type)}`;
       await storage.upload(path, f.bytes, f.type);
-      proofs.push({
+      stored.push({
         storage_path: path,
-        file_name: f.name.trim().slice(0, 255) || `proof-${i + 1}`,
+        file_name: f.name.trim().slice(0, 255) || `file-${i + 1}`,
         content_type: f.type,
         size_bytes: f.bytes.length,
       });
     }
   } catch (err) {
-    console.error(err);
-    await storage.remove(proofs.map((p) => p.storage_path));
-    throw new ApiError(500, "Could not save the proof files");
+    console.error(`store ${what} in ${folder}: ${err instanceof Error ? err.message : String(err)}`);
+    await storage.remove(stored.map((p) => p.storage_path));
+    throw new ApiError(500, `Could not save the ${what}`);
   }
-  return proofs;
+  return stored;
+}
+
+/** Uploads checked proofs into `<recordFolder>/proofs/`, returning the rows for create_payment (storeFiles). */
+export function storeProofs(recordFolder: string, files: (UploadedFile & { type: ProofContentType })[]): Promise<ProofArg[]> {
+  return storeFiles(`${recordFolder}/proofs`, files, "proof files");
 }

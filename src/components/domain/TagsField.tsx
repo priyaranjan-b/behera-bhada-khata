@@ -11,17 +11,19 @@ import { PAYMENT_TAG_LIMITS } from "@/lib/validation";
 const QUICK_TAGS = 5;
 
 /**
- * A payment's tags (0030, D34): pick a suggestion or type a new one
+ * A record's tags (payments 0030, D34; who paid a maintenance expense, 0031):
+ * the shared suggestions (Profile page); pick one or type a new one
  * (Enter, or leave the field, adds it). One of each whatever the case, and a
  * typed name that matches a known tag takes its spelling. The first
  * QUICK_TAGS suggestions also show as chips under the field: one tap adds a
  * tag, another removes it, and several can be on at once.
  */
-export default function PaymentTagsField({
+export default function TagsField({
   value,
   onChange,
   suggestions,
   disabled,
+  label = "Tags (optional)",
   helperText = "Who received it, or any label - pick one or type a new one",
 }: {
   value: string[];
@@ -29,6 +31,7 @@ export default function PaymentTagsField({
   /** The suggested names (Profile page), alphabetical. */
   suggestions: string[];
   disabled?: boolean;
+  label?: string;
   helperText?: string;
 }) {
   const full = value.length >= PAYMENT_TAG_LIMITS.maxPerPayment;
@@ -70,7 +73,7 @@ export default function PaymentTagsField({
       renderInput={(params) => (
         <TextField
           {...params}
-          label="Tags (optional)"
+          label={label}
           helperText={full ? `At most ${PAYMENT_TAG_LIMITS.maxPerPayment} tags` : helperText}
           // Enter adds the tag; it mustn't also submit the form around it.
           onKeyDown={(e) => {

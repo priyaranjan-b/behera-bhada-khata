@@ -6,7 +6,8 @@ import { ApiError } from "@/lib/errors";
 import { routes } from "@/lib/routes";
 import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
-import { listActivity, tenantHistory, unitHistory } from "@/server/services/audit";
+import { listActivity, maintenanceHistory, tenantHistory, unitHistory } from "@/server/services/audit";
+import { getMaintenanceExpense, getMaintenanceForm, getMaintenancePage } from "@/server/services/maintenance";
 import { getConfirmView } from "@/server/services/confirm";
 import { getBillingPage, getBillingReceived, getBillingTotals } from "@/server/services/billing";
 import { getDefaultersReport } from "@/server/services/dashboard";
@@ -109,6 +110,12 @@ const inProcessApi: ApiQueries = {
       paidDirect: async (query) => getPaymentsPaidDirect(await owner(), query),
       adjust: async (id) => getAdjustPaymentForm(await owner(), id),
       tagSuggestions: async () => getPaymentTagSuggestions(await owner()),
+    },
+    maintenance: {
+      list: async (query) => getMaintenancePage(await owner(), query),
+      newForm: async () => getMaintenanceForm(await owner()),
+      detail: async (id) => getMaintenanceExpense(await owner(), id),
+      history: async (id, before) => maintenanceHistory(await owner(), id, { before }),
     },
   },
   confirm: {

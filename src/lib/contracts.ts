@@ -15,6 +15,7 @@ import type { BillingShow, TenantMonthShow } from "@/lib/domain/billing";
 import type {
   AuditAction,
   AuditActorKind,
+  MaintenanceCategory,
   PaidDirectView,
   PaymentMode,
   PeriodStatus,
@@ -28,6 +29,10 @@ import type {
   uploadTenantDocumentsSchema,
   confirmSchema,
   createAdjustmentSchema,
+  createMaintenanceSchema,
+  maintenanceQuerySchema,
+  updateMaintenanceSchema,
+  voidMaintenanceSchema,
   createPaymentSchema,
   createPropertySchema,
   createTenantSchema,
@@ -227,6 +232,104 @@ export interface PaymentsPage extends TablePage<PaymentListRow> {
   from: string;
   to: string;
   totals: PaymentTotals;
+}
+
+// ---- /api/dashboard/maintenance (money spent on the houses, 0031, D35) --------
+
+/** `?from&to`: days spent, yyyy-MM-dd; none = this month. */
+export type MaintenanceQuery = z.input<typeof maintenanceQuerySchema>;
+
+/** The Maintenance grid's query: the days, plus the grid's own. */
+export interface MaintenancePageQuery extends GridQueryParams {
+  from?: string;
+  to?: string;
+}
+
+export interface MaintenanceListRow {
+  id: string;
+  /** The day it was spent, yyyy-MM-dd. */
+  expenseDate: string;
+  amount: number;
+  category: MaintenanceCategory;
+  description: string;
+  vendor: string | null;
+  note: string | null;
+  /** Voided: listed, never counted. */
+  voided: boolean;
+  /** Its houses' codes, in code order. */
+  unitCodes: string[];
+  /** Who paid, alphabetical. */
+  tags: string[];
+  fileCount: number;
+}
+
+/** Every matching expense that isn't voided, whatever the page. */
+export interface MaintenanceTotals {
+  amount: number;
+  count: number;
+  byCategory: Partial<Record<MaintenanceCategory, number>>;
+  /** Per payer, largest first; an expense with two payers counts in full for each. */
+  byPaidBy: { name: string; amount: number }[];
+  /** Spent with no payer tag. */
+  untagged: number;
+}
+
+export interface MaintenancePage extends TablePage<MaintenanceListRow> {
+  /** The days shown (yyyy-MM-dd, both included). */
+  from: string;
+  to: string;
+  totals: MaintenanceTotals;
+}
+
+/** A house the maintenance form offers: every house in use. */
+export interface MaintenanceHouseOption {
+  unitCode: string;
+  propertyCode: string;
+  propertyName: string;
+  label: string | null;
+}
+
+/** GET …/maintenance/new: the Record maintenance form's data. */
+export interface MaintenanceForm {
+  /** Grouped by tower, then by code. */
+  houses: MaintenanceHouseOption[];
+  /** Who-paid suggestions (the payment tags, 0030). */
+  tagSuggestions: string[];
+}
+
+export interface MaintenanceFileView {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+/** GET …/maintenance/[id]: one expense, its split and files. */
+export interface MaintenanceDetail {
+  id: string;
+  expenseDate: string;
+  amount: number;
+  category: MaintenanceCategory;
+  description: string;
+  vendor: string | null;
+  note: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  recordedAt: string;
+  /** In code order. */
+  houses: (MaintenanceHouseOption & { share: number })[];
+  tags: string[];
+  files: MaintenanceFileView[];
+}
+
+export type CreateMaintenanceInput = z.input<typeof createMaintenanceSchema>;
+export type UpdateMaintenanceInput = z.input<typeof updateMaintenanceSchema>;
+export type VoidMaintenanceInput = z.input<typeof voidMaintenanceSchema>;
+
+export interface MaintenanceFilesSaved {
+  /** All of the expense's files after the upload. */
+  files: MaintenanceFileView[];
 }
 
 /** GET /api/dashboard/payments/paid-direct: Govt rent paid to the bank directly for the rent months the days touch (A11). */

@@ -37,6 +37,10 @@ const ROUTE_LABELS: Record<string, string> = {
   "/defaulters": "Defaulters",
   "/billing": "Billing",
   "/payments": "Payments",
+  "/maintenance": "Maintenance",
+  "/maintenance/new": "Record maintenance",
+  "/maintenance/:id": "Expense",
+  "/maintenance/:id/edit": "Edit",
   "/activity": "Activity",
 };
 
