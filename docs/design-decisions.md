@@ -829,7 +829,7 @@ month (the next step). Until then the page is for the whole rent book only.
 ### A24 — Report pages: a sticky context bar, not a global header control
 
 **Decision.** The period switcher (‹ month ›), the range form and "Include
-Govt paid direct" live in `ContextBar` (`src/components/ui/ContextBar.tsx`),
+Govt paid direct" live in `ContextBar` (`src/components/shell/ContextBar.tsx`),
 which the report pages render under their `PageHeader`: Overview, Billing,
 Earnings, Payments and Maintenance. It is sticky under the top bar
 (`TOPBAR_HEIGHT` / `MOBILE_NAVBAR_HEIGHT`), frosted like it, and full width

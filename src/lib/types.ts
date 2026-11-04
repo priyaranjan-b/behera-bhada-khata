@@ -184,14 +184,14 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["owner_profile"]["Insert"]>;
         Relationships: [];
       };
-      /** Quick-select notes for the Record payment form (0024), edited on the Profile page. */
+      /** Quick-select notes for the Record payment form (0024), edited on the Settings page. */
       payment_note_presets: {
         Row: { id: string; text: string; created_at: string; updated_at: string };
         Insert: { text: string };
         Update: { text?: string };
         Relationships: [];
       };
-      /** Suggested payment tags (0030, D34), managed on the Profile page. */
+      /** Suggested payment tags (0030, D34), managed on the Settings page. */
       payment_tags: {
         Row: { id: string; name: string; created_at: string; updated_at: string };
         Insert: { name: string };

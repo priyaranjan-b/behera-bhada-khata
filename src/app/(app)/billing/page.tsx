@@ -6,9 +6,9 @@ import { rangeFromParams, rangeLength, rangeQuery, shiftRange } from "@/lib/doma
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
 import { BILLING_LIMITS } from "@/lib/validation";
-import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
+import PaidDirectOption from "@/components/domain/PaidDirectOption";
 import AsyncSection from "@/components/ui/AsyncSection";
-import ContextBar from "@/components/ui/ContextBar";
+import ContextBar from "@/components/shell/ContextBar";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import MonthRangeForm from "@/components/ui/MonthRangeForm";
@@ -62,9 +62,7 @@ export default async function BillingPage({
               path={routes.billing()}
               query={paidDirectQuery(paidDirect)}
             />
-            <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
-              <PaidDirectSwitch state={paidDirectState} />
-            </AsyncSection>
+            <PaidDirectOption view={paidDirect} state={paidDirectState} />
           </>
         }
         activeCount={paidDirect === "show" ? 1 : 0}

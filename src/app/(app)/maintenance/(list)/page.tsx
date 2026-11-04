@@ -6,7 +6,7 @@ import { dayRangeLabel, dayRangeUnit, shiftDayRange } from "@/lib/domain/payment
 import { routes } from "@/lib/routes";
 import { MAINTENANCE_LIMITS } from "@/lib/validation";
 import AsyncSection from "@/components/ui/AsyncSection";
-import ContextBar from "@/components/ui/ContextBar";
+import ContextBar from "@/components/shell/ContextBar";
 import DayRangeForm from "@/components/ui/DayRangeForm";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";

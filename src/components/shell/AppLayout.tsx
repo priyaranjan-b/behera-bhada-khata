@@ -3,7 +3,8 @@
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import { SideMenu } from "@/components/shell/SideMenu";
-import { AppNavbar, MOBILE_NAVBAR_HEIGHT } from "@/components/shell/AppNavbar";
+import { AppNavbar } from "@/components/shell/AppNavbar";
+import { MOBILE_NAVBAR_HEIGHT } from "@/components/shell/nav";
 import { Header } from "@/components/shell/Header";
 import { AppBreadcrumbs } from "@/components/shell/AppBreadcrumbs";
 import type { AppTab } from "@/components/shell/nav";

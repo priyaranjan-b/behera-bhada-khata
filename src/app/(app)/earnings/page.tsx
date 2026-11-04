@@ -6,9 +6,9 @@ import { earningsRange } from "@/lib/domain/earnings";
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
 import { EARNINGS_LIMITS } from "@/lib/validation";
-import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
+import PaidDirectOption from "@/components/domain/PaidDirectOption";
 import AsyncSection from "@/components/ui/AsyncSection";
-import ContextBar from "@/components/ui/ContextBar";
+import ContextBar from "@/components/shell/ContextBar";
 import MonthRangeForm from "@/components/ui/MonthRangeForm";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import { PageHeader } from "@/components/ui/DataDisplay";
@@ -56,9 +56,7 @@ export default async function EarningsPage({
               path={routes.earnings()}
               query={paidDirectQuery(paidDirect)}
             />
-            <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
-              <PaidDirectSwitch state={paidDirectState} />
-            </AsyncSection>
+            <PaidDirectOption view={paidDirect} state={paidDirectState} />
           </>
         }
         activeCount={paidDirect === "show" ? 1 : 0}

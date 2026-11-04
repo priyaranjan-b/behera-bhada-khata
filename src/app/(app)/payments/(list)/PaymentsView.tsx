@@ -6,8 +6,13 @@ import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
 import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
+import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import LocalAtmRoundedIcon from "@mui/icons-material/LocalAtmRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, {
   moneyColumn,
@@ -19,11 +24,6 @@ import DataTable, {
 } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
 import { TagsCell } from "@/components/ui/GridCells";
-import LocalAtmRoundedIcon from "@mui/icons-material/LocalAtmRounded";
-import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
-import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
-import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import StatCard from "@/components/ui/StatCard";
 import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";

@@ -3,7 +3,7 @@ import { addMonthsToKey, formatMonth, monthKeyFromParam, yearMonthOf } from "@/l
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
 import AsyncSection from "@/components/ui/AsyncSection";
-import ContextBar from "@/components/ui/ContextBar";
+import ContextBar from "@/components/shell/ContextBar";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
 import OverviewLayout from "./OverviewLayout";
@@ -11,7 +11,7 @@ import { OVERVIEW_SKELETONS as SKELETON } from "./overviewSkeletons";
 import AttentionSection from "./sections/AttentionSection";
 import DefaultersSection from "./sections/DefaultersSection";
 import MonthStats from "./sections/MonthStats";
-import PaidDirectSwitch from "@/components/domain/PaidDirectSwitch";
+import PaidDirectOption from "@/components/domain/PaidDirectOption";
 import PortfolioSection from "./sections/PortfolioSection";
 import SitesSection from "./sections/SitesSection";
 import TenantTypesSection from "./sections/TenantTypesSection";
@@ -60,9 +60,7 @@ export default async function DashboardPage({
               />
             }
             options={
-              <AsyncSection key={paidDirect} title="Include Govt paid direct" fallback={null} silent>
-                <PaidDirectSwitch state={paidDirectState} />
-              </AsyncSection>
+              <PaidDirectOption view={paidDirect} state={paidDirectState} />
             }
             activeCount={paidDirect === "show" ? 1 : 0}
             resetHref={routes.dashboard()}
