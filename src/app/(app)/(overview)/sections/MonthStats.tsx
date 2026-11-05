@@ -8,10 +8,11 @@ import { routes } from "@/lib/routes";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
+import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 
-/** The Overview stat cards (Vacant, its own section, is the fourth): a swipe row on phones, two a row, four from `md` (A26). */
-export const STAT_COLUMNS = { sm: 2, md: 4 } as const satisfies StatCardRowColumns;
+/** The Overview's five stat cards (Vacant, its own section, is the fifth): a swipe row on phones, three a row, all five from `lg` (A26). */
+export const STAT_COLUMNS = { sm: 3, lg: 5 } as const satisfies StatCardRowColumns;
 
 // Direction of the last month vs the one before, for sparkline colouring.
 function trendOf(values: number[]): Trend {
@@ -25,7 +26,7 @@ function sparklineFor(trend: MonthlyTrendPoint[], key: "billed" | "collected") {
   return { data, labels: trend.map((p) => p.label), trend: trendOf(data), format: "money" as const };
 }
 
-/** Overview: Expected, Collected and Outstanding - three cards in the stat row (Vacant, its own section, makes four). */
+/** Overview: Expected, Collected, Outstanding and Tenants overdue - four cards in the stat row (Vacant, its own section, makes five). */
 export default async function MonthStats({
   month,
   trend,
@@ -76,6 +77,18 @@ export default async function MonthStats({
         caption="Rent unpaid to the end of last month"
         badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
         href={routes.defaulters}
+      />
+      <StatCard
+        title="Tenants overdue"
+        icon={<PeopleAltRoundedIcon />}
+        value={String(report.overdueTenantCount)}
+        caption="With at least one month past due"
+        href={routes.tenants.list({ show: "overdue" })}
+        badge={
+          report.overdueTenantCount > 0
+            ? { label: "Follow up", tone: "danger" }
+            : { label: "On track", tone: "success" }
+        }
       />
     </>
   );

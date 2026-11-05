@@ -6,7 +6,7 @@ import StatCardRow from "@/components/ui/StatCardRow";
 /**
  * Where each Overview section goes. The page fills the slots with streamed
  * sections and loading.tsx with their skeletons, so the two can't drift (A12).
- * `stats` is three stat cards in the stat row (Vacant is the fourth); every other slot is one card.
+ * `stats` is four stat cards in the stat row (Vacant is the fifth); every other slot is one card.
  */
 export default function OverviewLayout(slots: {
   header: React.ReactNode;

@@ -18,8 +18,8 @@ export const OVERVIEW_SKELETONS = {
       <ContextBarSkeleton />
     </>
   ),
-  // Three stat cards (Vacant is the fourth); Billed and Collected carry a sparkline.
-  stats: Array.from({ length: 3 }, (_, i) => <StatCardSkeleton key={i} sparkline={i < 2} />),
+  // Four stat cards (Vacant is the fifth); Billed and Collected carry a sparkline.
+  stats: Array.from({ length: 4 }, (_, i) => <StatCardSkeleton key={i} sparkline={i < 2} />),
   vacant: <StatCardSkeleton />,
   trend: <ChartCardSkeleton />,
   // As the cards on phones (A26): all collapsible; the two to act on start open, the reference cards closed.
