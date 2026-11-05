@@ -182,10 +182,13 @@ export function ChartCardSkeleton({
  */
 export function DetailCardSkeleton({
   rows = 4,
+  action = true,
   collapseOnPhone = false,
   startOpen = false,
 }: {
   rows?: number;
+  /** The card has a heading control (a badge, a link); false draws none. */
+  action?: boolean;
   collapseOnPhone?: boolean;
   startOpen?: boolean;
 }) {
@@ -197,7 +200,11 @@ export function DetailCardSkeleton({
           <Typography variant="subtitle2" sx={{ width: 160 }}>
             <Skeleton />
           </Typography>
-          <HeadingControlSkeleton width={72} height={24} collapseOnPhone={collapseOnPhone} startOpen={startOpen} />
+          {action ? (
+            <HeadingControlSkeleton width={72} height={24} collapseOnPhone={collapseOnPhone} startOpen={startOpen} />
+          ) : collapseOnPhone ? (
+            <Skeleton variant="circular" width={44} height={44} sx={{ display: { xs: "block", sm: "none" } }} />
+          ) : null}
         </Stack>
         {Array.from({ length: rows }, (_, i) => (
           <Stack

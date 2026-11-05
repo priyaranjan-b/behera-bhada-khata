@@ -11,8 +11,12 @@ import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 
-/** The Overview's five stat cards (Vacant, its own section, is the fifth): a swipe row on phones, three a row, all five from `lg` (A26). */
-export const STAT_COLUMNS = { sm: 3, lg: 5 } as const satisfies StatCardRowColumns;
+/**
+ * The Overview's five stat cards (Vacant, its own section, is the fifth): a
+ * swipe row on phones, three a row, all five from `xl`. Not from `lg`: at
+ * 1200px a lakh-sized figure ("₹2,31,260.00") doesn't fit a fifth of the row (A26).
+ */
+export const STAT_COLUMNS = { sm: 3, xl: 5 } as const satisfies StatCardRowColumns;
 
 // Direction of the last month vs the one before, for sparkline colouring.
 function trendOf(values: number[]): Trend {
@@ -82,7 +86,8 @@ export default async function MonthStats({
         title="Tenants overdue"
         icon={<PeopleAltRoundedIcon />}
         value={String(report.overdueTenantCount)}
-        caption="With at least one month past due"
+        // As of today, like Outstanding, whatever month the bar shows.
+        caption="Behind on rent to the end of last month"
         href={routes.tenants.list({ show: "overdue" })}
         badge={
           report.overdueTenantCount > 0

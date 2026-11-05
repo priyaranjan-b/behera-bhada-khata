@@ -23,7 +23,7 @@ export const OVERVIEW_SKELETONS = {
   vacant: <StatCardSkeleton />,
   trend: <ChartCardSkeleton />,
   // As the cards on phones (A26): all collapsible; the two to act on start open, the reference cards closed.
-  attention: <DetailCardSkeleton rows={4} collapseOnPhone startOpen />,
+  attention: <DetailCardSkeleton rows={4} action={false} collapseOnPhone startOpen />,
   defaulters: <DetailCardSkeleton rows={5} collapseOnPhone startOpen />,
   sites: <DetailCardSkeleton rows={3} collapseOnPhone />,
   tenantTypes: <ChartCardSkeleton height={220} collapseOnPhone />,

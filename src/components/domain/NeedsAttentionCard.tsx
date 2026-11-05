@@ -14,7 +14,14 @@ const NAMES_SHOWN = 4;
 /** Overview: housekeeping that needs the owner - drafts, missing documents, unsigned receipts, rent revisions. */
 export default function NeedsAttentionCard({ items }: { items: AttentionItem[] }) {
   return (
-    <SectionCard title="Needs attention" fill collapseOnPhone startOpen>
+    <SectionCard
+      title="Needs attention"
+      // In the heading, so a card closed on a phone still says there is something to do.
+      caption={items.length > 0 ? `${items.length} thing${items.length === 1 ? "" : "s"} to look at` : undefined}
+      fill
+      collapseOnPhone
+      startOpen
+    >
       {items.length === 0 ? (
         <EmptyState icon={<TaskAltRoundedIcon />} title="All caught up" description="Nothing needs your attention." />
       ) : (

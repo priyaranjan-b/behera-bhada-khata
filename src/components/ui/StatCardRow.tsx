@@ -13,6 +13,7 @@ export interface StatCardRowColumns {
   sm: number;
   md?: number;
   lg?: number;
+  xl?: number;
 }
 
 /**
@@ -42,7 +43,12 @@ export default function StatCardRow({
       tabIndex={swipes ? 0 : undefined}
       sx={{
         display: { xs: "flex", sm: "grid" },
-        gridTemplateColumns: { sm: template(columns.sm), md: template(columns.md), lg: template(columns.lg) },
+        gridTemplateColumns: {
+          sm: template(columns.sm),
+          md: template(columns.md),
+          lg: template(columns.lg),
+          xl: template(columns.xl),
+        },
         gap: { xs: GAP_XS, sm: 2 },
         // Phones: run to the screen edges past the page gutter, snapping card by card.
         overflowX: { xs: "auto", sm: "visible" },

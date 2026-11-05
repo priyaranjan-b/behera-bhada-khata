@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { usePathname } from "next/navigation";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -11,12 +12,13 @@ import { useTheme } from "@mui/material/styles";
 import { toneTintSx, type Tone } from "./tone";
 
 /**
- * Which collapsible cards the owner opened or closed on phones, by title: a
- * section keyed by its params (the Overview's month) remounts when they
- * change, and the card shouldn't snap back. In memory for the tab's life;
- * only ever written by a click, so the server's copy stays empty.
+ * Which collapsible cards the owner opened or closed on phones, by page and
+ * title: a section keyed by its params (the Overview's month) remounts when
+ * they change, and the card shouldn't snap back. In memory for the tab's life.
+ * Only a click writes it (never render or an effect), so the server's copy,
+ * shared by every request, stays empty and a fresh load hydrates cleanly.
  */
-const phoneOpenByTitle = new Map<string, boolean>();
+const phoneOpenByCard = new Map<string, boolean>();
 
 /**
  * The one card-with-a-heading used across forms, summaries and detail panels:
@@ -60,12 +62,14 @@ export function SectionCard({
 }) {
   const headingId = useId();
   const bodyId = useId();
-  const [open, setOpenState] = useState(() => phoneOpenByTitle.get(title) ?? startOpen);
-  const toggle = () =>
-    setOpenState((o) => {
-      phoneOpenByTitle.set(title, !o);
-      return !o;
-    });
+  // The same title on another page is another card.
+  const cardKey = `${usePathname()} ${title}`;
+  const [open, setOpen] = useState(() => (collapseOnPhone ? (phoneOpenByCard.get(cardKey) ?? startOpen) : false));
+  const toggle = () => {
+    const next = !open;
+    phoneOpenByCard.set(cardKey, next);
+    setOpen(next);
+  };
   // The title is a tap target on phones only: on a wider screen the body is always shown.
   const phoneQuery = useTheme().breakpoints.down("sm").replace(/^@media\s*/, "");
   const toggleFromTitle = () => {
@@ -81,7 +85,8 @@ export function SectionCard({
     >
       <Stack spacing={2}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Stack direction="row" spacing={tone ? 1.5 : 1} sx={{ alignItems: "center", minWidth: 0 }}>
+          {/* A collapsible card's heading fills the row, so a tap anywhere left of the chevron toggles it. */}
+          <Stack direction="row" spacing={tone ? 1.5 : 1} sx={{ alignItems: "center", minWidth: 0, flex: collapseOnPhone ? 1 : undefined }}>
             {icon && tone ? (
               <IconTile icon={icon} tone={tone} look="tinted" size="compact" />
             ) : icon ? (
@@ -94,9 +99,10 @@ export function SectionCard({
               </Box>
             ) : null}
             <Box
-              // Tapping the title works too (the chevron is the accessible control); phones only.
+              // A pointer and touch convenience on phones; the chevron stays the one accessible control
+              // (the title gets no role or tab stop, so keyboard users have a single focus stop).
               onClick={collapseOnPhone ? toggleFromTitle : undefined}
-              sx={[{ minWidth: 0 }, collapseOnPhone && { cursor: { xs: "pointer", sm: "auto" } }]}
+              sx={[{ minWidth: 0 }, collapseOnPhone && { flex: 1, cursor: { xs: "pointer", sm: "auto" } }]}
             >
               <Typography id={headingId} component="h2" variant="subtitle2">
                 {title}
