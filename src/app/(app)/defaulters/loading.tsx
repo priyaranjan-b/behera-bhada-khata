@@ -1,6 +1,6 @@
 import { PageHeaderSkeleton, PageSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
 import StatCardRow from "@/components/ui/StatCardRow";
-import { DEFAULTER_STAT_COLUMNS } from "./defaulterStatCell";
+import { DEFAULTER_STAT_COLUMNS } from "./defaulterStatColumns";
 
 export default function DefaultersLoading() {
   return (

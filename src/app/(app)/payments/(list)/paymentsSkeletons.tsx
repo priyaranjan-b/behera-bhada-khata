@@ -1,7 +1,7 @@
 import Stack from "@mui/material/Stack";
 import { ContextBarSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
 import StatCardRow from "@/components/ui/StatCardRow";
-import { PAYMENT_STAT_COLUMNS } from "./paymentStatCell";
+import { PAYMENT_STAT_COLUMNS } from "./paymentStatColumns";
 
 /**
  * The placeholder for each Payments section, sized like its cards: page.tsx

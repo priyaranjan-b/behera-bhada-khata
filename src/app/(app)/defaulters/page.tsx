@@ -8,7 +8,7 @@ import StatCard from "@/components/ui/StatCard";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import DefaultersList from "./DefaultersList";
 import StatCardRow from "@/components/ui/StatCardRow";
-import { DEFAULTER_STAT_COLUMNS } from "./defaulterStatCell";
+import { DEFAULTER_STAT_COLUMNS } from "./defaulterStatColumns";
 
 const tenants = (n: number) => `${n} tenant${n === 1 ? "" : "s"}`;
 

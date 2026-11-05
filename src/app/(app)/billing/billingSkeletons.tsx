@@ -12,7 +12,7 @@ export const BILLING_SKELETONS = {
       <ContextBarSkeleton />
     </>
   ),
-  // Billed, Collected, Balance: three stat-card grid cells.
+  // Billed, Collected, Balance: three cards of the stat row (Received is the fourth).
   stats: [0, 1, 2].map((i) => (
     <StatCardSkeleton key={i} />
   )),

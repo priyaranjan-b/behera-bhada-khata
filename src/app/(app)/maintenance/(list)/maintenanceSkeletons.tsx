@@ -1,6 +1,6 @@
 import Stack from "@mui/material/Stack";
 import { ContextBarSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
-import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatCell";
+import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
 
 /** The Maintenance page's placeholders, sized like its cards: page.tsx's fallback and loading.tsx (A12). */

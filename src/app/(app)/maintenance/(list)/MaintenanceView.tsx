@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
-import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
 import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
@@ -37,7 +36,7 @@ import {
 import type { DayRange } from "@/lib/domain/payments";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
-import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatCell";
+import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
 
 const tagsOf = (row: MaintenanceListRow) => row.tags;

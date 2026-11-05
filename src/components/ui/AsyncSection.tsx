@@ -11,6 +11,7 @@ export default function AsyncSection({
   title,
   fallback,
   silent,
+  wide,
   children,
 }: {
   /** Heading of the error card. */
@@ -18,10 +19,12 @@ export default function AsyncSection({
   fallback: React.ReactNode;
   /** On error render nothing (header widgets) instead of an error card. */
   silent?: boolean;
+  /** Its children are several cards of a `StatCardRow`: on error, one card across the whole row. */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <CardErrorBoundary title={title} silent={silent}>
+    <CardErrorBoundary title={title} silent={silent} wide={wide}>
       <Suspense fallback={fallback}>{children}</Suspense>
     </CardErrorBoundary>
   );

@@ -70,7 +70,7 @@ export default async function BillingPage({
       />
 
       <StatCardRow columns={BILLING_STAT_COLUMNS} label="Billing totals">
-        <AsyncSection key={`stats-${view}`} title="Billing totals" fallback={SKELETON.stats}>
+        <AsyncSection key={`stats-${view}`} title="Billing totals" fallback={SKELETON.stats} wide>
           <BillingStats totals={totals} rangeLabel={rangeLabel} />
         </AsyncSection>
         <AsyncSection key={`received-${view}`} title="Received" fallback={SKELETON.received}>

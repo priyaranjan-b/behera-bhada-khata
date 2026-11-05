@@ -50,6 +50,8 @@ export default function StatCardRow({
         scrollbarWidth: "none",
         "&::-webkit-scrollbar": { display: "none" },
         "& > *": { flex: { xs: "0 0 auto" }, width: { xs: "42%", sm: "auto" }, minWidth: { xs: 148, sm: 0 }, scrollSnapAlign: "start" },
+        // A failed multi-card section's error card (`AsyncSection wide`) takes the whole row.
+        "& > [data-span='row']": { gridColumn: "1 / -1", width: "100%" },
       }}
     >
       {children}

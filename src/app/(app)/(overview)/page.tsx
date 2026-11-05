@@ -68,7 +68,7 @@ export default async function DashboardPage({
         </>
       }
       stats={
-        <AsyncSection key={monthView} title="This month" fallback={SKELETON.stats}>
+        <AsyncSection key={monthView} title="This month" fallback={SKELETON.stats} wide>
           <MonthStats month={monthData} trend={trend} />
         </AsyncSection>
       }

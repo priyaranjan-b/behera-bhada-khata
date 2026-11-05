@@ -933,5 +933,6 @@ took four rows above the table and now take one, and four cards take one row
 instead of two. Each page sets its columns per breakpoint in one constant
 (`STAT_COLUMNS`, `BILLING_STAT_COLUMNS`, `PAYMENT_STAT_COLUMNS`, ...), shared
 with its skeletons; a section that streams several cards returns them bare and
-they join the row (an `AsyncSection` adds no element). The tenant page's
+they join the row (an `AsyncSection` adds no element); it is `wide`, so if
+it fails its one error card spans the row instead of leaving a gap. The tenant page's
 account figures stay a two-a-row grid: they sit in the record header.

@@ -34,7 +34,7 @@ import { PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/dom
 import { formatMoney, round2 } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
-import { PAYMENT_STAT_COLUMNS } from "./paymentStatCell";
+import { PAYMENT_STAT_COLUMNS } from "./paymentStatColumns";
 
 const tagsOf = (row: PaymentListRow) => row.tags;
 /** The database filters on the label the column shows. */

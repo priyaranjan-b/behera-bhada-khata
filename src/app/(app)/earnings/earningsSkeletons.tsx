@@ -1,6 +1,6 @@
 import Stack from "@mui/material/Stack";
 import { ContextBarSkeleton, ChartCardSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
-import { EARNINGS_STAT_COLUMNS } from "./earningsStatCell";
+import { EARNINGS_STAT_COLUMNS } from "./earningsStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
 
 /** The Earnings page's placeholders, sized like its cards: page.tsx's fallback and loading.tsx (A12). */

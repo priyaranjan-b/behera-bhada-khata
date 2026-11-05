@@ -10,7 +10,7 @@ import PieChartRoundedIcon from "@mui/icons-material/PieChartRounded";
 import StatCard from "@/components/ui/StatCard";
 import EarningsChart from "@/components/domain/EarningsChart";
 import EarningsTable from "../EarningsTable";
-import { EARNINGS_STAT_COLUMNS } from "../earningsStatCell";
+import { EARNINGS_STAT_COLUMNS } from "../earningsStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
 
 /** A net's icon and colour: green and rising, or red, falling and marked when it's a loss. */
