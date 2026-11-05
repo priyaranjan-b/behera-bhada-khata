@@ -1,4 +1,3 @@
-import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { formatMonth, lastMonthKey, yearMonthOf } from "@/lib/dates";
@@ -14,8 +13,9 @@ import { PageHeader } from "@/components/ui/DataDisplay";
 import MonthRangeForm from "@/components/ui/MonthRangeForm";
 import { BILLING_SKELETONS as SKELETON } from "./billingSkeletons";
 import BillingGridSection from "./sections/BillingGridSection";
-import BillingStats, { BILLING_STAT_CELL } from "./sections/BillingStats";
+import BillingStats, { BILLING_STAT_COLUMNS } from "./sections/BillingStats";
 import ReceivedStat from "./sections/ReceivedStat";
+import StatCardRow from "@/components/ui/StatCardRow";
 
 // The page loads in sections (A12): the range comes straight from the URL, so
 // the header, the range form and the switch render at once; the totals, the
@@ -69,16 +69,14 @@ export default async function BillingPage({
         resetHref={routes.billing()}
       />
 
-      <Grid container spacing={2} columns={12}>
-        <AsyncSection key={view} title="Billing totals" fallback={SKELETON.stats}>
+      <StatCardRow columns={BILLING_STAT_COLUMNS} label="Billing totals">
+        <AsyncSection key={`stats-${view}`} title="Billing totals" fallback={SKELETON.stats}>
           <BillingStats totals={totals} rangeLabel={rangeLabel} />
         </AsyncSection>
-        <Grid size={BILLING_STAT_CELL}>
-          <AsyncSection key={view} title="Received" fallback={SKELETON.received}>
-            <ReceivedStat received={received} months={months} />
-          </AsyncSection>
-        </Grid>
-      </Grid>
+        <AsyncSection key={`received-${view}`} title="Received" fallback={SKELETON.received}>
+          <ReceivedStat received={received} months={months} />
+        </AsyncSection>
+      </StatCardRow>
 
       <AsyncSection key={view} title="Billing" fallback={SKELETON.grid}>
         <BillingGridSection grid={grid} query={query} rangeLabel={rangeLabel} />

@@ -1,4 +1,3 @@
-import Grid from "@mui/material/Grid";
 import {
   ChartCardSkeleton,
   ContextBarSkeleton,
@@ -6,7 +5,6 @@ import {
   PageHeaderSkeleton,
   StatCardSkeleton,
 } from "@/components/ui/Skeletons";
-import { STAT_CELL } from "./sections/MonthStats";
 
 /**
  * The placeholder for each OverviewLayout slot, sized like the card it
@@ -20,13 +18,8 @@ export const OVERVIEW_SKELETONS = {
       <ContextBarSkeleton />
     </>
   ),
-  // Three stat-card grid cells; the Vacant slot is already a cell.
-  stats: Array.from({ length: 3 }, (_, i) => (
-    <Grid key={i} size={STAT_CELL}>
-      {/* Billed and Collected carry a sparkline. */}
-      <StatCardSkeleton sparkline={i < 2} />
-    </Grid>
-  )),
+  // Three stat cards (Vacant is the fourth); Billed and Collected carry a sparkline.
+  stats: Array.from({ length: 3 }, (_, i) => <StatCardSkeleton key={i} sparkline={i < 2} />),
   vacant: <StatCardSkeleton />,
   trend: <ChartCardSkeleton />,
   attention: <DetailCardSkeleton rows={4} />,

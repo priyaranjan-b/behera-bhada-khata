@@ -1,11 +1,12 @@
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
-import { STAT_CELL } from "./sections/MonthStats";
+import { STAT_COLUMNS } from "./sections/MonthStats";
+import StatCardRow from "@/components/ui/StatCardRow";
 
 /**
  * Where each Overview section goes. The page fills the slots with streamed
  * sections and loading.tsx with their skeletons, so the two can't drift (A12).
- * `stats` is three stat-card grid cells (Vacant is the fourth); every other slot is one card.
+ * `stats` is three stat cards in the stat row (Vacant is the fourth); every other slot is one card.
  */
 export default function OverviewLayout(slots: {
   header: React.ReactNode;
@@ -21,10 +22,10 @@ export default function OverviewLayout(slots: {
   return (
     <Stack spacing={2}>
       {slots.header}
-      <Grid container spacing={2} columns={12}>
+      <StatCardRow columns={STAT_COLUMNS} label="This month's figures">
         {slots.stats}
-        <Grid size={STAT_CELL}>{slots.vacant}</Grid>
-      </Grid>
+        {slots.vacant}
+      </StatCardRow>
       <Grid container spacing={2} columns={12}>
         <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0 }}>
           {slots.trend}

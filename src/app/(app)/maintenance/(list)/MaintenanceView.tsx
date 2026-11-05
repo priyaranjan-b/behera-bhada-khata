@@ -37,7 +37,8 @@ import {
 import type { DayRange } from "@/lib/domain/payments";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
-import { MAINTENANCE_STAT_CELL } from "./maintenanceStatCell";
+import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatCell";
+import StatCardRow from "@/components/ui/StatCardRow";
 
 const tagsOf = (row: MaintenanceListRow) => row.tags;
 /** The database filters on the labels the columns show. */
@@ -194,58 +195,50 @@ export default function MaintenanceView({
 
   return (
     <Stack spacing={2}>
-      <Grid container spacing={2} columns={12}>
-        <Grid size={MAINTENANCE_STAT_CELL}>
-          <StatCard
-            title="Spent"
-            icon={<HandymanRoundedIcon />}
-            tone="primary"
-            variant="gradient"
-            value={formatMoney(totals.amount)}
-            caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
-              totals.cash < totals.amount ? ` · ${formatMoney(totals.amount - totals.cash)} by set-off` : ""
-            }`}
-          />
-        </Grid>
-        <Grid size={MAINTENANCE_STAT_CELL}>
-          <StatCard
-            title={categories[0] ? `Most on ${categories[0].label}` : "Biggest category"}
-            icon={<CategoryRoundedIcon />}
-            value={formatMoney(categories[0]?.amount ?? 0)}
-            caption={
-              categories[1]
-                ? `Then ${categories[1].label}: ${formatMoney(categories[1].amount)}`
-                : shareOf(categories[0]?.amount ?? 0, totals.amount)
-            }
-          />
-        </Grid>
-        <Grid size={MAINTENANCE_STAT_CELL}>
-          <StatCard
-            title={topPayer ? `Paid by ${topPayer.name}` : "Paid by"}
-            icon={<PersonRoundedIcon />}
-            value={formatMoney(topPayer?.amount ?? 0)}
-            caption={
-              otherPayers.length > 0
-                ? otherPayers
-                    .slice(0, 2)
-                    .map((p) => `${p.name} ${formatMoney(p.amount)}`)
-                    .join(" · ")
-                : topPayer
-                  ? shareOf(topPayer.amount, totals.amount)
-                  : "No one tagged yet"
-            }
-          />
-        </Grid>
-        <Grid size={MAINTENANCE_STAT_CELL}>
-          <StatCard
-            title="Payer not tagged"
-            icon={<LabelOffRoundedIcon />}
-            tone={totals.untagged > 0 ? "warning" : "neutral"}
-            value={formatMoney(totals.untagged)}
-            caption={shareOf(totals.untagged, totals.amount)}
-          />
-        </Grid>
-      </Grid>
+      <StatCardRow columns={MAINTENANCE_STAT_COLUMNS} label="Maintenance totals">
+        <StatCard
+          title="Spent"
+          icon={<HandymanRoundedIcon />}
+          tone="primary"
+          variant="gradient"
+          value={formatMoney(totals.amount)}
+          caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
+            totals.cash < totals.amount ? ` · ${formatMoney(totals.amount - totals.cash)} by set-off` : ""
+          }`}
+        />
+        <StatCard
+          title={categories[0] ? `Most on ${categories[0].label}` : "Biggest category"}
+          icon={<CategoryRoundedIcon />}
+          value={formatMoney(categories[0]?.amount ?? 0)}
+          caption={
+            categories[1]
+              ? `Then ${categories[1].label}: ${formatMoney(categories[1].amount)}`
+              : shareOf(categories[0]?.amount ?? 0, totals.amount)
+          }
+        />
+        <StatCard
+          title={topPayer ? `Paid by ${topPayer.name}` : "Paid by"}
+          icon={<PersonRoundedIcon />}
+          value={formatMoney(topPayer?.amount ?? 0)}
+          caption={
+            otherPayers.length > 0
+              ? otherPayers
+                  .slice(0, 2)
+                  .map((p) => `${p.name} ${formatMoney(p.amount)}`)
+                  .join(" · ")
+              : topPayer
+                ? shareOf(topPayer.amount, totals.amount)
+                : "No one tagged yet"
+          }
+        />
+        <StatCard
+          title="Payer not tagged"
+          icon={<LabelOffRoundedIcon />}
+          tone={totals.untagged > 0 ? "warning" : "neutral"}
+          value={formatMoney(totals.untagged)}
+          caption={shareOf(totals.untagged, totals.amount)}
+        />
+      </StatCardRow>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
       <DataTable<MaintenanceListRow>

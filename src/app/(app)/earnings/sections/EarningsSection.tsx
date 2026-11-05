@@ -1,4 +1,3 @@
-import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import type { EarningsView } from "@/lib/contracts";
 import { formatMoney } from "@/lib/money";
@@ -11,7 +10,8 @@ import PieChartRoundedIcon from "@mui/icons-material/PieChartRounded";
 import StatCard from "@/components/ui/StatCard";
 import EarningsChart from "@/components/domain/EarningsChart";
 import EarningsTable from "../EarningsTable";
-import { EARNINGS_STAT_CELL } from "../earningsStatCell";
+import { EARNINGS_STAT_COLUMNS } from "../earningsStatCell";
+import StatCardRow from "@/components/ui/StatCardRow";
 
 /** A net's icon and colour: green and rising, or red, falling and marked when it's a loss. */
 function netLook(net: number, profitVariant: "default" | "gradient" = "default") {
@@ -26,48 +26,36 @@ export default async function EarningsSection({ earnings, rangeLabel }: { earnin
   const bySetOff = t.maintenance - t.maintenanceCash;
   return (
     <Stack spacing={2}>
-      <Grid container spacing={2} columns={12}>
-        <Grid size={EARNINGS_STAT_CELL}>
-          <StatCard title="Collected" icon={<SavingsRoundedIcon />} tone="primary" value={formatMoney(t.collected)} caption={`Rent for these months, of ${formatMoney(t.billed)} billed`} />
-        </Grid>
-        <Grid size={EARNINGS_STAT_CELL}>
-          <StatCard title="Received" icon={<PaymentsRoundedIcon />} tone="primary" value={formatMoney(t.received)} caption="Cash that came in these months" />
-        </Grid>
-        <Grid size={EARNINGS_STAT_CELL}>
-          <StatCard
-            title="Maintenance"
-            icon={<HandymanRoundedIcon />}
-            value={formatMoney(t.maintenance)}
-            caption={bySetOff > 0 ? `${formatMoney(t.maintenanceCash)} in cash · ${formatMoney(bySetOff)} by set-off` : "Spent on the houses"}
-          />
-        </Grid>
-        <Grid size={EARNINGS_STAT_CELL}>
-          <StatCard
-            title="Net (rent month)"
-            value={formatMoney(t.netCollected)}
-            caption="Collected − maintenance"
-            badge={t.netCollected < 0 ? { label: "Loss", tone: "danger" } : undefined}
-            {...netLook(t.netCollected)}
-          />
-        </Grid>
-        <Grid size={EARNINGS_STAT_CELL}>
-          <StatCard
-            title="Net cash"
-            value={formatMoney(t.netCash)}
-            caption="Received − maintenance paid in cash"
-            badge={t.netCash < 0 ? { label: "Loss", tone: "danger" } : undefined}
-            {...netLook(t.netCash, "gradient")}
-          />
-        </Grid>
-        <Grid size={EARNINGS_STAT_CELL}>
-          <StatCard
-            title="Spent of collected"
-            icon={<PieChartRoundedIcon />}
-            value={t.expenseRatio === null ? "—" : `${t.expenseRatio}%`}
-            caption="Maintenance ÷ rent collected"
-          />
-        </Grid>
-      </Grid>
+      <StatCardRow columns={EARNINGS_STAT_COLUMNS} label="Earnings totals">
+        <StatCard title="Collected" icon={<SavingsRoundedIcon />} tone="primary" value={formatMoney(t.collected)} caption={`Rent for these months, of ${formatMoney(t.billed)} billed`} />
+        <StatCard title="Received" icon={<PaymentsRoundedIcon />} tone="primary" value={formatMoney(t.received)} caption="Cash that came in these months" />
+        <StatCard
+          title="Maintenance"
+          icon={<HandymanRoundedIcon />}
+          value={formatMoney(t.maintenance)}
+          caption={bySetOff > 0 ? `${formatMoney(t.maintenanceCash)} in cash · ${formatMoney(bySetOff)} by set-off` : "Spent on the houses"}
+        />
+        <StatCard
+          title="Net (rent month)"
+          value={formatMoney(t.netCollected)}
+          caption="Collected − maintenance"
+          badge={t.netCollected < 0 ? { label: "Loss", tone: "danger" } : undefined}
+          {...netLook(t.netCollected)}
+        />
+        <StatCard
+          title="Net cash"
+          value={formatMoney(t.netCash)}
+          caption="Received − maintenance paid in cash"
+          badge={t.netCash < 0 ? { label: "Loss", tone: "danger" } : undefined}
+          {...netLook(t.netCash, "gradient")}
+        />
+        <StatCard
+          title="Spent of collected"
+          icon={<PieChartRoundedIcon />}
+          value={t.expenseRatio === null ? "—" : `${t.expenseRatio}%`}
+          caption="Maintenance ÷ rent collected"
+        />
+      </StatCardRow>
       <EarningsChart months={months} />
       <EarningsTable months={months} rangeLabel={rangeLabel} />
     </Stack>

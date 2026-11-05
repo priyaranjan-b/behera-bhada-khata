@@ -927,5 +927,11 @@ are hidden, reordered or scrolled sideways.
 one-line title, a caption of two lines at most). `StatCardRow`
 (`src/components/ui/StatCardRow.tsx`) lays a page's cards out as one
 swipeable row on phones, each card ~42% wide so the next one peeks in, and as
-a grid from `sm` up. Payments uses it: seven cards took four rows above the
-table and now take one. Pages with four cards or fewer keep the two-a-row grid.
+a grid from `sm` up. Every page with a row of stat cards uses it (Overview,
+Billing, Payments, Earnings, Maintenance, Defaulters): on Payments seven cards
+took four rows above the table and now take one, and four cards take one row
+instead of two. Each page sets its columns per breakpoint in one constant
+(`STAT_COLUMNS`, `BILLING_STAT_COLUMNS`, `PAYMENT_STAT_COLUMNS`, ...), shared
+with its skeletons; a section that streams several cards returns them bare and
+they join the row (an `AsyncSection` adds no element). The tenant page's
+account figures stay a two-a-row grid: they sit in the record header.

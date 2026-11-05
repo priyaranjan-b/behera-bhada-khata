@@ -609,7 +609,9 @@ Each of these was found broken somewhere; keep them when adding code.
   hand. Date and month fields are
   as tall as every other field (`MuiPickersOutlinedInput` in `app.ts`).
   One-tap choices under a field (Today/Yesterday, the first five tag
-  suggestions, which toggle) are the kit's `QuickPicks`. A destructive button is
+  suggestions, which toggle) are the kit's `QuickPicks`. A row of stat
+  cards is a `StatCardRow` (one swipe row on phones, a grid of `columns`
+  from `sm`; A26), never a hand-made `Grid` of `StatCard`s. A destructive button is
   `variant="outlined" color="error"` (red via the theme variant in `app.ts`;
   the template's outlined style alone greys it).
 - Payments (`/payments`, A18, `src/server/services/paymentsReport.ts`):

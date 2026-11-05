@@ -1,2 +1,4 @@
-/** Grid cell of one Maintenance stat card: two a row on phones, four on wide screens. */
-export const MAINTENANCE_STAT_CELL = { xs: 6, md: 3 } as const;
+import type { StatCardRowColumns } from "@/components/ui/StatCardRow";
+
+/** The Maintenance stat cards: a swipe row on phones, two a row, four on wide screens (A26). */
+export const MAINTENANCE_STAT_COLUMNS = { sm: 2, md: 4 } as const satisfies StatCardRowColumns;

@@ -1,4 +1,4 @@
-import Grid from "@mui/material/Grid";
+import type { StatCardRowColumns } from "@/components/ui/StatCardRow";
 import type { OverviewMonth, OverviewTrend } from "@/lib/contracts";
 import { formatMonth, yearMonthOf } from "@/lib/dates";
 import { collectionRateTone } from "@/lib/domain/overview";
@@ -10,8 +10,8 @@ import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
 
-/** Grid cell of one stat card: four in a row from `md` (Vacant, its own section, is the fourth), two on phones. */
-export const STAT_CELL = { xs: 6, md: 3 } as const;
+/** The Overview stat cards (Vacant, its own section, is the fourth): a swipe row on phones, two a row, four from `md` (A26). */
+export const STAT_COLUMNS = { sm: 2, md: 4 } as const satisfies StatCardRowColumns;
 
 // Direction of the last month vs the one before, for sparkline colouring.
 function trendOf(values: number[]): Trend {
@@ -25,7 +25,7 @@ function sparklineFor(trend: MonthlyTrendPoint[], key: "billed" | "collected") {
   return { data, labels: trend.map((p) => p.label), trend: trendOf(data), format: "money" as const };
 }
 
-/** Overview: Expected, Collected and Outstanding - three grid cells (Vacant, its own section, makes four). */
+/** Overview: Expected, Collected and Outstanding - three cards in the stat row (Vacant, its own section, makes four). */
 export default async function MonthStats({
   month,
   trend,
@@ -45,44 +45,38 @@ export default async function MonthStats({
 
   return (
     <>
-      <Grid size={STAT_CELL}>
-        <StatCard
-          title="Expected"
-          icon={<ReceiptLongRoundedIcon />}
-          value={formatMoney(report.expected)}
-          caption={`Rent due for ${monthLabel}`}
-          badge={{ label: `${activeTenants} tenant${activeTenants === 1 ? "" : "s"}`, tone: "info" }}
-          sparkline={sparklineFor(points, "billed")}
-          href={monthBilling}
-        />
-      </Grid>
-      <Grid size={STAT_CELL}>
-        <StatCard
-          title="Collected"
-          icon={<SavingsRoundedIcon />}
-          value={formatMoney(report.collected)}
-          caption={`For ${monthLabel}'s rent`}
-          note={received === undefined ? undefined : `${formatMoney(received)} received in the month`}
-          badge={
-            collectionRate === null
-              ? undefined
-              : { label: `${collectionRate}%`, tone: collectionRateTone(collectionRate) }
-          }
-          sparkline={sparklineFor(points, "collected")}
-          href={monthBilling}
-        />
-      </Grid>
-      <Grid size={STAT_CELL}>
-        <StatCard
-          title="Outstanding"
-          icon={<PendingActionsRoundedIcon />}
-          variant={report.outstanding > 0 ? "highlighted" : "default"}
-          value={formatMoney(report.outstanding)}
-          caption="Rent unpaid to the end of last month"
-          badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
-          href={routes.defaulters}
-        />
-      </Grid>
+      <StatCard
+        title="Expected"
+        icon={<ReceiptLongRoundedIcon />}
+        value={formatMoney(report.expected)}
+        caption={`Rent due for ${monthLabel}`}
+        badge={{ label: `${activeTenants} tenant${activeTenants === 1 ? "" : "s"}`, tone: "info" }}
+        sparkline={sparklineFor(points, "billed")}
+        href={monthBilling}
+      />
+      <StatCard
+        title="Collected"
+        icon={<SavingsRoundedIcon />}
+        value={formatMoney(report.collected)}
+        caption={`For ${monthLabel}'s rent`}
+        note={received === undefined ? undefined : `${formatMoney(received)} received in the month`}
+        badge={
+          collectionRate === null
+            ? undefined
+            : { label: `${collectionRate}%`, tone: collectionRateTone(collectionRate) }
+        }
+        sparkline={sparklineFor(points, "collected")}
+        href={monthBilling}
+      />
+      <StatCard
+        title="Outstanding"
+        icon={<PendingActionsRoundedIcon />}
+        variant={report.outstanding > 0 ? "highlighted" : "default"}
+        value={formatMoney(report.outstanding)}
+        caption="Rent unpaid to the end of last month"
+        badge={report.outstanding > 0 ? { label: "To collect", tone: "warning" } : { label: "All clear", tone: "success" }}
+        href={routes.defaulters}
+      />
     </>
   );
 }

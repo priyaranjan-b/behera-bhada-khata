@@ -1,6 +1,5 @@
-import Grid from "@mui/material/Grid";
 import { ContextBarSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
-import { BILLING_STAT_CELL } from "./sections/BillingStats";
+import { BILLING_STAT_COLUMNS } from "./sections/BillingStats";
 
 /**
  * The placeholder for each Billing section, sized like its card: page.tsx
@@ -15,9 +14,7 @@ export const BILLING_SKELETONS = {
   ),
   // Billed, Collected, Balance: three stat-card grid cells.
   stats: [0, 1, 2].map((i) => (
-    <Grid key={i} size={BILLING_STAT_CELL}>
-      <StatCardSkeleton />
-    </Grid>
+    <StatCardSkeleton key={i} />
   )),
   received: <StatCardSkeleton />,
   grid: <PanelSkeleton />,
