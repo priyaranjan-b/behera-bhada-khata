@@ -23,6 +23,9 @@ is in `ap-south-1` (Mumbai). Production URL: `https://myrenthq.vercel.app`
 **Why.** Every page makes several database round-trips; a function in the
 default US region adds ~200 ms to each. The daily cron
 (`/api/cron/ensure-periods`, 03:00 UTC) is in the same file.
+Only `main` deploys (`git.deploymentEnabled`: `"**": false, "main": true`;
+`**` so branches with a slash match too): no preview deployment per PR
+branch, since CI (`.github/workflows/ci.yml`) already builds every PR.
 
 **Notes.**
 - Supabase **asymmetric JWT signing keys** are recommended: sessions are then
