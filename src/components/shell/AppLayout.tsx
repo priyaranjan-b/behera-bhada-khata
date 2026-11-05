@@ -7,6 +7,7 @@ import { AppNavbar } from "@/components/shell/AppNavbar";
 import { MOBILE_NAVBAR_HEIGHT } from "@/components/shell/nav";
 import { Header } from "@/components/shell/Header";
 import { AppBreadcrumbs } from "@/components/shell/AppBreadcrumbs";
+import { appCanvasSx } from "@/components/shell/surface";
 import type { AppTab } from "@/components/shell/nav";
 
 export type { AppTab } from "@/components/shell/nav";
@@ -60,7 +61,7 @@ export default function AppLayout({
         component="main"
         id="main-content"
         tabIndex={-1}
-        sx={{ flexGrow: 1, minWidth: 0, bgcolor: "background.default", outline: "none" }}
+        sx={[{ flexGrow: 1, minWidth: 0, outline: "none" }, appCanvasSx]}
       >
         <Header />
         <Stack

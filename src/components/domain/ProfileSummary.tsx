@@ -6,6 +6,7 @@ import Typography from "@mui/material/Typography";
 import AppCard from "@/components/ui/AppCard";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import { toneMain } from "@/components/ui/tone";
+import { lightStyles } from "@/theme/glass";
 import { OwnerAvatar } from "@/components/shell/OwnerMenu";
 import type { OwnerProfileView } from "@/lib/contracts";
 
@@ -26,7 +27,7 @@ export default function ProfileSummary({ profile }: { profile: OwnerProfileView 
           p: { xs: 2, sm: 3 },
           backgroundImage: wash(16),
           // The raised card's light-scheme background is set per scheme, so the wash must be too.
-          ...theme.applyStyles("light", { backgroundImage: wash(18) }),
+          ...lightStyles(theme, { backgroundImage: wash(18) }),
         };
       }}
     >
