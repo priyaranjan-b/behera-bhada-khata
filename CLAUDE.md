@@ -87,7 +87,7 @@ test instead.
   and Profile (the person) vs Settings (the shared lists, A25), and money
   tables' footer totals and the phone swipe row of stat cards (A26), and old
   confirm links and password changes (A27), and every figure linking to
-  its source data (A28). Read it before changing
+  its source data (A28), and the Glass skin (A29). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -531,7 +531,9 @@ Each of these was found broken somewhere; keep them when adding code.
   Avatar `soft`, touch targets, global tabular numbers) and
   `src/theme/appTokens.ts` (slate ramp; light-mode depth layers: slate
   `background.default` canvas, white `background.paper` for cards/header/side
-  menu, `#E2E8F0` dividers, `#F8FAFC` grid-row hover). Light + dark schemes
+  menu, `#E2E8F0` dividers, `#F8FAFC` grid-row hover). Light + dark schemes, plus the Glass
+  skin (A29: dark + `data-app-skin`; its rules via `glassSkin` in
+  `src/theme/skin.ts`, theme-wide ones in `customizations/glass.ts`)
   via CSS variables, so never read `theme.palette.*` in JS for colours — use
   `sx` palette keys or `theme.vars`.
 - Components: `src/components/ui/` = presentational primitives

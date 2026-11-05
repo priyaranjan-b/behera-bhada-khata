@@ -6,6 +6,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
 import { brand } from "@/theme/themePrimitives";
+import { glassSkin } from "@/theme/skin";
 
 const WIDTHS = { sm: 440, md: 520, lg: 1040 } as const;
 
@@ -51,6 +52,8 @@ export function PublicLayout({
               ...theme.applyStyles("dark", {
                 backgroundImage: `radial-gradient(at 50% 50%, color-mix(in srgb, ${brand[800]} 50%, transparent), ${(theme.vars || theme).palette.background.default})`,
               }),
+              // Glass: the glows on <body> are the backdrop.
+              ...glassSkin({ backgroundImage: "none" }),
             },
           }),
         ]}

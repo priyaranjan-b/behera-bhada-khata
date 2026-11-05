@@ -1,6 +1,7 @@
 import type { Theme } from "@mui/material/styles";
 import { brand } from "@/theme/themePrimitives";
-import { lightSurfaces } from "@/theme/appTokens";
+import { glass, lightSurfaces } from "@/theme/appTokens";
+import { glassPane, glassSkin } from "@/theme/skin";
 
 // The desktop side menu is a dark contrast column, like CoreUI's admin
 // layout, in both colour schemes - CoreUI's dark slate nudged towards the
@@ -30,15 +31,16 @@ const onChromeSx = {
   },
 } as const;
 
-/** Desktop side menu: the dark contrast column. */
+/** Desktop side menu: the dark contrast column (Glass: a see-through pane). */
 export const sideMenuSurfaceSx = (_theme: Theme) => ({
   ...onChromeSx,
   backgroundColor: SIDE_MENU_BG,
   backgroundImage: "none",
+  ...glassSkin({ ...glassPane, borderWidth: "0 1px 0 0", boxShadow: "none" }),
 });
 
 /** The band behind the logo at the top of the side menu. */
-export const sideMenuBrandBandSx = { backgroundColor: BRAND_BAND_BG } as const;
+export const sideMenuBrandBandSx = { backgroundColor: BRAND_BAND_BG, ...glassSkin({ backgroundColor: "transparent" }) } as const;
 
 // The top bars stay light: a faint indigo tint over the paper colour, between
 // the slate canvas and the white cards.
@@ -59,6 +61,7 @@ export const shellSurfaceSx = (theme: Theme) => {
     backgroundColor: tint.dark,
     backgroundImage: "none",
     ...theme.applyStyles("light", { backgroundColor: tint.light }),
+    ...glassSkin({ ...glassPane, borderWidth: "0 0 1px 0", boxShadow: "none" }),
   };
 };
 
@@ -80,5 +83,15 @@ export const topBarGlassSx = (theme: Theme, raised: boolean) => {
       backgroundColor: tint.light,
       boxShadow: raised ? "0 1px 0 rgba(15, 23, 42, 0.04), 0 10px 28px -14px rgba(30, 27, 75, 0.22)" : "none",
     }),
+    ...glassSkin({
+      backgroundColor: raised ? glass.popup : "transparent",
+      boxShadow: raised ? "0 10px 28px -14px rgba(0, 0, 0, 0.9)" : "none",
+    }),
   };
 };
+
+/** The page area behind the cards: the canvas colour, see-through under Glass to its glows on <body>. */
+export const appCanvasSx = {
+  bgcolor: "background.default",
+  ...glassSkin({ backgroundColor: "transparent" }),
+} as const;

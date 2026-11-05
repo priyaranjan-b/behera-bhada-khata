@@ -1,6 +1,7 @@
 import { gridClasses } from "@mui/x-data-grid";
 import type { Theme } from "@mui/material/styles";
-import { lightSurfaces, slate } from "@/theme/appTokens";
+import { glass, lightSurfaces, slate } from "@/theme/appTokens";
+import { glassSkin } from "@/theme/skin";
 import { embeddedIconButton } from "@/theme/embeddedIconButton";
 
 /** Row heights per density; `standard` fits an avatar + two-line identity cell. */
@@ -121,5 +122,17 @@ export const dataTableSx = (theme: Theme) => ({
   }),
   ...theme.applyStyles("dark", {
     [`& .${gridClasses.row}.odd`]: { backgroundColor: "rgba(255, 255, 255, 0.025)" },
+  }),
+  // Glass (A29): the grid shows its card's pane through it; no blur of its own.
+  ...glassSkin({
+    backgroundColor: "transparent",
+    "--DataGrid-containerBackground": "transparent",
+    "--DataGrid-pinnedBackground": glass.labelMask,
+    [`& .${gridClasses.columnHeader}`]: { backgroundColor: glass.inset },
+    [`& .${gridClasses.footerContainer}`]: { backgroundColor: "transparent" },
+    [`& .${gridClasses.row}`]: {
+      "&.odd": { backgroundColor: glass.rowStripe },
+      "&:hover": { backgroundColor: glass.rowHover },
+    },
   }),
 });
