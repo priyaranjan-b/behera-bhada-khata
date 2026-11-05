@@ -89,4 +89,38 @@ describe("changePassword", () => {
     await changePassword(ctx, { password: "long-enough", confirmPassword: "long-enough" });
     expect(fakes.auth.updatePassword).toHaveBeenCalledWith("long-enough");
   });
+
+  // S4 (docs/tech-debt.md): a stolen session mustn't be able to take over the password login.
+  describe("away from a fresh sign-in", () => {
+    const anHourAgo = () => Math.floor(Date.now() / 1000) - 60 * 60;
+    const change = { password: "long-enough", confirmPassword: "long-enough" };
+
+    it("needs the current password, and checks it against the owner's email", async () => {
+      fakes.auth.signedInAt.mockResolvedValue(anHourAgo());
+      await expect(changePassword(ctx, change)).rejects.toMatchObject({ status: 400 });
+      await expect(changePassword(ctx, { ...change, currentPassword: "a-wrong-guess" })).rejects.toMatchObject({
+        status: 400,
+        message: "Your current password isn't right",
+      });
+      expect(fakes.auth.updatePassword).not.toHaveBeenCalled();
+
+      await changePassword(ctx, { ...change, currentPassword: "correct-horse" });
+      expect(fakes.auth.signInWithPassword).toHaveBeenLastCalledWith("owner@example.com", "correct-horse");
+      expect(fakes.auth.updatePassword).toHaveBeenCalledWith("long-enough");
+    });
+
+    it("treats a session whose sign-in time can't be told as not fresh", async () => {
+      fakes.auth.signedInAt.mockResolvedValue(null);
+      await expect(changePassword(ctx, change)).rejects.toMatchObject({ status: 400 });
+      expect(fakes.auth.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it("rate-limits guesses at the current password per owner", async () => {
+      fakes.auth.signedInAt.mockResolvedValue(anHourAgo());
+      fakes.state.rateLimitAllows = false;
+      await expect(changePassword(ctx, { ...change, currentPassword: "correct-horse" })).rejects.toMatchObject({ status: 429 });
+      expect(fakes.auth.signInWithPassword).not.toHaveBeenCalled();
+      expect(fakes.auth.updatePassword).not.toHaveBeenCalled();
+    });
+  });
 });

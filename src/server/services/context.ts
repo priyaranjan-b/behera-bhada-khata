@@ -59,6 +59,7 @@ export async function enforceRateLimits(limits: RateLimit[]): Promise<void> {
 
 export const MINUTE = 60;
 export const HOUR = 60 * MINUTE;
+export const DAY = 24 * HOUR;
 
 /**
  * Every rate limit in one table. A route that costs money or sends email
@@ -77,6 +78,8 @@ export const RATE_LIMITS = {
   otpPerIp: { limit: 20, windowSeconds: HOUR },
   confirmPerRecord: { limit: 10, windowSeconds: HOUR },
   confirmPerIp: { limit: 30, windowSeconds: HOUR },
+  // Guesses at the current password when changing it (S4): a stolen session can't brute-force it.
+  passwordChangePerOwner: { limit: 5, windowSeconds: HOUR },
 } as const;
 
 /** Counts one owner API call against the owner's per-minute budget; 429 when it runs out (A17). */
@@ -88,6 +91,12 @@ export async function enforceOwnerRateLimit(ctx: OwnerContext): Promise<void> {
 export const SIGNED_URL_SECONDS = 5 * 60;
 /** The tenant-signed receipt link shown right after acknowledging: long enough to read and save it. */
 export const ACKNOWLEDGED_RECEIPT_URL_SECONDS = HOUR;
+/**
+ * How long a tenant's /confirm link keeps working after they acknowledge, to
+ * fetch their signed receipt again. After that a forwarded or old link shows
+ * nothing; the owner can still download and share the receipt.
+ */
+export const ACKNOWLEDGED_LINK_SECONDS = 14 * DAY;
 
 /**
  * An id from the URL that isn't a uuid can't exist: 404 here rather than a

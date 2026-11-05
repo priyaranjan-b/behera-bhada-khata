@@ -3,12 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { OwnerProfileView, SavedSignature } from "@/lib/contracts";
 import { ownerFullName } from "@/lib/domain/owner";
 import { ApiError } from "@/lib/errors";
-import { changePasswordSchema, ownerProfileSchema } from "@/lib/validation";
+import { changePasswordSchema, ownerProfileSchema, PASSWORD_LIMITS } from "@/lib/validation";
 import { auth, ownerDb, storage } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
 import { recordEvent } from "./audit";
 import { pngDataUrlToBytes } from "./confirmLinks";
-import { parseInput, SIGNED_URL_SECONDS, type OwnerContext } from "./context";
+import { enforceRateLimits, parseInput, RATE_LIMITS, SIGNED_URL_SECONDS, type OwnerContext } from "./context";
 
 // The owner's name and the signer's saved signature (owner_profile, 0013).
 // The owner (e.g. a parent) can be someone other than the person who uses
@@ -63,9 +63,28 @@ export async function updateOwnerProfile(ctx: OwnerContext, body: unknown): Prom
   if (oldPath && oldPath !== signaturePath) await storage.remove([oldPath]);
 }
 
-/** Sets the signed-in owner's password, for signing in without an email link. */
-export async function changePassword(_ctx: OwnerContext, body: unknown): Promise<void> {
-  const { password } = parseInput(changePasswordSchema, body);
+/**
+ * Sets the signed-in owner's password, for signing in without an email link.
+ * Needs the current password, so a stolen session can't take over the
+ * login (S4) - except within PASSWORD_LIMITS.recentSignInMinutes of signing
+ * in, which is how an owner who only used email links sets a first one.
+ */
+export async function changePassword(ctx: OwnerContext, body: unknown): Promise<void> {
+  const { password, currentPassword } = parseInput(changePasswordSchema, body);
+  const signedInAt = await auth.signedInAt();
+  const recent = signedInAt !== null && Date.now() / 1000 - signedInAt <= PASSWORD_LIMITS.recentSignInMinutes * 60;
+  if (!recent) {
+    if (!currentPassword) {
+      throw new ApiError(
+        400,
+        `Enter your current password, or sign in again to set one within ${PASSWORD_LIMITS.recentSignInMinutes} minutes`
+      );
+    }
+    await enforceRateLimits([{ key: `password-change:${ctx.ownerId}`, ...RATE_LIMITS.passwordChangePerOwner }]);
+    if (!ctx.email || !(await auth.signInWithPassword(ctx.email, currentPassword))) {
+      throw new ApiError(400, "Your current password isn't right");
+    }
+  }
   await auth.updatePassword(password);
   await recordEvent(await ownerDb(), { action: "auth.password_changed" });
 }

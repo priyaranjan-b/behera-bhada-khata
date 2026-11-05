@@ -9,6 +9,7 @@ import { hashToken } from "@/server/token";
 import { pngDataUrlToBytes, recordFolder } from "./confirmLinks";
 import { describeRecord, renderReceipt, systemReceiptReads, type RecordDetails } from "./receipts";
 import {
+  ACKNOWLEDGED_LINK_SECONDS,
   ACKNOWLEDGED_RECEIPT_URL_SECONDS,
   enforceRateLimits,
   parseInput,
@@ -59,8 +60,18 @@ async function loadByToken(token: string, recordType: RecordType): Promise<Ackno
   return details as Acknowledgeable;
 }
 
+/**
+ * Whether a link no longer works: not acknowledged and past its token's
+ * expiry, or acknowledged more than ACKNOWLEDGED_LINK_SECONDS ago (so an old,
+ * forwarded or shared-phone link can't keep fetching the signed receipt).
+ */
+function linkExpired(acknowledgedAt: string | null, tokenExpiresAt: string, now = Date.now()): boolean {
+  if (acknowledgedAt) return new Date(acknowledgedAt).getTime() + ACKNOWLEDGED_LINK_SECONDS * 1000 < now;
+  return new Date(tokenExpiresAt).getTime() < now;
+}
+
 function isExpired(ctx: RecordDetails): boolean {
-  return !ctx.record.acknowledgedAt && new Date(ctx.record.tokenExpiresAt) < new Date();
+  return linkExpired(ctx.record.acknowledgedAt, ctx.record.tokenExpiresAt);
 }
 
 /** Loads the record and rejects anything that can no longer be acknowledged. */
@@ -72,16 +83,21 @@ async function loadAcknowledgeable(token: string, recordType: RecordType): Promi
   return ctx;
 }
 
-/** What the tenant sees on /confirm/[token]. The token alone doesn't say which kind of record it is. */
+/**
+ * What the tenant sees on /confirm/[token]. The token alone doesn't say which
+ * kind of record it is. An expired link shows only that it expired: none of
+ * the tenant's details, to whoever holds an old link.
+ */
 export async function getConfirmView(token: string): Promise<ConfirmView> {
   const ctx = (await loadByToken(token, "payment")) ?? (await loadByToken(token, "adjustment"));
   if (!ctx) throw new ApiError(404, "Not found");
+  if (isExpired(ctx)) return { recordType: ctx.recordType, isExpired: true };
 
   return {
     recordType: ctx.recordType,
     receiptNo: ctx.record.receiptNo,
     acknowledged: Boolean(ctx.record.acknowledgedAt),
-    isExpired: isExpired(ctx),
+    isExpired: false,
     amount: ctx.record.amount,
     date: ctx.record.date,
     mode: ctx.record.mode,
@@ -191,5 +207,6 @@ export async function confirmReceiptUrl(token: string, recordType: string | null
       ? await db.payments.findByTokenHash(tokenHash)
       : await db.adjustments.findByTokenHash(tokenHash);
   if (!record?.acknowledged_at || !record.pdf_path) throw new ApiError(404, "Not available");
+  if (linkExpired(record.acknowledged_at, record.token_expires_at)) throw new ApiError(410, "Link expired");
   return storage.signedUrl(record.pdf_path, SIGNED_URL_SECONDS);
 }

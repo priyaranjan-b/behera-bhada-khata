@@ -120,8 +120,12 @@ export const magicLinkSchema = z.object({
   next: z.string().max(2048).optional(),
 });
 
-/** Owner password length (72 = the most bcrypt, and so Supabase Auth, uses). */
-export const PASSWORD_LIMITS = { minLength: 8, maxLength: 72 } as const;
+/**
+ * Owner password length (72 = the most bcrypt, and so Supabase Auth, uses).
+ * `recentSignInMinutes`: changing the password needs the current one, except
+ * this soon after signing in (e.g. setting a first one after an email link).
+ */
+export const PASSWORD_LIMITS = { minLength: 8, maxLength: 72, recentSignInMinutes: 10 } as const;
 
 export const passwordSignInSchema = z.object({
   email: emailSchema,
@@ -131,6 +135,8 @@ export const passwordSignInSchema = z.object({
 
 export const changePasswordSchema = z
   .object({
+    /** Required unless the session signed in within PASSWORD_LIMITS.recentSignInMinutes (the service checks). */
+    currentPassword: z.string().max(PASSWORD_LIMITS.maxLength).optional(),
     password: z
       .string()
       .min(PASSWORD_LIMITS.minLength, `Use at least ${PASSWORD_LIMITS.minLength} characters`)

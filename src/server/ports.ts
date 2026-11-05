@@ -607,6 +607,11 @@ export interface AuthGateway {
   /** Sets the signed-in account's password. */
   updatePassword(password: string): Promise<void>;
   /**
+   * When the current session signed in (epoch seconds), from the verified
+   * token, which keeps it across refreshes; null if it can't be told.
+   */
+  signedInAt(): Promise<number | null>;
+  /**
    * For receipts, which the tenant's confirm flow renders without a session:
    * the owner's name (owner_profile, else the account's name or email) and
    * the name under the signature (signature_name, else the owner's name).

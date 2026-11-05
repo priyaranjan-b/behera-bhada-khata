@@ -14,6 +14,7 @@ import { PASSWORD_LIMITS } from "@/lib/validation";
 /** Sets the owner's password, so they can sign in without an email link. */
 export default function ChangePasswordCard() {
   const router = useAppRouter();
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -24,7 +25,8 @@ export default function ChangePasswordCard() {
     setError(null);
     setSubmitting(true);
     try {
-      await api.dashboard.changePassword({ password, confirmPassword });
+      await api.dashboard.changePassword({ currentPassword: currentPassword || undefined, password, confirmPassword });
+      setCurrentPassword("");
       setPassword("");
       setConfirmPassword("");
       router.replace(routes.profile({ passwordChanged: "1" }));
@@ -43,6 +45,16 @@ export default function ChangePasswordCard() {
         icon={<LockRoundedIcon />}
         tone="warning"
       >
+        <TextField
+          type="password"
+          label="Current password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          fullWidth
+          autoComplete="current-password"
+          helperText={`Not needed within ${PASSWORD_LIMITS.recentSignInMinutes} minutes of signing in, e.g. to set your first password after an email link.`}
+          slotProps={{ htmlInput: { maxLength: PASSWORD_LIMITS.maxLength } }}
+        />
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
           <TextField
             type="password"

@@ -616,6 +616,8 @@ function build() {
     generateMagicLink: vi.fn(async () => "https://auth.test/link"),
     signInWithPassword: vi.fn(async (_email: string, password: string) => password === "correct-horse"),
     updatePassword: vi.fn(async () => undefined),
+    // Signed in a minute ago by default; a test sets an older time to need the current password (S4).
+    signedInAt: vi.fn(async (): Promise<number | null> => Math.floor(Date.now() / 1000) - 60),
     ownerNames: vi.fn(async () => ({ owner: "Ramesh Sahu", signature: "Anil Sahu" })),
     exchangeCode: vi.fn(),
     setSession: vi.fn(),

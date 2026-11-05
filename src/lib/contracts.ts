@@ -86,6 +86,8 @@ export interface PasswordSignInResult {
 }
 
 export interface ChangePasswordInput {
+  /** Required unless the owner signed in within PASSWORD_LIMITS.recentSignInMinutes (S4). */
+  currentPassword?: string;
   password: string;
   confirmPassword: string;
 }
@@ -820,13 +822,25 @@ export interface CreatedAdjustment extends RecordCreated {
 
 // ---- /api/confirm/[token] (tenant-facing, no login) ------------------------
 
-export interface ConfirmView {
+/**
+ * GET /api/confirm/[token]: the record, or - for a link that no longer works
+ * (unacknowledged past its expiry, or acknowledged more than 14 days ago) -
+ * only that it expired, with none of the tenant's details.
+ */
+export type ConfirmView = ConfirmDetails | ConfirmExpired;
+
+export interface ConfirmExpired {
+  recordType: RecordType;
+  isExpired: true;
+}
+
+export interface ConfirmDetails {
   recordType: RecordType;
   /** 2026/10/001 (ADJ/... for an adjustment), as printed on the receipt. */
   receiptNo: string;
   /** The tenant has already signed + verified (optional since 0010; the payment counts regardless). */
   acknowledged: boolean;
-  isExpired: boolean;
+  isExpired: false;
   amount: number;
   date: string;
   mode?: string;

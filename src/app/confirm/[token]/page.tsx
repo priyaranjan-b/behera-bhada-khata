@@ -24,8 +24,24 @@ import ConfirmForm from "./ConfirmForm";
 export default async function ConfirmPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const record = await serverApi.confirm.detail(token);
-  const { isExpired } = record;
   const recordLabel = record.recordType === "payment" ? "Payment" : "Adjustment";
+
+  // An expired link shows none of the record (S1): only what to do next.
+  if (record.isExpired) {
+    return (
+      <PublicLayout width="md" align="top">
+        <Stack spacing={3}>
+          <BrandMark />
+          <PublicHeading title="Link expired" subtitle={`This ${recordLabel.toLowerCase()} link no longer works.`} />
+          <Alert severity="warning">
+            <AlertTitle>Link expired</AlertTitle>
+            The {recordLabel.toLowerCase()} is still recorded. Ask the owner for a new link if you want to sign it, or
+            for a copy of your receipt.
+          </Alert>
+        </Stack>
+      </PublicLayout>
+    );
+  }
 
   return (
     <PublicLayout width="md" align="top">
@@ -43,8 +59,6 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
           action={
             record.acknowledged ? (
               <StatusBadge tone="success" label="Acknowledged" />
-            ) : isExpired ? (
-              <StatusBadge tone="warning" label="Link expired" />
             ) : (
               <StatusBadge tone="info" label="Recorded" />
             )
@@ -105,12 +119,6 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
             <AlertTitle>Acknowledging isn&apos;t available yet</AlertTitle>
             The {recordLabel.toLowerCase()} is recorded and counts. Signing it here needs an SMS code, which isn&apos;t
             set up yet; ask the owner for your receipt.
-          </Alert>
-        ) : isExpired ? (
-          <Alert severity="warning">
-            <AlertTitle>Link expired</AlertTitle>
-            This link has expired. The {recordLabel.toLowerCase()} is still recorded; ask the owner for a new link if you
-            want to sign the receipt.
           </Alert>
         ) : (
           <ConfirmForm token={token} recordType={record.recordType} maskedPhone={record.maskedPhone} />

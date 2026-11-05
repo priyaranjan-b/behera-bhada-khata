@@ -61,6 +61,18 @@ export const supabaseAuth: AuthGateway = {
     throw new ApiError(500, "Could not change the password");
   },
 
+  async signedInAt() {
+    const supabase = await createSessionClient();
+    const { data } = await supabase.auth.getClaims();
+    // `amr` lists how and when this session authenticated (password, otp, ...); a refresh keeps it.
+    const amr: unknown = data?.claims?.amr;
+    if (!Array.isArray(amr)) return null;
+    const times = amr
+      .map((entry: unknown) => (entry && typeof entry === "object" ? (entry as { timestamp?: unknown }).timestamp : undefined))
+      .filter((t): t is number => typeof t === "number");
+    return times.length > 0 ? Math.max(...times) : null;
+  },
+
   async ownerNames() {
     const admin = createAdminClient();
     const [{ data: owner }, { data: profile }] = await Promise.all([

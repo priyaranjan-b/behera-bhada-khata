@@ -6,7 +6,7 @@ vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
 
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
-const { confirmRecord, getConfirmView, sendConfirmOtp } = await import("@/server/services/confirm");
+const { confirmRecord, confirmReceiptUrl, getConfirmView, sendConfirmOtp } = await import("@/server/services/confirm");
 
 const meta = { ip: "203.0.113.7" };
 const body = { recordType: "payment", otpCode: "123456", tenantSignaturePng: PNG_DATA_URL };
@@ -121,11 +121,37 @@ describe("sendConfirmOtp", () => {
 
 describe("without Twilio", () => {
   it("tells the confirm page, and refuses an OTP before spending a rate-limit hit", async () => {
-    expect((await getConfirmView("token")).tenantMessaging).toBe(true);
+    expect(await getConfirmView("token")).toMatchObject({ isExpired: false, tenantMessaging: true });
     await withoutTwilio();
-    expect((await getConfirmView("token")).tenantMessaging).toBe(false);
+    expect(await getConfirmView("token")).toMatchObject({ isExpired: false, tenantMessaging: false });
     expect(await status(sendConfirmOtp("token", { recordType: "payment" }, meta))).toBe(503);
     expect(fakes.system.rateLimits.hit).not.toHaveBeenCalled();
     expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+  });
+});
+
+// S1 (docs/tech-debt.md): an old link mustn't keep showing the tenant's details or serving the signed receipt.
+describe("an old or expired link", () => {
+  const id = "00000000-0000-4000-8000-000000000201";
+  const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+  const acknowledged = (days: number) =>
+    payment({ acknowledged_at: daysAgo(days), pdf_path: `payments/x/${id}/a/receipt.pdf` });
+
+  it("shows only that it expired, none of the tenant's details, once the unacknowledged link is past its expiry", async () => {
+    fakes.state.payments.set(id, payment({ token_expires_at: "2020-01-01T00:00:00Z" }));
+    expect(await getConfirmView("token")).toEqual({ recordType: "payment", isExpired: true });
+  });
+
+  it("keeps the signed receipt for 14 days after the tenant acknowledges", async () => {
+    fakes.state.payments.set(id, acknowledged(3));
+    expect(await getConfirmView("token")).toMatchObject({ isExpired: false, acknowledged: true });
+    expect(await confirmReceiptUrl("token", "payment")).toContain("receipt.pdf");
+  });
+
+  it("stops serving the details and the signed receipt after that", async () => {
+    fakes.state.payments.set(id, acknowledged(15));
+    expect(await getConfirmView("token")).toEqual({ recordType: "payment", isExpired: true });
+    expect(await status(confirmReceiptUrl("token", "payment"))).toBe(410);
+    expect(fakes.storage.signedUrl).not.toHaveBeenCalled();
   });
 });

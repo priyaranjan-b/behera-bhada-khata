@@ -936,3 +936,30 @@ with its skeletons; a section that streams several cards returns them bare and
 they join the row (an `AsyncSection` adds no element); it is `wide`, so if
 it fails its one error card spans the row instead of leaving a gap. The tenant page's
 account figures stay a two-a-row grid: they sit in the record header.
+
+### A27 — Old confirm links and password changes (tech-debt S1, S4)
+
+**Decision.**
+- **Confirm links expire after use too.** A tenant's `/confirm/<token>` link
+  works until its token expires while unacknowledged, and for
+  `ACKNOWLEDGED_LINK_SECONDS` (14 days) after the tenant acknowledges, so they
+  can fetch their signed receipt again. After that the page and the receipt
+  download treat it as expired, and an expired link returns only
+  `{ recordType, isExpired: true }` (`ConfirmExpired`): no name, houses,
+  amounts or note. The owner can still download and share the receipt. No
+  SQL change: `confirm.ts` checks `acknowledged_at`.
+- **Changing the password needs the current one**, checked with
+  `signInWithPassword` against the owner's email and rate limited
+  (`passwordChangePerOwner`), **except within
+  `PASSWORD_LIMITS.recentSignInMinutes` (10) of signing in**, read from the
+  verified token's `amr` timestamps (`AuthGateway.signedInAt`), which a token
+  refresh keeps. A session whose sign-in time can't be told counts as old.
+
+**Why.** An old link (forwarded on WhatsApp, in a shared phone's history)
+kept serving the signed receipt with its payment proofs, and an expired one
+still showed the tenant's details. A stolen session cookie could set a new
+password and keep the login after the session was revoked. Always requiring
+the current password would stop an owner who has only used email links from
+ever setting one; the recent-sign-in window ("sudo mode") covers that, since
+signing in again proves the email. Supabase's emailed reauthentication code
+would be stronger but needs a dashboard setting and an extra form step.
