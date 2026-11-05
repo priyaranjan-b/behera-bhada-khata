@@ -22,10 +22,11 @@ import { dateLabel, labelOf, monthLabel, paymentTagsOf } from "./text";
 //     over the tenant's whole ledger before any filter or page, so every
 //     page shows the all-time balance.
 // One statement, under RLS. "This month" is the app's clock (currentMonthKey).
-// Money comes back as JSON numbers, as the SQL function's did: numeric sums
-// are exact in Postgres and print at most two decimals, so JSON.parse gives
-// the same number Number() would (paymentsPage reads text only because it
-// adds the per-mode sums in JS, through round2).
+// The rows' money comes back as JSON numbers, as the SQL function's did:
+// numeric sums are exact in Postgres and print at most two decimals, so
+// JSON.parse gives the same number Number() would. The footer sums (A26)
+// come back as text, through round2, and count only what the balance counts:
+// pending and upcoming rows are listed but left out, and counted apart.
 // A payment row carries its tags (0030, D34), searched with the rest.
 // The payment line keeps the SQL function's wording, raw mode included
 // ("Payment received (bank transfer)"); changing it is a separate change.
@@ -109,6 +110,7 @@ interface PageResult {
   rows: TenantLedgerDbRow[];
   debit: string;
   credit: string;
+  not_counted: number;
 }
 
 export async function tenantLedgerPage(
@@ -134,8 +136,9 @@ export async function tenantLedgerPage(
       -- The money columns over every matching row, whatever the page (A26); as text, for round2.
       counted as (
         select count(*)::int as total,
-          coalesce(sum(r.debit), 0)::text as debit,
-          coalesce(sum(r.credit), 0)::text as credit
+          coalesce(sum(r.debit) filter (where r.status not in ('pending', 'upcoming')), 0)::text as debit,
+          coalesce(sum(r.credit) filter (where r.status not in ('pending', 'upcoming')), 0)::text as credit,
+          (count(*) filter (where r.status in ('pending', 'upcoming')))::int as not_counted
         from matching r
       ),
       shown as (select ${gridPageNumber(sql`counted.total`, filter)} as page from counted),
@@ -147,6 +150,7 @@ export async function tenantLedgerPage(
         counted.total,
         counted.debit,
         counted.credit,
+        counted.not_counted,
         shown.page,
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'type', o.type, 'date', o.date, 'description', o.description, 'caption', o.caption,
@@ -165,6 +169,7 @@ export async function tenantLedgerPage(
     sums: {
       debit: round2(Number(result.debit)),
       credit: round2(Number(result.credit)),
+      not_counted: result.not_counted,
     },
   };
 }

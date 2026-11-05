@@ -797,6 +797,8 @@ export interface TenantMonthDbRow {
 export interface TenantMonthSumsDb {
   amount_due: number;
   amount_allocated: number;
+  /** Of amount_due, this month and later: listed but not owed yet. */
+  not_yet_due: number;
 }
 
 /** A row of the Billing grid query (billingPage; was billing_page, 0021): one tenant's rent for one month, or a paid-direct month. */
@@ -930,8 +932,11 @@ export interface TenantLedgerDbRow {
 
 /** The ledger's debits and credits over every row that matches its dates, search and filters, whatever the page (A26). */
 export interface TenantLedgerSumsDb {
+  /** Only what the running balance counts: pending and upcoming rows are left out. */
   debit: number;
   credit: number;
+  /** Matching rows the sums leave out: rent not due yet, old pending records. */
+  not_counted: number;
 }
 
 /** The text columns the history query searches and filters (auditHistoryPage; was audit_history_page, 0018); tenant_name is read from tenants. */

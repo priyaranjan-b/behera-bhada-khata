@@ -456,7 +456,11 @@ function build() {
         total: 1,
         all: 1,
         page: 0,
-             sums: { amount_due: Number(period.amount_due), amount_allocated: Number(period.amount_allocated) },
+        sums: {
+          amount_due: Number(period.amount_due),
+          amount_allocated: Number(period.amount_allocated),
+          not_yet_due: 0,
+        },
       })),
     },
     // The Billing query and totals; their real behaviour is in test/adapters/drizzle/queries.
@@ -524,7 +528,7 @@ function build() {
           total: rows.length,
           all: rows.length,
           page: 0,
-          sums: { debit: 0, credit: rows.reduce((sum, r) => sum + r.credit, 0) },
+          sums: { debit: 0, credit: rows.reduce((sum, r) => sum + r.credit, 0), not_counted: 0 },
         };
       }),
     },

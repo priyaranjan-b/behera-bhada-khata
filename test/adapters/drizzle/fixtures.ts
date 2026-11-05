@@ -101,15 +101,18 @@ export async function createLedgerDb(opts: { oracles?: boolean } = {}): Promise<
 
 /**
  * A paged query's `sums` (A26), the long way: fetches every matching row on
- * one page and adds up `keys`. The filters in these tests match at most 100 rows.
+ * one page and adds up `keys` over the rows `counted` keeps (all by default).
+ * The filters in these tests match at most 100 rows.
  */
 export async function expectedSums<R extends object, K extends keyof R & string>(
   allRows: () => Promise<{ rows: R[]; total: number }>,
-  keys: readonly K[]
+  keys: readonly K[],
+  counted: (row: R) => boolean = () => true
 ): Promise<Record<K, number>> {
   const { rows, total } = await allRows();
   if (rows.length !== total) throw new Error(`expectedSums: ${total} rows match but only ${rows.length} fit one page`);
+  const kept = rows.filter(counted);
   return Object.fromEntries(
-    keys.map((k) => [k, rows.reduce((sum, r) => Math.round((sum + Number(r[k])) * 100) / 100, 0)])
+    keys.map((k) => [k, kept.reduce((sum, r) => Math.round((sum + Number(r[k])) * 100) / 100, 0)])
   ) as Record<K, number>;
 }

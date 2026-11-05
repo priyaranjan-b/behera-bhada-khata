@@ -907,6 +907,13 @@ drops out of it.
   nothing) and Defaulters' **Rent / month**. Payments' footer is the Amount
   column (set-offs included, noted), while its "Received" card is cash only
   (A22). Maintenance's leaves voided expenses out (D35) and says how many.
+- **Not due yet.** The Ledger's Debit and Credit count only what its balance
+  counts: rent for this month and later ("upcoming") and old pending records
+  are listed but left out, and the footer says how many rows that is, so
+  Debit − Credit never reads as more owed than the Balance. The Months
+  table's Due is a plain column total that includes those months, and the
+  footer notes how much of it is "not due yet". Billing's footer matches its
+  cards, which count the whole range too.
 
 **Why not the cards.** The cards are the page's figures, and several of them
 deliberately don't follow the table: "Received" leaves out set-offs, "Govt

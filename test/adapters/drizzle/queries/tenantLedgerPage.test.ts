@@ -110,13 +110,24 @@ async function same(f: Partial<TenantLedgerFilter>, scope: Scope = asOwner) {
   const { sums, ...page } = drizzle;
   expect({ ...page, rows: page.rows.map(({ tags: _tags, ...r }) => r) }).toEqual(await viaSql(scope, filter));
   // The sums cover every matching row, whatever the page (A26).
-  expect(sums).toEqual(await expectedSums(() => viaDrizzle(scope, { ...filter, page: 0, pageSize: 100 }), ["debit", "credit"] as const));
+  // Only what the balance counts: rent not due yet and pending records are listed, not added up.
+  const all = () => viaDrizzle(scope, { ...filter, page: 0, pageSize: 100 });
+  const counted = (r: { status: string }) => r.status !== "pending" && r.status !== "upcoming";
+  expect(sums).toEqual({
+    ...(await expectedSums(all, ["debit", "credit"] as const, counted)),
+    not_counted: (await all()).rows.filter((r) => !counted(r)).length,
+  });
   return drizzle;
 }
 
 describe("tenantLedgerPage on Drizzle matches tenant_ledger_page()", () => {
   it("the whole journal, with the all-time running balance", async () => {
     const page = await same({});
+    // The footer leaves out the rent months not due yet, as the balance does (A26).
+    const upcoming = page.rows.filter((r) => r.status === "upcoming");
+    expect(upcoming.length).toBeGreaterThan(0);
+    expect(page.sums.not_counted).toBe(upcoming.length + page.rows.filter((r) => r.status === "pending").length);
+    expect(page.sums.debit).toBeLessThan(page.rows.reduce((sum, r) => sum + Number(r.debit), 0));
     // 6 charges (3 ended, this month, 2 ahead), 3 payments, 3 adjustments.
     expect(page.all).toBe(12);
     expect(page.rows.filter((r) => r.type === "charge").map((r) => r.status)).toEqual([
@@ -211,7 +222,7 @@ describe("tenantLedgerPage on Drizzle matches tenant_ledger_page()", () => {
 
   it("another tenant's journal, and nothing for another signed-in account", async () => {
     expect((await same({ tenantId: bimal })).all).toBe(5);
-    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0, sums: { debit: 0, credit: 0 } });
+    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0, sums: { debit: 0, credit: 0, not_counted: 0 } });
   });
 });
 

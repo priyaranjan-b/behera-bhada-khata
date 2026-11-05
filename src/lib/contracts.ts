@@ -717,8 +717,13 @@ export interface TenantLedgerQuery extends GridQueryParams {
 export interface TenantLedgerView extends TablePage<LedgerRow> {
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
-  /** Debits and credits of every row matching the dates, search and filters, whatever the page (A26). */
+  /**
+   * Debits and credits of every row matching the dates, search and filters, whatever the page,
+   * counting only what the balance counts (A26).
+   */
   totals: Pick<LedgerRow, "debit" | "credit">;
+  /** Matching rows the totals leave out: rent not due yet, old pending records. */
+  uncountedRows: number;
 }
 
 /** Data for the edit form: current values, plus the houses that could be added. */
@@ -900,6 +905,8 @@ export interface TenantMonthRow extends TenantPeriod {
 export interface TenantMonthsPage extends TablePage<TenantMonthRow> {
   /** Due and allocated over every month matching "Show", search and filters, whatever the page (A26). */
   totals: Pick<TenantMonthRow, "amountDue" | "amountAllocated">;
+  /** Of `totals.amountDue`, this month and later: listed, not owed yet. */
+  notYetDue: number;
 }
 
 /** A history table's query (Activity, …/tenants/[id]/history; A14): the grid's page, sort, search and filters, plus "Show" and dates. */

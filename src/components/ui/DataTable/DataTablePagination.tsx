@@ -17,6 +17,7 @@ import {
 } from "@mui/x-data-grid";
 import { useDataTable } from "./context";
 import DataTableTotals from "./DataTableTotals";
+import { fitsOnePage } from "./pagination";
 
 /**
  * "Total ₹… · Rows 10 ▾ ……… 1–10 of 26  ‹ 1 2 3 ›"; on phones the totals take
@@ -35,8 +36,7 @@ export default function DataTablePagination() {
   const from = rowCount === 0 ? 0 : page * pageSize + 1;
   const to = Math.min(rowCount, (page + 1) * pageSize);
 
-  // As DataTable's hideFooter: a bigger page size can always be undone.
-  const showPager = rowCount > Math.min(pageSize, ...pageSizeOptions);
+  const showPager = !fitsOnePage(rowCount, pageSize, pageSizeOptions);
 
   return (
     <Stack
@@ -67,7 +67,8 @@ export default function DataTablePagination() {
             </Stack>
           )}
           <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", ml: "auto" }}>
-            <Typography variant="caption" color="textSecondary" aria-live="polite">
+            {/* Not a live region: the totals announce what a filter changed, and paging changes only this. */}
+            <Typography variant="caption" color="textSecondary">
               {compact ? `${page + 1} / ${pageCount}` : `${from}–${to} of ${rowCount}`}
             </Typography>
             <Pagination

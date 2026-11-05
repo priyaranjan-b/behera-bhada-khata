@@ -1,4 +1,9 @@
+"use client";
+
+import type { ReactNode } from "react";
 import Box from "@mui/material/Box";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import type { Theme } from "@mui/material/styles";
 
 /** Cards per row from each breakpoint up; phones always swipe. */
 export interface StatCardRowColumns {
@@ -8,7 +13,7 @@ export interface StatCardRowColumns {
 }
 
 /**
- * A row of `StatCard`s. On phones one swipeable row (each card about 40% of
+ * A row of `StatCard`s. On phones one swipeable row (each card about 42% of
  * the screen, so the next one peeks in and says "swipe"), instead of
  * stacking seven cards two by two above the table; from `sm` up, a grid of
  * `columns` cards a row, all the same height.
@@ -21,15 +26,16 @@ export default function StatCardRow({
   columns: StatCardRowColumns;
   /** Names the row for screen readers, e.g. "Payment totals". */
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
+  // Only the phone row scrolls, so only there is it a tab stop (a keyboard scrolls it).
+  const swipes = useMediaQuery((theme: Theme) => theme.breakpoints.down("sm"));
   const template = (n: number | undefined) => (n === undefined ? undefined : `repeat(${n}, minmax(0, 1fr))`);
   return (
     <Box
       role="region"
       aria-label={label}
-      // Focusable on phones, so a keyboard can scroll the row.
-      tabIndex={0}
+      tabIndex={swipes ? 0 : undefined}
       sx={{
         display: { xs: "flex", sm: "grid" },
         gridTemplateColumns: { sm: template(columns.sm), md: template(columns.md), lg: template(columns.lg) },

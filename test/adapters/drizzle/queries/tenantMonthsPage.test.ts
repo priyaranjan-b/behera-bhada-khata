@@ -62,13 +62,21 @@ async function same(f: Partial<TenantMonthsFilter>, scope: Scope = asOwner) {
   const { sums, ...page } = drizzle;
   expect(page).toEqual(await viaSql(scope, filter));
   // The sums cover every matching row, whatever the page (A26).
-  expect(sums).toEqual(await expectedSums(() => viaDrizzle(scope, { ...filter, page: 0, pageSize: 100 }), ["amount_due", "amount_allocated"] as const));
+  const all = () => viaDrizzle(scope, { ...filter, page: 0, pageSize: 100 });
+  const notYetDue = await expectedSums(all, ["amount_due"] as const, (r) => r.period_month >= currentMonthKey());
+  expect(sums).toEqual({
+    ...(await expectedSums(all, ["amount_due", "amount_allocated"] as const)),
+    not_yet_due: notYetDue.amount_due,
+  });
   return drizzle;
 }
 
 describe("tenantMonthsPage on Drizzle matches tenant_months_page()", () => {
   it("every month, newest first, with the shown status", async () => {
     const page = await same({});
+    // This month and later are in Due, and the footer says how much of it isn't owed yet (A26).
+    expect(page.sums.not_yet_due).toBeGreaterThan(0);
+    expect(page.sums.not_yet_due).toBeLessThan(page.sums.amount_due);
     expect(page.rows.map((r) => [r.period_month, r.display_status])).toEqual([
       [month(2), "not_due_yet"],
       [month(1), "paid"],
@@ -108,6 +116,6 @@ describe("tenantMonthsPage on Drizzle matches tenant_months_page()", () => {
       });
       await expect(viaSql(asOwner, { ...base(), ...f })).rejects.toThrow();
     }
-    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0, sums: { amount_due: 0, amount_allocated: 0 } });
+    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0, sums: { amount_due: 0, amount_allocated: 0, not_yet_due: 0 } });
   });
 });

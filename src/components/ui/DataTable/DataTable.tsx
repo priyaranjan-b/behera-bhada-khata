@@ -11,6 +11,7 @@ import DataTableToolbar from "./DataTableToolbar";
 import DataTablePagination from "./DataTablePagination";
 import DataTableNoResults from "./DataTableNoResults";
 import type { DataTableColDef } from "./columns";
+import { fitsOnePage } from "./pagination";
 import { dataTableSx, filterPanelSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
 
 const SLOTS = {
@@ -132,7 +133,7 @@ export default function DataTable<R extends GridValidRowModel>({
   // A money column added up (A26) keeps the footer whenever there are rows; otherwise it hides
   // only while everything fits the smallest page, so a bigger page size can always be undone.
   const hasTotals = props.columns.some((col) => (col as DataTableColDef<R>).total);
-  const hideFooter = rowCount === 0 || (!hasTotals && rowCount <= Math.min(pageSize, ...pageSizeOptions));
+  const hideFooter = rowCount === 0 || (!hasTotals && fitsOnePage(rowCount, pageSize, pageSizeOptions));
 
   const body =
     // Not while loading: a table that loads its own first page (useServerGrid) starts at 0.

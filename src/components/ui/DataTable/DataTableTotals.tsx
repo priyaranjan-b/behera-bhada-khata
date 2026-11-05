@@ -53,6 +53,7 @@ export default function DataTableTotals() {
     <Stack
       direction="row"
       aria-live="polite"
+      aria-atomic
       sx={{ flexWrap: "wrap", alignItems: "baseline", columnGap: 2, rowGap: 0.25, minWidth: 0 }}
     >
       <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 600 }}>

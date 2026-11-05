@@ -17,6 +17,7 @@ import type { TenantMonthRow, TenantMonthsPage, TenantMonthsQuery } from "@/lib/
 import { TENANT_MONTH_DISPLAY_STATUSES, TENANT_MONTH_SHOW_OPTIONS, type TenantMonthShow } from "@/lib/domain/billing";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { statusLabel } from "@/lib/domain/status";
+import { formatMoney } from "@/lib/money";
 
 const columns: DataTableColDef<TenantMonthRow>[] = [
   {
@@ -46,7 +47,14 @@ interface Extra {
 
 const DEFAULT_EXTRA: Extra = { show: "all" };
 const DEFAULT_SORT: GridSortModel = [{ field: "periodMonth", sort: "desc" }];
-const EMPTY: TenantMonthsPage = { rows: [], total: 0, all: 0, page: 0, totals: { amountDue: 0, amountAllocated: 0 } };
+const EMPTY: TenantMonthsPage = {
+  rows: [],
+  total: 0,
+  all: 0,
+  page: 0,
+  totals: { amountDue: 0, amountAllocated: 0 },
+  notYetDue: 0,
+};
 const toQuery = (grid: GridQueryParams, extra: Extra): TenantMonthsQuery => ({ ...grid, show: extra.show });
 
 /**
@@ -85,6 +93,7 @@ export default function TenantPeriodsGrid({ tenantId }: { tenantId: string }) {
         subtitle="Rent owed and allocated per month"
         rows={data.rows}
         columnTotals={data.totals}
+        totalsNote={data.notYetDue > 0 ? `Due incl. ${formatMoney(data.notYetDue)} not due yet` : undefined}
         columns={columns}
         {...gridProps}
         filters={filters}

@@ -15,8 +15,8 @@ import { labelOf, monthLabel } from "./text";
 // the Months table shows them, one page. A month that hasn't ended and isn't
 // fully paid shows as "not due yet" (periodDisplayStatus in
 // src/lib/domain/billing.ts), with "this month" from the app's clock. One
-// statement, under RLS. Money comes back as JSON numbers, exact as in
-// tenantLedgerPage.
+// statement, under RLS. The rows' money comes back as JSON numbers, exact as
+// in tenantLedgerPage; the footer sums (A26) as text, through round2.
 
 const STATUS_LABELS = Object.fromEntries(TENANT_MONTH_DISPLAY_STATUSES.map((s) => [s, statusLabel(s)]));
 
@@ -24,6 +24,7 @@ function monthRows(tenantId: string): SQL {
   const thisMonth = currentMonthKey();
   return sql`
     select r.id, r.period_month, r.amount_due, r.amount_allocated, r.status, d.display_status,
+      r.period_month >= ${thisMonth}::date as not_yet_due,
       ${monthLabel(sql`r.period_month`)} as month_label, ${labelOf(sql`d.display_status`, STATUS_LABELS, "")} as status_label
     from rent_periods r
     cross join lateral (
@@ -54,6 +55,7 @@ interface PageResult {
   rows: TenantMonthDbRow[];
   amount_due: string;
   amount_allocated: string;
+  not_yet_due: string;
 }
 
 export async function tenantMonthsPage(
@@ -74,7 +76,9 @@ export async function tenantMonthsPage(
       counted as (
         select count(*)::int as total,
           coalesce(sum(r.amount_due), 0)::text as amount_due,
-          coalesce(sum(r.amount_allocated), 0)::text as amount_allocated
+          coalesce(sum(r.amount_allocated), 0)::text as amount_allocated,
+          -- Of Due, this month and later: listed, but not owed yet (the footer says so).
+          coalesce(sum(r.amount_due) filter (where r.not_yet_due), 0)::text as not_yet_due
         from matching r
       ),
       shown as (select ${gridPageNumber(sql`counted.total`, filter)} as page from counted),
@@ -86,6 +90,7 @@ export async function tenantMonthsPage(
         counted.total,
         counted.amount_due,
         counted.amount_allocated,
+        counted.not_yet_due,
         shown.page,
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'period_month', o.period_month, 'amount_due', o.amount_due,
@@ -104,6 +109,7 @@ export async function tenantMonthsPage(
     sums: {
       amount_due: round2(Number(result.amount_due)),
       amount_allocated: round2(Number(result.amount_allocated)),
+      not_yet_due: round2(Number(result.not_yet_due)),
     },
   };
 }

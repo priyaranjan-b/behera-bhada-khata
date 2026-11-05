@@ -55,6 +55,7 @@ const EMPTY: TenantLedgerView = {
   page: 0,
   tenantMessaging: false,
   totals: { debit: 0, credit: 0 },
+  uncountedRows: 0,
 };
 
 function toQuery(grid: GridQueryParams, extra: Extra): TenantLedgerQuery {
@@ -238,6 +239,12 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
         subtitle="Charges, payments and corrections"
         rows={data.rows}
         columnTotals={data.totals}
+        totalsNote={
+          // The totals count what the balance counts (A26): rent not due yet and old pending records are listed only.
+          data.uncountedRows > 0
+            ? `${data.uncountedRows} row${data.uncountedRows === 1 ? "" : "s"} not counted (not due yet or pending)`
+            : undefined
+        }
         columns={columns}
         {...gridProps}
         filters={filters}

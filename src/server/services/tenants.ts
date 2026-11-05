@@ -193,6 +193,7 @@ export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, quer
     all: result.all,
     page: result.page,
     totals: { amountDue: result.sums.amount_due, amountAllocated: result.sums.amount_allocated },
+    notYetDue: result.sums.not_yet_due,
   };
 }
 
@@ -250,7 +251,8 @@ export async function getTenantLedger(_ctx: OwnerContext, tenantId: string, quer
     all: result.all,
     page: result.page,
     tenantMessaging: tenantMessagingEnabled(),
-    totals: result.sums,
+    totals: { debit: result.sums.debit, credit: result.sums.credit },
+    uncountedRows: result.sums.not_counted,
   };
 }
 
