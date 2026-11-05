@@ -1,4 +1,6 @@
 import type { Theme } from "@mui/material/styles";
+import { glass } from "@/theme/appTokens";
+import { glassSkin } from "@/theme/skin";
 import type { BadgeTone } from "./StatusBadge";
 
 /** A status colour for kit surfaces: the badge tones plus the brand colour. */
@@ -20,6 +22,7 @@ function shades(theme: Theme, tone: Tone) {
  *   deep shade; the card's corner glow carries the rest of the colour.
  * - Dark: a soft tint behind a light icon, which already stands out on the
  *   dark card.
+ * - Glass: a solid neon disc with a dark icon (the palette's neon colours).
  */
 export function toneTintSx(theme: Theme, tone: Tone) {
   const palette = (theme.vars || theme).palette;
@@ -37,6 +40,7 @@ export function toneTintSx(theme: Theme, tone: Tone) {
       backgroundColor: `color-mix(in srgb, ${c.main} 20%, transparent)`,
       boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${c.main} 28%, transparent)`,
     }),
+    ...glassSkin({ color: glass.onNeon, backgroundColor: c.main, borderRadius: "50%", boxShadow: "none" }),
   };
 }
 

@@ -11,6 +11,7 @@ import { chartsCustomizations } from "./customizations/charts";
 import { dataGridCustomizations } from "./customizations/dataGrid";
 import { datePickersCustomizations } from "./customizations/datePickers";
 import { appCustomizations } from "./customizations/app";
+import { glassCustomizations } from "./customizations/glass";
 import { lightSurfaces } from "./appTokens";
 
 type ComponentConfig = {
@@ -82,7 +83,9 @@ const theme = createTheme({
     chartsCustomizations,
     dataGridCustomizations,
     datePickersCustomizations,
-    appCustomizations
+    appCustomizations,
+    // The Glass skin (A29), last: only applies under data-app-skin="glass".
+    glassCustomizations
   ),
 });
 

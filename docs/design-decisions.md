@@ -1045,3 +1045,41 @@ listens for and scrolls into view), so the kept tabs don't reload.
 
 **Why.** A figure the owner can't open is a dead end: the next question is
 always "which ones?".
+
+### A29 — Glass, a dark see-through skin
+
+The colour-mode menu offers System, Light, Dark and **Glass**: the look of
+dark "liquid glass" dashboards — a near-black canvas with soft colour glows,
+see-through smoked cards, bars and side menu, and neon accents (lime
+primary, cyan info, amber warning).
+
+- **Dark scheme + a skin attribute, not a fourth MUI scheme.** Glass sets
+  the mode to dark and `data-app-skin="glass"` on `<html>`
+  (`setGlassSkin`, `src/theme/skin.ts`); every other choice removes it. So
+  every `applyStyles("dark", …)` rule (~48, template included) still applies
+  and glass only restyles what differs. A named MUI scheme would have needed
+  them all copied. A first, light-frosted attempt was a named scheme and was
+  reverted.
+- **Glass rules hang off `GLASS_ROOT`**
+  (`html[data-app-skin="glass"][data-mui-color-scheme="dark"]`), which
+  outranks the template's `*:where(...)` dark rules and can't paint over
+  Light if the attribute is stale. Use `glassSkin(styles)` in overrides and
+  `sx`, one per object (two write the same key, the later wins). Theme-wide
+  ones are in `src/theme/customizations/glass.ts`, merged last.
+- **Palette by CSS variables:** `MuiCssBaseline` redefines the dark
+  scheme's `--template-palette-*` (background, divider, secondary text,
+  primary/info/warning and their channels) under `GLASS_ROOT`, so anything
+  reading `theme.vars` follows. Hard-coded colours (buttons, chips, switch,
+  icon tiles, the side menu, the grid) get a `glassSkin` block.
+- **Restored before paint** by `InitSkinScript` next to MUI's
+  `InitColorSchemeScript` (localStorage `app-skin`).
+- **Tokens** are `glass` in `src/theme/appTokens.ts`. The canvas is a fixed
+  `body::before`; the page area (`appCanvasSx`) and `PublicLayout`'s
+  backdrop go see-through.
+- **Blur only on big containers** (raised cards, bars, side menu, pop-ups);
+  grids and nested panels are see-through with no blur of their own.
+- **Contrast:** panes are 5.5% white and the glows dim, so white text keeps
+  its contrast; text on neon fills is `glass.onNeon` (near-black).
+
+**Why.** A look the owner asked for, kept to the theme layer: no page,
+data or API change, and Light/Dark render exactly as before.
