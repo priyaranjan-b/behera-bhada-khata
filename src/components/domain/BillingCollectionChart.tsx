@@ -21,15 +21,17 @@ import { formatMoney } from "@/lib/money";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 import { useAppRouter } from "@/components/ui/Loading";
-import Link from "@/components/ui/Link";
-import MuiLink from "@mui/material/Link";
+import TextLink from "@/components/ui/TextLink";
 import { routes } from "@/lib/routes";
+import { paidDirectQuery } from "@/lib/preferences";
+import type { PaidDirectView } from "@/lib/types";
 import { TREND_CHART_HEIGHT } from "@/components/ui/chartHeights";
 
 const compact = new Intl.NumberFormat(APP_LOCALE, { notation: "compact", maximumFractionDigits: 1 });
 
-/** The Billing page for one month of the chart (`monthKey` is yyyy-MM, as the trend's points). */
-const monthBillingHref = (monthKey: string) => routes.billing({ from: monthKey, to: monthKey });
+/** The Billing page for one month of the chart (`monthKey` is yyyy-MM, as the trend's points), paid direct as the chart has it. */
+const monthBillingHref = (monthKey: string, paidDirect: PaidDirectView) =>
+  routes.billing({ from: monthKey, to: monthKey, ...paidDirectQuery(paidDirect) });
 
 /**
  * Billed vs collected per month (template PageViewsBarChart look), with a
@@ -39,10 +41,13 @@ const monthBillingHref = (monthKey: string) => routes.billing({ from: monthKey, 
 export default function BillingCollectionChart({
   data,
   href,
+  paidDirect = "hide",
 }: {
   data: MonthlyTrendPoint[];
   /** The Billing page for the same months. */
   href?: string;
+  /** "Include Govt paid direct" as the chart's figures have it, carried into its month links. */
+  paidDirect?: PaidDirectView;
 }) {
   const theme = useTheme();
   const router = useAppRouter();
@@ -82,7 +87,7 @@ export default function BillingCollectionChart({
             )}
           </Stack>
           <Typography variant="caption" color="textSecondary">
-            Cash received (by payment date) vs. billed, last {data.length} months
+            Cash received (by payment date, incl. corrections) vs. billed, last {data.length} months
           </Typography>
         </Stack>
 
@@ -99,9 +104,9 @@ export default function BillingCollectionChart({
               {data.map((d) => (
                 <TableRow key={d.monthKey}>
                   <TableCell>
-                    <MuiLink component={Link} href={monthBillingHref(d.monthKey)} aria-label={`Billing for ${d.label}`}>
+                    <TextLink href={monthBillingHref(d.monthKey, paidDirect)} aria-label={`Billing for ${d.label}`}>
                       {d.label}
-                    </MuiLink>
+                    </TextLink>
                   </TableCell>
                   <TableCell align="right">{formatMoney(d.billed)}</TableCell>
                   <TableCell align="right">{formatMoney(d.collected)}</TableCell>
@@ -122,12 +127,15 @@ export default function BillingCollectionChart({
               ]}
               margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
               grid={{ horizontal: true }}
-              // A month's bars open its Billing page (the table view links each month for keyboards).
+              // A month's bars open its Billing page (the table view links each month for keyboards). On a
+              // touch screen a tap is how the tooltip opens, so there it stays a tap: "Open billing" and the
+              // table view's months are the way through.
               onAxisClick={(_event, item) => {
+                if (window.matchMedia("(pointer: coarse)").matches) return;
                 const point = item ? data[item.dataIndex] : undefined;
-                if (point) router.push(monthBillingHref(point.monthKey));
+                if (point) router.push(monthBillingHref(point.monthKey, paidDirect));
               }}
-              sx={{ cursor: "pointer" }}
+              sx={{ cursor: { md: "pointer" } }}
               slotProps={{ legend: { position: { vertical: "top", horizontal: "end" } } }}
             />
           </Box>

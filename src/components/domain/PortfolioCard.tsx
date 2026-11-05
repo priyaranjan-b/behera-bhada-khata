@@ -1,6 +1,5 @@
-import MuiLink from "@mui/material/Link";
 import { DetailList, DetailRow, SectionCard } from "@/components/ui";
-import Link from "@/components/ui/Link";
+import TextLink from "@/components/ui/TextLink";
 import { routes } from "@/lib/routes";
 import type { PortfolioFacts } from "@/lib/contracts";
 import { formatMoney } from "@/lib/money";
@@ -19,24 +18,24 @@ export default function PortfolioCard({
     <SectionCard title="Portfolio" fill collapseOnPhone>
       <DetailList dividers>
         <DetailRow label="Monthly rent roll">
-          <MuiLink component={Link} href={routes.tenants.list({ show: "current" })}>
+          <TextLink href={routes.tenants.list({ show: "current" })}>
             {formatMoney(portfolio.rentRoll)}
-          </MuiLink>
+          </TextLink>
         </DetailRow>
         <DetailRow label="Occupancy">
           {occupancy === null ? (
             "—"
           ) : (
-            <MuiLink component={Link} href={routes.houses.list()}>{`${occupancy}% · ${let_} of ${houses.total} houses let`}</MuiLink>
+            <TextLink href={routes.houses.list()}>{`${occupancy}% · ${let_} of ${houses.total} houses let`}</TextLink>
           )}
         </DetailRow>
         <DetailRow label="Deposits held">{formatMoney(portfolio.depositsHeld)}</DetailRow>
         <DetailRow label="Rent paid in advance">{formatMoney(portfolio.advancePaid)}</DetailRow>
         {portfolio.paidDirectRent > 0 ? (
           <DetailRow label="of which Govt, paid direct">
-            <MuiLink component={Link} href={routes.tenants.list({ show: "untracked" })}>
+            <TextLink href={routes.tenants.list({ show: "untracked" })}>
               {`${formatMoney(portfolio.paidDirectRent)} / month`}
-            </MuiLink>
+            </TextLink>
           </DetailRow>
         ) : null}
       </DetailList>

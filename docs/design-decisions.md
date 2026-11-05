@@ -963,6 +963,11 @@ full-width cards, about 3,400px):
   load. The skeletons match the phone layout as well (`collapseOnPhone` /
   `startOpen` on `DetailCardSkeleton` / `ChartCardSkeleton`).
 
+The Overview has five stat cards again ("Tenants overdue" is back, counted as
+of today like Outstanding): a swipe row on phones, three a row, and all five
+in one row only from `xl` - at 1200px a lakh-sized figure doesn't fit a fifth
+of the row. A collapsible card's open state is kept per page and title.
+
 `collapseOnPhone` hides in CSS (`display` below `sm`), not with a JavaScript
 width check, so the server's page is already right on a phone and nothing
 jumps on load; from `sm` up it is a no-op. The period switcher fills the
@@ -1028,6 +1033,15 @@ page holding the records behind it, for the same period:
   rather than recorded (Earnings' nets, Spent of collected), and two with no
   matching filter yet: "Payer not tagged" (the Paid by column has no "is
   empty") and Tenant types (the Tenants list can't filter by type).
+
+The tap lands on the same figure: links into Billing carry "Include Govt
+paid direct" when the Overview has it on, and where a figure counts
+corrections (adjustments) and the page it opens lists payments only (the
+chart's and Earnings' Received), its caption says "incl. corrections". On a
+touch screen a tap on the chart opens its tooltip, not Billing ("Open
+billing" and the table view's months do that). The tenant page's cards open
+their tab in the browser (`TabStatCard` → `openPageTab`, which `PageTabs`
+listens for and scrolls into view), so the kept tabs don't reload.
 
 **Why.** A figure the owner can't open is a dead end: the next question is
 always "which ones?".

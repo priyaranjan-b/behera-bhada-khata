@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Box from "@mui/material/Box";
 import MenuItem from "@mui/material/MenuItem";
 import Tab from "@mui/material/Tab";
@@ -9,6 +9,8 @@ import TextField from "@mui/material/TextField";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { TAB_PARAM } from "@/lib/routes";
 import { InTabsContext } from "./inTabs";
+import { OPEN_PAGE_TAB_EVENT } from "./openPageTab";
+import { MOBILE_NAVBAR_HEIGHT, TOPBAR_HEIGHT } from "@/components/shell/nav";
 
 export interface PageTab {
   value: string;
@@ -34,6 +36,10 @@ export interface PageTab {
  * On phones the tab row is a full-width "Section" select instead (both are
  * rendered and switched by CSS, so server and browser agree). Panels provide
  * `InTabsContext`, so a table inside drops its own title on phones.
+ *
+ * Something else on the page opens a tab with `openPageTab` (e.g.
+ * `TabStatCard`): in the browser, and the tabs scroll into view, since on a
+ * phone they sit below the header.
  *
  * `phoneDefault` opens another tab on phones when the URL names none (the
  * tenant page opens Ledger there). The server can't know the screen, so it
@@ -93,8 +99,26 @@ export default function PageTabs({
     window.history.replaceState(window.history.state, "", url);
   };
 
+  // `openPageTab` from elsewhere on the page: open the tab and bring the tabs into view.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  });
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const next = (event as CustomEvent<string>).detail;
+      if (!tabs.some((t) => t.value === next)) return;
+      openRef.current(next);
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener(OPEN_PAGE_TAB_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_PAGE_TAB_EVENT, onOpen);
+  }, [tabs]);
+
   return (
-    <Box sx={{ minWidth: 0 }}>
+    // Scrolled to below the fixed top bar.
+    <Box ref={rootRef} sx={{ minWidth: 0, scrollMarginTop: { xs: MOBILE_NAVBAR_HEIGHT + 8, md: TOPBAR_HEIGHT + 8 } }}>
       <TextField
         select
         fullWidth

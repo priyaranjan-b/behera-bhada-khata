@@ -187,10 +187,22 @@ export default function MaintenanceView({
   });
   const { totals } = data;
   const narrowed = data.total < data.all;
-  const categories = Object.entries(totals.byCategory)
-    .map(([category, amount]) => ({ label: maintenanceCategoryLabel(category), amount: amount ?? 0 }))
-    .sort((a, b) => b.amount - a.amount);
-  const [topPayer, ...otherPayers] = totals.byPaidBy;
+  // A category or payer card whose filter is on keeps naming that one (a tie can't re-sort it into another);
+  // otherwise it shows the biggest. The rest follow it.
+  const pinned = (field: string) => {
+    const item = filter.items.find((i) => i.field === field && i.operator === "is" && typeof i.value === "string");
+    return item ? (item.value as string) : null;
+  };
+  const pinnedFirst = <T,>(list: T[], name: (t: T) => string, value: string | null) =>
+    value === null ? list : [...list.filter((t) => name(t) === value), ...list.filter((t) => name(t) !== value)];
+  const categories = pinnedFirst(
+    Object.entries(totals.byCategory)
+      .map(([category, amount]) => ({ label: maintenanceCategoryLabel(category), amount: amount ?? 0 }))
+      .sort((a, b) => b.amount - a.amount),
+    (c) => c.label,
+    pinned("category")
+  );
+  const [topPayer, ...otherPayers] = pinnedFirst(totals.byPaidBy, (p) => p.name, pinned("tags"));
   // The footer adds up what was spent: a voided expense is listed but counted nowhere (D35).
   const columnTotals = useMemo(() => ({ amount: totals.amount }), [totals.amount]);
   const voided = data.total - totals.count;
@@ -210,7 +222,7 @@ export default function MaintenanceView({
           tone="primary"
           variant="gradient"
           value={formatMoney(totals.amount)}
-          caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
+          caption={`${totals.count} expense${totals.count === 1 ? "" : "s"}${narrowed ? " matching the filters" : ""}${
             totals.cash < totals.amount ? ` · ${formatMoney(totals.amount - totals.cash)} by set-off` : ""
           }`}
         />

@@ -49,7 +49,8 @@ export default async function EarningsSection({
           icon={<PaymentsRoundedIcon />}
           tone="primary"
           value={formatMoney(t.received)}
-          caption="Cash that came in these months"
+          // Counts corrections (adjustments) by the day they were made; Payments, which this opens, lists payments only.
+          caption="Cash that came in these months, incl. corrections"
           href={links.received}
         />
         <StatCard

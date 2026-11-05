@@ -53,7 +53,7 @@ export function SectionCard({
    * On phones, the heading (or its chevron) opens and closes the body, and
    * the action hides while it's closed (the Overview's cards, A26). Done in
    * CSS, so the server's page already has it as it should be: no jump on
-   * load. The choice survives a remount (`phoneOpenByTitle`).
+   * load. The choice survives a remount (`phoneOpenByCard`, by page and title).
    */
   collapseOnPhone?: boolean;
   /** With `collapseOnPhone`: start open (cards to act on) rather than closed (reference cards). */

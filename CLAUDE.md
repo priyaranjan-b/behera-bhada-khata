@@ -654,7 +654,10 @@ Each of these was found broken somewhere; keep them when adding code.
   in a tinted `IconTile`, `tone` defaulting to the badge's, `variant`
   `highlighted` for needs-attention or `gradient` for the page's headline
   figure; tints come from `toneTintSx`/`toneMain` in `src/components/ui/tone.ts`,
-  CSS variables + `color-mix`, never hex). Don't import
+  CSS variables + `color-mix`, never hex; `href` makes it a link, `onClick` +
+  `selected` a toggle that filters the table below, A28; `TabStatCard` opens
+  a `PageTabs` tab), `TextLink` (an inline link to an app page: MuiLink over
+  the app's `Link`). Don't import
   `@mui/material/Card` outside `AppCard`.
 - **Colours live in the theme.** No hex/rgba literals in components (the
   shell and `DataTable/styles.ts` included): add a token to

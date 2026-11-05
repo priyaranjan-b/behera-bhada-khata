@@ -69,7 +69,7 @@ export default async function DashboardPage({
       }
       stats={
         <AsyncSection key={monthView} title="This month" fallback={SKELETON.stats} wide>
-          <MonthStats month={monthData} trend={trend} />
+          <MonthStats month={monthData} trend={trend} paidDirect={paidDirect} />
         </AsyncSection>
       }
       vacant={
@@ -79,7 +79,7 @@ export default async function DashboardPage({
       }
       trend={
         <AsyncSection key={paidDirect} title="Billing vs Received" fallback={SKELETON.trend}>
-          <TrendSection trend={trend} />
+          <TrendSection trend={trend} paidDirect={paidDirect} />
         </AsyncSection>
       }
       attention={

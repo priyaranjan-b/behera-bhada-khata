@@ -5,8 +5,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { SectionCard } from "@/components/ui";
-import Link from "@/components/ui/Link";
-import MuiLink from "@mui/material/Link";
+import TextLink from "@/components/ui/TextLink";
 import { routes } from "@/lib/routes";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import { collectionRateTone, type SiteCollection } from "@/lib/domain/overview";
@@ -29,9 +28,9 @@ export default function SiteCollectionCard({ sites, monthLabel }: { sites: SiteC
           {sites.map((s) => (
             <TableRow key={s.siteCode}>
               <TableCell>
-                <MuiLink component={Link} href={routes.properties.site(s.siteCode)} variant="body2" sx={{ display: "block" }}>
+                <TextLink href={routes.properties.site(s.siteCode)} variant="body2" sx={{ display: "block" }}>
                   {s.siteName}
-                </MuiLink>
+                </TextLink>
                 <Typography variant="caption" color="textSecondary">
                   {s.siteCode}
                 </Typography>

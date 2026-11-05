@@ -5,6 +5,8 @@ import { collectionRateTone } from "@/lib/domain/overview";
 import type { MonthlyTrendPoint } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
+import { paidDirectQuery } from "@/lib/preferences";
+import type { PaidDirectView } from "@/lib/types";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
@@ -34,14 +36,17 @@ function sparklineFor(trend: MonthlyTrendPoint[], key: "billed" | "collected") {
 export default async function MonthStats({
   month,
   trend,
+  paidDirect,
 }: {
   month: Promise<OverviewMonth>;
   trend: Promise<OverviewTrend>;
+  /** "Include Govt paid direct" (A11): the Billing page they open shows the same figures. */
+  paidDirect: PaidDirectView;
 }) {
   const [{ monthKey, report }, { trend: points }] = await Promise.all([month, trend]);
   const monthLabel = formatMonth(monthKey);
   // Expected / Collected open the Billing page for the same month.
-  const monthBilling = routes.billing({ from: yearMonthOf(monthKey), to: yearMonthOf(monthKey) });
+  const monthBilling = routes.billing({ from: yearMonthOf(monthKey), to: yearMonthOf(monthKey), ...paidDirectQuery(paidDirect) });
   const collectionRate = report.expected > 0 ? Math.round((report.collected / report.expected) * 100) : null;
   const activeTenants = report.rows.length;
   // "Collected" is what was credited to this month's rent; the chart's bars are

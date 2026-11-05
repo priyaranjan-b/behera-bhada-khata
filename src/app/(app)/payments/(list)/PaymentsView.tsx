@@ -207,7 +207,7 @@ export default function PaymentsView({
           variant="gradient"
           value={formatMoney(totals.amount)}
           {...cardFilter("received")}
-          caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
+          caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the filters" : ""}${
             byMode.set_off > 0 ? ` · + ${formatMoney(byMode.set_off)} set off` : ""
           }`}
         />
