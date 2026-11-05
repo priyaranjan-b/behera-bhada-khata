@@ -10,8 +10,7 @@ import { switchClasses } from "@mui/material/Switch";
 import type {} from "@mui/x-date-pickers/themeAugmentation";
 import { pickersInputBaseClasses } from "@mui/x-date-pickers/PickersTextField";
 import { brand, gray, orange, red } from "../themePrimitives";
-import { cardShadows, glassSurfaces, lightSurfaces, slate } from "../appTokens";
-import { GLASS_SCHEME, glassBlur, glassPopupSx, lightStyles } from "../glass";
+import { cardShadows, lightSurfaces, slate } from "../appTokens";
 import { embeddedIconButton } from "../embeddedIconButton";
 
 declare module "@mui/material/Chip" {
@@ -53,17 +52,6 @@ export const appCustomizations: Components<Theme> = {
     styleOverrides: {
       // A rent ledger is mostly figures: keep digits aligned everywhere.
       body: { WebkitFontSmoothing: "antialiased", fontVariantNumeric: "tabular-nums" },
-      // Glass (A29): the colour canvas, fixed behind every page. A fixed
-      // pseudo-element rather than background-attachment, which phones ignore.
-      [`[data-mui-color-scheme="${GLASS_SCHEME}"] body::before`]: {
-        content: '""',
-        position: "fixed",
-        inset: 0,
-        zIndex: -1,
-        pointerEvents: "none",
-        backgroundColor: glassSurfaces.base,
-        backgroundImage: glassSurfaces.canvas,
-      },
       "@media (prefers-reduced-motion: reduce)": {
         "*, *::before, *::after": {
           animationDuration: "0.01ms !important",
@@ -145,8 +133,7 @@ export const appCustomizations: Components<Theme> = {
     variants: [
       {
         props: {},
-        style: ({ theme }) =>
-          lightStyles(theme, { backgroundColor: lightSurfaces.paper }, { backgroundColor: glassSurfaces.paper }),
+        style: ({ theme }) => theme.applyStyles("light", { backgroundColor: lightSurfaces.paper }),
       },
       {
         props: { variant: "raised" },
@@ -172,33 +159,17 @@ export const appCustomizations: Components<Theme> = {
             },
             "&:active": { transform: "translateY(0)", boxShadow: cardShadows.dark.rest },
           },
-          ...lightStyles(
-            theme,
-            {
-              background: lightSurfaces.paper,
-              borderColor: lightSurfaces.border,
-              boxShadow: cardShadows.light.rest,
-              "&[data-interactive]": {
-                "@media (hover: hover)": {
-                  "&:hover": { boxShadow: cardShadows.light.hover, borderColor: slate[400] },
-                },
-                "&:active": { boxShadow: cardShadows.light.rest },
+          ...theme.applyStyles("light", {
+            background: lightSurfaces.paper,
+            borderColor: lightSurfaces.border,
+            boxShadow: cardShadows.light.rest,
+            "&[data-interactive]": {
+              "@media (hover: hover)": {
+                "&:hover": { boxShadow: cardShadows.light.hover, borderColor: slate[400] },
               },
+              "&:active": { boxShadow: cardShadows.light.rest },
             },
-            // A frosted pane: translucent fill, blur, a bright rim.
-            {
-              ...glassBlur,
-              background: glassSurfaces.paper,
-              borderColor: glassSurfaces.rim,
-              boxShadow: glassSurfaces.shadow.rest,
-              "&[data-interactive]": {
-                "@media (hover: hover)": {
-                  "&:hover": { boxShadow: glassSurfaces.shadow.hover, borderColor: glassSurfaces.rimHover },
-                },
-                "&:active": { boxShadow: glassSurfaces.shadow.rest },
-              },
-            }
-          ),
+          }),
         }),
       },
     ],
@@ -207,8 +178,7 @@ export const appCustomizations: Components<Theme> = {
     variants: [
       {
         props: {},
-        style: ({ theme }) =>
-          lightStyles(theme, { backgroundColor: lightSurfaces.paper }, { backgroundColor: glassSurfaces.inset }),
+        style: ({ theme }) => theme.applyStyles("light", { backgroundColor: lightSurfaces.paper }),
       },
     ],
   },
@@ -231,8 +201,7 @@ export const appCustomizations: Components<Theme> = {
             padding: "0 4px",
             borderRadius: 2,
             backgroundColor: (theme.vars || theme).palette.background.default,
-            // Glass: the field is see-through, so the label needs a solid mask.
-            ...lightStyles(theme, { backgroundColor: lightSurfaces.paper }, { backgroundColor: glassSurfaces.base }),
+            ...theme.applyStyles("light", { backgroundColor: lightSurfaces.paper }),
           },
         }),
       },
@@ -409,7 +378,6 @@ export const appCustomizations: Components<Theme> = {
   // its own end slot, not an InputAdornment: the same plain icon, at the
   // 28px its slot is centred for.
   MuiAutocomplete: {
-    styleOverrides: { paper: ({ theme }) => glassPopupSx(theme) },
     variants: [
       {
         props: {},
@@ -418,15 +386,5 @@ export const appCustomizations: Components<Theme> = {
         }),
       },
     ],
-  },
-  // Glass pop-ups: frosted and more opaque than cards, as they sit over busy content.
-  MuiPopover: {
-    variants: [{ props: {}, style: ({ theme }) => ({ "& .MuiPopover-paper": glassPopupSx(theme) }) }],
-  },
-  MuiDialog: {
-    variants: [{ props: {}, style: ({ theme }) => ({ "& .MuiDialog-paper": glassPopupSx(theme) }) }],
-  },
-  MuiDrawer: {
-    variants: [{ props: {}, style: ({ theme }) => ({ "& .MuiDrawer-paper": glassPopupSx(theme) }) }],
   },
 };

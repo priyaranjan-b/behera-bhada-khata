@@ -6,7 +6,6 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
 import { brand } from "@/theme/themePrimitives";
-import { GLASS_SCHEME } from "@/theme/glass";
 
 const WIDTHS = { sm: 440, md: 520, lg: 1040 } as const;
 
@@ -49,8 +48,6 @@ export function PublicLayout({
               inset: 0,
               backgroundRepeat: "no-repeat",
               backgroundImage: `radial-gradient(ellipse at 50% 50%, ${brand[50]}, ${(theme.vars || theme).palette.background.default})`,
-              // Glass: the canvas on <body> is the backdrop.
-              ...theme.applyStyles(GLASS_SCHEME, { backgroundImage: "none" }),
               ...theme.applyStyles("dark", {
                 backgroundImage: `radial-gradient(at 50% 50%, color-mix(in srgb, ${brand[800]} 50%, transparent), ${(theme.vars || theme).palette.background.default})`,
               }),

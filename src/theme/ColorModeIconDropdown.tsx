@@ -2,24 +2,18 @@
 
 // Adapted from the MUI Dashboard template (MIT), mui/material-ui v9.5.0
 // docs/data/material/getting-started/templates. Keep in sync by hand.
-// App change: a fourth choice, Glass (A29), the light mode drawn with the
-// glass scheme; System and Light put the plain light scheme back.
 
 import * as React from 'react';
 import DarkModeIcon from '@mui/icons-material/DarkModeRounded';
 import LightModeIcon from '@mui/icons-material/LightModeRounded';
-import GlassIcon from '@mui/icons-material/BlurOnRounded';
 import Box from '@mui/material/Box';
 import IconButton, { IconButtonOwnProps } from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import { useColorScheme } from '@mui/material/styles';
-import { GLASS_SCHEME } from './glass';
-
-type Choice = 'system' | 'light' | 'dark' | 'glass';
 
 export default function ColorModeIconDropdown(props: IconButtonOwnProps) {
-  const { mode, systemMode, setMode, lightColorScheme, setColorScheme } = useColorScheme();
+  const { mode, systemMode, setMode } = useColorScheme();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -28,18 +22,10 @@ export default function ColorModeIconDropdown(props: IconButtonOwnProps) {
   const handleClose = () => {
     setAnchorEl(null);
   };
-  const glassOn = lightColorScheme === GLASS_SCHEME;
-  const handleMode = (choice: Choice) => () => {
-    if (choice === 'glass') {
-      setColorScheme({ light: GLASS_SCHEME });
-      setMode('light');
-    } else {
-      setColorScheme({ light: 'light' });
-      setMode(choice);
-    }
+  const handleMode = (targetMode: 'system' | 'light' | 'dark') => () => {
+    setMode(targetMode);
     handleClose();
   };
-  const selected: Choice | undefined = mode === 'light' && glassOn ? 'glass' : mode;
   if (!mode) {
     return (
       <Box
@@ -57,8 +43,10 @@ export default function ColorModeIconDropdown(props: IconButtonOwnProps) {
     );
   }
   const resolvedMode = (systemMode || mode) as 'light' | 'dark';
-  const icon =
-    resolvedMode === 'light' && glassOn ? <GlassIcon /> : { light: <LightModeIcon />, dark: <DarkModeIcon /> }[resolvedMode];
+  const icon = {
+    light: <LightModeIcon />,
+    dark: <DarkModeIcon />,
+  }[resolvedMode];
   return (
     <React.Fragment>
       <IconButton
@@ -91,17 +79,14 @@ export default function ColorModeIconDropdown(props: IconButtonOwnProps) {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem selected={selected === 'system'} onClick={handleMode('system')}>
+        <MenuItem selected={mode === 'system'} onClick={handleMode('system')}>
           System
         </MenuItem>
-        <MenuItem selected={selected === 'light'} onClick={handleMode('light')}>
+        <MenuItem selected={mode === 'light'} onClick={handleMode('light')}>
           Light
         </MenuItem>
-        <MenuItem selected={selected === 'dark'} onClick={handleMode('dark')}>
+        <MenuItem selected={mode === 'dark'} onClick={handleMode('dark')}>
           Dark
-        </MenuItem>
-        <MenuItem selected={selected === 'glass'} onClick={handleMode('glass')}>
-          Glass
         </MenuItem>
       </Menu>
     </React.Fragment>

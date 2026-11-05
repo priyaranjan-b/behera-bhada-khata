@@ -1,6 +1,6 @@
 import type {} from "@mui/x-charts/themeAugmentation";
 import type {} from "@mui/x-data-grid/themeAugmentation";
-import { createColorScheme, createTheme, type Components, type Theme } from "@mui/material/styles";
+import { createTheme, type Components, type Theme } from "@mui/material/styles";
 import { colorSchemes, shadows, shape, typography } from "./themePrimitives";
 import { inputsCustomizations } from "./customizations/inputs";
 import { dataDisplayCustomizations } from "./customizations/dataDisplay";
@@ -11,7 +11,7 @@ import { chartsCustomizations } from "./customizations/charts";
 import { dataGridCustomizations } from "./customizations/dataGrid";
 import { datePickersCustomizations } from "./customizations/datePickers";
 import { appCustomizations } from "./customizations/app";
-import { glassSurfaces, lightSurfaces } from "./appTokens";
+import { lightSurfaces } from "./appTokens";
 
 type ComponentConfig = {
   defaultProps?: object;
@@ -65,18 +65,6 @@ const theme = createTheme({
         background: { default: lightSurfaces.canvas, paper: lightSurfaces.paper },
       },
     },
-    // Glass (A29): the light palette with frosted surfaces; the canvas
-    // gradient and the blur are in customizations/app.ts (glass.ts helpers).
-    // MUI only completes the built-in light/dark palettes, so a named scheme
-    // is built with createColorScheme.
-    glass: createColorScheme({
-      palette: {
-        ...colorSchemes.light.palette,
-        mode: "light",
-        divider: glassSurfaces.divider,
-        background: { default: glassSurfaces.base, paper: glassSurfaces.paper },
-      },
-    }),
   },
   typography: {
     ...typography,

@@ -1,7 +1,6 @@
 import { gridClasses } from "@mui/x-data-grid";
 import type { Theme } from "@mui/material/styles";
-import { glassSurfaces, lightSurfaces, slate } from "@/theme/appTokens";
-import { lightStyles } from "@/theme/glass";
+import { lightSurfaces, slate } from "@/theme/appTokens";
 import { embeddedIconButton } from "@/theme/embeddedIconButton";
 
 /** Row heights per density; `standard` fits an avatar + two-line identity cell. */
@@ -111,28 +110,15 @@ export const dataTableSx = (theme: Theme) => ({
   // Footer
   [`& .${gridClasses.footerContainer}`]: { minHeight: 52, borderTopColor: (theme.vars || theme).palette.divider },
 
-  ...lightStyles(
-    theme,
-    {
-      backgroundColor: lightSurfaces.paper,
-      [`& .${gridClasses.columnHeader}`]: { backgroundColor: slate[50] },
-      [`& .${gridClasses.footerContainer}`]: { backgroundColor: lightSurfaces.paper },
-      [`& .${gridClasses.row}`]: {
-        "&.odd": { backgroundColor: "#FBFCFE" },
-        "&:hover": { backgroundColor: slate[100] },
-      },
+  ...theme.applyStyles("light", {
+    backgroundColor: lightSurfaces.paper,
+    [`& .${gridClasses.columnHeader}`]: { backgroundColor: slate[50] },
+    [`& .${gridClasses.footerContainer}`]: { backgroundColor: lightSurfaces.paper },
+    [`& .${gridClasses.row}`]: {
+      "&.odd": { backgroundColor: "#FBFCFE" },
+      "&:hover": { backgroundColor: slate[100] },
     },
-    // Glass: the grid shows its card's frosted pane through it (no blur of its own).
-    {
-      backgroundColor: "transparent",
-      [`& .${gridClasses.columnHeader}`]: { backgroundColor: glassSurfaces.inset },
-      [`& .${gridClasses.footerContainer}`]: { backgroundColor: "transparent" },
-      [`& .${gridClasses.row}`]: {
-        "&.odd": { backgroundColor: glassSurfaces.rowStripe },
-        "&:hover": { backgroundColor: glassSurfaces.rowHover },
-      },
-    }
-  ),
+  }),
   ...theme.applyStyles("dark", {
     [`& .${gridClasses.row}.odd`]: { backgroundColor: "rgba(255, 255, 255, 0.025)" },
   }),

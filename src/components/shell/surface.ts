@@ -1,7 +1,6 @@
 import type { Theme } from "@mui/material/styles";
 import { brand } from "@/theme/themePrimitives";
-import { glassSurfaces, lightSurfaces } from "@/theme/appTokens";
-import { GLASS_SCHEME, glassBlur, lightStyles } from "@/theme/glass";
+import { lightSurfaces } from "@/theme/appTokens";
 
 // The desktop side menu is a dark contrast column, like CoreUI's admin
 // layout, in both colour schemes - CoreUI's dark slate nudged towards the
@@ -31,16 +30,11 @@ const onChromeSx = {
   },
 } as const;
 
-/** Desktop side menu: the dark contrast column (glass: smoked glass over the canvas). */
-export const sideMenuSurfaceSx = (theme: Theme) => ({
+/** Desktop side menu: the dark contrast column. */
+export const sideMenuSurfaceSx = (_theme: Theme) => ({
   ...onChromeSx,
   backgroundColor: SIDE_MENU_BG,
   backgroundImage: "none",
-  ...theme.applyStyles(GLASS_SCHEME, {
-    ...glassBlur,
-    backgroundColor: `color-mix(in srgb, ${SIDE_MENU_BG} 78%, transparent)`,
-    borderRightColor: "transparent",
-  }),
 });
 
 /** The band behind the logo at the top of the side menu. */
@@ -55,7 +49,6 @@ function chromeTint(theme: Theme, alpha = 100) {
   return {
     dark: `color-mix(in srgb, color-mix(in srgb, ${brand[800]} 32%, ${paper}) ${alpha}%, transparent)`,
     light: `color-mix(in srgb, color-mix(in srgb, ${brand[50]} 62%, ${lightSurfaces.paper}) ${alpha}%, transparent)`,
-    glass: `color-mix(in srgb, ${lightSurfaces.paper} ${Math.round(alpha * 0.6)}%, transparent)`,
   };
 }
 
@@ -65,7 +58,7 @@ export const shellSurfaceSx = (theme: Theme) => {
   return {
     backgroundColor: tint.dark,
     backgroundImage: "none",
-    ...lightStyles(theme, { backgroundColor: tint.light }, { ...glassBlur, backgroundColor: tint.glass }),
+    ...theme.applyStyles("light", { backgroundColor: tint.light }),
   };
 };
 
@@ -83,19 +76,9 @@ export const topBarGlassSx = (theme: Theme, raised: boolean) => {
     WebkitBackdropFilter: "saturate(180%) blur(12px)",
     transition: theme.transitions.create("box-shadow", { duration: theme.transitions.duration.short }),
     boxShadow: raised ? "0 10px 28px -14px rgba(0, 0, 0, 0.7)" : "none",
-    ...lightStyles(
-      theme,
-      {
-        backgroundColor: tint.light,
-        boxShadow: raised ? "0 1px 0 rgba(15, 23, 42, 0.04), 0 10px 28px -14px rgba(30, 27, 75, 0.22)" : "none",
-      },
-      { backgroundColor: tint.glass, boxShadow: raised ? glassSurfaces.shadow.rest : "none" }
-    ),
+    ...theme.applyStyles("light", {
+      backgroundColor: tint.light,
+      boxShadow: raised ? "0 1px 0 rgba(15, 23, 42, 0.04), 0 10px 28px -14px rgba(30, 27, 75, 0.22)" : "none",
+    }),
   };
 };
-
-/** The page area behind the cards: the canvas colour, or see-through to the glass canvas on <body>. */
-export const appCanvasSx = (theme: Theme) => ({
-  backgroundColor: (theme.vars || theme).palette.background.default,
-  ...theme.applyStyles(GLASS_SCHEME, { backgroundColor: "transparent" }),
-});
