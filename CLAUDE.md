@@ -53,8 +53,10 @@ Run `/review-all` before a commit or PR (`/review-all security` for one
 area). It runs the read-only reviewers in `.claude/agents/` in parallel and
 merges their findings: `architecture-reviewer`, `security-reviewer`,
 `database-reviewer` (when `supabase/` or the data layer changed),
-`production-readiness-reviewer` and `ui-conventions-reviewer` (when the UI
-changed). They apply the rules in this file and `docs/`, so a new rule goes
+`production-readiness-reviewer`, and `ui-conventions-reviewer` (the UI code
+rules) and `ux-design-reviewer` (what the landlord experiences: flow,
+figures that could be misread, states, phone use, accessibility) when the
+UI changed. They apply the rules in this file and `docs/`, so a new rule goes
 here, not into an agent. Anything a tool can check belongs in ESLint or a
 test instead.
 

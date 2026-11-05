@@ -1,6 +1,6 @@
 ---
 name: review-all
-description: Review the current change in Behera Bhada Khata with the project reviewer agents (architecture, security, database, production readiness, UI conventions) in parallel, then merge their findings into one ranked list. Use before a commit or PR, or when asked to "review my changes" / "/review-all", optionally with one area (architecture, security, database, prod, ui).
+description: Review the current change in Behera Bhada Khata with the project reviewer agents (architecture, security, database, production readiness, UI conventions, UX design) in parallel, then merge their findings into one ranked list. Use before a commit or PR, or when asked to "review my changes" / "/review-all", optionally with one area (architecture, security, database, prod, ui, ux).
 ---
 
 # Review the current change
@@ -10,14 +10,15 @@ description: Review the current change in Behera Bhada Khata with the project re
 2. **Pick reviewers.** If the user named an area, run only that agent
    (`architecture` → architecture-reviewer, `security` → security-reviewer,
    `database` → database-reviewer, `prod` → production-readiness-reviewer,
-   `ui` → ui-conventions-reviewer). Otherwise run:
+   `ui` → ui-conventions-reviewer, `ux` → ux-design-reviewer). Otherwise run:
    - always: architecture-reviewer, security-reviewer,
      production-readiness-reviewer;
    - database-reviewer when `supabase/`, `src/lib/types.ts`,
      `src/server/ports.ts`, `src/server/adapters/drizzle/` or
      `test/schema.test.ts` changed;
-   - ui-conventions-reviewer when `src/app/`, `src/components/` or
-     `src/theme/` changed.
+   - ui-conventions-reviewer and ux-design-reviewer when `src/app/`,
+     `src/components/` or `src/theme/` changed (the first checks the code
+     rules, the second what the user experiences).
 3. **Run them in parallel** (one message, one Agent call each), passing the
    changed-file list. Don't pass your own opinion of the code.
 4. **Merge.** Drop duplicates (keep the most specific), drop anything
