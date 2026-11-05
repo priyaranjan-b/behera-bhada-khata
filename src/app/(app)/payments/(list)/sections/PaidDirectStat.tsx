@@ -4,7 +4,14 @@ import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceW
 import StatCard from "@/components/ui/StatCard";
 
 /** Govt rent paid to the bank directly (A11): by rent month, so the table's search doesn't apply. */
-export default async function PaidDirectStat({ paidDirect }: { paidDirect: Promise<PaymentsPaidDirect> }) {
+export default async function PaidDirectStat({
+  paidDirect,
+  href,
+}: {
+  paidDirect: Promise<PaymentsPaidDirect>;
+  /** The Billing page for those rent months, with Govt paid direct shown (where these figures come from). */
+  href: string;
+}) {
   const { amount, months, tenants } = await paidDirect;
   return (
     <StatCard
@@ -12,6 +19,7 @@ export default async function PaidDirectStat({ paidDirect }: { paidDirect: Promi
       icon={<AccountBalanceWalletRoundedIcon />}
       tone="info"
       value={formatMoney(amount)}
+      href={href}
       caption={
         months === 0
           ? "None for these rent months"

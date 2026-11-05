@@ -123,6 +123,15 @@ export function monthDayRange(key: string): { from: string; to: string } {
   return { from, to: `${from.slice(0, 8)}${String(last).padStart(2, "0")}` };
 }
 
+/**
+ * The days (yyyy-MM-dd) a range of months covers, from the first day of
+ * `from` to the last day of `to`: a month report linking to a page by day
+ * received (Payments, Maintenance).
+ */
+export function dayRangeOfMonths(from: string, to: string): { from: string; to: string } {
+  return { from: monthDayRange(from).from, to: monthDayRange(to).to };
+}
+
 /** Is `value` a real yyyy-MM-dd calendar date? */
 export function isDateKey(value: string): boolean {
   const match = DATE_KEY.exec(value);

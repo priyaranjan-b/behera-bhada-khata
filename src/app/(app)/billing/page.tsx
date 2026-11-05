@@ -1,6 +1,6 @@
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
-import { formatMonth, lastMonthKey, yearMonthOf } from "@/lib/dates";
+import { dayRangeOfMonths, formatMonth, lastMonthKey, yearMonthOf } from "@/lib/dates";
 import { rangeFromParams, rangeLength, rangeQuery, shiftRange } from "@/lib/domain/billing";
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
 import { routes } from "@/lib/routes";
@@ -74,7 +74,7 @@ export default async function BillingPage({
           <BillingStats totals={totals} rangeLabel={rangeLabel} />
         </AsyncSection>
         <AsyncSection key={`received-${view}`} title="Received" fallback={SKELETON.received}>
-          <ReceivedStat received={received} months={months} />
+          <ReceivedStat received={received} months={months} href={routes.payments.list(dayRangeOfMonths(range.from, range.to))} />
         </AsyncSection>
       </StatCardRow>
 

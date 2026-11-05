@@ -3,18 +3,19 @@ import {
   addMonthsToKey,
   currentMonthKey,
   dateKeyOf,
+  dayRangeOfMonths,
   formatDateKey,
   formatDateTime,
   formatMonth,
   isDateKey,
   lastMonthKey,
+  monthDayRange,
   monthKeyFromParam,
   monthKeyOf,
   monthsBetween,
   todayKey,
-  yearMonthOf,
-  monthDayRange,
   utcStartOfDayBefore,
+  yearMonthOf,
 } from "./dates";
 
 describe("dates (Asia/Kolkata)", () => {
@@ -99,5 +100,13 @@ describe("utcStartOfDayBefore", () => {
     // 00:00 IST on the day is 18:30 UTC the day before: inside the bound.
     expect(Date.parse(utcStartOfDayBefore("2026-10-15"))).toBeLessThanOrEqual(Date.parse("2026-10-15T00:00:00+05:30"));
     expect(dateKeyOf("2026-10-14T18:30:00Z")).toBe("2026-10-15");
+  });
+});
+
+describe("dayRangeOfMonths", () => {
+  it("runs from the first day of the first month to the last day of the last", () => {
+    expect(dayRangeOfMonths("2026-10-01", "2026-10-01")).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(dayRangeOfMonths("2026-01", "2026-02")).toEqual({ from: "2026-01-01", to: "2026-02-28" });
+    expect(dayRangeOfMonths("2028-02-01", "2028-02-01")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
   });
 });

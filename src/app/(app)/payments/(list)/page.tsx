@@ -1,6 +1,7 @@
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
-import { dayRangeFromParams, dayRangeLabel, dayRangeUnit, shiftDayRange } from "@/lib/domain/payments";
+import { dayRangeFromParams, dayRangeLabel, dayRangeUnit, monthsOfDayRange, shiftDayRange } from "@/lib/domain/payments";
+import { yearMonthOf } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 import { PAYMENTS_LIMITS } from "@/lib/validation";
 import AsyncSection from "@/components/ui/AsyncSection";
@@ -23,6 +24,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const tagSuggestions = serverApi.dashboard.payments.tagSuggestions();
   const rangeLabel = dayRangeLabel(range);
   const view = `${range.from}-${range.to}`;
+  const rentMonths = monthsOfDayRange(range);
+  const paidDirectHref = routes.billing({ from: yearMonthOf(rentMonths.from), to: yearMonthOf(rentMonths.to), paidDirect: "show" });
 
   return (
     <Stack spacing={2}>
@@ -50,7 +53,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           tagSuggestions={tagSuggestions}
           paidDirectCard={
             <AsyncSection key={view} title="Govt paid direct" fallback={SKELETON.stat}>
-              <PaidDirectStat paidDirect={paidDirect} />
+              <PaidDirectStat paidDirect={paidDirect} href={paidDirectHref} />
             </AsyncSection>
           }
         />

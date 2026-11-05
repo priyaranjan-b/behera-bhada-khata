@@ -21,18 +21,42 @@ function netLook(net: number, profitVariant: "default" | "gradient" = "default")
 }
 
 /** The two nets as cards, then the months as a chart and a table: one call, the same months (A23). */
-export default async function EarningsSection({ earnings, rangeLabel }: { earnings: Promise<EarningsView>; rangeLabel: string }) {
+export default async function EarningsSection({
+  earnings,
+  rangeLabel,
+  links,
+}: {
+  earnings: Promise<EarningsView>;
+  rangeLabel: string;
+  /** Where each figure comes from, for the same months: Billing, Payments and Maintenance. The nets are computed. */
+  links: { collected: string; received: string; maintenance: string };
+}) {
   const { months, totals: t } = await earnings;
   const bySetOff = t.maintenance - t.maintenanceCash;
   return (
     <Stack spacing={2}>
       <StatCardRow columns={EARNINGS_STAT_COLUMNS} label="Earnings totals">
-        <StatCard title="Collected" icon={<SavingsRoundedIcon />} tone="primary" value={formatMoney(t.collected)} caption={`Rent for these months, of ${formatMoney(t.billed)} billed`} />
-        <StatCard title="Received" icon={<PaymentsRoundedIcon />} tone="primary" value={formatMoney(t.received)} caption="Cash that came in these months" />
+        <StatCard
+          title="Collected"
+          icon={<SavingsRoundedIcon />}
+          tone="primary"
+          value={formatMoney(t.collected)}
+          caption={`Rent for these months, of ${formatMoney(t.billed)} billed`}
+          href={links.collected}
+        />
+        <StatCard
+          title="Received"
+          icon={<PaymentsRoundedIcon />}
+          tone="primary"
+          value={formatMoney(t.received)}
+          caption="Cash that came in these months"
+          href={links.received}
+        />
         <StatCard
           title="Maintenance"
           icon={<HandymanRoundedIcon />}
           value={formatMoney(t.maintenance)}
+          href={links.maintenance}
           caption={bySetOff > 0 ? `${formatMoney(t.maintenanceCash)} in cash · ${formatMoney(bySetOff)} by set-off` : "Spent on the houses"}
         />
         <StatCard

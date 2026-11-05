@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/money";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 import StatCard from "@/components/ui/StatCard";
+import { routes } from "@/lib/routes";
 import { StatCardSkeleton } from "@/components/ui/Skeletons";
 
 /** Grid cell of one account stat card. */
@@ -19,8 +20,11 @@ export function AccountStatsSkeleton() {
   ));
 }
 
-/** Tenant page: Outstanding and Months overdue - two cells of a `Grid container`. */
-export default async function AccountStats({ account }: { account: Promise<TenantAccount> }) {
+/**
+ * Tenant page: Outstanding and Months overdue - two cells of a `Grid container`,
+ * each opening the tab it comes from (the ledger, the rent months).
+ */
+export default async function AccountStats({ account, tenantId }: { account: Promise<TenantAccount>; tenantId: string }) {
   const { balance, endedMonths, paidEndedMonths } = await account;
   const lastMonth = formatMonth(addMonthsToKey(currentMonthKey(), -1));
   return (
@@ -31,6 +35,7 @@ export default async function AccountStats({ account }: { account: Promise<Tenan
           icon={<AccountBalanceWalletRoundedIcon />}
           variant={balance.totalOutstanding > 0 ? "highlighted" : "default"}
           value={formatMoney(balance.totalOutstanding)}
+          href={routes.tenants.detail(tenantId, { tab: "ledger" })}
           caption={
             balance.notYetDue > 0
               ? `To end of ${lastMonth} · ${formatMoney(balance.notYetDue)} not due yet`
@@ -46,6 +51,7 @@ export default async function AccountStats({ account }: { account: Promise<Tenan
           title="Months overdue"
           icon={<EventBusyRoundedIcon />}
           value={String(balance.overdueMonths)}
+          href={routes.tenants.detail(tenantId, { tab: "months" })}
           caption={`${paidEndedMonths} of ${endedMonths} ended month${endedMonths === 1 ? "" : "s"} paid`}
           badge={
             balance.overdueMonths > 0 ? { label: "Follow up", tone: "danger" } : { label: "On track", tone: "success" }

@@ -276,7 +276,7 @@ export default async function TenantPage({
       {account ? (
         <Grid container spacing={2} columns={12}>
           <AsyncSection title="Account" fallback={<AccountStatsSkeleton />}>
-            <AccountStats account={account} />
+            <AccountStats account={account} tenantId={tenantId} />
           </AsyncSection>
         </Grid>
       ) : null}

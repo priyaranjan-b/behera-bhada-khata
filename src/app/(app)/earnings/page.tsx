@@ -1,6 +1,6 @@
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
-import { formatMonth, yearMonthOf } from "@/lib/dates";
+import { dayRangeOfMonths, formatMonth, yearMonthOf } from "@/lib/dates";
 import { rangeLength, rangeQuery, shiftRange } from "@/lib/domain/billing";
 import { earningsRange } from "@/lib/domain/earnings";
 import { paidDirectQuery, paidDirectViewOf } from "@/lib/preferences";
@@ -63,7 +63,15 @@ export default async function EarningsPage({
         resetHref={routes.earnings()}
       />
       <AsyncSection key={view} title="Earnings" fallback={SKELETON.view}>
-        <EarningsSection earnings={earnings} rangeLabel={rangeLabel} />
+        <EarningsSection
+          earnings={earnings}
+          rangeLabel={rangeLabel}
+          links={{
+            collected: routes.billing({ ...rangeQuery(range), ...paidDirectQuery(paidDirect) }),
+            received: routes.payments.list(dayRangeOfMonths(range.from, range.to)),
+            maintenance: routes.maintenance.list(dayRangeOfMonths(range.from, range.to)),
+          }}
+        />
       </AsyncSection>
     </Stack>
   );

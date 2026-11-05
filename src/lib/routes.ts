@@ -67,6 +67,8 @@ export const routes = {
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
   properties: {
     list: "/properties",
+    /** The Properties page at one site's towers (its section heading is `site-<code>`). */
+    site: (locationCode: string) => withQuery("/properties", undefined, `site-${locationCode}`),
     new: "/properties/new",
     detail: (code: string) => `/properties/${e(code)}`,
     newUnit: (code: string) => `/properties/${e(code)}/units/new`,

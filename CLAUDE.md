@@ -86,7 +86,8 @@ test instead.
   report pages' sticky period/view bar instead of a global header control (A24),
   and Profile (the person) vs Settings (the shared lists, A25), and money
   tables' footer totals and the phone swipe row of stat cards (A26), and old
-  confirm links and password changes (A27). Read it before changing
+  confirm links and password changes (A27), and every figure linking to
+  its source data (A28). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 

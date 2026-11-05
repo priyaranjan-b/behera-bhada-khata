@@ -20,11 +20,22 @@ import { APP_LOCALE } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { useAppRouter } from "@/components/ui/Loading";
+import Link from "@/components/ui/Link";
+import MuiLink from "@mui/material/Link";
+import { routes } from "@/lib/routes";
 import { TREND_CHART_HEIGHT } from "@/components/ui/chartHeights";
 
 const compact = new Intl.NumberFormat(APP_LOCALE, { notation: "compact", maximumFractionDigits: 1 });
 
-/** Billed vs collected per month (template PageViewsBarChart look), with a table view for screen readers. */
+/** The Billing page for one month of the chart (`monthKey` is yyyy-MM, as the trend's points). */
+const monthBillingHref = (monthKey: string) => routes.billing({ from: monthKey, to: monthKey });
+
+/**
+ * Billed vs collected per month (template PageViewsBarChart look), with a
+ * table view for screen readers. A month's bars, or its row in the table,
+ * open the Billing page for that month.
+ */
 export default function BillingCollectionChart({
   data,
   href,
@@ -34,6 +45,7 @@ export default function BillingCollectionChart({
   href?: string;
 }) {
   const theme = useTheme();
+  const router = useAppRouter();
   const [showTable, setShowTable] = useState(false);
   if (data.length === 0) return null;
 
@@ -86,7 +98,11 @@ export default function BillingCollectionChart({
             <TableBody>
               {data.map((d) => (
                 <TableRow key={d.monthKey}>
-                  <TableCell>{d.label}</TableCell>
+                  <TableCell>
+                    <MuiLink component={Link} href={monthBillingHref(d.monthKey)} aria-label={`Billing for ${d.label}`}>
+                      {d.label}
+                    </MuiLink>
+                  </TableCell>
                   <TableCell align="right">{formatMoney(d.billed)}</TableCell>
                   <TableCell align="right">{formatMoney(d.collected)}</TableCell>
                 </TableRow>
@@ -106,6 +122,12 @@ export default function BillingCollectionChart({
               ]}
               margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
               grid={{ horizontal: true }}
+              // A month's bars open its Billing page (the table view links each month for keyboards).
+              onAxisClick={(_event, item) => {
+                const point = item ? data[item.dataIndex] : undefined;
+                if (point) router.push(monthBillingHref(point.monthKey));
+              }}
+              sx={{ cursor: "pointer" }}
               slotProps={{ legend: { position: { vertical: "top", horizontal: "end" } } }}
             />
           </Box>

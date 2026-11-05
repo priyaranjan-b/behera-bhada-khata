@@ -995,3 +995,26 @@ the current password would stop an owner who has only used email links from
 ever setting one; the recent-sign-in window ("sudo mode") covers that, since
 signing in again proves the email. Supabase's emailed reauthentication code
 would be stronger but needs a dashboard setting and an extra form step.
+
+### A28 — Every figure opens the data it comes from
+
+**Decision.** A card, chart or summary row that shows a figure links to the
+page holding the records behind it, for the same period:
+- **Another page:** the Overview's cards (Billing for the month, Defaulters,
+  overdue tenants, vacant houses), a Billing vs Received month (its bars, or
+  the month in the table view) to Billing for that month, Billing's Received
+  to Payments for the range's days (`dayRangeOfMonths`), Earnings' Collected,
+  Received and Maintenance to Billing, Payments and Maintenance for its
+  months, Payments' Govt paid direct to Billing for those rent months with
+  paid direct shown, the tenant page's Outstanding and Months overdue to its
+  Ledger and Months tabs, Collection by site to the site's towers
+  (`routes.properties.site`), and Portfolio's rent roll, occupancy and paid
+  direct to the Tenants and Houses lists.
+- **The same page** (a card above its own table): it filters that table
+  to what it counts (see the second part below, when it lands).
+- **No link:** a total of the table already on screen, and figures that are
+  computed rather than recorded (Earnings' nets, Spent of collected).
+  Tenant types has no link while the Tenants list can't filter by type.
+
+**Why.** A figure the owner can't open is a dead end: the next question is
+always "which ones?".
