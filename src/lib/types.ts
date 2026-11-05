@@ -793,6 +793,12 @@ export interface TenantMonthDbRow {
   month_label: string;
 }
 
+/** The Months query's money over every row that matches its search and filters, whatever the page (A26). */
+export interface TenantMonthSumsDb {
+  amount_due: number;
+  amount_allocated: number;
+}
+
 /** A row of the Billing grid query (billingPage; was billing_page, 0021): one tenant's rent for one month, or a paid-direct month. */
 export interface BillingDbRow {
   id: string;
@@ -885,6 +891,13 @@ export interface BillingTotalsDb {
   tenants: number;
 }
 
+/** The Billing grid's money over every row that matches its "Show", search and filters, whatever the page (A26). */
+export interface BillingSumsDb {
+  amount_due: number;
+  amount_allocated: number;
+  balance: number;
+}
+
 /** The tenant page's account figures (tenantAccountSummary; was tenant_account_summary, 0022). */
 export interface TenantAccountSummaryDb {
   /** Unpaid on months that have ended. */
@@ -913,6 +926,12 @@ export interface TenantLedgerDbRow {
   acknowledged: boolean | null;
   /** A payment's tags (0030), alphabetical; [] for other rows. */
   tags: string[];
+}
+
+/** The ledger's debits and credits over every row that matches its dates, search and filters, whatever the page (A26). */
+export interface TenantLedgerSumsDb {
+  debit: number;
+  credit: number;
 }
 
 /** The text columns the history query searches and filters (auditHistoryPage; was audit_history_page, 0018); tenant_name is read from tenants. */

@@ -16,6 +16,16 @@ import { formatMoney } from "@/lib/money";
 
 export type Trend = "up" | "down" | "neutral";
 
+/** At most `lines` lines per breakpoint, then an ellipsis; "none" lets the text wrap. */
+function clampLines(lines: { xs: number; sm: number | "none" }) {
+  return {
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: { xs: lines.xs, sm: lines.sm },
+    overflow: { xs: "hidden", sm: lines.sm === "none" ? "visible" : "hidden" },
+  } as const;
+}
+
 function AreaGradient({ color, id }: { color: string; id: string }) {
   return (
     <defs>
@@ -37,8 +47,10 @@ function AreaGradient({ color, id }: { color: string; id: string }) {
  * - `variant`: `highlighted` adds a tone bar down the left edge (needs
  *   attention; a danger card also shows the value in red), `gradient` a
  *   faint tone wash (the page's headline figure).
- * - Compact on phones, where pages lay them out two per row: a 32px icon, a
- *   smaller value with the badge under it, and no sparkline.
+ * - Compact on phones, where pages lay them out two per row or in a swipe
+ *   row (`StatCardRow`): less padding, a one-line title, a 32px icon, a
+ *   smaller value with the badge under it, a caption of two lines at most
+ *   and no sparkline.
  */
 export default function StatCard({
   title,
@@ -80,7 +92,8 @@ export default function StatCard({
     <AppCard
       href={href}
       sx={[
-        { height: "100%", flexGrow: 1, position: "relative" },
+        // Phones: 12px in, not the card's 16, so a row of figures stays short.
+        { height: "100%", flexGrow: 1, position: "relative", p: { xs: 1.5, sm: 2 } },
         variant === "highlighted" && {
           "&::before": { content: '""', position: "absolute", inset: "0 auto 0 0", width: 3, bgcolor: toneMain(theme, cardTone) },
         },
@@ -99,14 +112,14 @@ export default function StatCard({
         },
       ]}
     >
-      <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", gap: 1 }}>
+      <CardContent sx={{ height: "100%", display: "flex", flexDirection: "column", gap: { xs: 0.5, sm: 1 } }}>
         <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
           <Typography
             component="h2"
             variant="subtitle2"
             color="textSecondary"
-            // Two lines at most: narrow cards (seven in a row, two on phones) keep the whole title.
-            sx={{ fontWeight: 600, minWidth: 0, pt: 0.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            // Two lines at most where seven share a row; one on phones, where the titles are short words.
+            sx={{ fontWeight: 600, minWidth: 0, pt: 0.5, ...clampLines({ xs: 1, sm: 2 }) }}
           >
             {title}
           </Typography>
@@ -136,12 +149,12 @@ export default function StatCard({
         {caption || note ? (
           <Stack sx={{ mt: "auto" }}>
             {caption && (
-              <Typography variant="caption" color="textSecondary">
+              <Typography variant="caption" color="textSecondary" title={caption} sx={clampLines({ xs: 2, sm: "none" })}>
                 {caption}
               </Typography>
             )}
             {note && (
-              <Typography variant="caption" color="textSecondary">
+              <Typography variant="caption" color="textSecondary" title={note} sx={clampLines({ xs: 1, sm: "none" })}>
                 {note}
               </Typography>
             )}

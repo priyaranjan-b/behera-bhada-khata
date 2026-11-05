@@ -224,7 +224,7 @@ export default function DataTableToolbar() {
                         : "Download Excel"
                   }
                   className={TOOL_BUTTON}
-                  onClick={() => downloadGridAsExcel(apiRef, config.title)}
+                  onClick={() => downloadGridAsExcel(apiRef, config.title, { withTotals: !paged })}
                 >
                   <GridOnOutlinedIcon fontSize="small" />
                 </ToolbarButton>

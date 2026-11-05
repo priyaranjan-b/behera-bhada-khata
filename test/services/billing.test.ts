@@ -21,6 +21,8 @@ describe("Billing", () => {
   it("defaults to last month and asks the database for one page, as database columns", async () => {
     const page = await getBillingPage(ctx);
     expect(page).toMatchObject({ from: "2026-09-01", to: "2026-09-01", total: 1, all: 1, page: 0 });
+    // The footer totals: the database's sums over every matching row, keyed by the grid's fields (A26).
+    expect(page.totals).toEqual({ amountDue: 5000, amountAllocated: 5000, balance: 0 });
     expect(fakes.owner.billing.page).toHaveBeenLastCalledWith({
       from: "2026-09-01",
       to: "2026-09-01",

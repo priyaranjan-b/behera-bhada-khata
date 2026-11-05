@@ -13,7 +13,7 @@ import DataTable, {
 } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/domain/StatusChip";
 import { api } from "@/lib/api-client";
-import type { TablePage, TenantMonthRow, TenantMonthsQuery } from "@/lib/contracts";
+import type { TenantMonthRow, TenantMonthsPage, TenantMonthsQuery } from "@/lib/contracts";
 import { TENANT_MONTH_DISPLAY_STATUSES, TENANT_MONTH_SHOW_OPTIONS, type TenantMonthShow } from "@/lib/domain/billing";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { statusLabel } from "@/lib/domain/status";
@@ -28,8 +28,8 @@ const columns: DataTableColDef<TenantMonthRow>[] = [
     valueFormatter: (_value, row) => row.monthLabel,
     filterOperators: SERVER_TEXT_OPERATORS,
   },
-  moneyColumn<TenantMonthRow>("amountDue", "Due", { filterable: false }),
-  moneyColumn<TenantMonthRow>("amountAllocated", "Allocated", { filterable: false }),
+  moneyColumn<TenantMonthRow>("amountDue", "Due", { filterable: false, total: true }),
+  moneyColumn<TenantMonthRow>("amountAllocated", "Allocated", { filterable: false, total: true }),
   // The database filters on the label the column shows.
   selectColumn<TenantMonthRow>("status", "Status", TENANT_MONTH_DISPLAY_STATUSES.map(statusLabel), {
     minWidth: 140,
@@ -46,7 +46,7 @@ interface Extra {
 
 const DEFAULT_EXTRA: Extra = { show: "all" };
 const DEFAULT_SORT: GridSortModel = [{ field: "periodMonth", sort: "desc" }];
-const EMPTY: TablePage<TenantMonthRow> = { rows: [], total: 0, all: 0, page: 0 };
+const EMPTY: TenantMonthsPage = { rows: [], total: 0, all: 0, page: 0, totals: { amountDue: 0, amountAllocated: 0 } };
 const toQuery = (grid: GridQueryParams, extra: Extra): TenantMonthsQuery => ({ ...grid, show: extra.show });
 
 /**
@@ -84,6 +84,7 @@ export default function TenantPeriodsGrid({ tenantId }: { tenantId: string }) {
         title="Months"
         subtitle="Rent owed and allocated per month"
         rows={data.rows}
+        columnTotals={data.totals}
         columns={columns}
         {...gridProps}
         filters={filters}

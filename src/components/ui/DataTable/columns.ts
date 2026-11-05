@@ -1,12 +1,16 @@
 import type { GridColDef, GridValidRowModel } from "@mui/x-data-grid";
 import { formatMoney } from "@/lib/money";
 
-/** Right-aligned, tabular, ₹-formatted number column. */
+/**
+ * Right-aligned, tabular, ₹-formatted number column. `total: true` adds it
+ * up in the table's footer (A26): every row the search and filters leave,
+ * across all pages.
+ */
 export function moneyColumn<R extends GridValidRowModel>(
   field: string,
   headerName: string,
-  extra: Partial<GridColDef<R>> = {}
-): GridColDef<R> {
+  extra: Partial<DataTableColDef<R>> = {}
+): DataTableColDef<R> {
   return {
     field,
     headerName,
@@ -29,6 +33,8 @@ export function moneyColumn<R extends GridValidRowModel>(
  */
 export type DataTableColDef<R extends GridValidRowModel> = GridColDef<R> & {
   exportValue?: (row: R) => string | number | null;
+  /** A money column added up in the footer and the Excel download (`moneyColumn`, A26). */
+  total?: boolean;
 };
 
 /** A dropdown choice: a value with the label it shows, or a value that is its own label. */

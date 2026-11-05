@@ -11,7 +11,7 @@ import { BILLING_SHOWS, billedThroughMonth } from "@/lib/domain/billing";
 import { inScope, type Scope } from "@/server/adapters/drizzle/client";
 import { billingPage, billingTotals } from "@/server/adapters/drizzle/queries/billingPage";
 import type { BillingFilter } from "@/server/ports";
-import { asOwner, asStranger, createLedgerDb, type LedgerDb } from "../fixtures";
+import { asOwner, asStranger, createLedgerDb, expectedSums, type LedgerDb } from "../fixtures";
 
 const month = (offset: number) => addMonthsToKey(currentMonthKey(), offset);
 
@@ -145,7 +145,10 @@ const viaDrizzle = (scope: Scope, f: BillingFilter) => inScope(l.db, scope, (tx)
 async function same(f: Partial<BillingFilter>, scope: Scope = asOwner) {
   const filter = { ...BASE, ...f };
   const drizzle = await viaDrizzle(scope, filter);
-  expect(drizzle).toEqual(await viaSql(scope, filter));
+  const { sums, ...page } = drizzle;
+  expect(page).toEqual(await viaSql(scope, filter));
+  // The sums cover every matching row, whatever the page (A26).
+  expect(sums).toEqual(await expectedSums(() => viaDrizzle(scope, { ...filter, page: 0, pageSize: 100 }), ["amount_due", "amount_allocated", "balance"] as const));
   return drizzle;
 }
 
@@ -240,7 +243,7 @@ describe("billingPage on Drizzle matches billing_page()", () => {
   });
 
   it("shows another signed-in account nothing", async () => {
-    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0 });
+    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0, sums: { amount_due: 0, amount_allocated: 0, balance: 0 } });
   });
 });
 

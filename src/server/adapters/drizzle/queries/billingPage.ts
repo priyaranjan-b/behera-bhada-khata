@@ -12,8 +12,9 @@ import {
 } from "@/lib/domain/billing";
 import { statusLabel } from "@/lib/domain/status";
 import { NOT_SET } from "@/lib/domain/tenant";
-import type { BillingDbRow, BillingTotalsDb } from "@/lib/types";
+import type { BillingSumsDb, BillingDbRow, BillingTotalsDb } from "@/lib/types";
 import type { BillingFilter, DbPage } from "@/server/ports";
+import { round2 } from "@/lib/money";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
 import { dateLabel, labelOf, monthLabel, tenantDisplayName, towersNow, unitCodesNow } from "./text";
@@ -150,19 +151,40 @@ function checkRange(from: string, to: string): void {
   if (!isDateKey(from) || !isDateKey(to) || from > to) throw invalidQuery("month range");
 }
 
-export async function billingPage(tx: Tx, filter: BillingFilter): Promise<DbPage<BillingDbRow>> {
+/** What the statement returns; the sums as text so no float rounding happens before round2. */
+interface PageResult {
+  all_count: number;
+  total: number;
+  page: number;
+  rows: BillingDbRow[];
+  amount_due: string;
+  amount_allocated: string;
+  balance: string;
+}
+
+export async function billingPage(
+  tx: Tx,
+  filter: BillingFilter
+): Promise<DbPage<BillingDbRow> & { sums: BillingSumsDb }> {
   checkGrid(BILLING_TABLE, filter);
   if (!(BILLING_SHOWS as readonly string[]).includes(filter.show)) throw invalidQuery("show");
   checkRange(filter.from, filter.to);
   const shows = BILLING_SHOW_STATUSES[filter.show];
   const show = shows ? sql`r.display_status in (${sql.join(shows.map((s) => sql`${s}`), sql`, `)})` : sql`true`;
 
-  const [result] = await executeRows<{ all_count: number; total: number; page: number; rows: BillingDbRow[] }>(
+  const [result] = await executeRows<PageResult>(
     tx,
     sql`
       with every_row as materialized (${billingRows(filter.from, filter.to, filter.paidDirect)}),
       matching as (select * from every_row r where ${show} and ${gridWhere(BILLING_TABLE, filter)}),
-      counted as (select count(*)::int as total from matching),
+      -- The money columns over every matching row, whatever the page (A26); as text, for round2.
+      counted as (
+        select count(*)::int as total,
+          coalesce(sum(r.amount_due), 0)::text as amount_due,
+          coalesce(sum(r.amount_allocated), 0)::text as amount_allocated,
+          coalesce(sum(r.balance), 0)::text as balance
+        from matching r
+      ),
       shown as (select ${gridPageNumber(sql`counted.total`, filter)} as page from counted),
       ordered as (
         select r.*, row_number() over (order by ${gridOrderBy(BILLING_TABLE, filter)}) as n from matching r
@@ -170,6 +192,9 @@ export async function billingPage(tx: Tx, filter: BillingFilter): Promise<DbPage
       select
         (select count(*)::int from every_row) as all_count,
         counted.total,
+        counted.amount_due,
+        counted.amount_allocated,
+        counted.balance,
         shown.page,
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'tenant_id', o.tenant_id, 'tenant_name', o.tenant_name, 'property_name', o.property_name,
@@ -181,7 +206,17 @@ export async function billingPage(tx: Tx, filter: BillingFilter): Promise<DbPage
           where o.n > shown.page * ${filter.pageSize} and o.n <= (shown.page + 1) * ${filter.pageSize}) as rows
       from counted, shown`
   );
-  return { rows: result.rows, total: result.total, all: result.all_count, page: result.page };
+  return {
+    rows: result.rows,
+    total: result.total,
+    all: result.all_count,
+    page: result.page,
+    sums: {
+      amount_due: round2(Number(result.amount_due)),
+      amount_allocated: round2(Number(result.amount_allocated)),
+      balance: round2(Number(result.balance)),
+    },
+  };
 }
 
 /** The range's stat cards over every row, whatever the page, "Show" or search (billingTotals in src/lib/domain/billing.ts). */

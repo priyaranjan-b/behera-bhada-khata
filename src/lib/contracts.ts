@@ -183,6 +183,8 @@ export interface BillingPage extends TablePage<BillingRow> {
   /** The range shown, month keys (both ends included). */
   from: string;
   to: string;
+  /** The money of every row matching "Show", search and filters, whatever the page; keyed by grid field (A26). */
+  totals: Pick<BillingRow, "amountDue" | "amountAllocated" | "balance">;
 }
 
 /** GET /api/dashboard/billing/totals: the stat cards for the whole range. */
@@ -715,6 +717,8 @@ export interface TenantLedgerQuery extends GridQueryParams {
 export interface TenantLedgerView extends TablePage<LedgerRow> {
   /** False until Twilio is configured: tenants can't be sent links or OTP codes yet. */
   tenantMessaging: boolean;
+  /** Debits and credits of every row matching the dates, search and filters, whatever the page (A26). */
+  totals: Pick<LedgerRow, "debit" | "credit">;
 }
 
 /** Data for the edit form: current values, plus the houses that could be added. */
@@ -890,6 +894,12 @@ export interface TenantMonthRow extends TenantPeriod {
   displayStatus: PeriodStatus | "not_due_yet";
   /** "October 2026". */
   monthLabel: string;
+}
+
+/** One page of a tenant's rent months. */
+export interface TenantMonthsPage extends TablePage<TenantMonthRow> {
+  /** Due and allocated over every month matching "Show", search and filters, whatever the page (A26). */
+  totals: Pick<TenantMonthRow, "amountDue" | "amountAllocated">;
 }
 
 /** A history table's query (Activity, …/tenants/[id]/history; A14): the grid's page, sort, search and filters, plus "Show" and dates. */

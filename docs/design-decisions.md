@@ -881,3 +881,44 @@ a coloured tile through `SectionCard tone`.
 to find and mixed into one grid with the password form. A new list (e.g.
 maintenance categories, if they ever become editable) goes on Settings as
 another `ListSettingCard`.
+
+### A26 — Money tables: a footer total that follows the filters; phones swipe the stat cards
+
+**Decision.** Every table with money in it adds up its money columns in the
+footer: `Total · Billed ₹1,20,000 · Collected ₹98,000 · Balance ₹22,000`.
+The total covers every row the date range, "Show", search and column filters
+leave, **on every page**, never just the page shown. A column opts in with
+`moneyColumn(field, header, { total: true })` (or `total: true` on a plain
+number column). The footer reads the visible columns, so a hidden column
+drops out of it.
+- **Client-side tables** (Earnings, Defaulters, Tenants, a tower's tenants,
+  A15) add up the grid's filtered rows in the browser
+  (`sumColumns`, `src/components/ui/DataTable/totals.ts`). Their Excel
+  download ends with a Total row.
+- **Server-side tables** (Payments, Maintenance, Billing, a tenant's Months
+  and Ledger) get the sums from the same statement as the page: `sum()` over
+  the paged query's `matching` set (A19), returned as `totals` keyed by the
+  grid's fields and passed as `DataTable columnTotals`. The kit never adds up a
+  server page itself. Their Excel download is one page (A8), so it gets no
+  Total row, which would read as the whole table's.
+- The footer stays while the table has rows, even when they fit one page
+  (then without the pager), since a narrow filter is when a total is wanted.
+- What's left out: the Ledger's **Balance** (a running balance, so its sum means
+  nothing) and Defaulters' **Rent / month**. Payments' footer is the Amount
+  column (set-offs included, noted), while its "Received" card is cash only
+  (A22). Maintenance's leaves voided expenses out (D35) and says how many.
+
+**Why not the cards.** The cards are the page's figures, and several of them
+deliberately don't follow the table: "Received" leaves out set-offs, "Govt
+paid direct" ignores the table's search (A11). The footer is the table's own
+sum, next to the rows it adds up, the status-bar pattern from spreadsheets
+and accounting apps. A totals row lined up under the columns would need MUI X
+Pro/Premium (pinned rows, aggregation), and a fake one breaks when columns
+are hidden, reordered or scrolled sideways.
+
+**Phones.** `StatCard` is tighter on phones on every page (12px padding,
+one-line title, a caption of two lines at most). `StatCardRow`
+(`src/components/ui/StatCardRow.tsx`) lays a page's cards out as one
+swipeable row on phones, each card ~42% wide so the next one peeks in, and as
+a grid from `sm` up. Payments uses it: seven cards took four rows above the
+table and now take one. Pages with four cards or fewer keep the two-a-row grid.

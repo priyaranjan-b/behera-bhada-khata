@@ -2,8 +2,9 @@ import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { APP_TIME_ZONE, currentMonthKey, isDateKey } from "@/lib/dates";
 import { LEDGER_STATUS_LABELS } from "@/lib/domain/tenantLedger";
-import type { TenantLedgerDbRow } from "@/lib/types";
+import type { TenantLedgerSumsDb, TenantLedgerDbRow } from "@/lib/types";
 import type { DbPage, TenantLedgerFilter } from "@/server/ports";
+import { round2 } from "@/lib/money";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
 import { dateLabel, labelOf, monthLabel, paymentTagsOf } from "./text";
@@ -100,7 +101,20 @@ const LEDGER_TABLE: GridTable<TenantLedgerFilter["sort"], TenantLedgerFilter["fi
   tieBreak: [sql`r.ord desc`],
 };
 
-export async function tenantLedgerPage(tx: Tx, filter: TenantLedgerFilter): Promise<DbPage<TenantLedgerDbRow>> {
+/** What the statement returns; the sums as text so no float rounding happens before round2. */
+interface PageResult {
+  all_count: number;
+  total: number;
+  page: number;
+  rows: TenantLedgerDbRow[];
+  debit: string;
+  credit: string;
+}
+
+export async function tenantLedgerPage(
+  tx: Tx,
+  filter: TenantLedgerFilter
+): Promise<DbPage<TenantLedgerDbRow> & { sums: TenantLedgerSumsDb }> {
   checkGrid(LEDGER_TABLE, filter);
   for (const day of [filter.fromDate, filter.toDate]) {
     if (day !== undefined && !isDateKey(day)) throw invalidQuery("date range");
@@ -112,12 +126,18 @@ export async function tenantLedgerPage(tx: Tx, filter: TenantLedgerFilter): Prom
     filter.creditsOnly ? sql`r.credit > 0` : sql`true`,
   ];
 
-  const [result] = await executeRows<{ all_count: number; total: number; page: number; rows: TenantLedgerDbRow[] }>(
+  const [result] = await executeRows<PageResult>(
     tx,
     sql`
       with every_row as materialized (${ledgerRows(filter.tenantId)}),
       matching as (select * from every_row r where ${sql.join(dates, sql` and `)} and ${gridWhere(LEDGER_TABLE, filter)}),
-      counted as (select count(*)::int as total from matching),
+      -- The money columns over every matching row, whatever the page (A26); as text, for round2.
+      counted as (
+        select count(*)::int as total,
+          coalesce(sum(r.debit), 0)::text as debit,
+          coalesce(sum(r.credit), 0)::text as credit
+        from matching r
+      ),
       shown as (select ${gridPageNumber(sql`counted.total`, filter)} as page from counted),
       ordered as (
         select r.*, row_number() over (order by ${gridOrderBy(LEDGER_TABLE, filter)}) as n from matching r
@@ -125,6 +145,8 @@ export async function tenantLedgerPage(tx: Tx, filter: TenantLedgerFilter): Prom
       select
         (select count(*)::int from every_row) as all_count,
         counted.total,
+        counted.debit,
+        counted.credit,
         shown.page,
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'type', o.type, 'date', o.date, 'description', o.description, 'caption', o.caption,
@@ -135,5 +157,14 @@ export async function tenantLedgerPage(tx: Tx, filter: TenantLedgerFilter): Prom
           where o.n > shown.page * ${filter.pageSize} and o.n <= (shown.page + 1) * ${filter.pageSize}) as rows
       from counted, shown`
   );
-  return { rows: result.rows, total: result.total, all: result.all_count, page: result.page };
+  return {
+    rows: result.rows,
+    total: result.total,
+    all: result.all_count,
+    page: result.page,
+    sums: {
+      debit: round2(Number(result.debit)),
+      credit: round2(Number(result.credit)),
+    },
+  };
 }

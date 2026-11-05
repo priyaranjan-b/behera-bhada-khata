@@ -7,9 +7,8 @@ import type {
   EditTenantForm,
   TenantAccount,
   TenantDetail,
-  TablePage,
   TenantLedgerView,
-  TenantMonthRow,
+  TenantMonthsPage,
   TenantSearchRow,
 } from "@/lib/contracts";
 import { currentMonthKey } from "@/lib/dates";
@@ -165,7 +164,7 @@ const MONTH_SORT_COLUMNS = {
 const MONTH_FILTER_COLUMNS = { periodMonth: "month", status: "status" } as const;
 
 /** One page of the tenant's rent months, paged, sorted and searched in SQL (A15). */
-export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, query: unknown): Promise<TablePage<TenantMonthRow>> {
+export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, query: unknown): Promise<TenantMonthsPage> {
   const tenant = await tenantById(tenantId);
   const q = parseInput(tenantMonthsQuerySchema, query);
   await ensureRentPeriodsFor(billedTenantIds([tenant]));
@@ -193,6 +192,7 @@ export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, quer
     total: result.total,
     all: result.all,
     page: result.page,
+    totals: { amountDue: result.sums.amount_due, amountAllocated: result.sums.amount_allocated },
   };
 }
 
@@ -250,6 +250,7 @@ export async function getTenantLedger(_ctx: OwnerContext, tenantId: string, quer
     all: result.all,
     page: result.page,
     tenantMessaging: tenantMessagingEnabled(),
+    totals: result.sums,
   };
 }
 

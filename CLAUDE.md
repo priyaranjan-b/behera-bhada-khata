@@ -82,7 +82,8 @@ test instead.
   set-off payments: rent paid by deduction, never counted as cash (A22), and the
   Earnings page's two nets, by rent month and as cash (A23), and the
   report pages' sticky period/view bar instead of a global header control (A24),
-  and Profile (the person) vs Settings (the shared lists, A25). Read it before changing
+  and Profile (the person) vs Settings (the shared lists, A25), and money
+  tables' footer totals and the phone swipe row of stat cards (A26). Read it before changing
   any of these, and add a new A-number when you make a decision a future
   session should know.
 
@@ -553,7 +554,10 @@ Each of these was found broken somewhere; keep them when adding code.
   (default 10), `emptyState` (when there are no rows at all), `noRowsLabel`,
   `rowDensity` (`standard` 56px for avatar + two-line cells, `dense` 44px)
   and `variant="plain"` inside another card. Money columns via
-  `moneyColumn`. A column of a fixed set of values (mode, status, type,
+  `moneyColumn`; `{ total: true }` adds one up in the footer over every
+  filtered row on every page (A26): the kit sums a client-side table, and a
+  server-side one passes `columnTotals` from `sum()` over its query's
+  `matching` set. A column of a fixed set of values (mode, status, type,
   tags) is a `selectColumn` (`tagsColumn` for tags), so its column filter is
   a dropdown ("is", "is not", "is any of") instead of free text; in a
   server-side table its value and options are the labels shown, which is

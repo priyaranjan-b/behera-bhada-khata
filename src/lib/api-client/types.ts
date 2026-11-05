@@ -79,9 +79,8 @@ import type {
   SessionTokens,
   TenantAccount,
   TenantDetail,
-  TenantMonthRow,
+  TenantMonthsPage,
   TenantMonthsQuery,
-  TablePage,
   TenantLedgerQuery,
   TenantLedgerView,
   TenantSearchRow,
@@ -154,7 +153,7 @@ export interface ApiQueries {
       detail(tenantId: string): Promise<TenantDetail>;
       account(tenantId: string): Promise<TenantAccount>;
       /** One page of the tenant's rent months, paged, sorted and searched in SQL (A15). */
-      months(tenantId: string, query?: TenantMonthsQuery): Promise<TablePage<TenantMonthRow>>;
+      months(tenantId: string, query?: TenantMonthsQuery): Promise<TenantMonthsPage>;
       /** One page of the tenant's ledger, with the all-time running balance (A15). */
       ledger(tenantId: string, query?: TenantLedgerQuery): Promise<TenantLedgerView>;
       edit(tenantId: string): Promise<EditTenantForm>;

@@ -11,7 +11,7 @@ import { billedThroughMonth } from "@/lib/domain/billing";
 import { inScope, type Scope } from "@/server/adapters/drizzle/client";
 import { tenantLedgerPage } from "@/server/adapters/drizzle/queries/tenantLedgerPage";
 import type { TenantLedgerFilter } from "@/server/ports";
-import { asOwner, asStranger, createLedgerDb, type LedgerDb } from "../fixtures";
+import { asOwner, asStranger, createLedgerDb, expectedSums, type LedgerDb } from "../fixtures";
 
 const month = (offset: number) => addMonthsToKey(currentMonthKey(), offset);
 const day = (offset: number, d: number) => `${month(offset).slice(0, 8)}${String(d).padStart(2, "0")}`;
@@ -107,7 +107,10 @@ async function same(f: Partial<TenantLedgerFilter>, scope: Scope = asOwner) {
   const filter = { ...base(), ...f };
   const drizzle = await viaDrizzle(scope, filter);
   expect(drizzle.rows.every((r) => Array.isArray(r.tags))).toBe(true);
-  expect({ ...drizzle, rows: drizzle.rows.map(({ tags: _tags, ...r }) => r) }).toEqual(await viaSql(scope, filter));
+  const { sums, ...page } = drizzle;
+  expect({ ...page, rows: page.rows.map(({ tags: _tags, ...r }) => r) }).toEqual(await viaSql(scope, filter));
+  // The sums cover every matching row, whatever the page (A26).
+  expect(sums).toEqual(await expectedSums(() => viaDrizzle(scope, { ...filter, page: 0, pageSize: 100 }), ["debit", "credit"] as const));
   return drizzle;
 }
 
@@ -208,7 +211,7 @@ describe("tenantLedgerPage on Drizzle matches tenant_ledger_page()", () => {
 
   it("another tenant's journal, and nothing for another signed-in account", async () => {
     expect((await same({ tenantId: bimal })).all).toBe(5);
-    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0 });
+    expect(await same({}, asStranger)).toEqual({ rows: [], total: 0, all: 0, page: 0, sums: { debit: 0, credit: 0 } });
   });
 });
 

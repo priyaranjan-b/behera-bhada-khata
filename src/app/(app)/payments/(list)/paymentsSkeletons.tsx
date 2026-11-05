@@ -1,7 +1,7 @@
-import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { ContextBarSkeleton, PageHeaderSkeleton, PanelSkeleton, StatCardSkeleton } from "@/components/ui/Skeletons";
-import { PAYMENT_STAT_CELL } from "./paymentStatCell";
+import StatCardRow from "@/components/ui/StatCardRow";
+import { PAYMENT_STAT_COLUMNS } from "./paymentStatCell";
 
 /**
  * The placeholder for each Payments section, sized like its cards: page.tsx
@@ -18,13 +18,11 @@ export const PAYMENTS_SKELETONS = {
   // Seven stat cards (received, four modes, set-off, Govt paid direct), then the table.
   view: (
     <Stack spacing={2}>
-      <Grid container spacing={2} columns={12}>
+      <StatCardRow columns={PAYMENT_STAT_COLUMNS} label="Payment totals">
         {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-          <Grid key={i} size={PAYMENT_STAT_CELL}>
-            <StatCardSkeleton />
-          </Grid>
+          <StatCardSkeleton key={i} />
         ))}
-      </Grid>
+      </StatCardRow>
       <PanelSkeleton />
     </Stack>
   ),

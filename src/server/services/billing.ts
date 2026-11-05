@@ -88,6 +88,11 @@ export async function getBillingPage(_ctx: OwnerContext, query: unknown = {}): P
     total: result.total,
     all: result.all,
     page: result.page,
+    totals: {
+      amountDue: result.sums.amount_due,
+      amountAllocated: result.sums.amount_allocated,
+      balance: result.sums.balance,
+    },
   };
 }
 

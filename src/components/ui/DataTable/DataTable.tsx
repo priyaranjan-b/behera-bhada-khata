@@ -10,6 +10,7 @@ import { DataTableContext, type DataTableConfig, type DataTableFilter, type Data
 import DataTableToolbar from "./DataTableToolbar";
 import DataTablePagination from "./DataTablePagination";
 import DataTableNoResults from "./DataTableNoResults";
+import type { DataTableColDef } from "./columns";
 import { dataTableSx, filterPanelSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
 
 const SLOTS = {
@@ -53,6 +54,13 @@ export type DataTableProps<R extends GridValidRowModel> = Omit<DataGridProps<R>,
   rowDensity?: keyof typeof ROW_HEIGHT;
   /** `card` frames the table in an outlined card; `plain` for tables already inside one. */
   variant?: "card" | "plain";
+  /**
+   * Paged on the server: the footer total of each `total` column over every matching row, keyed by
+   * field (A26). A client-side table adds up its filtered rows itself and needs none.
+   */
+  columnTotals?: Partial<Record<string, number>>;
+  /** A line after the footer totals, e.g. "incl. ₹5,000 set off". */
+  totalsNote?: React.ReactNode;
 };
 
 /**
@@ -83,6 +91,8 @@ export default function DataTable<R extends GridValidRowModel>({
   noRowsLabel = "No rows match these filters.",
   rowDensity = "standard",
   variant = "card",
+  columnTotals,
+  totalsNote,
   initialState,
   getRowClassName,
   slotProps,
@@ -113,12 +123,16 @@ export default function DataTable<R extends GridValidRowModel>({
     exportExcel,
     pageSizeOptions,
     noRowsLabel,
+    columnTotals,
+    totalsNote,
   };
 
   const showToolbar =
     Boolean(title) || filters.length > 0 || Boolean(toolbarExtra) || Boolean(searchConfig) || columnsButton || filterButton || exportCsv || exportExcel;
-  // Hide the footer only while everything fits the smallest page, so a bigger page size can always be undone.
-  const hideFooter = rowCount <= Math.min(pageSize, ...pageSizeOptions);
+  // A money column added up (A26) keeps the footer whenever there are rows; otherwise it hides
+  // only while everything fits the smallest page, so a bigger page size can always be undone.
+  const hasTotals = props.columns.some((col) => (col as DataTableColDef<R>).total);
+  const hideFooter = rowCount === 0 || (!hasTotals && rowCount <= Math.min(pageSize, ...pageSizeOptions));
 
   const body =
     // Not while loading: a table that loads its own first page (useServerGrid) starts at 0.

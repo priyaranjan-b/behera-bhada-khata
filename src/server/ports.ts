@@ -6,6 +6,9 @@
 // new adapter that satisfies these interfaces - services and route handlers
 // stay as they are.
 import type {
+  TenantLedgerSumsDb,
+  BillingSumsDb,
+  TenantMonthSumsDb,
   TenantAccountSummaryDb,
   Adjustment,
   AppAuditAction,
@@ -471,17 +474,17 @@ export interface OwnerRepositories {
       filter?: { openOnly?: boolean; openOrFrom?: string; months?: { from: string; to: string } }
     ): Promise<RentPeriod[]>;
     listByIds(ids: string[]): Promise<RentPeriod[]>;
-    page(filter: TenantMonthsFilter): Promise<DbPage<TenantMonthDbRow>>;
+    page(filter: TenantMonthsFilter): Promise<DbPage<TenantMonthDbRow> & { sums: TenantMonthSumsDb }>;
   };
   billing: {
     /** Tenants × months in the range (plus paid-direct months), one page. */
-    page(filter: BillingFilter): Promise<DbPage<BillingDbRow>>;
+    page(filter: BillingFilter): Promise<DbPage<BillingDbRow> & { sums: BillingSumsDb }>;
     /** The range's totals: billed, collected, balance, overdue, rate, tenants. */
     totals(range: { from: string; to: string; paidDirect: boolean }): Promise<BillingTotalsDb>;
   };
   ledger: {
     /** Charges, payments and adjustments with the all-time running balance, one page. */
-    page(filter: TenantLedgerFilter): Promise<DbPage<TenantLedgerDbRow>>;
+    page(filter: TenantLedgerFilter): Promise<DbPage<TenantLedgerDbRow> & { sums: TenantLedgerSumsDb }>;
   };
   payments: {
     /** `fromDate` (yyyy-MM-dd): only payments dated on or after it. */

@@ -48,7 +48,14 @@ interface Extra {
 
 const DEFAULT_EXTRA: Extra = { show: "credits", mode: "all", from: "", to: "", month: "" };
 const DEFAULT_SORT: GridSortModel = [{ field: "date", sort: "desc" }];
-const EMPTY: TenantLedgerView = { rows: [], total: 0, all: 0, page: 0, tenantMessaging: false };
+const EMPTY: TenantLedgerView = {
+  rows: [],
+  total: 0,
+  all: 0,
+  page: 0,
+  tenantMessaging: false,
+  totals: { debit: 0, credit: 0 },
+};
 
 function toQuery(grid: GridQueryParams, extra: Extra): TenantLedgerQuery {
   const base = { ...grid, show: extra.show };
@@ -157,8 +164,8 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
             <StatusChip status={row.status} />
           ),
       }),
-      ...(creditsOnly ? [] : [moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false })]),
-      moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero, filterable: false }),
+      ...(creditsOnly ? [] : [moneyColumn<LedgerRow>("debit", "Debit", { valueGetter: blankZero, filterable: false, total: true })]),
+      moneyColumn<LedgerRow>("credit", "Credit", { valueGetter: blankZero, filterable: false, total: true }),
       ...(creditsOnly ? [] : [moneyColumn<LedgerRow>("balance", "Balance", { filterable: false })]),
       // Searched, not filtered: the ledger query has no tag filter field.
       tagsColumn<LedgerRow>("tags", "Tags", ledgerTagsOf, [], { filterable: false }),
@@ -230,6 +237,7 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
         title="Ledger"
         subtitle="Charges, payments and corrections"
         rows={data.rows}
+        columnTotals={data.totals}
         columns={columns}
         {...gridProps}
         filters={filters}

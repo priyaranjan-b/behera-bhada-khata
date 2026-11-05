@@ -80,8 +80,9 @@ export function TabsSkeleton({ tabs = 4 }: { tabs?: number }) {
 /** Matches `StatCard`: title + icon tile, value + badge, caption, and the 50px sparkline only with `sparkline`. */
 export function StatCardSkeleton({ sparkline = false }: { sparkline?: boolean }) {
   return (
-    <AppCard aria-hidden sx={{ height: "100%", flexGrow: 1 }}>
-      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+    // StatCard's phone padding and spacing, so the swap doesn't jump.
+    <AppCard aria-hidden sx={{ height: "100%", flexGrow: 1, p: { xs: 1.5, sm: 2 } }}>
+      <CardContent sx={{ display: "flex", flexDirection: "column", gap: { xs: 0.5, sm: 1 } }}>
         <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
           <Typography variant="subtitle2" sx={{ flexGrow: 1, pt: 0.5 }}>
             <Skeleton width="50%" />

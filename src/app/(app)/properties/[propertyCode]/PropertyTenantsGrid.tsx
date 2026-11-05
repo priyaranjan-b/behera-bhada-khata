@@ -37,7 +37,7 @@ const columns: DataTableColDef<PropertyTenantRow>[] = [
     renderCell: ({ row }) => <UnitCell unitMix={row.unitMix} unitCodes={row.unitCodes} />,
   },
   { field: "phone", headerName: "Phone", minWidth: 140, flex: 0.8 },
-  moneyColumn<PropertyTenantRow>("monthlyRent", "Combined rent"),
+  moneyColumn<PropertyTenantRow>("monthlyRent", "Combined rent", { total: true }),
   selectColumn<PropertyTenantRow>("status", "Status", STATUS_OPTIONS, {
     minWidth: 110,
     headerAlign: "right",

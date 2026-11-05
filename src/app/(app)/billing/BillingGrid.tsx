@@ -62,9 +62,9 @@ const columns: DataTableColDef<BillingRow>[] = [
       />
     ),
   },
-  moneyColumn<BillingRow>("amountDue", "Billed", { filterable: false }),
-  moneyColumn<BillingRow>("amountAllocated", "Collected", { filterable: false }),
-  moneyColumn<BillingRow>("balance", "Balance", { filterable: false }),
+  moneyColumn<BillingRow>("amountDue", "Billed", { filterable: false, total: true }),
+  moneyColumn<BillingRow>("amountAllocated", "Collected", { filterable: false, total: true }),
+  moneyColumn<BillingRow>("balance", "Balance", { filterable: false, total: true }),
   // Sorted in SQL by need (unpaid, partly paid, not due, paid, paid direct), then balance.
   // The database filters on the label the column shows.
   selectColumn<BillingRow>("status", "Status", BILLING_DISPLAY_STATUSES.map(statusLabel), {
@@ -167,6 +167,7 @@ export default function BillingGrid({
         title="Billing & collection"
         subtitle={`Rent per tenant per month, ${rangeLabel}`}
         rows={data.rows}
+        columnTotals={data.totals}
         {...gridProps}
         filters={filters}
         columns={columns}

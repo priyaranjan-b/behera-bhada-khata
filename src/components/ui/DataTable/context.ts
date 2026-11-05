@@ -40,6 +40,10 @@ export interface DataTableConfig {
   exportExcel: boolean;
   pageSizeOptions: number[];
   noRowsLabel: string;
+  /** Paged on the server, where the footer shows `columnTotals` instead of adding up the rows it holds. */
+  columnTotals?: Partial<Record<string, number>>;
+  /** A line after the footer totals, e.g. "incl. ₹5,000 set off". */
+  totalsNote?: React.ReactNode;
 }
 
 export const DataTableContext = createContext<DataTableConfig | null>(null);

@@ -141,7 +141,7 @@ export default async function ThingPage({ params }: { params: Promise<{ thingId:
   `IconTile`, `InsetBox`, `GridCell`, `UnitCell`, `DropzoneCard`.
 - **Badges:** `StatusBadge` and `TagPill` from `@/components/ui/DataDisplay`,
   `StatusChip` from `@/components/domain/StatusChip`.
-- **Tables:** `DataTable` plus `moneyColumn` (`@/components/ui/DataTable`).
+- **Tables:** `DataTable` plus `moneyColumn` (`@/components/ui/DataTable`). Mark money columns that add up with `{ total: true }` for the footer total (A26); a server-paged table also passes `columnTotals` (its query's `sum()` over `matching`).
   It brings its own card and one-row toolbar, so don't wrap it in
   `DashboardCardPanel`. Pass `title`, `filters` (status selects, with
   `totalCount` + `defaultValue`), `search`, `emptyState` and `rowDensity`.

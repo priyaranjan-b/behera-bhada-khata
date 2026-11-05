@@ -5,16 +5,17 @@ import type { EarningsMonth } from "@/lib/domain/earnings";
 
 // One row per month: at most EARNINGS_LIMITS.maxMonths (24), so the table
 // pages and sorts in the browser (A23, an exception to A15's "grows every
-// month" rule: the rows are monthly totals with a fixed cap).
+// month" rule: the rows are monthly totals with a fixed cap). The footer adds
+// up every money column: the range's totals (A26).
 const columns: DataTableColDef<EarningsMonth>[] = [
   { field: "label", headerName: "Month", minWidth: 110, sortable: false, filterable: false },
-  moneyColumn<EarningsMonth>("billed", "Billed"),
-  moneyColumn<EarningsMonth>("collected", "Collected"),
-  moneyColumn<EarningsMonth>("received", "Received (cash)"),
-  moneyColumn<EarningsMonth>("maintenance", "Maintenance"),
-  moneyColumn<EarningsMonth>("maintenanceCash", "Of it, in cash"),
-  moneyColumn<EarningsMonth>("netCollected", "Net (rent month)"),
-  moneyColumn<EarningsMonth>("netCash", "Net cash"),
+  moneyColumn<EarningsMonth>("billed", "Billed", { total: true }),
+  moneyColumn<EarningsMonth>("collected", "Collected", { total: true }),
+  moneyColumn<EarningsMonth>("received", "Received (cash)", { total: true }),
+  moneyColumn<EarningsMonth>("maintenance", "Maintenance", { total: true }),
+  moneyColumn<EarningsMonth>("maintenanceCash", "Of it, in cash", { total: true }),
+  moneyColumn<EarningsMonth>("netCollected", "Net (rent month)", { total: true }),
+  moneyColumn<EarningsMonth>("netCash", "Net cash", { total: true }),
   {
     field: "expenseRatio",
     headerName: "Spent of collected",

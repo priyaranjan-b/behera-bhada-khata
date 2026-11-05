@@ -300,6 +300,8 @@ describe("the Months table (A15)", () => {
       total: 1,
       all: 1,
       page: 0,
+      // The database's sums over every matching month, keyed by the grid's fields (A26).
+      totals: { amountDue: 5000, amountAllocated: 0 },
     });
   });
 
@@ -336,6 +338,8 @@ describe("the Ledger table (A15)", () => {
       pageSize: 10,
     });
     expect(view).toMatchObject({ total: view.rows.length, page: 0, tenantMessaging: true });
+    // The footer totals come from the database's sums, as they are (A26).
+    expect(view.totals).toEqual({ debit: 0, credit: view.rows.reduce((sum, r) => sum + r.credit, 0) });
     const pageIds = view.rows.map((r) => r.refId);
     for (const call of fakes.owner.payments.listProofs.mock.calls) expect(call[0]).toEqual(pageIds);
   });

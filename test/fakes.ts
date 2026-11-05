@@ -456,6 +456,7 @@ function build() {
         total: 1,
         all: 1,
         page: 0,
+             sums: { amount_due: Number(period.amount_due), amount_allocated: Number(period.amount_allocated) },
       })),
     },
     // The Billing query and totals; their real behaviour is in test/adapters/drizzle/queries.
@@ -490,6 +491,7 @@ function build() {
         total: 1,
         all: 1,
         page: 0,
+        sums: { amount_due: 5000, amount_allocated: 5000, balance: 0 },
       })),
       totals: vi.fn(async () => ({
         billed: 5000,
@@ -517,7 +519,13 @@ function build() {
           receipt_no: p.receipt_no,
           acknowledged: Boolean(p.acknowledged_at),
         }));
-        return { rows, total: rows.length, all: rows.length, page: 0 };
+        return {
+          rows,
+          total: rows.length,
+          all: rows.length,
+          page: 0,
+          sums: { debit: 0, credit: rows.reduce((sum, r) => sum + r.credit, 0) },
+        };
       }),
     },
     payments: {

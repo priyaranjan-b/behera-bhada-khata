@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
-import Grid from "@mui/material/Grid";
 import IconButton from "@mui/material/IconButton";
 import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
@@ -25,16 +24,17 @@ import DataTable, {
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
 import { TagsCell } from "@/components/ui/GridCells";
 import StatCard from "@/components/ui/StatCard";
+import StatCardRow from "@/components/ui/StatCardRow";
 import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
 import type { PaymentListRow, PaymentsPage, PaymentsPageQuery, PaymentTotals } from "@/lib/contracts";
 import { formatDateKey } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/domain/payments";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, round2 } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
-import { PAYMENT_STAT_CELL } from "./paymentStatCell";
+import { PAYMENT_STAT_COLUMNS } from "./paymentStatCell";
 
 const tagsOf = (row: PaymentListRow) => row.tags;
 /** The database filters on the label the column shows. */
@@ -77,7 +77,7 @@ const baseColumns: DataTableColDef<PaymentListRow>[] = [
     minWidth: 120,
     valueGetter: (_value, row) => paymentModeLabel(row.mode),
   }),
-  moneyColumn<PaymentListRow>("amount", "Amount", { filterable: false }),
+  moneyColumn<PaymentListRow>("amount", "Amount", { filterable: false, total: true }),
   {
     field: "monthsText",
     headerName: "For months",
@@ -167,55 +167,50 @@ export default function PaymentsView({
   const { totals } = data;
   const narrowed = data.total < data.all;
   const byMode = totals.byMode;
+  // The footer adds up the Amount column, set-offs included; "Received" above is cash only (A22, A26).
+  const columnTotals = useMemo(
+    () => ({ amount: round2(totals.amount + totals.byMode.set_off) }),
+    [totals.amount, totals.byMode.set_off]
+  );
 
   return (
     <Stack spacing={2}>
-      <Grid container spacing={2} columns={12}>
-        <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard
-            title="Received"
-            icon={<PaymentsRoundedIcon />}
-            tone="primary"
-            variant="gradient"
-            value={formatMoney(totals.amount)}
-            caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
-              byMode.set_off > 0 ? ` · + ${formatMoney(byMode.set_off)} set off` : ""
-            }`}
-          />
-        </Grid>
-        <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard title="Cash" icon={<LocalAtmRoundedIcon />} value={formatMoney(byMode.cash)} caption={shareOf(byMode.cash, totals)} />
-        </Grid>
-        <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard title="UPI" icon={<QrCode2RoundedIcon />} value={formatMoney(byMode.upi)} caption={shareOf(byMode.upi, totals)} />
-        </Grid>
-        <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard
-            title="Bank transfer"
-            icon={<AccountBalanceRoundedIcon />}
-            value={formatMoney(byMode.bank_transfer)}
-            caption={shareOf(byMode.bank_transfer, totals)}
-          />
-        </Grid>
-        <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard
-            title="Cheque & other"
-            icon={<DescriptionRoundedIcon />}
-            value={formatMoney(byMode.cheque + byMode.other)}
-            caption={shareOf(byMode.cheque + byMode.other, totals)}
-          />
-        </Grid>
-        <Grid size={PAYMENT_STAT_CELL}>
-          <StatCard title="Set-off" icon={<SwapHorizRoundedIcon />} value={formatMoney(byMode.set_off)} caption="Not cash · kept back by tenants" />
-        </Grid>
-        <Grid size={PAYMENT_STAT_CELL}>{paidDirectCard}</Grid>
-      </Grid>
+      <StatCardRow columns={PAYMENT_STAT_COLUMNS} label="Payment totals">
+        <StatCard
+          title="Received"
+          icon={<PaymentsRoundedIcon />}
+          tone="primary"
+          variant="gradient"
+          value={formatMoney(totals.amount)}
+          caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
+            byMode.set_off > 0 ? ` · + ${formatMoney(byMode.set_off)} set off` : ""
+          }`}
+        />
+        <StatCard title="Cash" icon={<LocalAtmRoundedIcon />} value={formatMoney(byMode.cash)} caption={shareOf(byMode.cash, totals)} />
+        <StatCard title="UPI" icon={<QrCode2RoundedIcon />} value={formatMoney(byMode.upi)} caption={shareOf(byMode.upi, totals)} />
+        <StatCard
+          title="Bank transfer"
+          icon={<AccountBalanceRoundedIcon />}
+          value={formatMoney(byMode.bank_transfer)}
+          caption={shareOf(byMode.bank_transfer, totals)}
+        />
+        <StatCard
+          title="Cheque & other"
+          icon={<DescriptionRoundedIcon />}
+          value={formatMoney(byMode.cheque + byMode.other)}
+          caption={shareOf(byMode.cheque + byMode.other, totals)}
+        />
+        <StatCard title="Set-off" icon={<SwapHorizRoundedIcon />} value={formatMoney(byMode.set_off)} caption="Not cash · kept back by tenants" />
+        {paidDirectCard}
+      </StatCardRow>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
       <DataTable<PaymentListRow>
         title="Payments received"
         subtitle={rangeLabel}
         rows={data.rows}
+        columnTotals={columnTotals}
+        totalsNote={byMode.set_off > 0 ? `incl. ${formatMoney(byMode.set_off)} set off, not cash` : undefined}
         {...gridProps}
         columns={columns}
         getRowId={getRowId}

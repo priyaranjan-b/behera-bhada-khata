@@ -82,7 +82,7 @@ const baseColumns: DataTableColDef<MaintenanceListRow>[] = [
     valueGetter: (_value, row) => housesOf(row),
     filterOperators: SERVER_TEXT_OPERATORS,
   },
-  moneyColumn<MaintenanceListRow>("amount", "Amount", { filterable: false }),
+  moneyColumn<MaintenanceListRow>("amount", "Amount", { filterable: false, total: true }),
   {
     field: "vendor",
     headerName: "Paid to",
@@ -188,6 +188,9 @@ export default function MaintenanceView({
     .map(([category, amount]) => ({ label: maintenanceCategoryLabel(category), amount: amount ?? 0 }))
     .sort((a, b) => b.amount - a.amount);
   const [topPayer, ...otherPayers] = totals.byPaidBy;
+  // The footer adds up what was spent: a voided expense is listed but counted nowhere (D35).
+  const columnTotals = useMemo(() => ({ amount: totals.amount }), [totals.amount]);
+  const voided = data.total - totals.count;
 
   return (
     <Stack spacing={2}>
@@ -249,6 +252,8 @@ export default function MaintenanceView({
         title="Maintenance expenses"
         subtitle={rangeLabel}
         rows={data.rows}
+        columnTotals={columnTotals}
+        totalsNote={voided > 0 ? `${voided} voided, not counted` : undefined}
         {...gridProps}
         columns={columns}
         getRowId={getRowId}

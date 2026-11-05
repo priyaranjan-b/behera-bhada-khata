@@ -91,12 +91,14 @@ const columns: DataTableColDef<TenantSearchRow>[] = [
   },
   moneyColumn<TenantSearchRow>("monthlyRent", "Monthly rent", {
     minWidth: 130,
+    total: true,
     valueFormatter: (value: number) => (value > 0 ? formatMoney(value) : "—"),
   }),
   {
     field: "totalOutstanding",
     headerName: "Outstanding",
     type: "number",
+    total: true,
     minWidth: 190,
     flex: 1,
     headerAlign: "right",

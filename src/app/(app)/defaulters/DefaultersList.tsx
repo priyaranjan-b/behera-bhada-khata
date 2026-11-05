@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { GridColDef } from "@mui/x-data-grid";
 import Typography from "@mui/material/Typography";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
@@ -26,10 +25,11 @@ const BAND_OPTIONS: { value: BandFilter; label: string }[] = [
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
 
 /** Unpaid rent of one age band; a dash when nothing is owed there. */
-function ageColumn(key: AgingBucketKey, headerName: string): GridColDef<DefaulterRow> {
+function ageColumn(key: AgingBucketKey, headerName: string): DataTableColDef<DefaulterRow> {
   const band = AGING_BUCKETS.find((b) => b.key === key)?.label;
   return moneyColumn<DefaulterRow>(`age_${key}`, headerName, {
     minWidth: 115,
+    total: true,
     valueGetter: (_value, row) => row.byAge[key],
     valueFormatter: (value: number) => (value > 0 ? formatMoney(value) : "—"),
     description: `Unpaid rent for months that ended ${band} ago`,
@@ -68,7 +68,7 @@ const columns: DataTableColDef<DefaulterRow>[] = [
     minWidth: 130,
     valueFormatter: (value: string | null) => (value ? formatMonth(value, "short") : ""),
   },
-  moneyColumn<DefaulterRow>("totalOutstanding", "Outstanding", { minWidth: 140 }),
+  moneyColumn<DefaulterRow>("totalOutstanding", "Outstanding", { minWidth: 140, total: true }),
   ageColumn("m1", "1 mo"),
   ageColumn("m2to3", "2–3 mo"),
   ageColumn("m4to6", "4–6 mo"),
