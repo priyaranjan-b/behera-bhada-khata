@@ -926,8 +926,15 @@ are hidden, reordered or scrolled sideways.
 **Phones.** `StatCard` is tighter on phones on every page (12px padding,
 one-line title, a caption of two lines at most). `StatCardRow`
 (`src/components/ui/StatCardRow.tsx`) lays a page's cards out as one
-swipeable row on phones, each card ~42% wide so the next one peeks in, and as
-a grid from `sm` up. Every page with a row of stat cards uses it (Overview,
+swipeable row on phones and as a grid from `sm` up. On phones it shows two
+whole cards and about a quarter of the next (`(100% - 2 gaps) / 2.25`, at
+least 128px), fades the right edge, and puts the page's headline card
+(`StatCard variant="gradient"`, marked `data-emphasis`) first, by CSS `order`
+only, so the DOM, screen readers and the `sm`+ grid keep the page's order.
+Titles get two lines, so "Most on Electrical" or "Govt paid direct" isn't
+cut. Not one card per slide: these figures are compared side by side, few
+people swipe past a carousel's first slide, and a full-width card is no
+shorter. Every page with a row of stat cards uses it (Overview,
 Billing, Payments, Earnings, Maintenance, Defaulters): on Payments seven cards
 took four rows above the table and now take one, and four cards take one row
 instead of two. Each page sets its columns per breakpoint in one constant

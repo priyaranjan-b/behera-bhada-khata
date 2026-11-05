@@ -613,8 +613,8 @@ Each of these was found broken somewhere; keep them when adding code.
   as tall as every other field (`MuiPickersOutlinedInput` in `app.ts`).
   One-tap choices under a field (Today/Yesterday, the first five tag
   suggestions, which toggle) are the kit's `QuickPicks`. A row of stat
-  cards is a `StatCardRow` (one swipe row on phones, a grid of `columns`
-  from `sm`; A26), never a hand-made `Grid` of `StatCard`s (the one
+  cards is a `StatCardRow` (one swipe row on phones, two cards and a peek,
+  the headline `gradient` card first; a grid of `columns` from `sm`; A26), never a hand-made `Grid` of `StatCard`s (the one
   exception: the tenant page's account figures, a grid in the record header).
   A section that streams several of its cards is an `AsyncSection wide`, so
   its error card spans the row. A destructive button is

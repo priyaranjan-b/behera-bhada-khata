@@ -5,6 +5,9 @@ import Box from "@mui/material/Box";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import type { Theme } from "@mui/material/styles";
 
+/** Space between the phone row's cards, in theme spacing units (8px each). */
+const GAP_XS = 1.5;
+
 /** Cards per row from each breakpoint up; phones always swipe. */
 export interface StatCardRowColumns {
   sm: number;
@@ -13,8 +16,9 @@ export interface StatCardRowColumns {
 }
 
 /**
- * A row of `StatCard`s. On phones one swipeable row (each card about 42% of
- * the screen, so the next one peeks in and says "swipe"), instead of
+ * A row of `StatCard`s. On phones one swipeable row (two whole cards and a
+ * quarter of the next, which peeks in and says "swipe", the edge fading out,
+ * and the page's headline card first), instead of
  * stacking seven cards two by two above the table; from `sm` up, a grid of
  * `columns` cards a row, all the same height.
  */
@@ -39,7 +43,7 @@ export default function StatCardRow({
       sx={{
         display: { xs: "flex", sm: "grid" },
         gridTemplateColumns: { sm: template(columns.sm), md: template(columns.md), lg: template(columns.lg) },
-        gap: { xs: 1.5, sm: 2 },
+        gap: { xs: GAP_XS, sm: 2 },
         // Phones: run to the screen edges past the page gutter, snapping card by card.
         overflowX: { xs: "auto", sm: "visible" },
         scrollSnapType: { xs: "x mandatory", sm: "none" },
@@ -50,7 +54,19 @@ export default function StatCardRow({
         scrollbarWidth: "none",
         "&::-webkit-scrollbar": { display: "none" },
         alignItems: "stretch",
-        "& > *": { flex: { xs: "0 0 auto" }, width: { xs: "42%", sm: "auto" }, minWidth: { xs: 148, sm: 0 }, scrollSnapAlign: "start" },
+        // Phones: two whole cards and a quarter of the next, so the row reads as more to swipe.
+        "& > *": {
+          flex: { xs: "0 0 auto" },
+          width: { xs: `calc((100% - 2 * ${GAP_XS * 8}px) / 2.25)`, sm: "auto" },
+          // A floor for very narrow screens (a 320px phone), low enough that a 360px one still shows the peek.
+          minWidth: { xs: 128, sm: 0 },
+          scrollSnapAlign: "start",
+        },
+        // ... and the right edge fades out (a mask, so no colour), the other hint the row goes on.
+        maskImage: { xs: "linear-gradient(to right, black calc(100% - 24px), transparent)", sm: "none" },
+        // The page's headline card (StatCard variant "gradient") first on phones, where the rest is off-screen.
+        // Only the visual order: the DOM, and so screen readers and the sm+ grid, keep the page's order.
+        "& > [data-emphasis]": { order: { xs: -1, sm: 0 } },
         // Every card as tall as the tallest. StatCard's own `height: 100%` (it fills a Grid cell elsewhere)
         // has nothing definite to resolve against in the phone's flex row, which stops the stretch and
         // leaves each card its content height; `auto` lets the row stretch them. `&&` outranks the card's class.

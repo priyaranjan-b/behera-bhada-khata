@@ -48,7 +48,7 @@ function AreaGradient({ color, id }: { color: string; id: string }) {
  *   attention; a danger card also shows the value in red), `gradient` a
  *   faint tone wash (the page's headline figure).
  * - Compact on phones, where pages lay them out two per row or in a swipe
- *   row (`StatCardRow`): less padding, a one-line title, a 32px icon, a
+ *   row (`StatCardRow`): less padding, a title of two lines at most, a 32px icon, a
  *   smaller value with the badge under it, a caption of two lines at most
  *   and no sparkline.
  */
@@ -91,6 +91,8 @@ export default function StatCard({
   return (
     <AppCard
       href={href}
+      // The page's headline figure: StatCardRow shows it first on phones (A26).
+      {...(variant === "gradient" ? { "data-emphasis": "" } : {})}
       sx={[
         // Phones: 12px in, not the card's 16, so a row of figures stays short.
         { height: "100%", flexGrow: 1, position: "relative", p: { xs: 1.5, sm: 2 } },
@@ -118,8 +120,8 @@ export default function StatCard({
             component="h2"
             variant="subtitle2"
             color="textSecondary"
-            // Two lines at most where seven share a row; one on phones, where the titles are short words.
-            sx={{ fontWeight: 600, minWidth: 0, pt: 0.5, ...clampLines({ xs: 1, sm: 2 }) }}
+            // Two lines at most: narrow cards (seven in a row, a phone's swipe row) keep the words the figure depends on.
+            sx={{ fontWeight: 600, minWidth: 0, pt: 0.5, ...clampLines({ xs: 2, sm: 2 }) }}
           >
             {title}
           </Typography>
