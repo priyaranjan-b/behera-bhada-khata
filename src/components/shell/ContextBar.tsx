@@ -79,7 +79,8 @@ export default function ContextBar({
           minHeight: 44,
         }}
       >
-        {period}
+        {/* Phones: the switcher takes the row up to the options button, so the bar has no empty gap. */}
+        <Box sx={{ flex: { xs: 1, md: "0 1 auto" }, minWidth: 0 }}>{period}</Box>
         {options ? (
           <>
             <Stack

@@ -12,7 +12,7 @@ import { formatMoney } from "@/lib/money";
 /** Overview: the selected month's expected vs collected rent per site, and each site's arrears. */
 export default function SiteCollectionCard({ sites, monthLabel }: { sites: SiteCollection[]; monthLabel: string }) {
   return (
-    <SectionCard title="Collection by site" caption={`${monthLabel} · arrears to the end of last month`} fill>
+    <SectionCard title="Collection by site" caption={`${monthLabel} · arrears to the end of last month`} fill collapseOnPhone>
       <Table size="small" aria-label={`Rent expected and collected per site, ${monthLabel}`}>
         <TableHead>
           <TableRow>

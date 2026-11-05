@@ -5,7 +5,11 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import Link from "@/components/ui/Link";
 import { InsetBox } from "./Surfaces";
 
-/** ‹ Label › : links to the previous and next period (a month on the Overview, a range on Billing). */
+/**
+ * ‹ Label › : links to the previous and next period (a month on the Overview,
+ * a range on Billing). It fills its container, arrows at the ends and the
+ * label centred between them: the phone's ContextBar gives it the row.
+ */
 export default function PeriodSwitcher({
   label,
   prevHref,
@@ -19,11 +23,11 @@ export default function PeriodSwitcher({
   unit?: string;
 }) {
   return (
-    <InsetBox>
+    <InsetBox fill>
       <IconButton component={Link} href={prevHref} size="small" aria-label={`Previous ${unit}`}>
         <ChevronLeftRoundedIcon fontSize="small" />
       </IconButton>
-      <Typography variant="subtitle2" align="center" noWrap sx={{ minWidth: 128 }} aria-live="polite">
+      <Typography variant="subtitle2" align="center" noWrap sx={{ minWidth: 128, flex: 1 }} aria-live="polite">
         {label}
       </Typography>
       <IconButton component={Link} href={nextHref} size="small" aria-label={`Next ${unit}`}>

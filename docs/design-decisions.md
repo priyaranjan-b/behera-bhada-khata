@@ -944,6 +944,25 @@ they join the row (an `AsyncSection` adds no element); it is `wide`, so if
 it fails its one error card spans the row instead of leaving a gap. The tenant page's
 account figures stay a two-a-row grid: they sit in the record header.
 
+**The Overview on phones** (everything below the stat row is a stack of
+full-width cards, about 3,400px):
+- **Order by task:** stat row, Needs attention, Top defaulters, then the
+  Billing vs Received chart, then the reference cards (CSS `order` on the
+  `OverviewLayout` grid items, phones only).
+- **Reference cards collapse:** Collection by site, Tenant types and
+  Portfolio start as their heading with a chevron (`SectionCard
+  collapseOnPhone`).
+- **Short lists:** Needs attention and Top defaulters show 3 entries and
+  "Show N more" (`MoreOnPhone`); Top defaulters' "See all" still goes to the
+  Defaulters page.
+- **Shorter chart:** 180px instead of 260px (its skeleton matches).
+
+Together about a third shorter. `collapseOnPhone` and `MoreOnPhone` hide in
+CSS (`display` below `sm`), not with a JavaScript width check, so the server's
+page is already short on a phone and nothing jumps on load; from `sm` up both
+are no-ops. The period switcher fills the phone's context bar up to the
+"View options" button, so the bar has no empty gap.
+
 ### A27 — Old confirm links and password changes (tech-debt S1, S4)
 
 **Decision.**

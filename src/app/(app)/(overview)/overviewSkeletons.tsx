@@ -21,7 +21,8 @@ export const OVERVIEW_SKELETONS = {
   // Three stat cards (Vacant is the fourth); Billed and Collected carry a sparkline.
   stats: Array.from({ length: 3 }, (_, i) => <StatCardSkeleton key={i} sparkline={i < 2} />),
   vacant: <StatCardSkeleton />,
-  trend: <ChartCardSkeleton />,
+  // The chart is 180px tall on phones (BillingCollectionChart).
+  trend: <ChartCardSkeleton phoneHeight={180} />,
   attention: <DetailCardSkeleton rows={4} />,
   defaulters: <DetailCardSkeleton rows={5} />,
   sites: <DetailCardSkeleton rows={3} />,

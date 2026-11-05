@@ -1,18 +1,22 @@
 import Link from "@/components/ui/Link";
 import MuiLink from "@mui/material/Link";
+import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import { BadgeRow, DetailList, SectionCard } from "@/components/ui";
 import { EmptyState, StatusBadge } from "@/components/ui/DataDisplay";
 import LinkButton from "@/components/ui/Loading/LinkButton";
-import type { DefaultersReport } from "@/lib/contracts";
+import MoreOnPhone from "@/components/ui/MoreOnPhone";
+import type { DefaulterRow, DefaultersReport } from "@/lib/contracts";
 import { AGING_BAND_TONE } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 
 /** How many defaulters the Overview lists (the Defaulters page has them all). */
 const TOP_DEFAULTERS = 5;
+/** Of those, how many a phone shows before "Show N more". */
+const PHONE_ROWS = 3;
 
 /** Overview: who is furthest behind today, with everyone's arrears by age band. */
 export default function TopDefaultersCard({ report }: { report: DefaultersReport }) {
@@ -51,31 +55,42 @@ export default function TopDefaultersCard({ report }: { report: DefaultersReport
                 />
               ))}
           </BadgeRow>
-          <DetailList dividers>
-            {top.map((row) => (
-              <Stack key={row.tenantId} direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "space-between" }}>
-                <Stack sx={{ minWidth: 0 }}>
-                  <MuiLink component={Link} href={routes.tenants.detail(row.tenantId)} noWrap>
-                    {row.displayName}
-                  </MuiLink>
-                  <Typography variant="caption" color="textSecondary" noWrap>
-                    {[row.propertyName, row.movedOut ? "moved out" : null].filter(Boolean).join(" · ")}
-                  </Typography>
-                </Stack>
-                <Stack spacing={0.5} sx={{ alignItems: "flex-end", flexShrink: 0 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {formatMoney(row.totalOutstanding)}
-                  </Typography>
-                  <StatusBadge
-                    tone={row.overdueMonths > 1 ? "danger" : "warning"}
-                    label={`${row.overdueMonths} month${row.overdueMonths === 1 ? "" : "s"} behind`}
-                  />
-                </Stack>
+          <Stack spacing={1}>
+            <DetailList dividers>{top.slice(0, PHONE_ROWS).map(defaulterRow)}</DetailList>
+            <MoreOnPhone count={top.length - PHONE_ROWS}>
+              <Stack spacing={1}>
+                <Divider flexItem />
+                <DetailList dividers>{top.slice(PHONE_ROWS).map(defaulterRow)}</DetailList>
               </Stack>
-            ))}
-          </DetailList>
+            </MoreOnPhone>
+          </Stack>
         </Stack>
       )}
     </SectionCard>
+  );
+}
+
+/** One defaulter: name and tower on the left, what they owe and how far behind on the right. */
+function defaulterRow(row: DefaulterRow) {
+  return (
+    <Stack key={row.tenantId} direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "space-between" }}>
+      <Stack sx={{ minWidth: 0 }}>
+        <MuiLink component={Link} href={routes.tenants.detail(row.tenantId)} noWrap>
+          {row.displayName}
+        </MuiLink>
+        <Typography variant="caption" color="textSecondary" noWrap>
+          {[row.propertyName, row.movedOut ? "moved out" : null].filter(Boolean).join(" · ")}
+        </Typography>
+      </Stack>
+      <Stack spacing={0.5} sx={{ alignItems: "flex-end", flexShrink: 0 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {formatMoney(row.totalOutstanding)}
+        </Typography>
+        <StatusBadge
+          tone={row.overdueMonths > 1 ? "danger" : "warning"}
+          label={`${row.overdueMonths} month${row.overdueMonths === 1 ? "" : "s"} behind`}
+        />
+      </Stack>
+    </Stack>
   );
 }

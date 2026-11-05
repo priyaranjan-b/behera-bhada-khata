@@ -13,7 +13,7 @@ export default function PortfolioCard({
   const let_ = houses.total - houses.vacant;
   const occupancy = houses.total > 0 ? Math.round((let_ / houses.total) * 100) : null;
   return (
-    <SectionCard title="Portfolio" fill>
+    <SectionCard title="Portfolio" fill collapseOnPhone>
       <DetailList dividers>
         <DetailRow label="Monthly rent roll">{formatMoney(portfolio.rentRoll)}</DetailRow>
         <DetailRow label="Occupancy">

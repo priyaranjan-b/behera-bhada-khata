@@ -108,7 +108,7 @@ export function StatCardSkeleton({ sparkline = false }: { sparkline?: boolean })
 }
 
 /** Matches `BillingCollectionChart`: header row, total, caption, 260px chart. */
-export function ChartCardSkeleton({ height = 260 }: { height?: number }) {
+export function ChartCardSkeleton({ height = 260, phoneHeight = height }: { height?: number; phoneHeight?: number }) {
   return (
     <AppCard aria-hidden sx={{ width: "100%" }}>
       <CardContent>
@@ -124,7 +124,7 @@ export function ChartCardSkeleton({ height = 260 }: { height?: number }) {
         <Typography variant="caption" component="p" sx={{ width: 240 }}>
           <Skeleton />
         </Typography>
-        <Skeleton variant="rounded" height={height} sx={{ mt: 2.5 }} />
+        <Skeleton variant="rounded" sx={{ mt: 2.5, height: { xs: phoneHeight, sm: height } }} />
       </CardContent>
     </AppCard>
   );

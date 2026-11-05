@@ -26,23 +26,24 @@ export default function OverviewLayout(slots: {
         {slots.stats}
         {slots.vacant}
       </StatCardRow>
+      {/* Phones: what the owner acts on first (attention, defaulters), then the chart, then the reference cards. */}
       <Grid container spacing={2} columns={12}>
-        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0 }}>
+        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0, order: { xs: 3, sm: 0 } }}>
           {slots.trend}
         </Grid>
-        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0 }}>
+        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0, order: { xs: 1, sm: 0 } }}>
           {slots.attention}
         </Grid>
-        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, order: { xs: 2, sm: 0 } }}>
           {slots.defaulters}
         </Grid>
-        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0 }}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, order: { xs: 4, sm: 0 } }}>
           {slots.sites}
         </Grid>
-        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0 }}>
+        <Grid size={{ xs: 12, lg: 8 }} sx={{ minWidth: 0, order: { xs: 5, sm: 0 } }}>
           {slots.tenantTypes}
         </Grid>
-        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0 }}>
+        <Grid size={{ xs: 12, lg: 4 }} sx={{ minWidth: 0, order: { xs: 6, sm: 0 } }}>
           {slots.portfolio}
         </Grid>
       </Grid>

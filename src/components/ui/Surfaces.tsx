@@ -1,7 +1,9 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import AppCard from "@/components/ui/AppCard";
 import Stack, { type StackProps } from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -21,6 +23,7 @@ export function SectionCard({
   action,
   sticky = false,
   fill = false,
+  collapseOnPhone = false,
   children,
 }: {
   title: string;
@@ -34,9 +37,19 @@ export function SectionCard({
   sticky?: boolean;
   /** Stretch to the height of its grid row (cards side by side). */
   fill?: boolean;
+  /**
+   * On phones, start as just the heading with a chevron that opens the body
+   * (reference cards a long page can do without, e.g. the Overview's). Done
+   * in CSS, so the server's page already has it closed: no jump on load.
+   */
+  collapseOnPhone?: boolean;
   children: React.ReactNode;
 }) {
   const headingId = useId();
+  const bodyId = useId();
+  const [open, setOpen] = useState(false);
+  // Hidden only below `sm`; from `sm` up a collapsible card is an ordinary one.
+  const phoneHidden = collapseOnPhone && !open ? { display: { xs: "none", sm: "block" } } : undefined;
   return (
     <AppCard
       component="section"
@@ -68,21 +81,47 @@ export function SectionCard({
               ) : null}
             </Box>
           </Stack>
-          {action ? <Box sx={{ flexShrink: 0 }}>{action}</Box> : null}
+          {action ? <Box sx={[{ flexShrink: 0 }, phoneHidden ?? {}]}>{action}</Box> : null}
+          {collapseOnPhone ? (
+            <IconButton
+              aria-label={`${open ? "Hide" : "Show"} ${title}`}
+              aria-expanded={open}
+              aria-controls={bodyId}
+              onClick={() => setOpen((o) => !o)}
+              sx={{ display: { xs: "inline-flex", sm: "none" }, flexShrink: 0 }}
+            >
+              <ExpandMoreRoundedIcon sx={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />
+            </IconButton>
+          ) : null}
         </Stack>
-        {children}
+        {collapseOnPhone ? (
+          <Box id={bodyId} sx={phoneHidden}>
+            {children}
+          </Box>
+        ) : (
+          children
+        )}
       </Stack>
     </AppCard>
   );
 }
 
 /** Thin divider-bordered inset, e.g. the month switcher. */
-export function InsetBox({ direction = "row", children }: { direction?: StackProps["direction"]; children: React.ReactNode }) {
+export function InsetBox({
+  direction = "row",
+  fill = false,
+  children,
+}: {
+  direction?: StackProps["direction"];
+  /** As wide as its container (a phone's period switcher), instead of its content. */
+  fill?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <Stack
       direction={direction}
       spacing={0.5}
-      sx={{ alignItems: "center", border: "1px solid", borderColor: "divider", borderRadius: 1, p: 0.5 }}
+      sx={{ alignItems: "center", border: "1px solid", borderColor: "divider", borderRadius: 1, p: 0.5, width: fill ? "100%" : undefined }}
     >
       {children}
     </Stack>

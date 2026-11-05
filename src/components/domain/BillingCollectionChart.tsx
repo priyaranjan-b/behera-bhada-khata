@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import Button from "@mui/material/Button";
 import AppCard from "@/components/ui/AppCard";
 import CardContent from "@mui/material/CardContent";
@@ -32,6 +33,8 @@ export default function BillingCollectionChart({
   href?: string;
 }) {
   const theme = useTheme();
+  // Shorter on phones, where the Overview's cards stack (its skeleton matches: OVERVIEW_SKELETONS.trend).
+  const chartHeight = useMediaQuery(theme.breakpoints.down("sm")) ? 180 : 260;
   const [showTable, setShowTable] = useState(false);
   if (data.length === 0) return null;
 
@@ -100,7 +103,7 @@ export default function BillingCollectionChart({
               { id: "billed", label: "Billed", data: data.map((d) => d.billed), color: palette.primary.main, valueFormatter: (v) => formatMoney(v ?? 0) },
               { id: "collected", label: "Received", data: data.map((d) => d.collected), color: palette.success.main, valueFormatter: (v) => formatMoney(v ?? 0) },
             ]}
-            height={260}
+            height={chartHeight}
             margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
             grid={{ horizontal: true }}
             slotProps={{ legend: { position: { vertical: "top", horizontal: "end" } } }}

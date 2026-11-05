@@ -96,6 +96,7 @@ export default function TenantTypesCard({ kinds, monthLabel }: { kinds: KindBrea
           </Button>
         }
         fill
+        collapseOnPhone
       >
         {showTable ? (
           <Table size="small" aria-label="Tenants, billing and arrears by tenant type">
