@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAppRouter } from "@/components/ui/Loading";
 import Typography from "@mui/material/Typography";
 import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
 import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/DataTable";
@@ -8,18 +10,17 @@ import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/
 import { GridCell } from "@/components/ui";
 import type { DefaulterRow } from "@/lib/contracts";
 import { formatDateKey, formatMonth } from "@/lib/dates";
-import { AGING_BUCKETS, type AgingBucketKey } from "@/lib/domain/reports";
+import { agingBucketOf, AGING_BUCKETS, isAgingBucketKey, type AgingBucketKey } from "@/lib/domain/reports";
 import { formatUnits } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 
-type BandFilter = "all" | "2" | "4" | "7";
+/** "Show": everyone, or one aging band - the same bands as the page's cards (A28). */
+type BandFilter = "all" | AgingBucketKey;
 
 const BAND_OPTIONS: { value: BandFilter; label: string }[] = [
   { value: "all", label: "All defaulters" },
-  { value: "2", label: "2+ months behind" },
-  { value: "4", label: "4+ months behind" },
-  { value: "7", label: "Over 6 months behind" },
+  ...AGING_BUCKETS.map((b) => ({ value: b.key, label: `${b.label} behind` })),
 ];
 
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
@@ -98,10 +99,21 @@ const columns: DataTableColDef<DefaulterRow>[] = [
   },
 ];
 
+/**
+ * The defaulters table. "Show" is the URL's `?band=` (the page's band cards
+ * link to it too), so a card, the select and Back all agree.
+ */
 export default function DefaultersList({ rows }: { rows: DefaulterRow[] }) {
-  const [band, setBand] = useState<BandFilter>("all");
+  const router = useAppRouter();
+  const param = useSearchParams().get("band");
+  const band: BandFilter = isAgingBucketKey(param) ? param : "all";
+  const setBand = useCallback(
+    (next: BandFilter) =>
+      router.replace(next === "all" ? routes.defaulters : routes.defaultersBand(next), { scroll: false }),
+    [router]
+  );
   const filtered = useMemo(
-    () => (band === "all" ? rows : rows.filter((r) => r.overdueMonths >= Number(band))),
+    () => (band === "all" ? rows : rows.filter((r) => agingBucketOf(r.overdueMonths) === band)),
     [rows, band]
   );
   const owed = filtered.reduce((sum, r) => sum + r.totalOutstanding, 0);

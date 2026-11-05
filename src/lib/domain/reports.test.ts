@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { RentPeriod } from "@/lib/types";
-import { agingGroups, agingOf, buildBillingCollectionTrend, buildMonthlyReport, compareAging } from "./reports";
+import {
+  agingGroups,
+  agingOf,
+  buildBillingCollectionTrend,
+  buildMonthlyReport,
+  compareAging,
+  isAgingBucketKey,
+} from "./reports";
 
 const period = (tenant_id: string, period_month: string, amount_allocated: number): RentPeriod => ({
   id: `${tenant_id}-${period_month}`,
@@ -96,5 +103,13 @@ describe("aging", () => {
       { key: "m4to6", label: "4–6 months", tenantCount: 0, outstanding: 0 },
       { key: "m7plus", label: "Over 6 months", tenantCount: 1, outstanding: 35000 },
     ]);
+  });
+});
+
+describe("isAgingBucketKey", () => {
+  it("accepts the bands' keys and nothing else", () => {
+    expect(isAgingBucketKey("m2to3")).toBe(true);
+    expect(isAgingBucketKey("m7plus")).toBe(true);
+    for (const value of ["2", "all", "", null, undefined]) expect(isAgingBucketKey(value)).toBe(false);
   });
 });

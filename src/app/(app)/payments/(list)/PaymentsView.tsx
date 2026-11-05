@@ -14,11 +14,14 @@ import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, {
+  isCardFilterOn,
   moneyColumn,
   selectColumn,
   SERVER_TEXT_OPERATORS,
   tagsColumn,
+  toggleCardFilter,
   useServerGrid,
+  type CardFilter,
   type DataTableColDef,
 } from "@/components/ui/DataTable";
 import { EmptyState, IdentityCell } from "@/components/ui/DataDisplay";
@@ -30,7 +33,8 @@ import { apiHref, apiPaths } from "@/lib/api-client/paths";
 import type { PaymentListRow, PaymentsPage, PaymentsPageQuery, PaymentTotals } from "@/lib/contracts";
 import { formatDateKey } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
-import { PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/domain/payments";
+import { isCashMode, PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/domain/payments";
+import { PAYMENT_MODES, type PaymentMode } from "@/lib/types";
 import { formatMoney, round2 } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
@@ -123,6 +127,21 @@ function columnsWithTags(
   ];
 }
 
+/** A card's filter on the Mode column, which the database compares as the label shown (A28). */
+const modeFilter = (modes: readonly PaymentMode[]): CardFilter =>
+  modes.length === 1
+    ? { field: "mode", operator: "is", value: paymentModeLabel(modes[0]) }
+    : { field: "mode", operator: "isAnyOf", value: modes.map(paymentModeLabel) };
+/** Each card shows the payments it counts: Received is every cash mode (no set-offs, A22). */
+const CARD_FILTERS = {
+  received: modeFilter(PAYMENT_MODES.filter(isCashMode)),
+  cash: modeFilter(["cash"]),
+  upi: modeFilter(["upi"]),
+  bank: modeFilter(["bank_transfer"]),
+  chequeOther: modeFilter(["cheque", "other"]),
+  setOff: modeFilter(["set_off"]),
+} as const;
+
 const DEFAULT_EXTRA = {};
 const DEFAULT_SORT: GridSortModel = [{ field: "paymentDate", sort: "desc" }];
 const getRowId = (row: PaymentListRow) => row.id;
@@ -156,7 +175,7 @@ export default function PaymentsView({
   const [suggestions, setSuggestions] = useState(tagSuggestions);
   const columns = useMemo(() => columnsWithTags(suggestions, setEditing), [suggestions]);
   const load = useCallback((q: PaymentsPageQuery) => api.dashboard.payments.list({ from, to, ...q }), [from, to]);
-  const { data, error, reload, gridProps } = useServerGrid({
+  const { data, error, reload, gridProps, filter, setFilter } = useServerGrid({
     initial,
     load,
     toQuery,
@@ -165,6 +184,11 @@ export default function PaymentsView({
     errorText: "Couldn't load the payments.",
   });
   const { totals } = data;
+  // A card filters the table to the payments it counts; tapped again, it clears that filter (A28).
+  const cardFilter = (key: keyof typeof CARD_FILTERS) => ({
+    onClick: () => void setFilter(toggleCardFilter(filter, CARD_FILTERS[key])),
+    selected: isCardFilterOn(filter, CARD_FILTERS[key]),
+  });
   const narrowed = data.total < data.all;
   const byMode = totals.byMode;
   // The footer adds up the Amount column, set-offs included; "Received" above is cash only (A22, A26).
@@ -182,25 +206,34 @@ export default function PaymentsView({
           tone="primary"
           variant="gradient"
           value={formatMoney(totals.amount)}
+          {...cardFilter("received")}
           caption={`${totals.count} payment${totals.count === 1 ? "" : "s"}${narrowed ? " matching the search" : ""}${
             byMode.set_off > 0 ? ` · + ${formatMoney(byMode.set_off)} set off` : ""
           }`}
         />
-        <StatCard title="Cash" icon={<LocalAtmRoundedIcon />} value={formatMoney(byMode.cash)} caption={shareOf(byMode.cash, totals)} />
-        <StatCard title="UPI" icon={<QrCode2RoundedIcon />} value={formatMoney(byMode.upi)} caption={shareOf(byMode.upi, totals)} />
+        <StatCard title="Cash" icon={<LocalAtmRoundedIcon />} value={formatMoney(byMode.cash)} caption={shareOf(byMode.cash, totals)} {...cardFilter("cash")} />
+        <StatCard title="UPI" icon={<QrCode2RoundedIcon />} value={formatMoney(byMode.upi)} caption={shareOf(byMode.upi, totals)} {...cardFilter("upi")} />
         <StatCard
           title="Bank transfer"
           icon={<AccountBalanceRoundedIcon />}
           value={formatMoney(byMode.bank_transfer)}
           caption={shareOf(byMode.bank_transfer, totals)}
+          {...cardFilter("bank")}
         />
         <StatCard
           title="Cheque & other"
           icon={<DescriptionRoundedIcon />}
           value={formatMoney(byMode.cheque + byMode.other)}
           caption={shareOf(byMode.cheque + byMode.other, totals)}
+          {...cardFilter("chequeOther")}
         />
-        <StatCard title="Set-off" icon={<SwapHorizRoundedIcon />} value={formatMoney(byMode.set_off)} caption="Not cash · kept back by tenants" />
+        <StatCard
+          title="Set-off"
+          icon={<SwapHorizRoundedIcon />}
+          value={formatMoney(byMode.set_off)}
+          caption="Not cash · kept back by tenants"
+          {...cardFilter("setOff")}
+        />
         {paidDirectCard}
       </StatCardRow>
 

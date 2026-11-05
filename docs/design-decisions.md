@@ -1010,11 +1010,24 @@ page holding the records behind it, for the same period:
   Ledger and Months tabs, Collection by site to the site's towers
   (`routes.properties.site`), and Portfolio's rent roll, occupancy and paid
   direct to the Tenants and Houses lists.
-- **The same page** (a card above its own table): it filters that table
-  to what it counts (see the second part below, when it lands).
-- **No link:** a total of the table already on screen, and figures that are
-  computed rather than recorded (Earnings' nets, Spent of collected).
-  Tenant types has no link while the Tenants list can't filter by type.
+- **The same page** (a card above its own table): the card filters that
+  table to what it counts, and tapped again clears it. On Payments, Received
+  shows every cash mode (no set-offs, A22) and each mode card its mode; on
+  Maintenance, "Most on …" its category and "Paid by …" that payer; on
+  Defaulters, each band card its band. A card that filters is a toggle
+  (`StatCard onClick` + `selected`: `aria-pressed` and an outline), setting
+  the column filter through `useServerGrid`'s `setFilter` with
+  `toggleCardFilter` (it replaces only that column's filter). Defaulters'
+  cards are server-rendered, so there the band is the URL's `?band=`
+  (`routes.defaultersBand`), which the table's "Show" reads and writes too;
+  its "Show" options are now the cards' four bands, not "2+ / 4+ / 7+".
+  Payments' and Maintenance's cards follow the table's filters (A18), so with
+  "Cash" on, the other mode cards read ₹0 until it's cleared.
+- **No link:** a total of the table already on screen (Billing's Billed,
+  Collected and Balance; Maintenance's Spent), figures that are computed
+  rather than recorded (Earnings' nets, Spent of collected), and two with no
+  matching filter yet: "Payer not tagged" (the Paid by column has no "is
+  empty") and Tenant types (the Tenants list can't filter by type).
 
 **Why.** A figure the owner can't open is a dead end: the next question is
 always "which ones?".

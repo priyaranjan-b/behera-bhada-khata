@@ -4,6 +4,7 @@ import { useId } from "react";
 import { useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import AppCard from "@/components/ui/AppCard";
+import ButtonBase from "@mui/material/ButtonBase";
 import CardContent from "@mui/material/CardContent";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -60,6 +61,8 @@ export default function StatCard({
   badge,
   sparkline,
   href,
+  onClick,
+  selected = false,
   icon,
   tone,
   variant = "default",
@@ -74,6 +77,13 @@ export default function StatCard({
   sparkline?: { data: number[]; labels: string[]; trend: Trend; format?: "money" };
   /** Makes the whole card a link (it lifts on hover), e.g. to a pre-filtered list. */
   href?: string;
+  /**
+   * Makes the whole card a toggle button instead, e.g. filtering the table
+   * below it to what it counts (A28); `selected` while that filter is on
+   * (`aria-pressed`, and an outline). Client components only.
+   */
+  onClick?: () => void;
+  selected?: boolean;
   /** Decorative icon in the top-right tile, e.g. `<ReceiptLongRoundedIcon />`. */
   icon?: React.ReactNode;
   tone?: Tone;
@@ -91,11 +101,19 @@ export default function StatCard({
   return (
     <AppCard
       href={href}
+      {...(onClick && !href
+        ? { component: ButtonBase, onClick, interactive: true, "aria-pressed": selected, focusRipple: true }
+        : {})}
+      // A selected link card (its filter is the page's current view) says so to screen readers.
+      {...(href && selected ? { "aria-current": "true" } : {})}
       // The page's headline figure: StatCardRow shows it first on phones (A26).
       {...(variant === "gradient" ? { "data-emphasis": "" } : {})}
       sx={[
         // Phones: 12px in, not the card's 16, so a row of figures stays short.
         { height: "100%", flexGrow: 1, position: "relative", p: { xs: 1.5, sm: 2 } },
+        // A card that's a button reads and lays out like the others (ButtonBase centres inline content).
+        Boolean(onClick && !href) && { display: "block", width: "100%", textAlign: "left" },
+        selected && { outline: "2px solid", outlineColor: toneMain(theme, "primary"), outlineOffset: -2 },
         variant === "highlighted" && {
           "&::before": { content: '""', position: "absolute", inset: "0 auto 0 0", width: 3, bgcolor: toneMain(theme, cardTone) },
         },

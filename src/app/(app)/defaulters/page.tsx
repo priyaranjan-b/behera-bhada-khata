@@ -3,6 +3,7 @@ import { serverApi } from "@/lib/api-client/server";
 import { formatMonth } from "@/lib/dates";
 import { AGING_BAND_TONE } from "@/lib/domain/reports";
 import { formatMoney } from "@/lib/money";
+import { routes } from "@/lib/routes";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import StatCard from "@/components/ui/StatCard";
 import { PageHeader } from "@/components/ui/DataDisplay";
@@ -12,8 +13,8 @@ import { DEFAULTER_STAT_COLUMNS } from "./defaulterStatColumns";
 
 const tenants = (n: number) => `${n} tenant${n === 1 ? "" : "s"}`;
 
-export default async function DefaultersPage() {
-  const report = await serverApi.dashboard.defaulters();
+export default async function DefaultersPage({ searchParams }: { searchParams: Promise<{ band?: string }> }) {
+  const [report, { band }] = await Promise.all([serverApi.dashboard.defaulters(), searchParams]);
 
   return (
     <Stack spacing={2}>
@@ -26,6 +27,9 @@ export default async function DefaultersPage() {
         {report.groups.map((group) => (
           <StatCard
             key={group.key}
+            // Shows that band in the table below; tapped again, everyone (A28).
+            href={band === group.key ? routes.defaulters : routes.defaultersBand(group.key)}
+            selected={band === group.key}
             title={`${group.label} behind`}
             icon={<ScheduleRoundedIcon />}
             value={formatMoney(group.outstanding)}

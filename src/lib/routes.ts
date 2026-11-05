@@ -56,6 +56,8 @@ export const routes = {
   /** `paidDirect: "show"` keeps "Include Govt paid direct" on (A11); off when left out. */
   dashboard: (query?: { month?: string; paidDirect?: "show" }, hash?: string) => withQuery("/", query, hash),
   defaulters: "/defaulters",
+  /** Defaulters showing one aging band (`AGING_BUCKETS` key, e.g. `m2to3`); the page's cards and "Show" use it (A28). */
+  defaultersBand: (band: string) => withQuery("/defaulters", { band }),
   /** `from`/`to` are `yyyy-MM`; none = last month. */
   billing: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/billing", query),
   activity: "/activity",

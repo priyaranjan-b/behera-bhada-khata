@@ -9,11 +9,14 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import HandymanRoundedIcon from "@mui/icons-material/HandymanRounded";
 import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, {
+  isCardFilterOn,
   moneyColumn,
   selectColumn,
   SERVER_TEXT_OPERATORS,
   tagsColumn,
+  toggleCardFilter,
   useServerGrid,
+  type CardFilter,
   type DataTableColDef,
 } from "@/components/ui/DataTable";
 import { EmptyState, StatusBadge } from "@/components/ui/DataDisplay";
@@ -174,7 +177,7 @@ export default function MaintenanceView({
   const [suggestions, setSuggestions] = useState(tagSuggestions);
   const columns = useMemo(() => columnsWithTags(suggestions, setEditing), [suggestions]);
   const load = useCallback((q: MaintenancePageQuery) => api.dashboard.maintenance.list({ from, to, ...q }), [from, to]);
-  const { data, error, reload, gridProps } = useServerGrid({
+  const { data, error, reload, gridProps, filter, setFilter } = useServerGrid({
     initial,
     load,
     toQuery,
@@ -191,6 +194,12 @@ export default function MaintenanceView({
   // The footer adds up what was spent: a voided expense is listed but counted nowhere (D35).
   const columnTotals = useMemo(() => ({ amount: totals.amount }), [totals.amount]);
   const voided = data.total - totals.count;
+  // The category and payer cards filter the table to the expenses they count; tapped again, they clear it (A28).
+  // "Spent" totals the table on screen, and "Payer not tagged" has no column filter for "no tags".
+  const cardFilter = (f: CardFilter | null) =>
+    f ? { onClick: () => void setFilter(toggleCardFilter(filter, f)), selected: isCardFilterOn(filter, f) } : {};
+  const categoryFilter: CardFilter | null = categories[0] ? { field: "category", operator: "is", value: categories[0].label } : null;
+  const payerFilter: CardFilter | null = topPayer ? { field: "tags", operator: "is", value: topPayer.name } : null;
 
   return (
     <Stack spacing={2}>
@@ -209,6 +218,7 @@ export default function MaintenanceView({
           title={categories[0] ? `Most on ${categories[0].label}` : "Biggest category"}
           icon={<CategoryRoundedIcon />}
           value={formatMoney(categories[0]?.amount ?? 0)}
+          {...cardFilter(categoryFilter)}
           caption={
             categories[1]
               ? `Then ${categories[1].label}: ${formatMoney(categories[1].amount)}`
@@ -219,6 +229,7 @@ export default function MaintenanceView({
           title={topPayer ? `Paid by ${topPayer.name}` : "Paid by"}
           icon={<PersonRoundedIcon />}
           value={formatMoney(topPayer?.amount ?? 0)}
+          {...cardFilter(payerFilter)}
           caption={
             otherPayers.length > 0
               ? otherPayers

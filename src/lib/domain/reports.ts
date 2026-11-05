@@ -141,6 +141,11 @@ export const AGING_BAND_TONE: Record<AgingBucketKey, "warning" | "danger"> = {
   m7plus: "danger",
 };
 
+/** Is `value` an aging band's key (a Defaulters `?band=`)? */
+export function isAgingBucketKey(value: string | null | undefined): value is AgingBucketKey {
+  return AGING_BUCKETS.some((b) => b.key === value);
+}
+
 export function agingBucketOf(months: number): AgingBucketKey | null {
   return AGING_BUCKETS.find((b) => months >= b.min && months <= b.max)?.key ?? null;
 }

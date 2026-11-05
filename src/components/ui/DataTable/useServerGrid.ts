@@ -142,6 +142,8 @@ export function useServerGrid<P extends ServerGridPage, E extends object, Q exte
   const onPaginationModelChange = useCallback((pagination: GridPaginationModel) => update({ pagination }), [update]);
   const onSortModelChange = useCallback((sort: GridSortModel) => update({ sort }), [update]);
   const onFilterModelChange = useCallback((filter: GridFilterModel) => update({ filter }), [update]);
+  /** Sets the column filters from outside the grid, e.g. a stat card above it (`toggleCardFilter`, A28). */
+  const setFilter = onFilterModelChange;
   const setExtra = useCallback(
     (change: Partial<E>) => update({ extra: { ...viewRef.current.extra, ...change } }),
     [update]
@@ -167,5 +169,5 @@ export function useServerGrid<P extends ServerGridPage, E extends object, Q exte
   /** Fetches the current view again, e.g. after a write changed its rows. */
   const reload = useCallback(() => run(viewRef.current), [run]);
 
-  return { data, error, extra: view.extra, setExtra, reload, gridProps };
+  return { data, error, extra: view.extra, setExtra, setFilter, filter: view.filter, reload, gridProps };
 }
