@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import AppCard from "@/components/ui/AppCard";
 import CardContent from "@mui/material/CardContent";
@@ -20,6 +20,7 @@ import { APP_LOCALE } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { StatusBadge } from "@/components/ui/DataDisplay";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { TREND_CHART_HEIGHT } from "@/components/ui/chartHeights";
 
 const compact = new Intl.NumberFormat(APP_LOCALE, { notation: "compact", maximumFractionDigits: 1 });
 
@@ -33,8 +34,6 @@ export default function BillingCollectionChart({
   href?: string;
 }) {
   const theme = useTheme();
-  // Shorter on phones, where the Overview's cards stack (its skeleton matches: OVERVIEW_SKELETONS.trend).
-  const chartHeight = useMediaQuery(theme.breakpoints.down("sm")) ? 180 : 260;
   const [showTable, setShowTable] = useState(false);
   if (data.length === 0) return null;
 
@@ -95,19 +94,21 @@ export default function BillingCollectionChart({
             </TableBody>
           </Table>
         ) : (
-          <BarChart
-            borderRadius={6}
-            xAxis={[{ scaleType: "band", categoryGapRatio: 0.45, barGapRatio: 0.15, data: data.map((d) => d.label), height: 24 }]}
-            yAxis={[{ width: 56, valueFormatter: (v: number) => compact.format(v) }]}
-            series={[
-              { id: "billed", label: "Billed", data: data.map((d) => d.billed), color: palette.primary.main, valueFormatter: (v) => formatMoney(v ?? 0) },
-              { id: "collected", label: "Received", data: data.map((d) => d.collected), color: palette.success.main, valueFormatter: (v) => formatMoney(v ?? 0) },
-            ]}
-            height={chartHeight}
-            margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
-            grid={{ horizontal: true }}
-            slotProps={{ legend: { position: { vertical: "top", horizontal: "end" } } }}
-          />
+          // Sized in CSS, not by a width check in JS, so a phone gets 180px from the first paint (no jump; A26).
+          <Box sx={{ height: TREND_CHART_HEIGHT }}>
+            <BarChart
+              borderRadius={6}
+              xAxis={[{ scaleType: "band", categoryGapRatio: 0.45, barGapRatio: 0.15, data: data.map((d) => d.label), height: 24 }]}
+              yAxis={[{ width: 56, valueFormatter: (v: number) => compact.format(v) }]}
+              series={[
+                { id: "billed", label: "Billed", data: data.map((d) => d.billed), color: palette.primary.main, valueFormatter: (v) => formatMoney(v ?? 0) },
+                { id: "collected", label: "Received", data: data.map((d) => d.collected), color: palette.success.main, valueFormatter: (v) => formatMoney(v ?? 0) },
+              ]}
+              margin={{ left: 0, right: 0, top: 20, bottom: 0 }}
+              grid={{ horizontal: true }}
+              slotProps={{ legend: { position: { vertical: "top", horizontal: "end" } } }}
+            />
+          </Box>
         )}
       </CardContent>
     </AppCard>

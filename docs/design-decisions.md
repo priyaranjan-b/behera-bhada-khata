@@ -955,7 +955,11 @@ full-width cards, about 3,400px):
 - **Short lists:** Needs attention and Top defaulters show 3 entries and
   "Show N more" (`MoreOnPhone`); Top defaulters' "See all" still goes to the
   Defaulters page.
-- **Shorter chart:** 180px instead of 260px (its skeleton matches).
+- **Shorter chart:** 180px instead of 260px, set in CSS on the chart's box
+  (`TREND_CHART_HEIGHT`, read by its skeleton too), so it doesn't resize after
+  load. The skeletons match the phone layout as well: the lists stop at 3 rows
+  and the collapsed cards are just their heading (`phoneRows`,
+  `collapseOnPhone` on `DetailCardSkeleton` / `ChartCardSkeleton`).
 
 Together about a third shorter. `collapseOnPhone` and `MoreOnPhone` hide in
 CSS (`display` below `sm`), not with a JavaScript width check, so the server's

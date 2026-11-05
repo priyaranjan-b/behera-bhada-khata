@@ -7,6 +7,7 @@ import CardContent from "@mui/material/CardContent";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { TREND_CHART_HEIGHT } from "./chartHeights";
 
 /** Wraps a page's skeletons and announces the loading state once. */
 export function PageSkeleton({ label = "Loading…", children }: { label?: string; children: React.ReactNode }) {
@@ -107,8 +108,35 @@ export function StatCardSkeleton({ sparkline = false }: { sparkline?: boolean })
   );
 }
 
-/** Matches `BillingCollectionChart`: header row, total, caption, 260px chart. */
-export function ChartCardSkeleton({ height = 260, phoneHeight = height }: { height?: number; phoneHeight?: number }) {
+/** Hidden on phones only: the body of a skeleton whose card is `SectionCard collapseOnPhone` (A26). */
+const PHONE_HIDDEN = { display: { xs: "none", sm: "block" } } as const;
+
+/**
+ * The heading row's right-hand control: the card's own (a button, a badge) or,
+ * for a card that starts collapsed on phones, its 44px chevron there.
+ */
+function HeadingControlSkeleton({ width, height, collapseOnPhone }: { width: number; height: number; collapseOnPhone: boolean }) {
+  if (!collapseOnPhone) return <Skeleton variant="rounded" width={width} height={height} />;
+  return (
+    <>
+      <Skeleton variant="rounded" width={width} height={height} sx={PHONE_HIDDEN} />
+      <Skeleton variant="circular" width={44} height={44} sx={{ display: { xs: "block", sm: "none" } }} />
+    </>
+  );
+}
+
+/**
+ * Matches `BillingCollectionChart`: header row, total, caption and the chart
+ * (`TREND_CHART_HEIGHT`, shorter on phones). `height` for another chart card;
+ * `collapseOnPhone` for one that is just its heading on phones.
+ */
+export function ChartCardSkeleton({
+  height = TREND_CHART_HEIGHT,
+  collapseOnPhone = false,
+}: {
+  height?: number | { xs: number; sm: number };
+  collapseOnPhone?: boolean;
+}) {
   return (
     <AppCard aria-hidden sx={{ width: "100%" }}>
       <CardContent>
@@ -116,22 +144,36 @@ export function ChartCardSkeleton({ height = 260, phoneHeight = height }: { heig
           <Typography variant="subtitle2" gutterBottom sx={{ width: 160 }}>
             <Skeleton />
           </Typography>
-          <Skeleton variant="rounded" width={96} height={30} />
+          <HeadingControlSkeleton width={96} height={30} collapseOnPhone={collapseOnPhone} />
         </Stack>
-        <Typography variant="h4" sx={{ width: 180 }}>
-          <Skeleton />
-        </Typography>
-        <Typography variant="caption" component="p" sx={{ width: 240 }}>
-          <Skeleton />
-        </Typography>
-        <Skeleton variant="rounded" sx={{ mt: 2.5, height: { xs: phoneHeight, sm: height } }} />
+        <Box sx={collapseOnPhone ? PHONE_HIDDEN : undefined}>
+          <Typography variant="h4" sx={{ width: 180 }}>
+            <Skeleton />
+          </Typography>
+          <Typography variant="caption" component="p" sx={{ width: 240 }}>
+            <Skeleton />
+          </Typography>
+          <Skeleton variant="rounded" sx={{ mt: 2.5, height }} />
+        </Box>
       </CardContent>
     </AppCard>
   );
 }
 
-/** Matches a `SectionCard` of `DetailRow`s (label left, value right). */
-export function DetailCardSkeleton({ rows = 4 }: { rows?: number }) {
+/**
+ * Matches a `SectionCard` of `DetailRow`s (label left, value right).
+ * `phoneRows`: a list a phone cuts short (`MoreOnPhone`); `collapseOnPhone`:
+ * a card that is just its heading on phones (`SectionCard collapseOnPhone`).
+ */
+export function DetailCardSkeleton({
+  rows = 4,
+  phoneRows = rows,
+  collapseOnPhone = false,
+}: {
+  rows?: number;
+  phoneRows?: number;
+  collapseOnPhone?: boolean;
+}) {
   return (
     <AppCard aria-hidden component="section">
       <Stack spacing={2}>
@@ -139,10 +181,14 @@ export function DetailCardSkeleton({ rows = 4 }: { rows?: number }) {
           <Typography variant="subtitle2" sx={{ width: 160 }}>
             <Skeleton />
           </Typography>
-          <Skeleton variant="rounded" width={72} height={24} />
+          <HeadingControlSkeleton width={72} height={24} collapseOnPhone={collapseOnPhone} />
         </Stack>
         {Array.from({ length: rows }, (_, i) => (
-          <Stack key={i} direction="row" sx={{ justifyContent: "space-between", gap: 2 }}>
+          <Stack
+            key={i}
+            direction="row"
+            sx={[{ justifyContent: "space-between", gap: 2 }, (collapseOnPhone || i >= phoneRows) && PHONE_HIDDEN]}
+          >
             <Typography variant="body2" sx={{ width: "30%" }}>
               <Skeleton />
             </Typography>

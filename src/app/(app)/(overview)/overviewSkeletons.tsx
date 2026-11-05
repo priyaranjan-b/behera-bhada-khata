@@ -21,11 +21,11 @@ export const OVERVIEW_SKELETONS = {
   // Three stat cards (Vacant is the fourth); Billed and Collected carry a sparkline.
   stats: Array.from({ length: 3 }, (_, i) => <StatCardSkeleton key={i} sparkline={i < 2} />),
   vacant: <StatCardSkeleton />,
-  // The chart is 180px tall on phones (BillingCollectionChart).
-  trend: <ChartCardSkeleton phoneHeight={180} />,
-  attention: <DetailCardSkeleton rows={4} />,
-  defaulters: <DetailCardSkeleton rows={5} />,
-  sites: <DetailCardSkeleton rows={3} />,
-  tenantTypes: <ChartCardSkeleton height={220} />,
-  portfolio: <DetailCardSkeleton rows={5} />,
+  trend: <ChartCardSkeleton />,
+  // As the cards on phones (A26): the lists stop at 3, the reference cards are just their heading.
+  attention: <DetailCardSkeleton rows={4} phoneRows={3} />,
+  defaulters: <DetailCardSkeleton rows={5} phoneRows={3} />,
+  sites: <DetailCardSkeleton rows={3} collapseOnPhone />,
+  tenantTypes: <ChartCardSkeleton height={220} collapseOnPhone />,
+  portfolio: <DetailCardSkeleton rows={5} collapseOnPhone />,
 } satisfies Record<string, React.ReactNode>;
