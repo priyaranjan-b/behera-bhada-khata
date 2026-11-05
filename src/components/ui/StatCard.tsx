@@ -13,6 +13,7 @@ import { lineClasses } from "@mui/x-charts/LineChart";
 import { StatusBadge, type BadgeTone } from "@/components/ui/DataDisplay";
 import { IconTile } from "@/components/ui/Surfaces";
 import { toneMain, type Tone } from "@/components/ui/tone";
+import { lightStyles } from "@/theme/glass";
 import { formatMoney } from "@/lib/money";
 
 export type Trend = "up" | "down" | "neutral";
@@ -120,13 +121,13 @@ export default function StatCard({
         // Light mode: a faint glow of the tone from the icon's corner, so a white
         // card isn't blank (the dark card needs none).
         variant !== "gradient" &&
-          theme.applyStyles("light", {
+          lightStyles(theme, {
             backgroundImage: `radial-gradient(circle at 100% 0%, color-mix(in srgb, ${toneMain(theme, cardTone)} 10%, transparent), transparent 60%)`,
           }),
         variant === "gradient" && {
           // Over the card's own background, so both schemes keep their surface.
           backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${toneMain(theme, cardTone)} 18%, transparent) 0%, transparent 75%)`,
-          ...theme.applyStyles("light", {
+          ...lightStyles(theme, {
             backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${toneMain(theme, cardTone)} 22%, transparent) 0%, transparent 80%)`,
           }),
         },

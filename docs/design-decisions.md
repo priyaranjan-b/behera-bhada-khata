@@ -1045,3 +1045,38 @@ listens for and scrolls into view), so the kept tabs don't reload.
 
 **Why.** A figure the owner can't open is a dead end: the next question is
 always "which ones?".
+
+### A29 — Glass, a third colour scheme
+
+The colour-mode menu offers System, Light, Dark and **Glass**: frosted,
+see-through cards and bars over a soft colour canvas.
+
+- **A named MUI scheme, light-based.** `colorSchemes.glass` in
+  `src/theme/index.ts` is built with `createColorScheme` (MUI only completes
+  the built-in light/dark palettes) with `palette.mode: "light"`. Choosing
+  Glass sets the light slot to `glass` (`setColorScheme({ light: "glass" })`)
+  and the mode to light; Light and System put `light` back
+  (`ColorModeIconDropdown`). `InitColorSchemeScript` restores it before
+  paint, as for the others.
+- **Light styles reach glass through `lightStyles`** (`src/theme/glass.ts`).
+  `applyStyles("light", …)` matches only `data-mui-color-scheme="light"`, so
+  every light-only rule uses `lightStyles(theme, styles, glassExtra?)`, which
+  emits the same rules for glass with the glass-only tweaks deep-merged on
+  top. Don't add a separate `applyStyles("glass", …)` next to it in one
+  object: both write the same selector key and the later one wins. The
+  template's `applyStyles("dark", …)` rules need nothing: glass gets the base
+  (light) styles. A dark-based glass would have meant copying ~48 of them.
+- **Tokens** are `glassSurfaces` in `src/theme/appTokens.ts`. The canvas is
+  a fixed `body::before` (MuiCssBaseline), not `background-attachment: fixed`,
+  which phones ignore; the page area (`appCanvasSx`) and `PublicLayout`'s
+  backdrop go see-through under glass.
+- **Blur only on big containers:** raised cards (`AppCard`), the top bars,
+  the side menu (smoked glass) and pop-ups (`glassPopupSx`: menus, dialogs,
+  drawers, Autocomplete). Grid rows and nested surfaces are see-through with
+  no blur of their own: each `backdrop-filter` is a GPU layer.
+- **Contrast floor:** cards stay 70% white, pop-ups 86%, so text and
+  figures keep the light scheme's contrast. Field labels mask the border with
+  the solid `glassSurfaces.base`.
+
+**Why.** A look the owner asked for, kept to the theme layer: no page,
+data or API change, and Light/Dark render exactly as before.

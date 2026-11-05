@@ -1,4 +1,5 @@
 import type { Theme } from "@mui/material/styles";
+import { lightStyles } from "@/theme/glass";
 import type { BadgeTone } from "./StatusBadge";
 
 /** A status colour for kit surfaces: the badge tones plus the brand colour. */
@@ -30,7 +31,7 @@ export function toneTintSx(theme: Theme, tone: Tone) {
   return {
     color: dark.light,
     backgroundColor: `color-mix(in srgb, ${dark.main} 22%, transparent)`,
-    ...theme.applyStyles("light", {
+    ...lightStyles(theme, {
       // Between a pale tint (lost on white) and a solid fill (shouts): a
       // clear wash with a hairline edge, the icon in the deep shade.
       color: c.dark,

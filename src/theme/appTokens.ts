@@ -60,3 +60,38 @@ export const chartCategorical = {
   light: ["#2a78d6", "#eb6834", "#1baf7a"],
   dark: ["#3987e5", "#d95926", "#199e70"],
 } as const;
+
+/**
+ * The glass scheme (A29): a light scheme whose surfaces are frosted panes
+ * over a colourful canvas. Cards stay ~70% white so figures keep their
+ * contrast; blur is only on large containers (cards, bars, pop-ups).
+ */
+export const glassSurfaces = {
+  /** Solid fallback behind the canvas, and the colour masks (labels, selected menu item) use. */
+  base: "#ECEEFB",
+  /** The canvas: soft colour blobs, fixed behind every page. */
+  canvas: [
+    "radial-gradient(at 8% 12%, rgba(124, 92, 255, 0.55) 0px, transparent 45%)",
+    "radial-gradient(at 92% 8%, rgba(56, 189, 248, 0.5) 0px, transparent 45%)",
+    "radial-gradient(at 85% 88%, rgba(244, 114, 182, 0.42) 0px, transparent 50%)",
+    "radial-gradient(at 12% 92%, rgba(45, 212, 191, 0.42) 0px, transparent 50%)",
+    "linear-gradient(135deg, #E9E7FF 0%, #E3F1FF 50%, #FBE9F5 100%)",
+  ].join(", "),
+  paper: "rgba(255, 255, 255, 0.7)",
+  /** Pop-ups (menus, dialogs, pickers) sit over busy content: more opaque. */
+  popup: "rgba(255, 255, 255, 0.86)",
+  /** Field and grid header fills inside a pane. */
+  inset: "rgba(255, 255, 255, 0.55)",
+  rowHover: "rgba(255, 255, 255, 0.6)",
+  rowStripe: "rgba(255, 255, 255, 0.22)",
+  /** Lines inside a pane (white would vanish on white). */
+  divider: "rgba(15, 23, 42, 0.09)",
+  /** A pane's own edge: a bright rim catching the light. */
+  rim: "rgba(255, 255, 255, 0.75)",
+  rimHover: "rgba(255, 255, 255, 0.95)",
+  blur: "blur(18px) saturate(160%)",
+  shadow: {
+    rest: "inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 32px -12px rgba(49, 46, 129, 0.22)",
+    hover: "inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 18px 44px -14px rgba(49, 46, 129, 0.32)",
+  },
+} as const;

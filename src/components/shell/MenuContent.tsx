@@ -7,6 +7,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { lightStyles } from "@/theme/glass";
 import { useSearchParams } from "next/navigation";
 import Link from "@/components/ui/Link";
 import { carryPaidDirect, PAID_DIRECT_PARAM } from "@/lib/preferences";
@@ -75,7 +76,7 @@ export function MenuContent({
                 "&.Mui-selected .MuiListItemIcon-root": { color: (theme.vars || theme).palette.primary.main },
                 // Light mode: the active item takes the slate canvas colour on the white side menu.
                 // `&&` outranks the template's `.MuiListItem-root .Mui-selected` rule.
-                "&&.Mui-selected, &&.Mui-selected:hover": theme.applyStyles("light", {
+                "&&.Mui-selected, &&.Mui-selected:hover": lightStyles(theme, {
                   backgroundColor: (theme.vars || theme).palette.background.default,
                   color: (theme.vars || theme).palette.primary.main,
                 }),
