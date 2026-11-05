@@ -68,8 +68,15 @@ export function subscribeGlassSkin(onChange: () => void) {
   return () => window.removeEventListener(SKIN_EVENT, onChange);
 }
 
+/** MUI's saved colour scheme per mode; only "light" and "dark" exist. */
+const MUI_SCHEME_KEYS = ["mui-color-scheme-light", "mui-color-scheme-dark"];
+
 /**
- * Runs before paint (InitSkinScript), next to MUI's InitColorSchemeScript,
- * so a reload in Glass doesn't flash the plain dark scheme.
+ * Runs before paint (InitSkinScript), just before MUI's
+ * InitColorSchemeScript:
+ * - drops a saved colour scheme that no longer exists (the first, light
+ *   Glass saved "glass" as the light scheme; MUI would put it on <html>,
+ *   no light rule would match, and Light's white cards would turn grey);
+ * - restores the Glass skin, so a reload in Glass doesn't flash plain Dark.
  */
-export const INIT_SKIN_SCRIPT = `(function(){try{if(localStorage.getItem(${JSON.stringify(SKIN_STORAGE_KEY)})==="glass"){document.documentElement.setAttribute(${JSON.stringify(SKIN_ATTRIBUTE)},"glass")}}catch(e){}})();`;
+export const INIT_SKIN_SCRIPT = `(function(){try{var s=localStorage;${JSON.stringify(MUI_SCHEME_KEYS)}.forEach(function(k){var v=s.getItem(k);if(v!==null&&v!=="light"&&v!=="dark"){s.removeItem(k)}});if(s.getItem(${JSON.stringify(SKIN_STORAGE_KEY)})==="glass"){document.documentElement.setAttribute(${JSON.stringify(SKIN_ATTRIBUTE)},"glass")}}catch(e){}})();`;
