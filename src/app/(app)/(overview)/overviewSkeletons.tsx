@@ -22,9 +22,9 @@ export const OVERVIEW_SKELETONS = {
   stats: Array.from({ length: 3 }, (_, i) => <StatCardSkeleton key={i} sparkline={i < 2} />),
   vacant: <StatCardSkeleton />,
   trend: <ChartCardSkeleton />,
-  // As the cards on phones (A26): the lists stop at 3, the reference cards are just their heading.
-  attention: <DetailCardSkeleton rows={4} phoneRows={3} />,
-  defaulters: <DetailCardSkeleton rows={5} phoneRows={3} />,
+  // As the cards on phones (A26): all collapsible; the two to act on start open, the reference cards closed.
+  attention: <DetailCardSkeleton rows={4} collapseOnPhone startOpen />,
+  defaulters: <DetailCardSkeleton rows={5} collapseOnPhone startOpen />,
   sites: <DetailCardSkeleton rows={3} collapseOnPhone />,
   tenantTypes: <ChartCardSkeleton height={220} collapseOnPhone />,
   portfolio: <DetailCardSkeleton rows={5} collapseOnPhone />,

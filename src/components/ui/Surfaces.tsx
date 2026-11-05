@@ -7,7 +7,16 @@ import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import AppCard from "@/components/ui/AppCard";
 import Stack, { type StackProps } from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
 import { toneTintSx, type Tone } from "./tone";
+
+/**
+ * Which collapsible cards the owner opened or closed on phones, by title: a
+ * section keyed by its params (the Overview's month) remounts when they
+ * change, and the card shouldn't snap back. In memory for the tab's life;
+ * only ever written by a click, so the server's copy stays empty.
+ */
+const phoneOpenByTitle = new Map<string, boolean>();
 
 /**
  * The one card-with-a-heading used across forms, summaries and detail panels:
@@ -24,6 +33,7 @@ export function SectionCard({
   sticky = false,
   fill = false,
   collapseOnPhone = false,
+  startOpen = false,
   children,
 }: {
   title: string;
@@ -38,16 +48,29 @@ export function SectionCard({
   /** Stretch to the height of its grid row (cards side by side). */
   fill?: boolean;
   /**
-   * On phones, start as just the heading with a chevron that opens the body
-   * (reference cards a long page can do without, e.g. the Overview's). Done
-   * in CSS, so the server's page already has it closed: no jump on load.
+   * On phones, the heading (or its chevron) opens and closes the body, and
+   * the action hides while it's closed (the Overview's cards, A26). Done in
+   * CSS, so the server's page already has it as it should be: no jump on
+   * load. The choice survives a remount (`phoneOpenByTitle`).
    */
   collapseOnPhone?: boolean;
+  /** With `collapseOnPhone`: start open (cards to act on) rather than closed (reference cards). */
+  startOpen?: boolean;
   children: React.ReactNode;
 }) {
   const headingId = useId();
   const bodyId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(() => phoneOpenByTitle.get(title) ?? startOpen);
+  const toggle = () =>
+    setOpenState((o) => {
+      phoneOpenByTitle.set(title, !o);
+      return !o;
+    });
+  // The title is a tap target on phones only: on a wider screen the body is always shown.
+  const phoneQuery = useTheme().breakpoints.down("sm").replace(/^@media\s*/, "");
+  const toggleFromTitle = () => {
+    if (window.matchMedia(phoneQuery).matches) toggle();
+  };
   // Hidden only below `sm`; from `sm` up a collapsible card is an ordinary one.
   const phoneHidden = collapseOnPhone && !open ? { display: { xs: "none", sm: "block" } } : undefined;
   return (
@@ -70,7 +93,11 @@ export function SectionCard({
                 {icon}
               </Box>
             ) : null}
-            <Box sx={{ minWidth: 0 }}>
+            <Box
+              // Tapping the title works too (the chevron is the accessible control); phones only.
+              onClick={collapseOnPhone ? toggleFromTitle : undefined}
+              sx={[{ minWidth: 0 }, collapseOnPhone && { cursor: { xs: "pointer", sm: "auto" } }]}
+            >
               <Typography id={headingId} component="h2" variant="subtitle2">
                 {title}
               </Typography>
@@ -87,7 +114,7 @@ export function SectionCard({
               aria-label={`${open ? "Hide" : "Show"} ${title}`}
               aria-expanded={open}
               aria-controls={bodyId}
-              onClick={() => setOpen((o) => !o)}
+              onClick={toggle}
               sx={{ display: { xs: "inline-flex", sm: "none" }, flexShrink: 0 }}
             >
               <ExpandMoreRoundedIcon sx={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms" }} />

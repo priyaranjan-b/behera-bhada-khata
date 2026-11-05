@@ -946,26 +946,28 @@ account figures stay a two-a-row grid: they sit in the record header.
 
 **The Overview on phones** (everything below the stat row is a stack of
 full-width cards, about 3,400px):
-- **Order by task:** stat row, Needs attention, Top defaulters, then the
-  Billing vs Received chart, then the reference cards (CSS `order` on the
-  `OverviewLayout` grid items, phones only).
-- **Reference cards collapse:** Collection by site, Tenant types and
-  Portfolio start as their heading with a chevron (`SectionCard
-  collapseOnPhone`).
-- **Short lists:** Needs attention and Top defaulters show 3 entries and
-  "Show N more" (`MoreOnPhone`); Top defaulters' "See all" still goes to the
-  Defaulters page.
+- **Same order as desktop:** stat row, the Billing vs Received chart, Needs
+  attention, Top defaulters, then the reference cards. The DOM is that order,
+  so keyboard and screen-reader order match the screen (no CSS `order`).
+- **Every card below the chart collapses** (`SectionCard collapseOnPhone`):
+  its heading or chevron opens and closes it, and its action hides while
+  it's closed. Needs attention and Top defaulters start open (`startOpen`:
+  they're what the owner acts on); Collection by site, Tenant types and
+  Portfolio start closed. A card the owner opened or closed stays that way
+  when the month changes (the section remounts; `phoneOpenByTitle` keeps the
+  choice for the tab's life). Lists show in full when open: no "Show N
+  more" (Needs attention can hide one item at most, and Top defaulters
+  already has "See all").
 - **Shorter chart:** 180px instead of 260px, set in CSS on the chart's box
   (`TREND_CHART_HEIGHT`, read by its skeleton too), so it doesn't resize after
-  load. The skeletons match the phone layout as well: the lists stop at 3 rows
-  and the collapsed cards are just their heading (`phoneRows`,
-  `collapseOnPhone` on `DetailCardSkeleton` / `ChartCardSkeleton`).
+  load. The skeletons match the phone layout as well (`collapseOnPhone` /
+  `startOpen` on `DetailCardSkeleton` / `ChartCardSkeleton`).
 
-Together about a third shorter. `collapseOnPhone` and `MoreOnPhone` hide in
-CSS (`display` below `sm`), not with a JavaScript width check, so the server's
-page is already short on a phone and nothing jumps on load; from `sm` up both
-are no-ops. The period switcher fills the phone's context bar up to the
-"View options" button, so the bar has no empty gap.
+`collapseOnPhone` hides in CSS (`display` below `sm`), not with a JavaScript
+width check, so the server's page is already right on a phone and nothing
+jumps on load; from `sm` up it is a no-op. The period switcher fills the
+phone's context bar up to the "View options" button, so the bar has no
+empty gap.
 
 ### A27 — Old confirm links and password changes (tech-debt S1, S4)
 

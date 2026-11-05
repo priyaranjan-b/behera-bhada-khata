@@ -586,9 +586,8 @@ Each of these was found broken somewhere; keep them when adding code.
   `sections/*.tsx` inside an `AsyncSection` (Suspense + per-card error
   boundary), placed by `OverviewLayout`; the placeholders are one map,
   `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`. On phones
-  (A26) the action cards come first, the reference cards are
-  `SectionCard collapseOnPhone`, and long lists end in `MoreOnPhone`
-  ("Show N more"); both hide in CSS, so nothing jumps on load.
+  (A26) every card below the chart is `SectionCard collapseOnPhone` (the
+  action cards `startOpen`), hidden in CSS so nothing jumps on load.
 - The tenant page (`tenants/[tenantId]/(profile)/`) is a record page in
   tabs by data source (A16): header, alerts and account stats on top, then
   `PageTabs` with Details, Ledger, Months and Change history. A tab mounts

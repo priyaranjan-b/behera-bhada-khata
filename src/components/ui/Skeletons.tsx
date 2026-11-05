@@ -112,16 +112,27 @@ export function StatCardSkeleton({ sparkline = false }: { sparkline?: boolean })
 const PHONE_HIDDEN = { display: { xs: "none", sm: "block" } } as const;
 
 /**
- * The heading row's right-hand control: the card's own (a button, a badge) or,
- * for a card that starts collapsed on phones, its 44px chevron there.
+ * The heading row's right-hand control: the card's own (a button, a badge),
+ * plus on phones the 44px chevron of a collapsible card (`SectionCard
+ * collapseOnPhone`), whose own control shows there only while it's open.
  */
-function HeadingControlSkeleton({ width, height, collapseOnPhone }: { width: number; height: number; collapseOnPhone: boolean }) {
+function HeadingControlSkeleton({
+  width,
+  height,
+  collapseOnPhone,
+  startOpen,
+}: {
+  width: number;
+  height: number;
+  collapseOnPhone: boolean;
+  startOpen: boolean;
+}) {
   if (!collapseOnPhone) return <Skeleton variant="rounded" width={width} height={height} />;
   return (
-    <>
-      <Skeleton variant="rounded" width={width} height={height} sx={PHONE_HIDDEN} />
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+      <Skeleton variant="rounded" width={width} height={height} sx={startOpen ? undefined : PHONE_HIDDEN} />
       <Skeleton variant="circular" width={44} height={44} sx={{ display: { xs: "block", sm: "none" } }} />
-    </>
+    </Stack>
   );
 }
 
@@ -133,10 +144,14 @@ function HeadingControlSkeleton({ width, height, collapseOnPhone }: { width: num
 export function ChartCardSkeleton({
   height = TREND_CHART_HEIGHT,
   collapseOnPhone = false,
+  startOpen = false,
 }: {
   height?: number | { xs: number; sm: number };
+  /** As `SectionCard`'s: on phones the body shows only when `startOpen`. */
   collapseOnPhone?: boolean;
+  startOpen?: boolean;
 }) {
+  const bodyHidden = collapseOnPhone && !startOpen;
   return (
     <AppCard aria-hidden sx={{ width: "100%" }}>
       <CardContent>
@@ -144,9 +159,9 @@ export function ChartCardSkeleton({
           <Typography variant="subtitle2" gutterBottom sx={{ width: 160 }}>
             <Skeleton />
           </Typography>
-          <HeadingControlSkeleton width={96} height={30} collapseOnPhone={collapseOnPhone} />
+          <HeadingControlSkeleton width={96} height={30} collapseOnPhone={collapseOnPhone} startOpen={startOpen} />
         </Stack>
-        <Box sx={collapseOnPhone ? PHONE_HIDDEN : undefined}>
+        <Box sx={bodyHidden ? PHONE_HIDDEN : undefined}>
           <Typography variant="h4" sx={{ width: 180 }}>
             <Skeleton />
           </Typography>
@@ -162,18 +177,19 @@ export function ChartCardSkeleton({
 
 /**
  * Matches a `SectionCard` of `DetailRow`s (label left, value right).
- * `phoneRows`: a list a phone cuts short (`MoreOnPhone`); `collapseOnPhone`:
- * a card that is just its heading on phones (`SectionCard collapseOnPhone`).
+ * `collapseOnPhone` / `startOpen` as the card's: on phones its rows show only
+ * when it starts open.
  */
 export function DetailCardSkeleton({
   rows = 4,
-  phoneRows = rows,
   collapseOnPhone = false,
+  startOpen = false,
 }: {
   rows?: number;
-  phoneRows?: number;
   collapseOnPhone?: boolean;
+  startOpen?: boolean;
 }) {
+  const rowsHidden = collapseOnPhone && !startOpen;
   return (
     <AppCard aria-hidden component="section">
       <Stack spacing={2}>
@@ -181,13 +197,13 @@ export function DetailCardSkeleton({
           <Typography variant="subtitle2" sx={{ width: 160 }}>
             <Skeleton />
           </Typography>
-          <HeadingControlSkeleton width={72} height={24} collapseOnPhone={collapseOnPhone} />
+          <HeadingControlSkeleton width={72} height={24} collapseOnPhone={collapseOnPhone} startOpen={startOpen} />
         </Stack>
         {Array.from({ length: rows }, (_, i) => (
           <Stack
             key={i}
             direction="row"
-            sx={[{ justifyContent: "space-between", gap: 2 }, (collapseOnPhone || i >= phoneRows) && PHONE_HIDDEN]}
+            sx={[{ justifyContent: "space-between", gap: 2 }, rowsHidden && PHONE_HIDDEN]}
           >
             <Typography variant="body2" sx={{ width: "30%" }}>
               <Skeleton />
