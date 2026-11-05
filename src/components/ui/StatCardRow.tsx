@@ -49,7 +49,12 @@ export default function StatCardRow({
         pb: { xs: 0.5, sm: 0 },
         scrollbarWidth: "none",
         "&::-webkit-scrollbar": { display: "none" },
+        alignItems: "stretch",
         "& > *": { flex: { xs: "0 0 auto" }, width: { xs: "42%", sm: "auto" }, minWidth: { xs: 148, sm: 0 }, scrollSnapAlign: "start" },
+        // Every card as tall as the tallest. StatCard's own `height: 100%` (it fills a Grid cell elsewhere)
+        // has nothing definite to resolve against in the phone's flex row, which stops the stretch and
+        // leaves each card its content height; `auto` lets the row stretch them. `&&` outranks the card's class.
+        "&& > *": { height: "auto" },
         // A failed multi-card section's error card (`AsyncSection wide`) takes the whole row.
         "& > [data-span='row']": { gridColumn: "1 / -1", width: "100%" },
       }}
