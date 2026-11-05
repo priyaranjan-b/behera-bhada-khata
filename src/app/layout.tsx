@@ -46,8 +46,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     // attribute on <html> before React hydrates.
     <html lang="en" className={`${inter.variable} ${notoOriya.variable}`} suppressHydrationWarning>
       <body>
-        <InitColorSchemeScript attribute="data-mui-color-scheme" />
+        {/* First: it drops a stale saved scheme before MUI's script reads it. */}
         <InitSkinScript />
+        <InitColorSchemeScript attribute="data-mui-color-scheme" />
         <ThemeRegistry>
           {/* Reads search params, so it needs its own boundary to keep pages static-renderable. */}
           <Suspense fallback={null}>
