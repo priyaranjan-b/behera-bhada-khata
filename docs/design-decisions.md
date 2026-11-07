@@ -1086,3 +1086,40 @@ primary, cyan info, amber warning).
 
 **Why.** A look the owner asked for, kept to the theme layer: no page,
 data or API change, and Light/Dark render exactly as before.
+
+### A30 — Phone table filters in one bottom sheet
+
+**Decision.** On a phone (below `sm`) a `DataTable`'s filter icon opens one
+bottom sheet (`DataTableFilterSheet`, built on the kit's `BottomSheet`) with
+every filter: the "Show" selects, `toolbarExtra`, then the column filter.
+Filters apply as they change. The sticky footer has "Clear all" and a primary
+"Show N rows" button that closes the sheet; ✕, a swipe down and a tap
+outside close it too. Once it is closed, what's set shows as chips under the
+toolbar (`ActiveFilterChips`), also while search is open: each chip's ✕
+(`FilterChip`, a labelled button with a ~44px tap area) removes that one
+filter. A table's own inputs count through `toolbarExtraFilter` (`{ label,
+onClear }`, e.g. `formatDayRange`): their chip, the badge and "Clear all". Wide screens keep the grid's own filter panel, now with a
+"Clear" / "Done" footer (`DataTableFilterPanel`, the `filterPanel` slot).
+
+- **One simple control per column, not the query builder.** The grid's
+  panel stacked column / operator / value / And-Or into four full-width rows
+  per filter, nearly a screen high, and only closed on a tap outside it,
+  which a full-screen panel leaves no room for. The sheet picks a column and
+  shows the control for its kind (`filterColumnsOf` in `columnFilter.ts`):
+  chips (`QuickPicks`, "is any of") for a `selectColumn`/`tagsColumn`, a
+  "contains" box for text, at least / at most / exactly for a number column
+  that has those operators. A column with none of these (dates) is left to
+  the wide-screen panel. A filter set there with an operator the sheet can't
+  show (e.g. "is not") appears as a removable chip, not lost.
+- **One column filter at a time.** The free Data Grid forces
+  `disableMultipleColumnsFiltering`, so picking another column replaces the
+  filter; the sheet says so. "Show" selects and dates still combine with it.
+- **Server tables work unchanged**: the controls write the grid's
+  `filterModel`, which `useServerGrid` already sends. Typing waits 300ms
+  (`TYPE_DELAY_MS`, `useDelayedCommit`) so the server isn't asked per
+  letter; leaving the field (closing the sheet takes focus from it) applies
+  what is still waiting. Nothing is written on unmount, so leaving the page
+  mid-typing writes nothing, and "Clear all" remounts the controls.
+
+**Why.** The owner uses the app on a phone; filtering there was the
+largest and hardest-to-leave screen in the app.

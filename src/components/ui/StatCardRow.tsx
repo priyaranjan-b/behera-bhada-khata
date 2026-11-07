@@ -61,24 +61,26 @@ export default function StatCardRow({
         "&::-webkit-scrollbar": { display: "none" },
         alignItems: "stretch",
         // Phones: two whole cards and a quarter of the next, so the row reads as more to swipe.
-        "& > *": {
+        // `&&` outranks a toggle card's own `width: 100%` (StatCard with onClick), which made
+        // Payments show one card a slide.
+        "&& > *": {
           flex: { xs: "0 0 auto" },
           width: { xs: `calc((100% - 2 * ${GAP_XS * 8}px) / 2.25)`, sm: "auto" },
           // A floor for very narrow screens (a 320px phone), low enough that a 360px one still shows the peek.
           minWidth: { xs: 128, sm: 0 },
           scrollSnapAlign: "start",
+          // Every card as tall as the tallest. StatCard's own `height: 100%` (it fills a Grid cell elsewhere)
+          // has nothing definite to resolve against in the phone's flex row, which stops the stretch and
+          // leaves each card its content height; `auto` lets the row stretch them.
+          height: "auto",
         },
         // ... and the right edge fades out (a mask, so no colour), the other hint the row goes on.
         maskImage: { xs: "linear-gradient(to right, black calc(100% - 24px), transparent)", sm: "none" },
         // The page's headline card (StatCard variant "gradient") first on phones, where the rest is off-screen.
         // Only the visual order: the DOM, and so screen readers and the sm+ grid, keep the page's order.
         "& > [data-emphasis]": { order: { xs: -1, sm: 0 } },
-        // Every card as tall as the tallest. StatCard's own `height: 100%` (it fills a Grid cell elsewhere)
-        // has nothing definite to resolve against in the phone's flex row, which stops the stretch and
-        // leaves each card its content height; `auto` lets the row stretch them. `&&` outranks the card's class.
-        "&& > *": { height: "auto" },
         // A failed multi-card section's error card (`AsyncSection wide`) takes the whole row.
-        "& > [data-span='row']": { gridColumn: "1 / -1", width: "100%" },
+        "&& > [data-span='row']": { gridColumn: "1 / -1", width: "100%" },
       }}
     >
       {children}

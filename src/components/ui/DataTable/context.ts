@@ -12,6 +12,13 @@ export interface DataTableFilter<T extends string = string> {
   defaultValue?: T;
 }
 
+/** What a table's own toolbar inputs (`toolbarExtra`) filter by right now. */
+export interface ToolbarExtraFilter {
+  /** The chip's text, e.g. "01/10/2026 – 31/10/2026". */
+  label: string;
+  onClear: () => void;
+}
+
 export interface DataTableSearch {
   placeholder?: string;
 }
@@ -32,7 +39,7 @@ export interface DataTableConfig {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each filter has its own value union
   filters: DataTableFilter<any>[];
   toolbarExtra?: React.ReactNode;
-  toolbarExtraActive: boolean;
+  toolbarExtraFilter?: ToolbarExtraFilter;
   search: DataTableSearch | false;
   columnsButton: boolean;
   filterButton: boolean;

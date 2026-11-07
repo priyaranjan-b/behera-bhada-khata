@@ -3,12 +3,9 @@
 import { useId, useState } from "react";
 import Badge from "@mui/material/Badge";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
-import Collapse from "@mui/material/Collapse";
 import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
-import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
@@ -37,7 +34,11 @@ import {
   useGridSelector,
 } from "@mui/x-data-grid";
 import { useInTabs } from "../inTabs";
-import { useDataTable, type DataTableFilter } from "./context";
+import ActiveFilterChips from "./ActiveFilterChips";
+import { useDataTable } from "./context";
+import DataTableFilterSheet from "./DataTableFilterSheet";
+import ExtraInputs from "./ExtraInputs";
+import ShowFilter from "./ShowFilter";
 import { downloadGridAsExcel } from "./exportExcel";
 import { pillControlSx, TOOL_BUTTON, toolbarIconButtonSx } from "./styles";
 import { useTableFilters } from "./useTableFilters";
@@ -49,9 +50,9 @@ import { useTableFilters } from "./useTableFilters";
  * Phones get short rows instead: the title and count on their own line
  * (unless a `PageTabs` section already names the table, then only the
  * count, on the icons' row), then the icons. The "Show"
- * selects, `toolbarExtra` and the column filters move into a panel the
- * filter icon opens (its badge counts what's active), and search expands
- * across the whole row.
+ * selects, `toolbarExtra` and the column filter move into a bottom sheet
+ * the filter icon opens (its badge counts what's active; A30), what's set
+ * shows as chips under the row, and search expands across the whole row.
  */
 export default function DataTableToolbar() {
   const config = useDataTable();
@@ -60,7 +61,7 @@ export default function DataTableToolbar() {
   const visible = config.matchingCount ?? filtered;
   const compact = useMediaQuery((theme: Theme) => theme.breakpoints.down("sm"));
   const inTabs = useInTabs();
-  const { changedFilters, columnFilterCount, canClear, clearAll } = useTableFilters();
+  const { changedFilters, columnFilterCount } = useTableFilters();
   const [searchOpen, setSearchOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const panelId = useId();
@@ -68,7 +69,7 @@ export default function DataTableToolbar() {
   const count = visible === config.totalCount ? `${visible}` : `${visible} of ${config.totalCount}`;
 
   const hasPanel = compact && (config.filters.length > 0 || Boolean(config.toolbarExtra) || config.filterButton);
-  const activeCount = changedFilters.length + columnFilterCount + (config.toolbarExtraActive ? 1 : 0);
+  const activeCount = changedFilters.length + columnFilterCount + (config.toolbarExtraFilter ? 1 : 0);
   // On a phone an open search takes the whole row.
   const searchOnly = compact && searchOpen;
   const showTitle = !(compact && inTabs);
@@ -167,11 +168,12 @@ export default function DataTableToolbar() {
               <Tooltip title={activeCount > 0 ? `Filters (${activeCount} active)` : "Filters"}>
                 <ToolbarButton
                   aria-label="Filters"
+                  aria-haspopup="dialog"
                   aria-expanded={panelOpen}
-                  aria-controls={panelId}
-                  color={activeCount > 0 || panelOpen ? "primary" : "default"}
+                  aria-controls={panelOpen ? panelId : undefined}
+                  color={activeCount > 0 ? "primary" : "default"}
                   className={TOOL_BUTTON}
-                  onClick={() => setPanelOpen((open) => !open)}
+                  onClick={() => setPanelOpen(true)}
                 >
                   <Badge badgeContent={activeCount} color="primary" overlap="circular">
                     <FilterListRoundedIcon fontSize="small" />
@@ -235,79 +237,11 @@ export default function DataTableToolbar() {
       </Stack>
 
       {hasPanel ? (
-        <Collapse in={panelOpen} id={panelId}>
-          <Stack spacing={1.25} sx={{ px: 2, pb: 1.5 }}>
-            {config.filters.map((filter) => (
-              <ShowFilter key={filter.label} filter={filter} sx={{ width: "100%" }} />
-            ))}
-            {config.toolbarExtra ? <ExtraInputs fill>{config.toolbarExtra}</ExtraInputs> : null}
-            <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-              {config.filterButton ? (
-                <FilterPanelTrigger
-                  render={(triggerProps, state) => (
-                    <Button {...triggerProps} size="small" variant="outlined" startIcon={<FilterListRoundedIcon />}>
-                      Column filters{state.filterCount > 0 ? ` (${state.filterCount})` : ""}
-                    </Button>
-                  )}
-                />
-              ) : (
-                <span />
-              )}
-              {canClear ? (
-                <Button size="small" onClick={() => clearAll({ keepSearch: true })}>
-                  Clear
-                </Button>
-              ) : null}
-            </Stack>
-          </Stack>
-        </Collapse>
+        <>
+          <ActiveFilterChips />
+          <DataTableFilterSheet open={panelOpen} onClose={() => setPanelOpen(false)} id={panelId} visible={visible} />
+        </>
       ) : null}
-    </Box>
-  );
-}
-
-/** A "Show: …" select. */
-function ShowFilter({ filter, sx }: { filter: DataTableFilter; sx: object }) {
-  return (
-    <TextField
-      select
-      size="small"
-      value={filter.value}
-      onChange={(e) => filter.onChange(e.target.value)}
-      aria-label={filter.label}
-      slotProps={{
-        input: {
-          startAdornment: (
-            <InputAdornment position="start" sx={{ mr: 0.5 }}>
-              <Typography variant="caption" color="textSecondary" sx={{ fontWeight: 500 }}>
-                {filter.label}:
-              </Typography>
-            </InputAdornment>
-          ),
-        },
-      }}
-      sx={{ ...pillControlSx, ...sx }}
-    >
-      {filter.options.map((o) => (
-        <MenuItem key={o.value} value={o.value}>
-          {o.label}
-        </MenuItem>
-      ))}
-    </TextField>
-  );
-}
-
-/** The caller's own inputs (e.g. dates) as pills; `fill` stretches them across the phone panel. */
-function ExtraInputs({ fill = false, children }: { fill?: boolean; children: React.ReactNode }) {
-  return (
-    <Box
-      sx={{
-        ...pillControlSx,
-        "& .MuiInputBase-root": { borderRadius: 999, height: 36 },
-        ...(fill ? { "& > *": { width: "100%" }, "& .MuiTextField-root": { flex: 1, minWidth: 0 } } : {}),
-      }}
-    >
-      {children}
     </Box>
   );
 }

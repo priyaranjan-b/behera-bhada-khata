@@ -8,9 +8,10 @@ import Typography from "@mui/material/Typography";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 /**
- * A panel that slides up from the bottom of a phone screen (the context bar's
- * view options): grab handle, title, close button, then `children`, kept
- * clear of the home indicator.
+ * A panel that slides up from the bottom of a phone screen (the context
+ * bar's view options, a table's filters): grab handle, title, close button,
+ * then `children`, which scroll, and an optional `footer` that stays put
+ * (e.g. "Clear all" / "Show N rows"), kept clear of the home indicator.
  */
 export default function BottomSheet({
   open,
@@ -18,6 +19,7 @@ export default function BottomSheet({
   title,
   id,
   children,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,6 +27,8 @@ export default function BottomSheet({
   /** For the opener's `aria-controls`. */
   id?: string;
   children: React.ReactNode;
+  /** Actions pinned under the scrolling content. */
+  footer?: React.ReactNode;
 }) {
   const titleId = id ? `${id}-title` : undefined;
   return (
@@ -56,7 +60,12 @@ export default function BottomSheet({
           <CloseRoundedIcon />
         </IconButton>
       </Stack>
-      {children}
+      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", mx: -2, px: 2 }}>{children}</Box>
+      {footer ? (
+        <Stack direction="row" spacing={1} sx={{ borderTop: 1, borderColor: "divider", pt: 1.5, mx: -2, px: 2 }}>
+          {footer}
+        </Stack>
+      ) : null}
     </Drawer>
   );
 }

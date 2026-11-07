@@ -87,9 +87,9 @@ test instead.
   and Profile (the person) vs Settings (the shared lists, A25), and money
   tables' footer totals and the phone swipe row of stat cards (A26), and old
   confirm links and password changes (A27), and every figure linking to
-  its source data (A28), and the Glass skin (A29). Read it before changing
-  any of these, and add a new A-number when you make a decision a future
-  session should know.
+  its source data (A28), and the Glass skin (A29), and phone table filters
+  in one bottom sheet (A30). Read it before changing any of these, and add
+  a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
 
@@ -606,9 +606,15 @@ Each of these was found broken somewhere; keep them when adding code.
   with the rest two to a row. On phones a `DataTable` toolbar puts the
   title and count on their own line (inside `PageTabs`, where the title is
   hidden, just the count starts the icons' row). Then come search (it
-  expands across the row), a filter button opening a panel with the "Show"
-  selects, `toolbarExtra` (pass `toolbarExtraActive` so its badge counts set
-  dates) and column filters, then columns and Excel. Touch screens get no
+  expands across the row), a filter button opening a bottom sheet (A30)
+  with the "Show" selects, `toolbarExtra` (pass `toolbarExtraFilter`, a
+  label + `onClear`, so the badge, the chips and "Clear all" include its
+  dates) and one simple column filter (chips, contains, or at least / at
+  most / exactly), whose footer button ("Show N rows") closes it; what's
+  set shows as removable chips under the toolbar, also while search is
+  open. Then columns and Excel. Wide screens keep the grid's filter panel
+  with a "Clear filter" / "Done" footer (`DataTableFilterPanel`, the
+  `filterPanel` slot). Touch screens get no
   column ⋮ menu; tapping the header sorts. A standalone icon button is 44px
   on touch screens. One embedded in a field (a picker's calendar, a search
   clear, an Autocomplete's ×) or a grid header is a plain small icon

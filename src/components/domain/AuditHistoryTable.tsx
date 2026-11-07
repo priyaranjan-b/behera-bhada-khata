@@ -9,6 +9,7 @@ import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, { useServerGrid } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/DataDisplay";
 import { api } from "@/lib/api-client";
+import { formatDayRange } from "@/lib/dates";
 import type { AuditEntry, AuditTablePage, AuditTableQuery } from "@/lib/contracts";
 import { AUDIT_CATEGORIES, AUDIT_CATEGORY_LABELS, type AuditCategory } from "@/lib/domain/audit";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
@@ -109,6 +110,12 @@ export default function AuditHistoryTable({
     </Stack>
   );
 
+  const dateLabel = formatDayRange(extra.from, extra.to);
+  const dateFilter = useMemo(
+    () => (dateLabel ? { label: dateLabel, onClear: () => setExtra({ from: "", to: "" }) } : undefined),
+    [dateLabel, setExtra]
+  );
+
   return (
     <Stack spacing={2}>
       {error ? <Alert severity="error">{error}</Alert> : null}
@@ -121,7 +128,7 @@ export default function AuditHistoryTable({
         {...gridProps}
         filters={filters}
         toolbarExtra={dateInputs}
-        toolbarExtraActive={Boolean(extra.from || extra.to)}
+        toolbarExtraFilter={dateFilter}
         search={{ placeholder: "Search changes…" }}
         noRowsLabel="No changes match these filters."
         emptyState={<EmptyState icon={<HistoryRoundedIcon />} title="No changes recorded yet" description={emptyDescription} />}

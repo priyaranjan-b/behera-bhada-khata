@@ -175,3 +175,11 @@ export function formatDateKey(dateKey: string): string {
   const [year, month, day] = dateKey.slice(0, 10).split("-");
   return DATE_FORMAT.replace("YYYY", year).replace("MM", month).replace("DD", day);
 }
+
+/** A from/to day filter as text: "01/10/2026 – 31/10/2026", "From 01/10/2026", "Until 31/10/2026", or "" when neither is set. */
+export function formatDayRange(from: string, to: string): string {
+  if (from && to) return `${formatDateKey(from)} – ${formatDateKey(to)}`;
+  if (from) return `From ${formatDateKey(from)}`;
+  if (to) return `Until ${formatDateKey(to)}`;
+  return "";
+}

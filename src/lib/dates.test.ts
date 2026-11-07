@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatDayRange,
   addMonthsToKey,
   currentMonthKey,
   dateKeyOf,
@@ -108,5 +109,14 @@ describe("dayRangeOfMonths", () => {
     expect(dayRangeOfMonths("2026-10-01", "2026-10-01")).toEqual({ from: "2026-10-01", to: "2026-10-31" });
     expect(dayRangeOfMonths("2026-01", "2026-02")).toEqual({ from: "2026-01-01", to: "2026-02-28" });
     expect(dayRangeOfMonths("2028-02-01", "2028-02-01")).toEqual({ from: "2028-02-01", to: "2028-02-29" });
+  });
+});
+
+describe("formatDayRange", () => {
+  it("reads a full, half-open or empty range", () => {
+    expect(formatDayRange("2026-10-01", "2026-10-31")).toBe("01/10/2026 – 31/10/2026");
+    expect(formatDayRange("2026-10-01", "")).toBe("From 01/10/2026");
+    expect(formatDayRange("", "2026-10-31")).toBe("Until 31/10/2026");
+    expect(formatDayRange("", "")).toBe("");
   });
 });

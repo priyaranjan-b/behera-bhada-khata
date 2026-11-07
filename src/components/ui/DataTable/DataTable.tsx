@@ -6,19 +6,27 @@ import AppCard from "@/components/ui/AppCard";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { DataGrid, type DataGridProps, type GridValidRowModel } from "@mui/x-data-grid";
-import { DataTableContext, type DataTableConfig, type DataTableFilter, type DataTableSearch } from "./context";
+import {
+  DataTableContext,
+  type DataTableConfig,
+  type DataTableFilter,
+  type DataTableSearch,
+  type ToolbarExtraFilter,
+} from "./context";
 import DataTableToolbar from "./DataTableToolbar";
 import DataTablePagination from "./DataTablePagination";
 import DataTableNoResults from "./DataTableNoResults";
+import DataTableFilterPanel from "./DataTableFilterPanel";
 import type { DataTableColDef } from "./columns";
 import { fitsOnePage } from "./pagination";
-import { dataTableSx, filterPanelSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
+import { dataTableSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
 
 const SLOTS = {
   toolbar: DataTableToolbar,
   pagination: DataTablePagination,
   noRowsOverlay: DataTableNoResults,
   noResultsOverlay: DataTableNoResults,
+  filterPanel: DataTableFilterPanel,
 };
 
 export type DataTableProps<R extends GridValidRowModel> = Omit<DataGridProps<R>, "slots" | "showToolbar"> & {
@@ -35,8 +43,11 @@ export type DataTableProps<R extends GridValidRowModel> = Omit<DataGridProps<R>,
   filters?: DataTableFilter<any>[];
   /** Custom inputs placed before the search box (e.g. a date range). */
   toolbarExtra?: React.ReactNode;
-  /** `toolbarExtra` narrows the rows (e.g. a date is set): counted on the phone filter button's badge. */
-  toolbarExtraActive?: boolean;
+  /**
+   * What `toolbarExtra` narrows the rows by, while it does (e.g. "From 01/10/2026"): counted on
+   * the phone filter badge, shown as a chip under the phone toolbar and reset by "Clear all" (A30).
+   */
+  toolbarExtraFilter?: ToolbarExtraFilter;
   /** Quick search over every column. Default: on when there are more than 8 rows. */
   search?: boolean | DataTableSearch;
   columnsButton?: boolean;
@@ -80,7 +91,7 @@ export default function DataTable<R extends GridValidRowModel>({
   totalCount,
   filters = [],
   toolbarExtra,
-  toolbarExtraActive = false,
+  toolbarExtraFilter,
   search,
   columnsButton = true,
   filterButton = true,
@@ -116,7 +127,7 @@ export default function DataTable<R extends GridValidRowModel>({
     matchingCount: server ? rowCount : undefined,
     filters,
     toolbarExtra,
-    toolbarExtraActive,
+    toolbarExtraFilter,
     search: searchConfig,
     columnsButton,
     filterButton,
@@ -178,7 +189,6 @@ export default function DataTable<R extends GridValidRowModel>({
           initialState={{ ...initialState, pagination: { paginationModel: { pageSize }, ...initialState?.pagination } }}
           slotProps={{
             loadingOverlay: { variant: "skeleton", noRowsVariant: "skeleton" },
-            filterPanel: { sx: filterPanelSx },
             ...slotProps,
           }}
           sx={[dataTableSx, ...(Array.isArray(sx) ? sx : [sx])]}

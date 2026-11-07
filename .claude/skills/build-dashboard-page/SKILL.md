@@ -248,20 +248,23 @@ possible. The kit already does the work below, so use it rather than adding
     panel (`InTabsContext`: the Section select already names it; the title
     stays for screen readers). The subtitle is hidden on phones;
   - 🔍 opens search across the whole row, and its ✕ clears and closes it;
-  - the filter icon toggles an inline panel holding the "Show" selects, the
-    `toolbarExtra` inputs (stretched full width) and "Column filters" /
-    "Clear". Its badge counts changed "Show" selects, column filters and
-    `toolbarExtraActive`. **Pass `toolbarExtraActive`** whenever
-    `toolbarExtra` can narrow the rows (e.g. `Boolean(from || to)`), or
-    the badge misses it;
+  - the filter icon opens a bottom sheet (A30, `DataTableFilterSheet`):
+    the "Show" selects, the `toolbarExtra` inputs (stretched full width)
+    and one simple column filter (chips for a `selectColumn`/`tagsColumn`,
+    "contains" for text, at least / at most / exactly for numbers), with a
+    sticky "Clear all" / "Show N rows" footer. What's set shows as
+    removable chips under the toolbar (`ActiveFilterChips`). Its badge
+    counts changed "Show" selects, the column filter and
+    `toolbarExtraFilter`. **Pass `toolbarExtraFilter`** (`{ label,
+    onClear }`, e.g. `formatDayRange(from, to)`) whenever `toolbarExtra`
+    can narrow the rows, or the badge, the chips and "Clear all" miss it;
   - the Columns and Excel icons stay inline.
-  - The grid's column filter panel stacks each filter on phones (delete,
-    then column / operator / value full width): `filterPanelSx` in
-    `DataTable/styles.ts`, applied by `DataTable`. Its default single row
-    is ~600px and scrolls sideways on a phone.
+  - The free grid keeps one column filter at a time; wide screens use its
+    own panel, with a "Clear filter" / "Done" footer
+    (`DataTableFilterPanel`, the `filterPanel` slot).
   - What narrows a table and how to clear it is one hook,
-    `useTableFilters` (the empty-results overlay and the phone panel share
-    it). Use it rather than re-deriving it.
+    `useTableFilters` (the empty-results overlay, the phone sheet and its
+    chips share it). Use it rather than re-deriving it.
 - **Long pages:** keep what the common task needs (the header action, key
   figures) above the fold and move the rest into `PageTabs` (A16). Don't
   stack several tables on one phone screen.
@@ -294,7 +297,7 @@ These mistakes have shipped before (see CLAUDE.md → "Single source of truth"):
 - [ ] Phone (see "Phones"): the header uses `ActionStack phone="primaryOnTop"`
       when there's one main action; destructive buttons are outlined
       `color="error"`; a `toolbarExtra` that filters passes
-      `toolbarExtraActive`; no page-level `useMediaQuery` where the kit
+      `toolbarExtraFilter`; no page-level `useMediaQuery` where the kit
       already adapts.
 
 ## Verify

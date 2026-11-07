@@ -9,7 +9,7 @@ import type { GridSortModel } from "@mui/x-data-grid";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import { LEDGER_SHOW_OPTIONS, LEDGER_STATUS_LABELS, type LedgerRow, type LedgerShow } from "@/lib/domain/tenantLedger";
 import type { TenantLedgerQuery, TenantLedgerView } from "@/lib/contracts";
-import { formatDateKey, monthDayRange } from "@/lib/dates";
+import { formatDateKey, formatDayRange, formatMonth, monthDayRange, monthKeyOf } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import DataTable, {
   moneyColumn,
@@ -231,6 +231,14 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
       />
     );
 
+  // The picked dates as a chip; clearing them keeps "Date range" / "Month" chosen.
+  const dateLabel =
+    extra.mode === "range" ? formatDayRange(extra.from, extra.to) : extra.mode === "month" && extra.month ? formatMonth(monthKeyOf(extra.month)) : "";
+  const dateFilter = useMemo(
+    () => (dateLabel ? { label: dateLabel, onClear: () => setExtra({ from: "", to: "", month: "" }) } : undefined),
+    [dateLabel, setExtra]
+  );
+
   return (
     <Stack spacing={2}>
       {error ? <Alert severity="error">{error}</Alert> : null}
@@ -249,6 +257,7 @@ export default function TenantLedgerTable({ tenantId }: { tenantId: string }) {
         {...gridProps}
         filters={filters}
         toolbarExtra={dateInputs}
+        toolbarExtraFilter={dateFilter}
         search={{ placeholder: "Search the ledger…" }}
         noRowsLabel={extra.show === "credits" ? "No payments or credits match this filter." : "No entries match this filter."}
       />

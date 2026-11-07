@@ -1,5 +1,5 @@
 export { default, type DataTableProps } from "./DataTable";
-export type { DataTableFilter } from "./context";
+export type { DataTableFilter, ToolbarExtraFilter } from "./context";
 export { moneyColumn, selectColumn, type DataTableColDef } from "./columns";
 export { tagsColumn } from "./tagsColumn";
 export { SERVER_TEXT_OPERATORS } from "./serverQuery";
