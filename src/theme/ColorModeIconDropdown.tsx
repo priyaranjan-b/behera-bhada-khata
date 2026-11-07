@@ -19,7 +19,7 @@ import { isGlassSkin, setGlassSkin, subscribeGlassSkin } from './skin';
 type Choice = 'system' | 'light' | 'dark' | 'glass';
 
 export default function ColorModeIconDropdown(props: IconButtonOwnProps) {
-  const { mode, systemMode, setMode } = useColorScheme();
+  const { mode, systemMode, setMode, setColorScheme } = useColorScheme();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -31,6 +31,8 @@ export default function ColorModeIconDropdown(props: IconButtonOwnProps) {
   const glassOn = React.useSyncExternalStore(subscribeGlassSkin, isGlassSkin, () => false);
   const handleMode = (choice: Choice) => () => {
     setGlassSkin(choice === 'glass');
+    // Back to the built-in light/dark schemes, in case an old one was saved.
+    setColorScheme(null);
     setMode(choice === 'glass' ? 'dark' : choice);
     handleClose();
   };
