@@ -1,6 +1,6 @@
 import Grid from "@mui/material/Grid";
 import { DetailCardSkeleton, PageHeaderSkeleton, PageSkeleton, TabsSkeleton } from "@/components/ui/Skeletons";
-import { AccountStatsSkeleton } from "./sections/AccountStats";
+import { AccountStatsSkeleton } from "@/components/domain/AccountStats";
 
 // Same shape as page.tsx: header, account stats, the tab bar and the Details
 // tab (the one most visits open on). The (profile) group scopes this to the

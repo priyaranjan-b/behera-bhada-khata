@@ -18,6 +18,8 @@ import { PublicCard, PublicHeading, PublicLayout } from "@/components/ui";
 import { api, errorMessage } from "@/lib/api-client";
 import { LoadingButton } from "@/components/ui/Loading";
 import { PASSWORD_LIMITS } from "@/lib/validation";
+import TextLink from "@/components/ui/TextLink";
+import { routes } from "@/lib/routes";
 
 const valuePoints = [
   {
@@ -224,6 +226,10 @@ export default function LoginForm({
               </Box>
             )}
           </Box>
+          <Typography variant="caption" color="textSecondary">
+            Tenant? <TextLink href={routes.tenantPortal.login}>Sign in with your phone</TextLink> to see your rent and
+            receipts.
+          </Typography>
         </PublicCard>
       </Stack>
     </PublicLayout>

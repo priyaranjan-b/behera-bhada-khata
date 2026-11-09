@@ -80,6 +80,38 @@ export interface Session {
 
 export type MagicLinkResult = { dev: false } | { dev: true; link: string };
 
+// ---- /api/tenant (the tenant portal, A32) ------------------------------------
+
+/**
+ * "Send code" always answers the same, registered number or not. `devCode`:
+ * development without Twilio (ALLOW_DEV_LOGIN) - the code to type.
+ */
+export interface TenantOtpSent {
+  devCode?: string;
+}
+
+/** Signed in: the tenant page, or the tenancy picker when one phone has several. */
+export interface TenantSignedIn {
+  next: string;
+}
+
+/** One of the tenancies a phone may open (/tenant/select). */
+export interface TenancyOption {
+  id: string;
+  displayName: string;
+  status: TenantStatus;
+  movedOutOn: string | null;
+  leaseStart: string | null;
+  /** The houses it holds (or held last), so two tenancies of one person tell apart. */
+  unitCodes: string[];
+}
+
+/** The tenant portal's header: who is signed in, and whether they can switch tenancy. */
+export interface TenantPortalSession {
+  displayName: string;
+  canSwitch: boolean;
+}
+
 /** Signed in: where to go next (already checked by safeNext). */
 export interface PasswordSignInResult {
   next: string;
@@ -687,7 +719,8 @@ export interface TenantDetail {
     unitMix: UnitMix | null;
     currentUnits: TenantHouse[];
     /** Every tenancy, oldest first. */
-    unitHistory: { unitCode: string; startDate: string; endDate: string | null }[];
+    /** `label`: the house's own name, if it has one (tenants don't know the codes). */
+    unitHistory: { unitCode: string; label: string | null; startDate: string; endDate: string | null }[];
     rentHistory: { effectiveMonth: string; monthlyAmount: number }[];
   };
 }

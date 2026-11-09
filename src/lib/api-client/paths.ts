@@ -95,6 +95,24 @@ export const apiPaths = {
       receipt: (adjustmentId: string) => `/api/dashboard/adjustments/${e(adjustmentId)}/receipt`,
     },
   },
+  // The tenant portal (A32): the signed-in tenant's own data. No tenant id
+  // anywhere: the session says whose.
+  tenant: {
+    otp: "/api/tenant/auth/otp",
+    verify: "/api/tenant/auth/verify",
+    select: "/api/tenant/auth/select",
+    signOut: "/api/tenant/auth/signout",
+    session: "/api/tenant/session",
+    profile: "/api/tenant",
+    account: "/api/tenant/account",
+    ledger: "/api/tenant/ledger",
+    months: "/api/tenant/months",
+    documents: "/api/tenant/documents",
+    document: (documentId: string) => `/api/tenant/documents/${e(documentId)}`,
+    paymentReceipt: (paymentId: string) => `/api/tenant/payments/${e(paymentId)}/receipt`,
+    adjustmentReceipt: (adjustmentId: string) => `/api/tenant/adjustments/${e(adjustmentId)}/receipt`,
+    proof: (paymentId: string, proofId: string) => `/api/tenant/payments/${e(paymentId)}/proofs/${e(proofId)}`,
+  },
   confirm: {
     detail: (token: string) => `/api/confirm/${e(token)}`,
     otp: (token: string) => `/api/confirm/${e(token)}/otp`,

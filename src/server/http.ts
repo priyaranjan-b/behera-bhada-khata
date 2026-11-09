@@ -5,7 +5,8 @@ import { routes } from "@/lib/routes";
 import { env } from "@/server/env";
 import { auth } from "@/server/infra";
 import { getOwnerContext } from "@/server/services/auth";
-import { enforceOwnerRateLimit } from "@/server/services/context";
+import { enforceOwnerRateLimit, enforceTenantRateLimit, type TenantContext } from "@/server/services/context";
+import { getTenantContext } from "@/server/services/tenantAuth";
 import { secretsEqual } from "@/server/token";
 import type { OwnerContext, RequestMeta, UploadedFile } from "@/server/services/context";
 
@@ -15,17 +16,43 @@ import type { OwnerContext, RequestMeta, UploadedFile } from "@/server/services/
 type RouteContext<P> = { params: Promise<P> };
 type Result = unknown;
 
+// Owner and tenant data: never kept by a browser, proxy, CDN or service worker (A21, A31).
+const NO_STORE = { "Cache-Control": "private, no-store" };
+
 function toResponse(result: Result): Response {
   if (result instanceof Response) return result;
-  if (result === undefined) return NextResponse.json({ ok: true });
-  return NextResponse.json(result);
+  if (result === undefined) return NextResponse.json({ ok: true }, { headers: NO_STORE });
+  return NextResponse.json(result, { headers: NO_STORE });
+}
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * A write sent by a page on another site (CSRF, A31). The session cookie is
+ * SameSite=Lax, which already keeps it off cross-site POSTs; this is the
+ * second lock. Browsers send `Sec-Fetch-Site` on every request; older ones
+ * at least send `Origin` on a POST. A request with neither isn't from a web
+ * page (curl, a server), so it carries no browser cookies to abuse.
+ */
+export function isCrossSiteWrite(request: Request): boolean {
+  if (SAFE_METHODS.has(request.method)) return false;
+  const site = request.headers.get("sec-fetch-site");
+  if (site) return site === "cross-site";
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  if (origin === "null") return true;
+  try {
+    return new URL(origin).host !== (request.headers.get("host") ?? new URL(request.url).host);
+  } catch {
+    return true;
+  }
 }
 
 function toErrorResponse(err: unknown): Response {
-  if (err instanceof ApiError) return NextResponse.json({ error: err.message }, { status: err.status });
+  if (err instanceof ApiError) return NextResponse.json({ error: err.message }, { status: err.status, headers: NO_STORE });
   // Unexpected: log the detail, don't leak it.
   console.error(err);
-  return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  return NextResponse.json({ error: "Something went wrong" }, { status: 500, headers: NO_STORE });
 }
 
 /** The query string as a plain object, for a service to validate (GET filters). */
@@ -78,12 +105,13 @@ export function requestMeta(request: Request): RequestMeta {
   return { ip: forwarded || request.headers.get("x-real-ip") || "unknown" };
 }
 
-/** Public endpoint (the tenant confirm flow, auth). */
+/** Public endpoint (the tenant confirm flow, auth). Every route helper below builds on it, so each refuses cross-site writes. */
 export function publicRoute<P = Record<string, never>>(
   handler: (request: Request, params: P) => Promise<Result>
 ) {
   return async (request: Request, { params }: RouteContext<P>) => {
     try {
+      if (isCrossSiteWrite(request)) throw new ApiError(403, "Cross-site request refused");
       return toResponse(await handler(request, await params));
     } catch (err) {
       return toErrorResponse(err);
@@ -112,6 +140,40 @@ export function ownerLinkRoute<P = Record<string, never>>(
     if (!session.isOwner) return NextResponse.redirect(new URL(routes.login({ error: "owner" }), request.url));
     const ctx = { ownerId: session.userId, email: session.email };
     await enforceOwnerRateLimit(ctx);
+    return handler(ctx, request, params);
+  });
+}
+
+/**
+ * Endpoint for a signed-in tenant (the portal, A32): 401 without a tenant
+ * session, 403 until a phone with several tenancies picks one, 429 past the
+ * session's rate limit. Reads only: the tenant API has no writes but signing
+ * in and out (test/services/tenantRoutes.test.ts checks every route file).
+ */
+export function tenantRoute<P = Record<string, never>>(
+  handler: (ctx: TenantContext, request: Request, params: P) => Promise<Result>
+) {
+  return publicRoute<P>(async (request, params) => {
+    const ctx = await getTenantContext();
+    await enforceTenantRateLimit(ctx);
+    return handler(ctx, request, params);
+  });
+}
+
+/** Like tenantRoute, for URLs opened directly in the browser (a receipt): no session -> the tenant sign-in page. */
+export function tenantLinkRoute<P = Record<string, never>>(
+  handler: (ctx: TenantContext, request: Request, params: P) => Promise<Result>
+) {
+  return publicRoute<P>(async (request, params) => {
+    let ctx: TenantContext;
+    try {
+      ctx = await getTenantContext();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) return NextResponse.redirect(new URL(routes.tenantPortal.login, request.url));
+      if (err instanceof ApiError && err.status === 403) return NextResponse.redirect(new URL(routes.tenantPortal.select, request.url));
+      throw err;
+    }
+    await enforceTenantRateLimit(ctx);
     return handler(ctx, request, params);
   });
 }

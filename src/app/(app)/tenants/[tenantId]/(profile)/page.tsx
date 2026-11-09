@@ -6,28 +6,25 @@ import Alert from "@mui/material/Alert";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { addMonthsToKey, formatDateKey, formatMonth, monthKeyOf } from "@/lib/dates";
-import { formatMoney } from "@/lib/money";
+import { formatDateKey } from "@/lib/dates";
 import FlashAlert from "@/components/ui/FlashAlert";
-import { PageHeader, TagPill } from "@/components/ui/DataDisplay";
-import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
-import { ActionStack, BadgeRow, DetailList, DetailRow, SectionCard } from "@/components/ui";
+import { PageHeader } from "@/components/ui/DataDisplay";
+import { ActionStack } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
 import AsyncSection from "@/components/ui/AsyncSection";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import CorrectRentButton from "@/components/domain/CorrectRentButton";
 import RentTrackingButton from "@/components/domain/RentTrackingButton";
-import TenantKindTags from "@/components/domain/TenantKindTags";
-import { unitMixLabel } from "@/lib/domain/tenant";
+import TenantDetailsCards from "@/components/domain/TenantDetailsCards";
 import { FLASH, TAB_PARAM, routes, type Flash, type TenantTab } from "@/lib/routes";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 import PageTabs, { type PageTab } from "@/components/ui/PageTabs";
 import AuditHistoryTable from "@/components/domain/AuditHistoryTable";
-import AccountStats, { AccountStatsSkeleton } from "./sections/AccountStats";
+import AccountStats, { AccountStatsSkeleton } from "@/components/domain/AccountStats";
 import MoveOutAction from "./sections/MoveOutAction";
 import StopTrackingAction from "./sections/StopTrackingAction";
-import TenantLedgerTable from "./TenantLedgerTable";
-import TenantPeriodsGrid from "./TenantPeriodsGrid";
+import TenantLedgerTable from "@/components/domain/TenantLedgerTable";
+import TenantPeriodsGrid from "@/components/domain/TenantPeriodsGrid";
 
 // The page waits only for the profile (who, which houses, which rents - and a
 // 404 for a wrong id) and streams the account stats (A12). Everything else is
@@ -56,103 +53,37 @@ export default async function TenantPage({
   // Government rent paid to the owner directly (0016): no months, no dues, no payments.
   const untracked = active && !tenant.rentTracked;
   const account = untracked ? null : serverApi.dashboard.tenants.account(tenantId);
-  const houseHistory = [...tenant.unitHistory].reverse();
   const moveOut = { tenantId, tenantName: tenant.displayName, unitCodes: tenant.currentUnits.map((u) => u.unitCode) };
 
   const details = (
-    <Grid container spacing={2} columns={12}>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <SectionCard title="Details" fill>
-          <DetailList dividers>
-            <DetailRow label="Status">
-              <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
-            </DetailRow>
-            <DetailRow label="Tenant type">
-              <BadgeRow align="end">
-                <TenantKindTags tenantKind={tenant.tenantKind} rentTracked={tenant.rentTracked} />
-              </BadgeRow>
-            </DetailRow>
-            <DetailRow label={active || draft ? "Houses" : "Last houses"}>
-              <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
-                <TagPill label={unitMixLabel(tenant.unitMix)} />
-                {tenant.currentUnits.map((u) => (
-                  <MuiLink key={u.unitCode} component={Link} href={routes.properties.detail(u.propertyCode)}>
-                    {u.unitCode}
-                    {u.label ? ` · ${u.label}` : ""}
-                  </MuiLink>
-                ))}
-              </Stack>
-            </DetailRow>
-            <DetailRow label="Phone">
-              {tenant.phone ? <MuiLink href={`tel:${tenant.phone}`}>{tenant.phone}</MuiLink> : "Not set"}
-            </DetailRow>
-            <DetailRow label={untracked ? "Agreement rent" : "Combined rent"}>
-              {tenant.monthlyRent > 0 ? `${formatMoney(tenant.monthlyRent)} / month` : "Not set"}
-              {tenant.billingStart && tenant.rentTracked ? (
-                <CorrectRentButton tenantId={tenantId} billingStart={tenant.billingStart} monthlyRent={tenant.monthlyRent} />
-              ) : null}
-            </DetailRow>
-            <DetailRow label="Security deposit">
-              {tenant.depositAmount ? formatMoney(tenant.depositAmount) : draft ? "Not set" : "None"}
-            </DetailRow>
-            <DetailRow label="Moved in">{tenant.leaseStart ? formatDateKey(tenant.leaseStart) : "Not set"}</DetailRow>
-            <DetailRow label="Billing from">
-              {tenant.billingStart
-                ? formatMonth(tenant.billingStart) +
-                  (tenant.leaseStart && tenant.billingStart > monthKeyOf(tenant.leaseStart)
-                    ? ` · paid up to ${formatMonth(addMonthsToKey(tenant.billingStart, -1))} before the app`
-                    : "")
-                : untracked
-                  ? "Not tracked - paid to you directly"
-                  : "Not billed yet"}
-              {account && tenant.tenantKind === "government" ? (
-                <AsyncSection title="Stop tracking" fallback={null} silent>
-                  <StopTrackingAction tenantId={tenantId} account={account} />
-                </AsyncSection>
-              ) : null}
-              {active && tenant.leaseStart && tenant.billingStart ? (
-                <CorrectPaidThroughButton
-                  tenantId={tenantId}
-                  leaseStart={tenant.leaseStart}
-                  billingStart={tenant.billingStart}
-                />
-              ) : null}
-            </DetailRow>
-          </DetailList>
-        </SectionCard>
-      </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <Stack spacing={2}>
-          <SectionCard title="House history">
-            <DetailList dividers>
-              {houseHistory.map((h) => (
-                <DetailRow key={`${h.unitCode}-${h.startDate}`} label={h.unitCode}>
-                  {formatDateKey(h.startDate)} → {h.endDate ? formatDateKey(h.endDate) : "now"}
-                </DetailRow>
-              ))}
-            </DetailList>
-          </SectionCard>
-          <SectionCard title="Rent history">
-            <DetailList dividers>
-              {[...tenant.rentHistory].reverse().map((r) => (
-                <DetailRow key={r.effectiveMonth} label={`From ${formatMonth(r.effectiveMonth)}`}>
-                  <BadgeRow align="end">
-                    <span>{formatMoney(r.monthlyAmount)}</span>
-                  </BadgeRow>
-                </DetailRow>
-              ))}
-            </DetailList>
-          </SectionCard>
-        </Stack>
-      </Grid>
-    </Grid>
+    <TenantDetailsCards
+      tenant={tenant}
+      audience="owner"
+      rentAction={
+        tenant.billingStart && tenant.rentTracked ? (
+          <CorrectRentButton tenantId={tenantId} billingStart={tenant.billingStart} monthlyRent={tenant.monthlyRent} />
+        ) : null
+      }
+      billingActions={
+        <>
+          {account && tenant.tenantKind === "government" ? (
+            <AsyncSection title="Stop tracking" fallback={null} silent>
+              <StopTrackingAction tenantId={tenantId} account={account} />
+            </AsyncSection>
+          ) : null}
+          {active && tenant.leaseStart && tenant.billingStart ? (
+            <CorrectPaidThroughButton tenantId={tenantId} leaseStart={tenant.leaseStart} billingStart={tenant.billingStart} />
+          ) : null}
+        </>
+      }
+    />
   );
   const tabs: (PageTab & { value: TenantTab })[] = [
     { value: "details", label: "Details", content: details },
     ...(account
       ? ([
-          { value: "ledger", label: "Ledger", content: <TenantLedgerTable tenantId={tenantId} /> },
-          { value: "months", label: "Months", content: <TenantPeriodsGrid tenantId={tenantId} /> },
+          { value: "ledger", label: "Ledger", content: <TenantLedgerTable source="owner" tenantId={tenantId} /> },
+          { value: "months", label: "Months", content: <TenantPeriodsGrid source="owner" tenantId={tenantId} /> },
         ] as const)
       : []),
     {

@@ -36,6 +36,10 @@ export const TAB_PARAM = "tab";
 export const TENANT_TABS = ["details", "ledger", "months", "history"] as const;
 export type TenantTab = (typeof TENANT_TABS)[number];
 
+/** The tenant portal's tabs (A32), first = the default; ledger and months match TENANT_TABS so the stat cards open them. */
+export const TENANT_PORTAL_TABS = ["details", "ledger", "months", "documents"] as const;
+export type TenantPortalTab = (typeof TENANT_PORTAL_TABS)[number];
+
 /** `path` plus the defined query params (and an optional `#hash`). Also builds API query strings. */
 export function withQuery(path: string, query?: Query, hash?: string): string {
   const params = new URLSearchParams();
@@ -67,6 +71,13 @@ export const routes = {
   /** The rent book's shared lists: payment tags, quick notes (A25). */
   settings: "/settings",
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
+  /** The tenant portal (A32): a tenant's own account, read-only, behind a phone sign-in. No id: the session says whose. */
+  tenantPortal: {
+    home: (query?: { [TAB_PARAM]?: TenantPortalTab }) => withQuery("/tenant", query),
+    login: "/tenant/login",
+    /** One phone, several tenancies: pick which to open. */
+    select: "/tenant/select",
+  },
   properties: {
     list: "/properties",
     /** The Properties page at one site's towers (its section heading is `site-<code>`). */
@@ -114,7 +125,9 @@ export const routes = {
 // (it can't import a constant). It also lists the installed-app files
 // (manifest, sw.js, offline.html, icons/, A21); keep it in step with
 // public/ and the sw.js headers in next.config.ts.
-const PUBLIC_PREFIXES = ["/login", "/auth/", "/confirm/", "/api/"] as const;
+// The tenant portal (/tenant, A32) isn't the owner's: its layout checks the
+// tenant session instead, and sends anyone without one to /tenant/login.
+const PUBLIC_PREFIXES = ["/login", "/auth/", "/confirm/", "/api/", "/tenant"] as const;
 
 /** Does `pathname` need the owner signed in? */
 export function isProtectedPath(pathname: string): boolean {

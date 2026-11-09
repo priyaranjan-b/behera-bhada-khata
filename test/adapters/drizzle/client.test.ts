@@ -102,3 +102,34 @@ describe("inScope", () => {
     expect(rows[0]).toEqual({ role: "postgres", sub: null });
   });
 });
+
+describe("inScope as a tenant (0033, A32)", () => {
+  const TENANT = "00000000-0000-4000-8000-000000000101";
+
+  it("runs as tenant_reader for that tenant only: no user id, a 5s timeout, nothing left after", async () => {
+    const [s] = await inScope(db, { role: "tenant_reader", tenantId: TENANT }, (tx) =>
+      executeRows<{ role: string; tenant: string; sub: string; timeout: string }>(
+        tx,
+        sql`select current_user as role, current_tenant_id()::text as tenant,
+              current_setting('request.jwt.claim.sub') as sub, current_setting('statement_timeout') as timeout`
+      )
+    );
+    expect(s).toEqual({ role: "tenant_reader", tenant: TENANT, sub: "", timeout: "5s" });
+    // Not even Supabase's auth schema (so auth.uid() and the owner checks) is reachable as a tenant.
+    const authSchema = inScope(db, { role: "tenant_reader", tenantId: TENANT }, (tx) => executeRows(tx, sql`select auth.uid()`));
+    await expect(authSchema).rejects.toThrow();
+    // The setting was local to that transaction.
+    const [after] = await executeRows<{ tenant: string }>(db, sql`select coalesce(current_setting('app.tenant_id', true), '') as tenant`);
+    expect(after.tenant).toBe("");
+  });
+
+  it("can't read the owner's tables", async () => {
+    const run = inScope(db, { role: "tenant_reader", tenantId: TENANT }, (tx) => tx.select().from(schema.locations));
+    await expect(run).rejects.toThrow();
+  });
+
+  it("refuses to run without a real tenant id", async () => {
+    await expect(inScope(db, { role: "tenant_reader", tenantId: "" }, async () => 1)).rejects.toThrow(/tenant id/);
+    await expect(inScope(db, { role: "tenant_reader", tenantId: "x' or true --" }, async () => 1)).rejects.toThrow(/tenant id/);
+  });
+});

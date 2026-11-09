@@ -8,22 +8,27 @@ import { units } from "./places";
 // 0001/0006/0007/0008/0016: tenants and their dated houses and rents (D7, D8).
 // Written only through the tenant lifecycle functions, which stay in SQL.
 
-export const tenants = pgTable("tenants", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  preferred_channel: text("preferred_channel", { enum: PREFERRED_CHANNELS }).notNull().default("both"),
-  lease_start: dateKey("lease_start"),
-  status: text("status", { enum: TENANT_STATUSES }).notNull().default("active"),
-  created_at: timestamptz("created_at").notNull().default(sql`now()`),
-  business_name: text("business_name"),
-  moved_out_on: dateKey("moved_out_on"),
-  updated_at: timestamptz("updated_at").notNull().default(sql`now()`),
-  billing_start: dateKey("billing_start"),
-  deposit_amount: money("deposit_amount"),
-  tenant_kind: text("tenant_kind", { enum: TENANT_KINDS }).notNull().default("individual"),
-  rent_tracked: boolean("rent_tracked").notNull().default(true),
-});
+export const tenants = pgTable(
+  "tenants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    preferred_channel: text("preferred_channel", { enum: PREFERRED_CHANNELS }).notNull().default("both"),
+    lease_start: dateKey("lease_start"),
+    status: text("status", { enum: TENANT_STATUSES }).notNull().default("active"),
+    created_at: timestamptz("created_at").notNull().default(sql`now()`),
+    business_name: text("business_name"),
+    moved_out_on: dateKey("moved_out_on"),
+    updated_at: timestamptz("updated_at").notNull().default(sql`now()`),
+    billing_start: dateKey("billing_start"),
+    deposit_amount: money("deposit_amount"),
+    tenant_kind: text("tenant_kind", { enum: TENANT_KINDS }).notNull().default("individual"),
+    rent_tracked: boolean("rent_tracked").notNull().default(true),
+  },
+  // The tenant portal's sign-in looks tenants up by phone (0033).
+  (t) => [index("tenants_phone_idx").on(t.phone).where(sql`phone is not null`)]
+);
 
 /** No two tenancies of a house overlap: an exclusion constraint in 0006. */
 export const tenantUnits = pgTable(

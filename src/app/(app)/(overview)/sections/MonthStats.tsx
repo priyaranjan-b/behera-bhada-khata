@@ -1,5 +1,7 @@
-import type { StatCardRowColumns } from "@/components/ui/StatCardRow";
-import type { OverviewMonth, OverviewTrend } from "@/lib/contracts";
+"use client";
+
+import { use } from "react";
+import type { OverviewTrend } from "@/lib/contracts";
 import { formatMonth, yearMonthOf } from "@/lib/dates";
 import { collectionRateTone } from "@/lib/domain/overview";
 import type { MonthlyTrendPoint } from "@/lib/domain/reports";
@@ -12,13 +14,7 @@ import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
 import StatCard, { type Trend } from "@/components/ui/StatCard";
-
-/**
- * The Overview's five stat cards (Vacant, its own section, is the fifth): a
- * swipe row on phones, three a row, all five from `xl`. Not from `lg`: at
- * 1200px a lakh-sized figure ("₹2,31,260.00") doesn't fit a fifth of the row (A26).
- */
-export const STAT_COLUMNS = { sm: 3, xl: 5 } as const satisfies StatCardRowColumns;
+import { useOverviewMonth } from "../OverviewMonthProvider";
 
 // Direction of the last month vs the one before, for sparkline colouring.
 function trendOf(values: number[]): Trend {
@@ -33,17 +29,17 @@ function sparklineFor(trend: MonthlyTrendPoint[], key: "billed" | "collected") {
 }
 
 /** Overview: Expected, Collected, Outstanding and Tenants overdue - four cards in the stat row (Vacant, its own section, makes five). */
-export default async function MonthStats({
-  month,
+export default function MonthStats({
   trend,
   paidDirect,
 }: {
-  month: Promise<OverviewMonth>;
   trend: Promise<OverviewTrend>;
   /** "Include Govt paid direct" (A11): the Billing page they open shows the same figures. */
   paidDirect: PaidDirectView;
 }) {
-  const [{ monthKey, report }, { trend: points }] = await Promise.all([month, trend]);
+  // The month comes from the switcher (A31), fetched in the browser after the first render.
+  const { monthKey, report } = use(useOverviewMonth().data);
+  const { trend: points } = use(trend);
   const monthLabel = formatMonth(monthKey);
   // Expected / Collected open the Billing page for the same month.
   const monthBilling = routes.billing({ from: yearMonthOf(monthKey), to: yearMonthOf(monthKey), ...paidDirectQuery(paidDirect) });

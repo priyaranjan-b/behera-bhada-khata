@@ -1,5 +1,6 @@
 import "server-only";
-import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
+import { randomBytes, createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { env } from "@/server/env";
 
 const CONFIRM_LINK_TTL_DAYS = 14;
 
@@ -14,6 +15,16 @@ export function generateConfirmToken(): { token: string; tokenHash: string; expi
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * A keyed hash for a value that must not be recoverable from what is stored:
+ * a phone number or an IP in a rate-limit key or the audit log. A plain
+ * sha256 of a 10-digit mobile can be brute-forced; this needs the server's
+ * secret key too. Rotating the key only resets rate-limit windows.
+ */
+export function keyedHash(value: string): string {
+  return createHmac("sha256", env().SUPABASE_SECRET_KEY).update(value).digest("hex");
 }
 
 /** Constant-time comparison of two secrets (e.g. a bearer token against the configured one). */

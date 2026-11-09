@@ -4,7 +4,7 @@ import { currentMonthKey, todayKey } from "@/lib/dates";
 import { NOT_SET, unitMix, type UnitMix } from "@/lib/domain/tenant";
 import { round2 } from "@/lib/money";
 import type { Property, TenantRentRate, Unit, UnitOccupancy } from "@/lib/types";
-import type { OwnerRepositories } from "@/server/ports";
+import type { OwnerRepositories, TenantAccountReads } from "@/server/ports";
 
 // Who is in which house, and at what rent - derived from the dated history
 // tables (tenant_units via the unit_occupancy view, tenant_rent_rates).
@@ -69,7 +69,10 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 }
 
 /** Houses, towers, tenancies and rent rates for a set of tenants, in four queries. */
-export async function loadPlacements(db: OwnerRepositories, tenantIds: string[]): Promise<Placements> {
+export async function loadPlacements(
+  db: Pick<TenantAccountReads, "occupancy" | "rentRates" | "properties" | "units">,
+  tenantIds: string[]
+): Promise<Placements> {
   const [history, rates, properties] = await Promise.all([
     tenantIds.length ? db.occupancy.list({ tenantIds }) : Promise.resolve([]),
     tenantIds.length ? db.rentRates.listForTenants(tenantIds) : Promise.resolve([]),

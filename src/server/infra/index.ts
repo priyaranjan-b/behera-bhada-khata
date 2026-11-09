@@ -4,11 +4,27 @@ import { cache } from "react";
 // Swap these bindings (e.g. to a MySQL adapter) to change the backing
 // services; nothing else in the app imports an adapter directly.
 import { ApiError } from "@/lib/errors";
-import type { AuthGateway, FileStorage, Messaging, OwnerRepositories, SystemRepositories } from "@/server/ports";
+import type {
+  AfterResponse,
+  AuthGateway,
+  FileStorage,
+  Messaging,
+  OwnerRepositories,
+  SystemRepositories,
+  TenantRepositories,
+  TenantSessionCookie,
+} from "@/server/ports";
 import { sessionJwtClaims, supabaseAuth } from "@/server/adapters/supabase/auth";
 import { supabaseStorage } from "@/server/adapters/supabase/storage";
 import { twilioMessaging } from "@/server/adapters/twilio/messaging";
-import { drizzleDb, drizzleOwnerRepositories, drizzleSystemRepositories } from "@/server/adapters/drizzle";
+import {
+  drizzleDb,
+  drizzleOwnerRepositories,
+  drizzleSystemRepositories,
+  drizzleTenantRepositories,
+} from "@/server/adapters/drizzle";
+import { nextTenantCookie } from "@/server/adapters/next/tenantCookie";
+import { nextAfterResponse } from "@/server/adapters/next/afterResponse";
 
 // Data goes through the Drizzle adapter (A19); Supabase is sign-in and file
 // storage only.
@@ -29,7 +45,20 @@ export function systemDb(): SystemRepositories {
   return drizzleSystemRepositories(drizzleDb());
 }
 
+/**
+ * Data access as one signed-in tenant (A32): only their own rows, read-only
+ * (the database enforces it). `tenantId` must come from a verified tenant
+ * session (getTenantContext), never from the request.
+ */
+export function tenantDb(tenantId: string): TenantRepositories {
+  return drizzleTenantRepositories(drizzleDb(), tenantId);
+}
+
 export const auth: AuthGateway = supabaseAuth;
+
+export const tenantCookie: TenantSessionCookie = nextTenantCookie;
+
+export const afterResponse: AfterResponse = nextAfterResponse;
 
 export const storage: FileStorage = supabaseStorage;
 

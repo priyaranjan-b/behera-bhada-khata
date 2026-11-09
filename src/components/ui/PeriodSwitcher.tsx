@@ -15,22 +15,35 @@ export default function PeriodSwitcher({
   prevHref,
   nextHref,
   unit = "month",
+  onStep,
 }: {
   label: string;
   prevHref: string;
   nextHref: string;
   /** For the buttons' accessible names: "Previous month" / "Next months"… */
   unit?: string;
+  /**
+   * Changes the period in place instead of navigating (-1 / +1; the Overview, A31).
+   * The arrows stay links, so a new tab or a copied link still opens that period.
+   */
+  onStep?: (step: -1 | 1) => void;
 }) {
+  const clickFor = (step: -1 | 1) =>
+    onStep &&
+    ((event: React.MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      onStep(step);
+    });
   return (
     <InsetBox fill>
-      <IconButton component={Link} href={prevHref} size="small" aria-label={`Previous ${unit}`}>
+      <IconButton component={Link} href={prevHref} onClick={clickFor(-1)} size="small" aria-label={`Previous ${unit}`}>
         <ChevronLeftRoundedIcon fontSize="small" />
       </IconButton>
       <Typography variant="subtitle2" align="center" noWrap sx={{ minWidth: 128, flex: 1 }} aria-live="polite">
         {label}
       </Typography>
-      <IconButton component={Link} href={nextHref} size="small" aria-label={`Next ${unit}`}>
+      <IconButton component={Link} href={nextHref} onClick={clickFor(1)} size="small" aria-label={`Next ${unit}`}>
         <ChevronRightRoundedIcon fontSize="small" />
       </IconButton>
     </InsetBox>

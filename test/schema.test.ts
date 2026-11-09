@@ -2173,12 +2173,12 @@ describe("app_drizzle login (0027)", () => {
   /** 0028 again: the 0027 cases below re-run 0027, which revokes service_role. */
   const regrant0028 = () => db.exec(readFileSync(path.join(MIGRATIONS, "0028_app_drizzle_service_role.sql"), "utf8"));
 
-  it("is a member of authenticated and, since 0028, service_role - and of nothing else", async () => {
+  it("is a member of authenticated, service_role (0028) and tenant_reader (0033) - and of nothing else", async () => {
     const { rows } = await db.query<{ rolname: string; inherit: boolean }>(
       `select r.rolname, m.inherit_option as inherit from pg_auth_members m join pg_roles r on r.oid = m.roleid
        join pg_roles u on u.oid = m.member where u.rolname = 'app_drizzle' order by r.rolname`
     );
-    expect(rows.map((r) => r.rolname)).toEqual(["authenticated", "service_role"]);
+    expect(rows.map((r) => r.rolname)).toEqual(["authenticated", "service_role", "tenant_reader"]);
     // NOINHERIT: it only ever acts as them after switching role.
     expect(rows.every((r) => !r.inherit)).toBe(true);
   });
@@ -2695,5 +2695,192 @@ describe("set-off payments (0032)", () => {
     await pay("set_off");
     const { rows } = await db.query<{ details: string }>(`select details from audit_log where action = 'payment.recorded'`);
     expect(rows[0].details).toContain("Mode: Set-off (deducted by tenant)");
+  });
+});
+
+describe("tenant portal (0033)", () => {
+  /** Runs `sql` as tenant_reader for `tenantId`, as inScope() does for a signed-in tenant. */
+  async function asTenant<T = Record<string, unknown>>(tenantId: string, sql: string, params: unknown[] = []): Promise<T[]> {
+    await db.query(`select set_config('app.tenant_id', $1, false), set_config('request.jwt.claim.sub', '', false)`, [tenantId]);
+    await db.exec(`set role tenant_reader`);
+    try {
+      return (await db.query<T>(sql, params)).rows;
+    } finally {
+      await db.exec(`reset role`);
+      await db.query(`select set_config('app.tenant_id', '', false)`);
+    }
+  }
+
+  async function payFor(tenantId: string, periodId: string) {
+    await createPayment(owner(OWNER_A), { tenant: tenantId, amount: 100, allocations: [{ rent_period_id: periodId, amount: 100 }] });
+    return latestPaymentId();
+  }
+
+  it("shows a tenant their own rows and nobody else's", async () => {
+    const mine = await payFor(fx.tenantA, fx.periods[0].id);
+    await payFor(fx.tenantA2, fx.otherTenantPeriod);
+    await db.query(
+      `insert into payment_proofs (payment_id, storage_path, file_name, content_type, size_bytes)
+       select id, 'payments/' || tenant_id || '/' || id || '/proofs/a.png', 'a.png', 'image/png', 1 from payments`
+    );
+
+    expect(await asTenant(fx.tenantA, `select id from tenants`)).toEqual([{ id: fx.tenantA }]);
+    const periods = await asTenant<{ tenant_id: string }>(fx.tenantA, `select tenant_id from rent_periods`);
+    expect(periods.length).toBe(3);
+    expect(periods.every((p) => p.tenant_id === fx.tenantA)).toBe(true);
+    expect(await asTenant(fx.tenantA, `select id from payments`)).toEqual([{ id: mine }]);
+    expect(await asTenant(fx.tenantA, `select payment_id from payment_proofs`)).toEqual([{ payment_id: mine }]);
+    expect(await asTenant(fx.tenantA, `select unit_code from tenant_units`)).toEqual([{ unit_code: "AC-T1-G01" }]);
+    expect(await asTenant(fx.tenantA, `select unit_code from units`)).toEqual([{ unit_code: "AC-T1-G01" }]);
+    expect(await asTenant(fx.tenantA, `select property_code from properties`)).toEqual([{ property_code: "AC-T1" }]);
+    expect(await asTenant(fx.tenantA, `select tenant_id from unit_occupancy`)).toEqual([{ tenant_id: fx.tenantA }]);
+    expect(await asTenant(fx.tenantA, `select count(*)::int as n from tenant_rent_rates`)).toEqual([{ n: 1 }]);
+    // Another tenant's id in the query changes nothing: RLS decides.
+    expect(await asTenant(fx.tenantA, `select id from tenants where id = $1`, [fx.tenantA2])).toEqual([]);
+  });
+
+  it("sees nothing without a tenant set", async () => {
+    await db.query(`select set_config('app.tenant_id', '', false)`);
+    await db.exec(`set role tenant_reader`);
+    try {
+      expect((await db.query(`select id from tenants`)).rows).toEqual([]);
+      expect((await db.query(`select id from rent_periods`)).rows).toEqual([]);
+    } finally {
+      await db.exec(`reset role`);
+    }
+  });
+
+  it("can't read the confirm-link token, signatures or the owner's tags and records", async () => {
+    const mine = await payFor(fx.tenantA, fx.periods[0].id);
+    await as(owner(OWNER_A), `select set_payment_tags($1, array['Padma'])`, [mine]).catch(() => undefined);
+    for (const column of ["token_hash", "owner_signature_path", "pdf_path", "recorded_by"]) {
+      expect(await errorCode(asTenant(fx.tenantA, `select ${column} from payments`)), column).toBe("42501");
+    }
+    expect(await errorCode(asTenant(fx.tenantA, `select * from payments`))).toBe("42501");
+    expect(await asTenant(fx.tenantA, `select * from payment_record_tags`)).toEqual([]);
+    for (const table of ["audit_log", "owner_profile", "tenant_sessions", "maintenance_expenses", "payment_tags", "rate_limits", "app_owner", "locations"]) {
+      expect(await errorCode(asTenant(fx.tenantA, `select * from ${table}`)), table).toBe("42501");
+    }
+  });
+
+  it("can change nothing and run none of the owner's functions", async () => {
+    expect(await errorCode(asTenant(fx.tenantA, `update tenants set name = 'x'`))).toBe("42501");
+    expect(await errorCode(asTenant(fx.tenantA, `insert into tenant_documents (tenant_id, document_type, storage_path, file_name, content_type, size_bytes) values ($1::uuid, 'x', 'tenants/' || $1::text || '/documents/x', 'x', 'application/pdf', 1)`, [fx.tenantA]))).toBe("42501");
+    expect(await errorCode(asTenant(fx.tenantA, `delete from rent_periods`))).toBe("42501");
+    expect(
+      await errorCode(
+        asTenant(
+          fx.tenantA,
+          `select create_payment(gen_random_uuid(), $1, 100, '2026-03-05', 'cash', null, 'sig.png',
+             md5(random()::text), now() + interval '14 days', $2::jsonb)`,
+          [fx.tenantA, JSON.stringify([{ rent_period_id: fx.periods[0].id, amount: 100 }])]
+        )
+      )
+    ).not.toBe("ok");
+    expect(await errorCode(asTenant(fx.tenantA, `select move_out_tenant($1, '2026-03-31')`, [fx.tenantA]))).not.toBe("ok");
+    expect(await errorCode(asTenant(fx.tenantA, `select log_event('receipt.downloaded')`))).toBe("42501");
+    expect(await errorCode(asTenant(fx.tenantA, `select ensure_rent_periods(null, '2026-04-01')`))).toBe("42501");
+    expect((await db.query(`select name from tenants where id = $1`, [fx.tenantA])).rows).toEqual([{ name: "Asha" }]);
+  });
+
+  it("keeps sessions to the service role, and the owner's view of a non-owner unchanged", async () => {
+    for (const who of [owner(OWNER_A), owner(OWNER_B)]) {
+      expect(await errorCode(as(who, `select * from tenant_sessions`))).toBe("42501");
+    }
+    await db.exec(`set role anon`);
+    try {
+      expect(await errorCode(db.query(`select * from tenant_sessions`))).toBe("42501");
+    } finally {
+      await db.exec(`reset role`);
+    }
+    await as(service, `insert into tenant_sessions (token_hash, phone, tenant_id, expires_at) values ('h', '+919876543210', $1, now() + interval '7 days')`, [fx.tenantA]);
+    expect(await as(service, `select phone from tenant_sessions`)).toEqual([{ phone: "+919876543210" }]);
+    // The tenant role's policies give an ordinary signed-in account nothing.
+    expect(await as(owner(OWNER_B), `select * from tenants`)).toEqual([]);
+  });
+
+  it("refuses a session that ends before it starts, or a malformed phone", async () => {
+    expect(
+      await errorCode(as(service, `insert into tenant_sessions (token_hash, phone, expires_at) values ('h', '+919876543210', now() - interval '1 day')`))
+    ).toBe("23514");
+    expect(
+      await errorCode(as(service, `insert into tenant_sessions (token_hash, phone, expires_at) values ('h', '98765', now() + interval '1 day')`))
+    ).toBe("23514");
+  });
+});
+
+describe("tenant portal hardening (0034)", () => {
+  it("lets tenant_reader run one function and read exactly the portal's tables, nothing else", async () => {
+    // Every function in public it may execute, extension functions (btree_gist) aside.
+    const { rows: functions } = await db.query<{ fn: string }>(
+      `select p.oid::regprocedure::text as fn
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+         and has_function_privilege('tenant_reader', p.oid, 'execute')
+       order by 1`
+    );
+    expect(functions.map((f) => f.fn)).toEqual(["current_tenant_id()"]);
+
+    const { rows: relations } = await db.query<{ rel: string }>(
+      `select c.relname as rel
+       from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind in ('r', 'v', 'm', 'p')
+         and (has_table_privilege('tenant_reader', c.oid, 'select') or has_any_column_privilege('tenant_reader', c.oid, 'select'))
+       order by 1`
+    );
+    expect(relations.map((r) => r.rel)).toEqual([
+      "adjustments",
+      "payment_proofs",
+      "payment_record_tags",
+      "payments",
+      "properties",
+      "rent_periods",
+      "tenant_documents",
+      "tenant_rent_rates",
+      "tenant_units",
+      "tenants",
+      "unit_occupancy",
+      "units",
+    ]);
+    // ...and writes none of them.
+    const { rows: writable } = await db.query(
+      `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind in ('r', 'v', 'p')
+         and (has_table_privilege('tenant_reader', c.oid, 'insert, update, delete, truncate')
+           or has_any_column_privilege('tenant_reader', c.oid, 'insert, update'))`
+    );
+    expect(writable).toEqual([]);
+  });
+
+  it("hides the confirm-link token, signatures, stored PDF and recorder on every table", async () => {
+    const hidden: Record<string, string[]> = {
+      payments: ["token_hash", "token_expires_at", "owner_signature_path", "tenant_signature_path", "pdf_path", "otp_verified_at", "recorded_by"],
+      adjustments: ["token_hash", "token_expires_at", "owner_signature_path", "tenant_signature_path", "pdf_path", "otp_verified_at", "recorded_by"],
+      tenant_units: ["recorded_by"],
+      tenant_rent_rates: ["recorded_by"],
+      tenant_documents: ["recorded_by"],
+    };
+    for (const [table, columns] of Object.entries(hidden)) {
+      for (const column of columns) {
+        const { rows } = await db.query<{ ok: boolean }>(
+          `select has_column_privilege('tenant_reader', $1::regclass, $2, 'select') as ok`,
+          [table, column]
+        );
+        expect(rows[0].ok, `${table}.${column}`).toBe(false);
+      }
+    }
+  });
+
+  it("refuses to run over a tenant_reader that could bypass RLS", async () => {
+    const run0034 = () => db.exec(readFileSync(path.join(MIGRATIONS, "0034_tenant_portal_hardening.sql"), "utf8"));
+    await db.exec(`alter role tenant_reader bypassrls`);
+    try {
+      await expect(run0034()).rejects.toThrow(/could read every tenant/);
+    } finally {
+      await db.exec(`alter role tenant_reader nobypassrls`);
+    }
+    // And runs again cleanly otherwise.
+    await run0034();
   });
 });

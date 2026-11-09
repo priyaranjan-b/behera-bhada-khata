@@ -75,7 +75,11 @@ payments count, receipts download, and the "send to tenant" step shows as
    **Account SID** and **Auth Token** from the console → `TWILIO_ACCOUNT_SID`
    / `TWILIO_AUTH_TOKEN`.
 2. **Verify service (for OTP)**: Console → Verify → Services → create one →
-   copy its SID → `TWILIO_VERIFY_SERVICE_SID`.
+   copy its SID → `TWILIO_VERIFY_SERVICE_SID`. It also sends the tenant
+   portal's sign-in codes (`/tenant/login`, A32): under the service's **Geo
+   permissions**, allow India (+91) only, so nobody can use the sign-in page
+   to text premium numbers abroad. Locally without Twilio, `ALLOW_DEV_LOGIN=1`
+   makes the tenant code `000000`.
 3. **SMS sender**: buy/use a Twilio phone number capable of sending SMS →
    `TWILIO_SMS_FROM` (E.164 format, e.g. `+14155551234`).
 4. **WhatsApp sender**: for testing, join the [Twilio WhatsApp

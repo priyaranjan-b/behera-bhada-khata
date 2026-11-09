@@ -24,6 +24,7 @@ import type {
   PaymentAllocation,
   PaymentProof,
   TenantDocument,
+  TenantSession,
   Property,
   RentPeriod,
   Tenant,
@@ -171,6 +172,11 @@ function build() {
     /** Maintenance expenses (0031) by id, with their houses, tags and files. */
     maintenance: new Map<string, MaintenanceExpenseRecord>(),
     rateLimitAllows: true,
+    /** Tenant portal sessions (0033) by id, and the browser's tenant cookie (A32). */
+    tenantSessions: new Map<string, TenantSession>(),
+    tenantCookie: null as string | null,
+    /** Work queued to run after the response (AfterResponse); the fake starts it at once. */
+    afterTasks: [] as Promise<void>[],
     /** Newest last; list() returns newest first like the database. */
     audit: [] as AuditLogEntry[],
   };
@@ -574,7 +580,44 @@ function build() {
       get: vi.fn(async () => ({ location_code: "AC", name: "Arnapal Chakk Complex", address: null, created_at: "", updated_at: "" })),
     },
     properties: { get: vi.fn(async () => property) },
-    tenants: { get: vi.fn(async (id: string) => state.tenants.get(id) ?? null) },
+    tenants: {
+      get: vi.fn(async (id: string) => state.tenants.get(id) ?? null),
+      listByPhone: vi.fn(async (phone: string) =>
+        [...state.tenants.values()].filter((t) => t.phone === phone && (t.status === "active" || t.status === "inactive"))
+      ),
+    },
+    tenantSessions: {
+      create: vi.fn(async (row: Partial<TenantSession> & { token_hash: string; phone: string; expires_at: string }) => {
+        const id = `00000000-0000-4000-8000-${String(900 + state.tenantSessions.size).padStart(12, "0")}`;
+        state.tenantSessions.set(id, {
+          id,
+          token_hash: row.token_hash,
+          phone: row.phone,
+          tenant_id: row.tenant_id ?? null,
+          created_at: new Date().toISOString(),
+          expires_at: row.expires_at,
+          revoked_at: null,
+          ip_hash: row.ip_hash ?? null,
+        });
+      }),
+      findActive: vi.fn(
+        async (hash: string) =>
+          [...state.tenantSessions.values()].find(
+            (s) => s.token_hash === hash && !s.revoked_at && new Date(s.expires_at).getTime() > Date.now()
+          ) ?? null
+      ),
+      choose: vi.fn(async (id: string, tenantId: string) => {
+        const s = state.tenantSessions.get(id);
+        if (!s || s.revoked_at) return false;
+        s.tenant_id = tenantId;
+        return true;
+      }),
+      revoke: vi.fn(async (id: string) => {
+        const s = state.tenantSessions.get(id);
+        if (s && !s.revoked_at) s.revoked_at = new Date().toISOString();
+      }),
+      prune: vi.fn(async () => 0),
+    },
     occupancy: { listForTenant: vi.fn(async () => occupancy) },
     rentPeriods: { listByIds: vi.fn(async () => [period]), ensure: vi.fn(async () => 0) },
     payments: {
@@ -586,10 +629,62 @@ function build() {
     },
     adjustments: {
       findByTokenHash: vi.fn(async () => null),
+      get: vi.fn(async (id: string) => state.adjustments.get(id) ?? null),
       listAllocations: vi.fn(async () => []),
       acknowledge: vi.fn(async () => true),
     },
     rateLimits: { hit: vi.fn(async () => state.rateLimitAllows), prune: vi.fn(async () => 0) },
+  };
+
+  /**
+   * A signed-in tenant's repositories (A32): the owner fakes' data, cut down
+   * to what tenant_reader's RLS shows - that tenant's own rows only.
+   */
+  function tenantRepos(tenantId: string) {
+    const ownPayment = (id: string) => state.payments.get(id)?.tenant_id === tenantId;
+    return {
+      tenants: {
+        get: vi.fn(async (id: string) => (id === tenantId ? (state.tenants.get(id) ?? null) : null)),
+        accountSummary: owner.tenants.accountSummary,
+      },
+      rentPeriods: { page: owner.rentPeriods.page },
+      ledger: owner.ledger,
+      payments: {
+        listProofs: vi.fn(async (ids: string[]) =>
+          [...state.proofs.values()].filter((p) => ids.includes(p.payment_id) && ownPayment(p.payment_id))
+        ),
+        getProof: vi.fn(async (id: string) => {
+          const proof = state.proofs.get(id);
+          return proof && ownPayment(proof.payment_id) ? proof : null;
+        }),
+      },
+      occupancy: owner.occupancy,
+      rentRates: owner.rentRates,
+      properties: { list: owner.properties.list },
+      units: { list: owner.units.list },
+      tenantDocuments: {
+        list: vi.fn(async (id: string) => [...state.documents.values()].filter((d) => d.tenant_id === id && id === tenantId)),
+        get: vi.fn(async (id: string) => {
+          const doc = state.documents.get(id);
+          return doc?.tenant_id === tenantId ? doc : null;
+        }),
+      },
+      records: {
+        exists: vi.fn(async (kind: "payment" | "adjustment", id: string) =>
+          kind === "payment" ? ownPayment(id) : state.adjustments.get(id)?.tenant_id === tenantId
+        ),
+      },
+    };
+  }
+
+  const tenantCookie = {
+    read: vi.fn(async () => state.tenantCookie),
+    write: vi.fn(async (token: string) => {
+      state.tenantCookie = token;
+    }),
+    clear: vi.fn(async () => {
+      state.tenantCookie = null;
+    }),
   };
 
   const storage = {
@@ -624,7 +719,13 @@ function build() {
     signOut: vi.fn(),
   };
 
-  return { state, owner, system, storage, messaging, auth };
+  const afterResponse = {
+    run: vi.fn((task: () => Promise<void>) => {
+      state.afterTasks.push(task());
+    }),
+  };
+
+  return { state, owner, system, storage, messaging, auth, tenantRepos, tenantCookie, afterResponse };
 }
 
 export const fakes = build();
@@ -640,6 +741,13 @@ export function infraMock() {
   return {
     ownerDb: async () => fakes.owner,
     systemDb: () => fakes.system,
+    tenantDb: (tenantId: string) => fakes.tenantRepos(tenantId),
+    get tenantCookie() {
+      return fakes.tenantCookie;
+    },
+    get afterResponse() {
+      return fakes.afterResponse;
+    },
     get storage() {
       return fakes.storage;
     },

@@ -12,8 +12,20 @@ import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import type { LedgerProof } from "@/lib/domain/tenantLedger";
 import { apiHref, apiPaths } from "@/lib/api-client";
 
-/** "📎 2" for a payment's proof files; each opens in a new tab via a short-lived signed URL. */
-export default function ProofsButton({ paymentId, proofs }: { paymentId: string; proofs: LedgerProof[] }) {
+/**
+ * "📎 2" for a payment's proof files; each opens in a new tab via a
+ * short-lived signed URL. `source`: the owner's API, or the signed-in
+ * tenant's own (the portal, A32).
+ */
+export default function ProofsButton({
+  paymentId,
+  proofs,
+  source = "owner",
+}: {
+  paymentId: string;
+  proofs: LedgerProof[];
+  source?: "owner" | "tenant";
+}) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   if (proofs.length === 0) return null;
 
@@ -34,7 +46,11 @@ export default function ProofsButton({ paymentId, proofs }: { paymentId: string;
           <MenuItem
             key={proof.id}
             component="a"
-            href={apiHref(apiPaths.dashboard.payments.proof(paymentId, proof.id))}
+            href={apiHref(
+              source === "tenant"
+                ? apiPaths.tenant.proof(paymentId, proof.id)
+                : apiPaths.dashboard.payments.proof(paymentId, proof.id)
+            )}
             target="_blank"
             rel="noopener"
             onClick={() => setAnchor(null)}

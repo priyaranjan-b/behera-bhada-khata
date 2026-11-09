@@ -12,6 +12,11 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
 ];
 
+const TENANT_PORTAL_HEADERS = [
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
+  { key: "Cache-Control", value: "private, no-store" },
+];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
@@ -20,6 +25,9 @@ const nextConfig: NextConfig = {
     "/api/confirm/**": ["./src/server/pdf/fonts/**/*"],
     "/api/dashboard/payments/*/receipt": ["./src/server/pdf/fonts/**/*"],
     "/api/dashboard/adjustments/*/receipt": ["./src/server/pdf/fonts/**/*"],
+    // The tenant portal's own receipt downloads (A32).
+    "/api/tenant/payments/*/receipt": ["./src/server/pdf/fonts/**/*"],
+    "/api/tenant/adjustments/*/receipt": ["./src/server/pdf/fonts/**/*"],
   },
 
   // Every page used to live under /dashboard (/dashboard/tenants/…); now it is
@@ -40,6 +48,9 @@ const nextConfig: NextConfig = {
       // site as a Referer.
       { source: "/confirm/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
       { source: "/api/confirm/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      // The tenant portal (A32): a tenant's own account, never indexed or cached by a shared cache.
+      { source: "/tenant", headers: TENANT_PORTAL_HEADERS },
+      { source: "/tenant/:path*", headers: TENANT_PORTAL_HEADERS },
       // The service worker is checked for updates on every visit; never let a
       // CDN or the browser serve an old copy of it.
       {

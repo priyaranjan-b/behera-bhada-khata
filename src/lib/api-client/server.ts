@@ -45,7 +45,15 @@ import {
   getTenantLedger,
   listTenants,
 } from "@/server/services/tenants";
-import type { OwnerContext } from "@/server/services/context";
+import type { OwnerContext, TenantContext } from "@/server/services/context";
+import { getTenantContext, getTenantPortalSession, listTenancies } from "@/server/services/tenantAuth";
+import {
+  getMyAccount,
+  getMyDocuments,
+  getMyLedger,
+  getMyMonths,
+  getMyProfile,
+} from "@/server/services/tenantPortal";
 import { createHttpApi } from "./http";
 import type { ApiQueries } from "./types";
 
@@ -56,6 +64,8 @@ import type { ApiQueries } from "./types";
 // reads over HTTP to a standalone backend instead; pages don't change.
 
 const owner = cache((): Promise<OwnerContext> => getOwnerContext());
+/** The signed-in tenant (A32); never an owner check, so a tenant page can't be read with an owner session either. */
+const tenant = (): Promise<TenantContext> => getTenantContext();
 
 const inProcessApi: ApiQueries = {
   auth: {
@@ -120,6 +130,15 @@ const inProcessApi: ApiQueries = {
       history: async (id, before) => maintenanceHistory(await owner(), id, { before }),
     },
   },
+  tenant: {
+    session: async () => getTenantPortalSession(await tenant()),
+    tenancies: () => listTenancies(),
+    profile: async () => getMyProfile(await tenant()),
+    account: async () => getMyAccount(await tenant()),
+    months: async (query) => getMyMonths(await tenant(), query ?? {}),
+    ledger: async (query) => getMyLedger(await tenant(), query ?? {}),
+    documents: async () => getMyDocuments(await tenant()),
+  },
   confirm: {
     detail: (token) => getConfirmView(token),
   },
@@ -142,10 +161,21 @@ function selectApi(): ApiQueries {
   return selected;
 }
 
+/** Where a page goes without the session it needs (401) or with the wrong one (403). */
+interface AuthRedirects {
+  unauthorized: string;
+  forbidden: string;
+}
+
+const OWNER_REDIRECTS: AuthRedirects = { unauthorized: routes.login(), forbidden: routes.login({ error: "owner" }) };
+/** The tenant portal (A32): its own sign-in, and the picker while a phone hasn't chosen a tenancy. */
+const TENANT_REDIRECTS: AuthRedirects = { unauthorized: routes.tenantPortal.login, forbidden: routes.tenantPortal.select };
+
 // Pages render whatever the API returns; the two failures every page treats
 // the same way are handled once here: no session -> /login, signed in but not
-// the owner -> /login?error=owner, missing -> 404.
-function withPageErrors<T extends object>(shape: T, resolve: () => T): T {
+// the owner -> /login?error=owner, missing -> 404. The tenant portal's calls
+// (`tenant.*`) go to its own sign-in and picker instead.
+function withPageErrors<T extends object>(shape: T, resolve: () => T, redirects: AuthRedirects = OWNER_REDIRECTS): T {
   return Object.fromEntries(
     Object.entries(shape).map(([key, value]) => [
       key,
@@ -155,13 +185,17 @@ function withPageErrors<T extends object>(shape: T, resolve: () => T): T {
               const fn = (resolve() as Record<string, (...a: unknown[]) => Promise<unknown>>)[key];
               return await fn(...args);
             } catch (err) {
-              if (err instanceof ApiError && err.status === 401) redirect(routes.login());
-              if (err instanceof ApiError && err.status === 403) redirect(routes.login({ error: "owner" }));
+              if (err instanceof ApiError && err.status === 401) redirect(redirects.unauthorized);
+              if (err instanceof ApiError && err.status === 403) redirect(redirects.forbidden);
               if (err instanceof ApiError && err.status === 404) notFound();
               throw err;
             }
           }
-        : withPageErrors(value as object, () => (resolve() as Record<string, object>)[key]),
+        : withPageErrors(
+            value as object,
+            () => (resolve() as Record<string, object>)[key],
+            key === "tenant" ? TENANT_REDIRECTS : redirects
+          ),
     ])
   ) as T;
 }

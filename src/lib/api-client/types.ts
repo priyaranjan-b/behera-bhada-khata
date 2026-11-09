@@ -84,6 +84,11 @@ import type {
   TenantLedgerQuery,
   TenantLedgerView,
   TenantSearchRow,
+  TenancyOption,
+  TenantDocumentView,
+  TenantOtpSent,
+  TenantPortalSession,
+  TenantSignedIn,
   UnitRow,
 } from "@/lib/contracts";
 
@@ -182,6 +187,17 @@ export interface ApiQueries {
       history(expenseId: string, before?: number): Promise<AuditPage>;
     };
   };
+  /** The tenant portal (A32): the signed-in tenant's own account, read-only. */
+  tenant: {
+    session(): Promise<TenantPortalSession>;
+    /** The tenancies the signed-in phone may open (/tenant/select). */
+    tenancies(): Promise<TenancyOption[]>;
+    profile(): Promise<TenantDetail>;
+    account(): Promise<TenantAccount>;
+    months(query?: TenantMonthsQuery): Promise<TenantMonthsPage>;
+    ledger(query?: TenantLedgerQuery): Promise<TenantLedgerView>;
+    documents(): Promise<TenantDocumentView[]>;
+  };
   confirm: {
     detail(token: string): Promise<ConfirmView>;
   };
@@ -246,6 +262,13 @@ export interface ApiCommands {
       addFiles(expenseId: string, files: File[]): Promise<MaintenanceFilesSaved>;
       deleteFile(expenseId: string, fileId: string): Promise<void>;
     };
+  };
+  /** Signing in and out of the tenant portal - its only writes (A32). */
+  tenant: {
+    sendOtp(input: { phone: string }): Promise<TenantOtpSent>;
+    verifyOtp(input: { phone: string; code: string }): Promise<TenantSignedIn>;
+    selectTenancy(input: { tenantId: string }): Promise<TenantSignedIn>;
+    signOut(): Promise<void>;
   };
   confirm: {
     sendOtp(token: string, recordType: RecordType): Promise<OtpSent>;

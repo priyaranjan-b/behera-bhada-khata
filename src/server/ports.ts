@@ -44,10 +44,12 @@ import type {
   PreferredChannel,
   ProofArg,
   Property,
+  RecordType,
   RentPeriod,
   Tenant,
   TenantDocument,
   TenantKind,
+  TenantSession,
   TenantRentRate,
   TenantStatus,
   Unit,
@@ -533,6 +535,57 @@ export interface OwnerRepositories {
   };
 }
 
+// ---- Tenant portal (A32): one tenant's own rows, read-only ----
+
+/**
+ * The reads a tenant's account page makes. The owner's repositories provide
+ * them (the owner's tenant page) and so do the tenant's own (the portal), so
+ * the shaping in src/server/services/tenantAccount.ts is written once.
+ */
+export interface TenantAccountReads {
+  tenants: Pick<OwnerRepositories["tenants"], "get" | "accountSummary">;
+  rentPeriods: Pick<OwnerRepositories["rentPeriods"], "page">;
+  ledger: OwnerRepositories["ledger"];
+  payments: Pick<OwnerRepositories["payments"], "listProofs" | "getProof">;
+  occupancy: OwnerRepositories["occupancy"];
+  rentRates: OwnerRepositories["rentRates"];
+  properties: Pick<OwnerRepositories["properties"], "list">;
+  units: Pick<OwnerRepositories["units"], "list">;
+  tenantDocuments: Pick<OwnerRepositories["tenantDocuments"], "list" | "get">;
+}
+
+/**
+ * A signed-in tenant's data access (0033, D37): reads only, and only that
+ * tenant's rows - the database enforces it (tenant_reader, RLS on
+ * current_tenant_id()), whatever id a method is passed. There is no write.
+ */
+export interface TenantRepositories extends TenantAccountReads {
+  records: {
+    /** Whether this payment or adjustment is the tenant's own (false for anyone else's). */
+    exists(kind: RecordType, id: string): Promise<boolean>;
+  };
+}
+
+/** Writes the tenant session cookie (an opaque random token); the browser never reads it. */
+export interface TenantSessionCookie {
+  read(): Promise<string | null>;
+  /** HttpOnly, Secure, SameSite=Lax, until `expiresAt`. */
+  write(token: string, expiresAt: Date): Promise<void>;
+  /** Best effort (a Server Component can't set cookies). Never throws. */
+  clear(): Promise<void>;
+}
+
+export type NewTenantSession = Database["public"]["Tables"]["tenant_sessions"]["Insert"];
+
+/**
+ * Work that runs after the response is sent (Next's `after()`), so slow
+ * outside calls - an SMS - don't show in the response time (A32: the timing
+ * mustn't reveal who is a tenant). The task must catch its own errors.
+ */
+export interface AfterResponse {
+  run(task: () => Promise<void>): void;
+}
+
 // ---- System access (bypasses the owner check) - only for flows that authorize some other way:
 // the tenant confirm link (possession of the token), rent-period upkeep, rate limits and cron. ----
 
@@ -549,6 +602,19 @@ export interface SystemRepositories {
   };
   tenants: {
     get(id: string): Promise<Tenant | null>;
+    /** Active and moved-out tenants with this phone, oldest first: who may sign in to the portal with it (A32). */
+    listByPhone(phone: string): Promise<Tenant[]>;
+  };
+  /** Tenant portal sign-ins (0033, A32). */
+  tenantSessions: {
+    create(row: NewTenantSession): Promise<void>;
+    /** The session for this token hash, if not revoked or expired. */
+    findActive(tokenHash: string): Promise<TenantSession | null>;
+    /** Points an active session at one of its phone's tenancies; false if it has ended. */
+    choose(id: string, tenantId: string): Promise<boolean>;
+    revoke(id: string): Promise<void>;
+    /** Drops sessions that ended over a month ago; returns how many. */
+    prune(): Promise<number>;
   };
   occupancy: {
     /** A tenant's tenancies, oldest first. */
@@ -579,6 +645,8 @@ export interface SystemRepositories {
   };
   adjustments: {
     findByTokenHash(tokenHash: string): Promise<Adjustment | null>;
+    /** For the tenant portal's receipt download, after the tenant's own read found it (A32). */
+    get(id: string): Promise<Adjustment | null>;
     listAllocations(adjustmentId: string): Promise<AdjustmentAllocation[]>;
     acknowledge(id: string, patch: AcknowledgementPatch): Promise<boolean>;
   };

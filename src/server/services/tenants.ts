@@ -13,7 +13,6 @@ import type {
 } from "@/lib/contracts";
 import { currentMonthKey } from "@/lib/dates";
 import { summarizeBalance } from "@/lib/domain/allocation";
-import { round2 } from "@/lib/money";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { errorMessage } from "@/lib/errors";
 import type { RentPeriod } from "@/lib/types";
@@ -33,6 +32,7 @@ import type { NewTenant } from "@/server/ports";
 import { parseInput, requireTenant, type OwnerContext } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { db, tenantById, tenantPlacements } from "./loaders";
+import { tenantAccountOf, tenantDetailOf, tenantLedgerOf, tenantMonthsOf } from "./tenantAccount";
 import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
 
@@ -101,36 +101,7 @@ export async function listTenants(_ctx: OwnerContext): Promise<TenantSearchRow[]
 /** The tenant page's profile: who they are, their houses and rents - no money (that's account and ledger). */
 export async function getTenantDetail(_ctx: OwnerContext, tenantId: string): Promise<TenantDetail> {
   const [tenant, placements] = await Promise.all([tenantById(tenantId), tenantPlacements(tenantId)]);
-  const placement = placementOf(placements, tenantId);
-  return {
-    tenant: {
-      id: tenant.id,
-      name: tenant.name,
-      businessName: tenant.business_name,
-      displayName: tenantDisplayName(tenant),
-      phone: tenant.phone,
-      preferredChannel: tenant.preferred_channel,
-      status: tenant.status,
-      tenantKind: tenant.tenant_kind,
-      rentTracked: tenant.rent_tracked,
-      leaseStart: tenant.lease_start,
-      billingStart: tenant.billing_start,
-      depositAmount: tenant.deposit_amount === null ? null : Number(tenant.deposit_amount),
-      movedOutOn: tenant.moved_out_on,
-      monthlyRent: placement.monthlyRent,
-      unitMix: placement.unitMix,
-      currentUnits: placement.houses,
-      unitHistory: (placements.historyByTenant.get(tenantId) ?? []).map((o) => ({
-        unitCode: o.unit_code,
-        startDate: o.start_date,
-        endDate: o.end_date,
-      })),
-      rentHistory: (placements.ratesByTenant.get(tenantId) ?? []).map((r) => ({
-        effectiveMonth: r.effective_month,
-        monthlyAmount: Number(r.monthly_amount),
-      })),
-    },
-  };
+  return tenantDetailOf(tenant, placements);
 }
 
 /**
@@ -141,64 +112,16 @@ export async function getTenantAccount(_ctx: OwnerContext, tenantId: string): Pr
   const tenant = await tenantById(tenantId);
   // Months billed ahead must exist before they're counted as not due yet.
   await ensureRentPeriodsFor(billedTenantIds([tenant]));
-  const s = await (await db()).tenants.accountSummary(tenantId);
-  return {
-    balance: {
-      totalOutstanding: round2(Number(s.total_outstanding)),
-      overdueMonths: s.overdue_months,
-      notYetDue: round2(Number(s.not_yet_due)),
-    },
-    endedMonths: s.ended_months,
-    paidEndedMonths: s.paid_ended_months,
-    canStopRentTracking: s.can_stop_rent_tracking,
-  };
+  return tenantAccountOf(await db(), tenantId);
 }
-
-// The Months table's fields → the columns the Months query reads.
-const MONTH_SORT_COLUMNS = {
-  periodMonth: "period_month",
-  amountDue: "amount_due",
-  amountAllocated: "amount_allocated",
-  status: "status",
-} as const;
-const MONTH_FILTER_COLUMNS = { periodMonth: "month", status: "status" } as const;
 
 /** One page of the tenant's rent months, paged, sorted and searched in SQL (A15). */
 export async function getTenantMonths(_ctx: OwnerContext, tenantId: string, query: unknown): Promise<TenantMonthsPage> {
   const tenant = await tenantById(tenantId);
   const q = parseInput(tenantMonthsQuerySchema, query);
   await ensureRentPeriodsFor(billedTenantIds([tenant]));
-  const result = await (await db()).rentPeriods.page({
-    tenantId,
-    show: q.show,
-    search: q.q || undefined,
-    filters: q.filters.map((f) => ({ ...f, field: MONTH_FILTER_COLUMNS[f.field] })),
-    logic: q.logic,
-    sort: MONTH_SORT_COLUMNS[q.sort],
-    dir: q.dir,
-    page: q.page,
-    pageSize: q.pageSize,
-  });
-  return {
-    rows: result.rows.map((r) => ({
-      id: r.id,
-      periodMonth: r.period_month,
-      amountDue: Number(r.amount_due),
-      amountAllocated: Number(r.amount_allocated),
-      status: r.status,
-      displayStatus: r.display_status,
-      monthLabel: r.month_label,
-    })),
-    total: result.total,
-    all: result.all,
-    page: result.page,
-    totals: { amountDue: result.sums.amount_due, amountAllocated: result.sums.amount_allocated },
-    notYetDue: result.sums.not_yet_due,
-  };
+  return tenantMonthsOf(await db(), tenantId, q);
 }
-
-// The Ledger table's fields → the columns the ledger query reads (the same names).
-const LEDGER_FILTER_COLUMNS = { date: "date", description: "description", status: "status" } as const;
 
 /**
  * One page of the tenant's ledger (charges, payments, adjustments), paged,
@@ -209,51 +132,7 @@ export async function getTenantLedger(_ctx: OwnerContext, tenantId: string, quer
   const tenant = await tenantById(tenantId);
   const q = parseInput(tenantLedgerQuerySchema, query);
   await ensureRentPeriodsFor(billedTenantIds([tenant]));
-  const repos = await db();
-  const result = await repos.ledger.page({
-    tenantId,
-    fromDate: q.from,
-    toDate: q.to,
-    creditsOnly: q.show === "credits",
-    search: q.q || undefined,
-    filters: q.filters.map((f) => ({ ...f, field: LEDGER_FILTER_COLUMNS[f.field] })),
-    logic: q.logic,
-    sort: q.sort,
-    dir: q.dir,
-    page: q.page,
-    pageSize: q.pageSize,
-  });
-  const paymentIds = result.rows.filter((r) => r.type === "payment" && r.ref_id).map((r) => r.ref_id as string);
-  const proofs = paymentIds.length > 0 ? await repos.payments.listProofs(paymentIds) : [];
-  return {
-    rows: result.rows.map((r) => ({
-      id: r.id,
-      type: r.type,
-      date: r.date,
-      description: r.description,
-      caption: r.caption,
-      debit: Number(r.debit),
-      credit: Number(r.credit),
-      balance: Number(r.balance),
-      status: r.status,
-      refId: r.ref_id ?? undefined,
-      receiptNo: r.receipt_no ?? undefined,
-      proofs:
-        r.type === "payment"
-          ? proofs
-              .filter((f) => f.payment_id === r.ref_id)
-              .map((f) => ({ id: f.id, fileName: f.file_name, contentType: f.content_type }))
-          : undefined,
-      acknowledged: r.acknowledged ?? undefined,
-      tags: r.type === "payment" ? r.tags : undefined,
-    })),
-    total: result.total,
-    all: result.all,
-    page: result.page,
-    tenantMessaging: tenantMessagingEnabled(),
-    totals: { debit: result.sums.debit, credit: result.sums.credit },
-    uncountedRows: result.sums.not_counted,
-  };
+  return tenantLedgerOf(await db(), tenantId, q, { tenantMessaging: tenantMessagingEnabled() });
 }
 
 /** Vacant houses in every tower, for "Add tenant" without starting from a tower. */

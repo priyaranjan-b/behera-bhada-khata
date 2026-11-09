@@ -5,7 +5,7 @@ import { ApiError } from "@/lib/errors";
 import type { TenantDocument } from "@/lib/types";
 import { DOCUMENT_LIMITS, uploadTenantDocumentsSchema } from "@/lib/validation";
 import { ownerDb, storage } from "@/server/infra";
-import type { OwnerRepositories } from "@/server/ports";
+import type { OwnerRepositories, TenantAccountReads } from "@/server/ports";
 import {
   notFound,
   parseInput,
@@ -32,7 +32,10 @@ function toView(row: TenantDocument): TenantDocumentView {
   };
 }
 
-export async function listTenantDocuments(db: OwnerRepositories, tenantId: string): Promise<TenantDocumentView[]> {
+export async function listTenantDocuments(
+  db: Pick<TenantAccountReads, "tenantDocuments">,
+  tenantId: string
+): Promise<TenantDocumentView[]> {
   return (await db.tenantDocuments.list(tenantId)).map(toView);
 }
 

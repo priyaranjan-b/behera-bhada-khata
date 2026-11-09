@@ -9,3 +9,4 @@ import "server-only";
 export { drizzleDb } from "./client";
 export { drizzleOwnerRepositories } from "./repositories/owner";
 export { drizzleSystemRepositories } from "./repositories/system";
+export { drizzleTenantRepositories } from "./repositories/tenant";

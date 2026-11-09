@@ -64,7 +64,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D34), see below.
+- **Database:** `docs/database-design.md` (D1–D37), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -88,7 +88,10 @@ test instead.
   tables' footer totals and the phone swipe row of stat cards (A26), and old
   confirm links and password changes (A27), and every figure linking to
   its source data (A28), and the Glass skin (A29), and phone table filters
-  in one bottom sheet (A30). Read it before changing any of these, and add
+  in one bottom sheet (A30), and server-streamed pages with JSON only for
+  what changes per click (the Overview's month), plus the API's no-store
+  and cross-site write check (A31), and the tenant portal: phone sign-in,
+  `/tenant` with no id, read-only (A32). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
@@ -295,6 +298,8 @@ Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-or
            src/server/adapters/supabase/* — the ONLY code importing @supabase:
              sign-in (auth.ts, proxy.ts) and file storage (storage.ts)
            src/server/adapters/twilio/*   — the ONLY code importing twilio
+           src/server/adapters/next/*     — ports Next.js itself provides: the
+             tenant session cookie (next/headers) and AfterResponse (after())
 ```
 
 - **Split a page's data into logical reads, never one big response.** Don't
@@ -349,7 +354,8 @@ Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-or
   `node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md`). It
   sends a signed-out visitor to `/login?next=…` for **every page except the
   public ones** (`isProtectedPath` in `src/lib/routes.ts`: `/login`,
-  `/auth/*`, `/confirm/*` and `/api/*`, which answers 401 itself). It fails
+  `/auth/*`, `/confirm/*`, `/tenant*` (the tenant portal checks its own
+  session, A32) and `/api/*`, which answers 401 itself). It fails
   closed, so a new page is protected without listing it. It also refreshes
   the session cookie (`src/server/adapters/supabase/proxy.ts`). Static files
   skip it through its `matcher`, including the installed-app files
@@ -377,6 +383,17 @@ Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-or
   can set cookies) or posts `#access_token` to `POST /api/auth/session`. The
   tenant-facing `/confirm/[token]` flow has no login at all — auth is the
   token itself.
+- **Tenant portal (A32, D37).** A tenant signs in at `/tenant/login` with
+  their phone and an SMS code (`src/server/services/tenantAuth.ts`) - not
+  Supabase Auth: an opaque session in `tenant_sessions` and an HttpOnly
+  cookie (`tenantCookie` port). `/tenant` (no id; the session says whose)
+  shows their own account read-only through `src/app/api/tenant/**`:
+  GETs only via `tenantRoute`/`tenantLinkRoute` (plus sign in/out), data via
+  `tenantDb()` as the `tenant_reader` role, whose RLS shows that tenant's
+  rows only (`src/server/services/tenantPortal.ts`). A tenant browser is
+  confined to the portal by the proxy (`isTenantAllowedPath`). A new tenant
+  route stays a GET (`test/services/tenantRoutes.test.ts`), and a new
+  `/api/dashboard` route uses `ownerRoute`/`ownerLinkRoute`.
 - Who may sign in: `OWNER_EMAILS` (listed emails may also sign up); unset =
   existing accounts only. `ALLOW_DEV_LOGIN=1` returns the magic link to the
   browser instead of emailing it, and is ignored in production.
@@ -453,8 +470,8 @@ until the tenant-signed copy exists.
   `process.env` anywhere else. A new variable goes in the schema and in
   `.env.local.example`.
 - API routes are one line per method: `ownerRoute` / `publicRoute` /
-  `ownerLinkRoute` / `cronRoute` from `src/server/http.ts` around a service
-  call. Services validate their own input with `zod` schemas from
+  `ownerLinkRoute` / `cronRoute`, or for the tenant portal `tenantRoute` /
+  `tenantLinkRoute` (A32), from `src/server/http.ts` around a service call. Services validate their own input with `zod` schemas from
   `src/lib/validation.ts` (`parseInput`), so validation holds whichever
   transport calls them.
 
@@ -588,7 +605,9 @@ Each of these was found broken somewhere; keep them when adding code.
   `src/server/services/loaders.ts`), each rendered by
   `sections/*.tsx` inside an `AsyncSection` (Suspense + per-card error
   boundary), placed by `OverviewLayout`; the placeholders are one map,
-  `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`. On phones
+  `OVERVIEW_SKELETONS`, shared by the page and `loading.tsx`. ‹ month ›
+  doesn't re-render the page: `OverviewMonthProvider` fetches the month as
+  JSON and only the three month cards reload (A31). On phones
   (A26) every card below the chart is `SectionCard collapseOnPhone` (the
   action cards `startOpen`), hidden in CSS so nothing jumps on load.
 - The tenant page (`tenants/[tenantId]/(profile)/`) is a record page in

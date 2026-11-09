@@ -12,6 +12,7 @@ import {
 } from "@/lib/domain/billing";
 import { MAINTENANCE_FILTER_FIELDS, MAINTENANCE_SORT_FIELDS } from "@/lib/domain/maintenance";
 import { LEDGER_FILTER_FIELDS, LEDGER_SHOWS, LEDGER_SORT_FIELDS } from "@/lib/domain/tenantLedger";
+import { normalizePhone } from "@/lib/domain/phone";
 import { PAYMENTS_FILTER_FIELDS, PAYMENTS_SORT_FIELDS } from "@/lib/domain/payments";
 import {
   MAINTENANCE_CATEGORIES,
@@ -28,9 +29,10 @@ import {
 // it (parseInput in src/server/services/context.ts). Client-safe, so forms
 // can reuse the same rules.
 
-export const phoneE164Schema = z
-  .string()
-  .regex(/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format, e.g. +919876543210");
+/** E.164, as tenants.phone stores it (the tenants_phone_e164 CHECK in 0006 is the same pattern). */
+const PHONE_E164 = /^\+[1-9]\d{7,14}$/;
+
+export const phoneE164Schema = z.string().regex(PHONE_E164, "Phone must be in E.164 format, e.g. +919876543210");
 
 /** A real yyyy-MM-dd calendar date. */
 export const dateKeySchema = z.string().refine(isDateKey, "Use a valid date (yyyy-MM-dd)");
@@ -413,6 +415,44 @@ export const confirmSchema = z.object({
   otpCode: z.string().trim().regex(/^\d{4,10}$/, "Enter the code from the SMS"),
   tenantSignaturePng: signaturePngSchema,
 });
+
+// ---- Tenant portal sign-in (A32) ---------------------------------------------
+
+/** The tenant portal's limits (A32): the forms and the sign-in service read these. */
+export const TENANT_PORTAL_LIMITS = {
+  /** The SMS code's length (Twilio Verify sends 6 digits). */
+  otpLength: 6,
+  /** Longest a typed phone number may be, spaces and dashes included. */
+  phoneInputMaxLength: 20,
+  /**
+   * How long a moved-out tenant may still sign in, in months after the move-out
+   * month: long enough for tax receipts, short enough that a mobile number
+   * reassigned by the operator (after ~90 days unused) doesn't open it for
+   * a stranger for good.
+   */
+  movedOutAccessMonths: 12,
+} as const;
+
+/** The number a tenant signs in with, typed any common way (normalizePhone), as E.164. */
+export const tenantPhoneSchema = z.preprocess(
+  (v) => (typeof v === "string" ? normalizePhone(v) : v),
+  z.string("Enter your mobile number").regex(PHONE_E164, "Enter your 10-digit mobile number")
+);
+
+export const tenantOtpSendSchema = z.object({ phone: tenantPhoneSchema });
+
+export const tenantOtpVerifySchema = z.object({
+  phone: tenantPhoneSchema,
+  code: z
+    .string("Enter the code from the SMS")
+    .trim()
+    .regex(
+      new RegExp(`^\\d{${TENANT_PORTAL_LIMITS.otpLength}}$`),
+      `Enter the ${TENANT_PORTAL_LIMITS.otpLength}-digit code from the SMS`
+    ),
+});
+
+export const tenancyChoiceSchema = z.object({ tenantId: z.uuid("Choose a tenancy") });
 
 // ---- Server-side tables (A14) ---------------------------------------------------
 

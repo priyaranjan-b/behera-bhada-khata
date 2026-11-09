@@ -1041,6 +1041,58 @@ behind it, and the amount couldn't be checked against one.
 
 ---
 
+### D37 — Tenants read their own rows as `tenant_reader`; sessions in `tenant_sessions`
+
+**Decision (0033, A32).** A signed-in tenant reads the database as a role of
+its own, `tenant_reader` (`nologin`, granted to `app_drizzle` with `inherit
+false, set true`, like `authenticated` in D32). `inScope()` switches to it and
+sets `app.tenant_id` from the verified tenant session; `current_tenant_id()`
+reads it.
+- **Policies `to tenant_reader` only**, each `tenant_id =
+  current_tenant_id()` (or the payment's / tenancy's): `tenants`,
+  `rent_periods`, `payments`, `adjustments`, `payment_proofs`,
+  `tenant_units`, `tenant_rent_rates`, `tenant_documents`, and the `units` /
+  `properties` the tenant holds. The owner's policies are untouched, so a
+  signed-in Supabase account that isn't the owner still sees nothing (D1).
+- **SELECT only.** On `payments` / `adjustments` only the columns the page
+  shows: never `token_hash`, signature or PDF paths, `recorded_by`.
+  `payment_record_tags` is readable with no policy, so the ledger query
+  runs and the owner's tags come back empty. No other table, no `auth`
+  schema, no function beyond `current_tenant_id()`.
+- **The same queries as the owner's tenant page** (`tenantLedgerPage`,
+  `tenantMonthsPage`, `tenantAccountSummary`, D29) run unchanged under it;
+  `test/adapters/drizzle/tenantRepositories.test.ts` checks they answer what
+  the owner sees for that tenant, and nothing for another.
+- **`tenant_sessions`**: one row per phone sign-in, the sha256 of a random
+  token (never the token), the phone, the tenancy it reads (null until a
+  phone with several picks one), `expires_at` (7 days), `revoked_at`, a short
+  IP hash. Service role only (RLS on, no policies, revoked from the browser
+  roles). The daily cron deletes rows that ended over 30 days ago.
+- An index on `tenants(phone)` for the sign-in lookup. Phones stay
+  non-unique: one number can hold several tenancies.
+- **Hardened in 0034** (0033 had already run): the migration refuses a
+  `tenant_reader` with SUPERUSER, REPLICATION, BYPASSRLS or LOGIN (as 0027
+  does for `app_drizzle`); every policy reads `(select current_tenant_id())`,
+  once per statement rather than per row; and `recorded_by` is hidden on
+  every table the tenant reads (column grants on `tenant_units`,
+  `tenant_rent_rates`, `tenant_documents` too), so the tenant repositories
+  read those column by column. `test/schema.test.ts` pins the role's exact
+  reach: it may execute `current_tenant_id()` and nothing else, and select
+  exactly the twelve tables and views 0033/0034 grant.
+- **`tenant_sessions` is not audited** (not vital data, and it holds session
+  hashes); a sign-in is the `auth.sign_in` event, actor kind `tenant`.
+
+**Why a role and not `systemDb()` filtered in TS.** The service role bypasses
+RLS, so one missing `where tenant_id = …` would show every tenant. With the
+role, the database refuses it whatever the query says.
+
+**Rejected: tenants as Supabase Auth users (phone OTP).** Their JWT would run
+as `authenticated`, the owner's role, one policy away from owner data, and
+the invoker paging functions (D28) would answer them. It also needs the
+Supabase SMS provider and creates an `auth.users` row per tenant.
+
+---
+
 ## 3. Checklists
 
 **Adding a table**

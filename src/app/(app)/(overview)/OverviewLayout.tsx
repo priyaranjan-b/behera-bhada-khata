@@ -1,6 +1,6 @@
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
-import { STAT_COLUMNS } from "./sections/MonthStats";
+import { STAT_COLUMNS } from "./overviewStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
 
 /**

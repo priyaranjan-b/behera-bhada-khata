@@ -25,7 +25,15 @@ export type JwtClaims = { sub: string };
  * function grants and auth.uid() (the audit actor) apply exactly as they do
  * for the Supabase clients.
  */
-export type Scope = { role: "authenticated"; claims: JwtClaims } | { role: "service_role" };
+export type Scope =
+  | { role: "authenticated"; claims: JwtClaims }
+  | { role: "service_role" }
+  /**
+   * One tenant's own rows, read-only (0033, A32): RLS keys every policy on
+   * current_tenant_id(), set here from the verified tenant session, never
+   * from request input.
+   */
+  | { role: "tenant_reader"; tenantId: string };
 
 /**
  * Per role, set per transaction: a role's own `statement_timeout` (0023)
@@ -33,7 +41,9 @@ export type Scope = { role: "authenticated"; claims: JwtClaims } | { role: "serv
  * 5s. The service role gets the 8s it had over the Supabase API (the
  * `authenticator` login's limit), never unlimited (A17).
  */
-const STATEMENT_TIMEOUT: Record<Scope["role"], string> = { authenticated: "5s", service_role: "8s" };
+const STATEMENT_TIMEOUT: Record<Scope["role"], string> = { authenticated: "5s", service_role: "8s", tenant_reader: "5s" };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Runs `fn` in one transaction as `scope`. Every adapter query goes through
@@ -48,11 +58,15 @@ const STATEMENT_TIMEOUT: Record<Scope["role"], string> = { authenticated: "5s", 
 export function inScope<T>(db: Db, scope: Scope, fn: (tx: Tx) => Promise<T>): Promise<T> {
   const sub = scope.role === "authenticated" ? scope.claims.sub : "";
   const claims = sub ? { sub, role: scope.role } : { role: scope.role };
+  const tenantId = scope.role === "tenant_reader" ? scope.tenantId : "";
+  // Fail closed: a tenant scope without a real id would read nothing anyway, but never run it.
+  if (scope.role === "tenant_reader" && !UUID.test(tenantId)) return Promise.reject(new Error("tenant scope needs a tenant id"));
   return db.transaction(async (tx) => {
     await tx.execute(sql`select
       set_config('role', ${scope.role}, true),
       set_config('request.jwt.claims', ${JSON.stringify(claims)}, true),
       set_config('request.jwt.claim.sub', ${sub}, true),
+      set_config('app.tenant_id', ${tenantId}, true),
       set_config('statement_timeout', ${STATEMENT_TIMEOUT[scope.role]}, true),
       set_config('timezone', 'UTC', true)`);
     return fn(tx as Tx);

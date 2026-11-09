@@ -9,6 +9,7 @@ import { auth } from "@/server/infra";
 import { safeNext } from "@/lib/redirects";
 import { recordSystemEvent } from "./audit";
 import { enforceRateLimits, parseInput, RATE_LIMITS, type OwnerContext, type RequestMeta } from "./context";
+import { endTenantSession } from "./tenantAuth";
 
 /**
  * Who is signed in, and whether they're the owner (an `is_app_owner` call).
@@ -104,6 +105,8 @@ export async function signInWithPassword(body: unknown, meta: RequestMeta): Prom
     await logFailedSignIn(meta, { knownEmail, reason: "not_owner" });
     throw new ApiError(403, NOT_OWNER_MESSAGE);
   }
+  // One identity per browser: the owner signing in ends a tenant portal session here (A32).
+  await endTenantSession();
   await recordSystemEvent({
     action: "auth.sign_in",
     actorKind: "owner",
@@ -127,6 +130,7 @@ async function logFailedSignIn(meta: RequestMeta, context: { knownEmail: boolean
 async function logEmailLinkSignIn(): Promise<void> {
   const session = await auth.getSession();
   if (!session?.isOwner) return;
+  await endTenantSession();
   await recordSystemEvent({
     action: "auth.sign_in",
     actorKind: "owner",

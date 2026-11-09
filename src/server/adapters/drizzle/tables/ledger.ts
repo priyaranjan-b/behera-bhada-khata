@@ -157,3 +157,14 @@ export async function rotateToken(
     .returning({ id: table.id });
   return rows.length > 0;
 }
+
+/**
+ * Whether the payment or adjustment exists for whoever reads it: under
+ * tenant_reader (0033) only the tenant's own. Selects the id alone, the one
+ * column every reader may see.
+ */
+export async function recordExists(tx: Tx, kind: "payment" | "adjustment", id: string): Promise<boolean> {
+  const table = kind === "payment" ? payments : adjustments;
+  const rows = await tx.select({ id: table.id }).from(table).where(eq(table.id, id));
+  return rows.length > 0;
+}

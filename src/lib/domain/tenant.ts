@@ -119,3 +119,20 @@ export function billingStartFor(leaseStart: string, paidThrough: string | null):
   const afterPaid = addMonthsToKey(monthKeyOf(paidThrough), 1);
   return afterPaid > leaseMonth ? afterPaid : leaseMonth;
 }
+
+/**
+ * May this tenant sign in to the tenant portal (A32)? They need a phone, and
+ * to be active - or moved out no more than `movedOutAccessMonths` months ago
+ * (TENANT_PORTAL_LIMITS in src/lib/validation.ts), counted from the move-out
+ * month. Drafts never.
+ */
+export function canUseTenantPortal(
+  tenant: { phone: string | null; status: TenantStatus; moved_out_on: string | null },
+  movedOutAccessMonths: number,
+  thisMonth: string
+): boolean {
+  if (!tenant.phone) return false;
+  if (tenant.status === "active") return true;
+  if (tenant.status !== "inactive" || !tenant.moved_out_on) return false;
+  return monthKeyOf(tenant.moved_out_on) >= addMonthsToKey(thisMonth, -movedOutAccessMonths);
+}

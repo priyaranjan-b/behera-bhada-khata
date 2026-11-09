@@ -296,8 +296,9 @@ How the pieces fit:
 - **Start every call first.** `page.tsx` starts every call before anything
   awaits, so the calls run in parallel.
 - **Key boundaries by their inputs.** Each boundary is keyed by what its
-  data depends on (`monthKey`, the paid-direct view). Switching the month
-  reloads only the month's cards.
+  data depends on (the paid-direct view). Switching the month reloads only
+  the month's cards, fetched as JSON in the browser without a server
+  render (A31).
 - **Shared reads run once.** The tenant list, the `ensure_rent_periods`
   write, placements, rent months, and recent payments and adjustments come
   from loaders wrapped in React `cache()` in
@@ -1123,3 +1124,127 @@ onClear }`, e.g. `formatDayRange`): their chip, the badge and "Clear all". Wide 
 
 **Why.** The owner uses the app on a phone; filtering there was the
 largest and hardest-to-leave screen in the app.
+
+### A31 — Pages stream from the server; a period switch fetches JSON; the API refuses cross-site writes
+
+**Context.** DevTools shows one request per page (the HTML, or a `?_rsc=`
+fetch of `text/x-component`), not one `application/json` call per card,
+which looks as if every figure loads together. It doesn't: each section
+already loads on its own and streams into that one response (A12). The
+question was whether to move every page to browser `GET /api/...` calls,
+the way the server-side tables already page (A14, A15).
+
+**Decision.** A hybrid:
+- **First render: streamed from the server**, as today. The calls start
+  while the HTML streams, the `cache()` loaders share the base reads (the
+  tenant list, the `ensure_rent_periods` top-up, recent rent months) across
+  sections, and the session check and rate limit run once.
+- **What changes on every click: JSON from the browser.** The tables
+  (`useServerGrid`) did this already. Now the Overview's ‹ month › does it
+  too: `OverviewMonthProvider` (`src/app/(app)/(overview)/`) holds the
+  month, the server's month as `initial`, and on ‹ › fetches
+  `api.dashboard.overview.month` in the browser. Only the three month cards
+  (`MonthStats`, `SitesSection`, `TenantTypesSection`, client components
+  that `use()` the promise inside their `AsyncSection`) show their skeleton.
+  The URL follows through `history.replaceState`, and a server render (a
+  reload, "Try again", the paid-direct switch) brings a new `initial` that
+  replaces the fetched month. `PeriodSwitcher`'s `onStep` keeps the arrows
+  as links, so a new tab still opens that month. Before this, a month change
+  re-ran all seven Overview reads for three cards.
+- **API hardening for browser calls** (`src/server/http.ts`): every JSON
+  response, errors included, carries `Cache-Control: private, no-store`
+  (A21: nothing caches owner data), and every route helper refuses a write
+  from another site with a 403 (`isCrossSiteWrite`: `Sec-Fetch-Site:
+  cross-site`, or else an `Origin` that isn't this host) before any handler
+  runs. The Lax session cookie already keeps it off cross-site POSTs; this
+  is the second lock. A request with neither header (curl, a server) passes,
+  because it carries no browser cookies.
+
+**Rejected: every section as a browser fetch.** HTML, then the JS, then
+hydration, then the calls: slower first paint on a phone. Seven function
+calls instead of one, each repeating the base reads, the owner check and a
+rate-limit write (A17). And each card would need its own browser loading
+and error code, which `AsyncSection` gives today for free.
+
+**Apply it** to another period switch (Billing, Earnings) only if its
+re-render costs much more than the cards it changes. Billing's period drives
+nearly every section there, so it stays a navigation.
+
+**Still open (A17):** a nonce `script-src` CSP. `@supabase/ssr` session
+cookies are readable by scripts, so XSS, not the transport, is the bigger
+risk.
+
+### A32 — The tenant portal: phone sign-in, `/tenant`, read-only
+
+**Context.** Tenants asked to see their own rent and download receipts
+without calling the owner. The `/confirm` link (A2) covers one record at a
+time and expires.
+
+**Decision.**
+- **Sign-in by phone + SMS code** (`/tenant/login`,
+  `src/server/services/tenantAuth.ts`). The number is the one the owner
+  recorded (`tenants.phone`, typed any common way, `normalizePhone`); the
+  code goes through the existing Twilio Verify `Messaging` port. Active
+  tenants may sign in, and moved-out ones for
+  `TENANT_PORTAL_LIMITS.movedOutAccessMonths` (12) months after the move-out
+  month (`canUseTenantPortal`): long enough for tax receipts, but operators
+  reassign an unused mobile number after about 90 days, so not for good.
+  Drafts and phone-less Govt tenants never.
+- **Nothing tells a stranger who is a tenant.** "Send code" answers the same
+  for any number, at once: the SMS goes out after the response
+  (`AfterResponse` port, Next's `after()`), so the reply time doesn't depend
+  on Twilio, and a Twilio failure is only logged. A failed check takes at
+  least `VERIFY_MIN_MS` (800 ms) whether or not Twilio was asked (an unknown
+  number never is), and a Twilio error there counts as a wrong code.
+- **Not Supabase Auth.** The app's own session: a random token in an
+  HttpOnly, Secure, SameSite=Lax cookie (`__Host-bbk_tenant` over HTTPS,
+  `TenantSessionCookie` port, `src/server/adapters/next/tenantCookie.ts`),
+  its hash in `tenant_sessions` (D37), 7 days. Every request re-checks the
+  session and that the tenant still has that phone: the owner changing the
+  number ends access at once. One identity per browser: a tenant sign-in
+  signs any owner out, an owner sign-in ends the tenant session.
+- **`/tenant`, no id in the URL.** The session says whose page it is, so
+  there is no id to change or guess. `/tenant/<id>` (an old link) redirects
+  there when it is the session's tenant and is 404 otherwise. A phone with
+  several tenancies picks one at `/tenant/select` (only that phone's).
+- **Read-only, enforced three times.** The tenant API
+  (`src/app/api/tenant/**`) has GETs only, through `tenantRoute` /
+  `tenantLinkRoute`, apart from signing in and out
+  (`test/services/tenantRoutes.test.ts` scans every route file, and that
+  every `/api/dashboard` method uses `ownerRoute`/`ownerLinkRoute`). Its
+  data goes through `tenantDb()` as `tenant_reader` (D37), which can't
+  write. And a tenant has no owner session, so every owner route and SQL
+  function refuses them (401 / `is_app_owner()`).
+- **Confined in the proxy** (UX, not the guard): a browser with a tenant
+  cookie and no owner session may open `/tenant/**`, `/api/tenant/**`,
+  `/confirm/**` and the sign-in pages (`isTenantAllowedPath`); any other page
+  goes to `/tenant`, any other API call is a 403.
+- **What it shows**: name, houses, rent, deposit, house and rent history, the
+  account figures, Payments (the ledger: receipt and proof downloads only, no
+  owner tags, no "signed by tenant"), Months, and Documents (download only)
+  while they're a current tenant: once moved out, none, since the number may
+  have changed hands and ID proofs are the worst thing to hand over. The
+  owner's tenant page components are shared, in the tenant's own words
+  (`TenantDetailsCards`, `AccountStats` with `audience`; `TenantLedgerTable`,
+  `TenantPeriodsGrid` with `source`: "You owe", "You paid", "₹X due" / "paid
+  ahead", never the owner's "To collect"), and the data shaping is
+  `src/server/services/tenantAccount.ts`. The owner's Edit tenant page says
+  the tenant can see the documents.
+- **Abuse limits** (`RATE_LIMITS`): codes 3 per 15 min, 5 per hour and 10 a
+  day per number, 20 per hour per IP, and 200 a day in all against SMS
+  pumping - counted only for a code actually sent, so junk requests can't
+  use it up for every tenant; checks 5 per hour and 10 a day per number, 30
+  per hour per IP; 120 API calls a minute and 30 downloads an hour per
+  session. Downloads are audited as the tenant (`receipt.downloaded`, actor
+  `tenant`). Rate-limit keys and the audit log's IP hold a keyed hash
+  (`keyedHash`, HMAC with the server secret), never the number or IP, and
+  never a plain sha256 a 10-digit number can be brute-forced from. Outside
+  services' errors are logged by code only (`loggableError`): Twilio's
+  messages quote the number.
+- `/tenant` pages are `noindex` and `private, no-store`; the service worker
+  caches no page or API response anyway (A21).
+
+**Ops.** Restrict the Twilio Verify service's geo permissions to India (+91),
+so the sign-in can't be used to text premium numbers abroad. Development
+without Twilio: `ALLOW_DEV_LOGIN=1` makes the code `000000` (never in
+production).

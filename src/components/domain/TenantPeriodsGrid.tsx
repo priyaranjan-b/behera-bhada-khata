@@ -12,6 +12,7 @@ import DataTable, {
   type DataTableColDef,
 } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/domain/StatusChip";
+import { orTenantSignIn } from "@/components/domain/tenantSignedOut";
 import { api } from "@/lib/api-client";
 import type { TenantMonthRow, TenantMonthsPage, TenantMonthsQuery } from "@/lib/contracts";
 import { TENANT_MONTH_DISPLAY_STATUSES, TENANT_MONTH_SHOW_OPTIONS, type TenantMonthShow } from "@/lib/domain/billing";
@@ -19,7 +20,8 @@ import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { statusLabel } from "@/lib/domain/status";
 import { formatMoney } from "@/lib/money";
 
-const columns: DataTableColDef<TenantMonthRow>[] = [
+/** The Months columns; `paidHeader` is the owner's "Allocated" or the tenant's "Paid" (A32). */
+const monthColumns = (paidHeader: string): DataTableColDef<TenantMonthRow>[] => [
   {
     field: "periodMonth",
     headerName: "Month",
@@ -30,7 +32,7 @@ const columns: DataTableColDef<TenantMonthRow>[] = [
     filterOperators: SERVER_TEXT_OPERATORS,
   },
   moneyColumn<TenantMonthRow>("amountDue", "Due", { filterable: false, total: true }),
-  moneyColumn<TenantMonthRow>("amountAllocated", "Allocated", { filterable: false, total: true }),
+  moneyColumn<TenantMonthRow>("amountAllocated", paidHeader, { filterable: false, total: true }),
   // The database filters on the label the column shows.
   selectColumn<TenantMonthRow>("status", "Status", TENANT_MONTH_DISPLAY_STATUSES.map(statusLabel), {
     minWidth: 140,
@@ -40,6 +42,8 @@ const columns: DataTableColDef<TenantMonthRow>[] = [
     renderCell: ({ row }) => <StatusChip status={row.displayStatus} />,
   }),
 ];
+const OWNER_COLUMNS = monthColumns("Allocated");
+const TENANT_COLUMNS = monthColumns("Paid");
 
 interface Extra {
   show: TenantMonthShow;
@@ -60,16 +64,22 @@ const toQuery = (grid: GridQueryParams, extra: Extra): TenantMonthsQuery => ({ .
 /**
  * A tenant's rent months, one page at a time: paging, sort, search and "Show"
  * run in SQL (A15). Loads its first page when mounted (the Months tab, A16).
+ * `source`: the owner's API for one tenant, or the signed-in tenant's own (A32).
  */
-export default function TenantPeriodsGrid({ tenantId }: { tenantId: string }) {
-  const load = useCallback((query: TenantMonthsQuery) => api.dashboard.tenants.months(tenantId, query), [tenantId]);
+export default function TenantPeriodsGrid(props: { source: "owner"; tenantId: string } | { source: "tenant" }) {
+  const tenantId = props.source === "owner" ? props.tenantId : null;
+  const load = useCallback(
+    (query: TenantMonthsQuery) =>
+      tenantId === null ? orTenantSignIn(api.tenant.months(query)) : api.dashboard.tenants.months(tenantId, query),
+    [tenantId]
+  );
   const { data, error, extra, setExtra, gridProps } = useServerGrid({
     empty: EMPTY,
     load,
     toQuery,
     defaultSort: DEFAULT_SORT,
     defaultExtra: DEFAULT_EXTRA,
-    errorText: "Couldn't load the months.",
+    errorText: tenantId === null ? "Couldn't load your rent months." : "Couldn't load the months.",
   });
 
   const filters = useMemo(
@@ -94,7 +104,7 @@ export default function TenantPeriodsGrid({ tenantId }: { tenantId: string }) {
         rows={data.rows}
         columnTotals={data.totals}
         totalsNote={data.notYetDue > 0 ? `Due incl. ${formatMoney(data.notYetDue)} not due yet` : undefined}
-        columns={columns}
+        columns={tenantId === null ? TENANT_COLUMNS : OWNER_COLUMNS}
         {...gridProps}
         filters={filters}
         search={{ placeholder: "Search months…" }}

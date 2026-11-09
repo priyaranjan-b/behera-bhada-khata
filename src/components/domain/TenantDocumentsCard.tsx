@@ -115,7 +115,7 @@ export default function TenantDocumentsCard({
   return (
     <SectionCard
       title="Documents"
-      caption="ID proof, passport photo, rent agreement… Photos or PDFs, kept privately with this tenant."
+      caption="ID proof, passport photo, rent agreement… Photos or PDFs. Your tenant can see and download these when signed in to their account."
       icon={<DescriptionOutlinedIcon />}
       action={
         <LoadingButton

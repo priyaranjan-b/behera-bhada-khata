@@ -15,6 +15,16 @@ export interface OwnerContext {
   email?: string;
 }
 
+/**
+ * Proof that the call is made by a signed-in tenant (built by
+ * getTenantContext in ./tenantAuth from the session cookie, A32). Services
+ * read data only for `tenantId`, never for an id the request names.
+ */
+export interface TenantContext {
+  sessionId: string;
+  tenantId: string;
+}
+
 /** Transport facts a public service needs for abuse control; filled in by src/server/http.ts. */
 export interface RequestMeta {
   /** Best-effort client IP, or "unknown". */
@@ -80,7 +90,38 @@ export const RATE_LIMITS = {
   confirmPerIp: { limit: 30, windowSeconds: HOUR },
   // Guesses at the current password when changing it (S4): a stolen session can't brute-force it.
   passwordChangePerOwner: { limit: 5, windowSeconds: HOUR },
+  // Tenant portal sign-in (A32). Every code is a paid SMS: per number, per
+  // client, and a daily cap on all of them against SMS pumping.
+  tenantOtpPerPhoneShort: { limit: 3, windowSeconds: 15 * MINUTE },
+  tenantOtpPerPhone: { limit: 5, windowSeconds: HOUR },
+  tenantOtpPerPhoneDay: { limit: 10, windowSeconds: DAY },
+  tenantOtpPerIp: { limit: 20, windowSeconds: HOUR },
+  // Counted only for codes actually sent to a tenant, so junk requests can't use it up for everyone.
+  tenantOtpPerDay: { limit: 200, windowSeconds: DAY },
+  tenantVerifyPerPhone: { limit: 5, windowSeconds: HOUR },
+  // About 10 guesses a day at one number, and the real tenant locked out at most until tomorrow.
+  tenantVerifyPerPhoneDay: { limit: 10, windowSeconds: DAY },
+  tenantVerifyPerIp: { limit: 30, windowSeconds: HOUR },
+  // Every tenant API call, and the downloads (receipts render a PDF) on their own.
+  tenantApiPerMinute: { limit: 120, windowSeconds: MINUTE },
+  tenantDownloadsPerHour: { limit: 30, windowSeconds: HOUR },
 } as const;
+
+/**
+ * What may be logged of an error from an outside service: its kind and code,
+ * never the message, which can quote a phone number (Twilio's "Invalid
+ * parameter `To`: +91...").
+ */
+export function loggableError(err: unknown): { name?: string; code?: unknown; status?: unknown } {
+  if (typeof err !== "object" || err === null) return { name: typeof err };
+  const e = err as { name?: unknown; code?: unknown; status?: unknown };
+  return { name: typeof e.name === "string" ? e.name : undefined, code: e.code, status: e.status };
+}
+
+/** Counts one tenant API call against the session's per-minute budget; 429 when it runs out (A32). */
+export async function enforceTenantRateLimit(ctx: TenantContext): Promise<void> {
+  await enforceRateLimits([{ key: `tenant:${ctx.sessionId}`, ...RATE_LIMITS.tenantApiPerMinute }]);
+}
 
 /** Counts one owner API call against the owner's per-minute budget; 429 when it runs out (A17). */
 export async function enforceOwnerRateLimit(ctx: OwnerContext): Promise<void> {

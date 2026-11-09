@@ -421,6 +421,33 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      /** Tenant portal sign-ins (0033, D37, A32): service role only, never read by the browser. */
+      tenant_sessions: {
+        Row: {
+          id: string;
+          /** sha256 of the random token in the browser's cookie; the token itself is never stored. */
+          token_hash: string;
+          phone: string;
+          /** The tenancy the session reads; null until chosen (one phone, several tenancies). */
+          tenant_id: string | null;
+          created_at: string;
+          expires_at: string;
+          revoked_at: string | null;
+          ip_hash: string | null;
+        };
+        Insert: {
+          id?: string;
+          token_hash: string;
+          phone: string;
+          tenant_id?: string | null;
+          created_at?: string;
+          expires_at: string;
+          revoked_at?: string | null;
+          ip_hash?: string | null;
+        };
+        Update: { tenant_id?: string | null; revoked_at?: string | null };
+        Relationships: [];
+      };
       tenant_rent_rates: {
         Row: {
           id: number;
@@ -952,6 +979,7 @@ export type Tenant = Database["public"]["Tables"]["tenants"]["Row"];
 export type TenantUnit = Database["public"]["Tables"]["tenant_units"]["Row"];
 export type TenantRentRate = Database["public"]["Tables"]["tenant_rent_rates"]["Row"];
 export type TenantDocument = Database["public"]["Tables"]["tenant_documents"]["Row"];
+export type TenantSession = Database["public"]["Tables"]["tenant_sessions"]["Row"];
 export type UnitOccupancy = Database["public"]["Views"]["unit_occupancy"]["Row"];
 export type RentPeriod = Database["public"]["Tables"]["rent_periods"]["Row"];
 export type Payment = Database["public"]["Tables"]["payments"]["Row"];

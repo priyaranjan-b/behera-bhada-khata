@@ -12,6 +12,7 @@ import {
   ACKNOWLEDGED_LINK_SECONDS,
   ACKNOWLEDGED_RECEIPT_URL_SECONDS,
   enforceRateLimits,
+  loggableError,
   parseInput,
   RATE_LIMITS,
   SIGNED_URL_SECONDS,
@@ -124,7 +125,7 @@ export async function sendConfirmOtp(token: string, body: unknown, meta: Request
   try {
     await messaging.sendOtp(ctx.tenant.phone);
   } catch (err) {
-    console.error("sendOtp:", err);
+    console.error("sendOtp:", loggableError(err));
     throw new ApiError(502, "Could not send the verification code");
   }
   return { maskedPhone: maskPhone(ctx.tenant.phone) };

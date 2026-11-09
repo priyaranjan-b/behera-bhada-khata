@@ -6,6 +6,7 @@ import { acknowledge, ensureRentPeriods, logEvent } from "../procedures/system";
 import {
   findAdjustmentByTokenHash,
   findPaymentByTokenHash,
+  getAdjustment,
   getPayment,
   listAdjustmentAllocations,
   listPaymentAllocations,
@@ -14,7 +15,14 @@ import {
 } from "../tables/ledger";
 import { getLocation, getProperty, listOccupancy } from "../tables/places";
 import { checkRateLimit, hitRateLimit, pruneRateLimits } from "../tables/rateLimits";
-import { getTenant } from "../tables/tenants";
+import { getTenant, listTenantsByPhone } from "../tables/tenants";
+import {
+  chooseTenantSessionTenancy,
+  createTenantSession,
+  findActiveTenantSession,
+  pruneTenantSessions,
+  revokeTenantSession,
+} from "../tables/tenantSessions";
 
 /**
  * A rate-limit key's kind for a log label, never the IP, id or hash after it:
@@ -76,6 +84,17 @@ export function drizzleSystemRepositories(db: Db): SystemRepositories {
     },
     tenants: {
       get: (id) => asSystem(`get tenant ${id}`, (tx) => getTenant(tx, id)),
+      // Never log the phone.
+      listByPhone: (phone) => asSystem("list tenants by phone", (tx) => listTenantsByPhone(tx, phone)),
+    },
+    // The tenant portal's sessions (A32): never log the token hash or phone.
+    tenantSessions: {
+      create: (row) => writeAsSystem("create tenant session", (tx) => createTenantSession(tx, row)),
+      findActive: (hash) => asSystem("find tenant session", (tx) => findActiveTenantSession(tx, hash)),
+      choose: (id, tenantId) =>
+        writeAsSystem(`choose tenancy ${tenantId} for tenant session ${id}`, (tx) => chooseTenantSessionTenancy(tx, id, tenantId)),
+      revoke: (id) => writeAsSystem(`revoke tenant session ${id}`, (tx) => revokeTenantSession(tx, id)),
+      prune: () => asSystem("prune tenant sessions", pruneTenantSessions),
     },
     occupancy: {
       listForTenant: (tenantId) =>
@@ -101,6 +120,7 @@ export function drizzleSystemRepositories(db: Db): SystemRepositories {
     },
     adjustments: {
       findByTokenHash: (hash) => asSystem("find adjustment by link", (tx) => findAdjustmentByTokenHash(tx, hash)),
+      get: (id) => asSystem(`get adjustment ${id}`, (tx) => getAdjustment(tx, id)),
       listAllocations: (id) => asSystem(`list allocations of adjustment ${id}`, (tx) => listAdjustmentAllocations(tx, id)),
       acknowledge: (id, patch) =>
         writeAsSystem(`acknowledge adjustment ${id}`, (tx) => acknowledge(tx, "adjustment", id, patch)),
