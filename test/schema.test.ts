@@ -2884,3 +2884,22 @@ describe("tenant portal hardening (0034)", () => {
     await run0034();
   });
 });
+
+describe("otp_sessions (0035)", () => {
+  it("is the service role's only, and refuses a reference that expires before it starts", async () => {
+    for (const who of [owner(OWNER_A), owner(OWNER_B)]) {
+      expect(await errorCode(as(who, `select * from otp_sessions`))).toBe("42501");
+    }
+    await db.exec(`set role tenant_reader`);
+    try {
+      expect(await errorCode(db.query(`select * from otp_sessions`))).toBe("42501");
+    } finally {
+      await db.exec(`reset role`);
+    }
+    await as(service, `insert into otp_sessions (key, reference, expires_at) values ('k', 'session-1', now() + interval '15 minutes')`);
+    expect(await as(service, `select reference from otp_sessions`)).toEqual([{ reference: "session-1" }]);
+    expect(
+      await errorCode(as(service, `insert into otp_sessions (key, reference, expires_at) values ('k2', 's', now() - interval '1 minute')`))
+    ).toBe("23514");
+  });
+});

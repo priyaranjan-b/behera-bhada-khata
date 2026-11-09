@@ -650,6 +650,16 @@ export interface SystemRepositories {
     listAllocations(adjustmentId: string): Promise<AdjustmentAllocation[]>;
     acknowledge(id: string, patch: AcknowledgementPatch): Promise<boolean>;
   };
+  /** An SMS code's provider reference between sending and checking it (0035, A34). `key`: a keyed hash of the phone. */
+  otpSessions: {
+    /** Saves the reference, replacing an earlier one for the same key. */
+    save(key: string, reference: string, expiresAt: string): Promise<void>;
+    /** The unexpired reference, or null. */
+    get(key: string): Promise<string | null>;
+    remove(key: string): Promise<void>;
+    /** Drops expired ones; returns how many. */
+    prune(): Promise<number>;
+  };
   rateLimits: {
     /** Records one hit for `key`; false once it's over `limit` hits per `windowSeconds`. */
     hit(key: string, limit: number, windowSeconds: number): Promise<boolean>;
@@ -703,15 +713,33 @@ export interface FileStorage {
   remove(paths: string[]): Promise<void>;
 }
 
-// ---- Messaging (tenant OTP + confirm links) ----
+// ---- SMS one-time codes (tenant sign-in, acknowledging a payment; A34) ----
+
+/**
+ * The provider that sends and checks SMS codes: Twilio Verify or 2Factor,
+ * picked by OTP_PROVIDER. It generates and checks the code itself; the app
+ * never sees or stores one.
+ */
+export interface OtpGateway {
+  /**
+   * Sends a code to the phone. Returns the provider's reference to check it
+   * against (2Factor's session id), or null when it checks by phone alone
+   * (Twilio Verify).
+   */
+  sendOtp(phoneE164: string): Promise<string | null>;
+  /**
+   * True only for the correct, unexpired code - false (not a throw) for a
+   * wrong, expired or unknown one; throws only when the provider can't be
+   * reached or refuses the request.
+   */
+  checkOtp(phoneE164: string, code: string, reference: string | null): Promise<boolean>;
+}
+
+// ---- Messaging (confirm links over WhatsApp / SMS) ----
 
 export type NotifyChannel = PreferredChannel;
 
 export interface Messaging {
-  /** Starts an SMS one-time-code verification. */
-  sendOtp(phoneE164: string): Promise<void>;
-  /** True only for a correct, unexpired code - false (not a throw) for a wrong, expired or unknown one. */
-  checkOtp(phoneE164: string, code: string): Promise<boolean>;
   /** Sends on the preferred channel(s); `delivered` if at least one channel accepted it. */
   send(params: { toPhoneE164: string; channel: NotifyChannel; message: string }): Promise<{ delivered: boolean }>;
 }

@@ -177,6 +177,8 @@ function build() {
     tenantCookie: null as string | null,
     /** Work queued to run after the response (AfterResponse); the fake starts it at once. */
     afterTasks: [] as Promise<void>[],
+    /** Code references by key (otp_sessions, 0035). */
+    otpSessions: new Map<string, string>(),
     /** Newest last; list() returns newest first like the database. */
     audit: [] as AuditLogEntry[],
   };
@@ -634,6 +636,16 @@ function build() {
       acknowledge: vi.fn(async () => true),
     },
     rateLimits: { hit: vi.fn(async () => state.rateLimitAllows), prune: vi.fn(async () => 0) },
+    otpSessions: {
+      save: vi.fn(async (key: string, reference: string) => {
+        state.otpSessions.set(key, reference);
+      }),
+      get: vi.fn(async (key: string) => state.otpSessions.get(key) ?? null),
+      remove: vi.fn(async (key: string) => {
+        state.otpSessions.delete(key);
+      }),
+      prune: vi.fn(async () => 0),
+    },
   };
 
   /**
@@ -700,9 +712,13 @@ function build() {
   };
 
   const messaging = {
-    sendOtp: vi.fn(async () => undefined),
-    checkOtp: vi.fn(async () => true),
     send: vi.fn(async () => ({ delivered: true })),
+  };
+
+  /** The SMS-code provider (A34): Twilio-like by default (checks by phone, no reference). */
+  const otp = {
+    sendOtp: vi.fn(async (_phone: string): Promise<string | null> => null),
+    checkOtp: vi.fn(async (_phone: string, _code: string, _reference: string | null) => true),
   };
 
   const auth = {
@@ -725,7 +741,7 @@ function build() {
     }),
   };
 
-  return { state, owner, system, storage, messaging, auth, tenantRepos, tenantCookie, afterResponse };
+  return { state, owner, system, storage, messaging, otp, auth, tenantRepos, tenantCookie, afterResponse };
 }
 
 export const fakes = build();
@@ -753,6 +769,9 @@ export function infraMock() {
     },
     get messaging() {
       return fakes.messaging;
+    },
+    get otp() {
+      return fakes.otp;
     },
     get auth() {
       return fakes.auth;

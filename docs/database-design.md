@@ -1091,6 +1091,22 @@ as `authenticated`, the owner's role, one policy away from owner data, and
 the invoker paging functions (D28) would answer them. It also needs the
 Supabase SMS provider and creates an `auth.users` row per tenant.
 
+### D38 — `otp_sessions`: an SMS code's provider reference until it is checked
+
+**Decision (0035, A34).** 2Factor checks a code against the session id it
+returned when sending it, and the check comes in a later request, maybe on
+another server instance - so the id is kept in `otp_sessions`: `key` (a
+keyed hash of the phone, `keyedHash`, never the number) as the primary key,
+`reference`, `created_at`, `expires_at` (15 minutes; checked against the
+database clock). One row per phone, upserted by each send. Deleted when the
+code matches; expired rows are dropped by the daily cron. Service role only
+(RLS on, no policies, revoked from the browser roles and `tenant_reader`).
+Not audited: no vital data, and sign-ins are already `auth.sign_in` events.
+
+**Why not keep it in the cookie or the browser.** The reference must not be
+choosable by the client; on the server it can't be swapped for another
+phone's.
+
 ---
 
 ## 3. Checklists

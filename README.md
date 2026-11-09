@@ -89,6 +89,23 @@ payments count, receipts download, and the "send to tenant" step shows as
    once. For production, apply for a WhatsApp Business Platform sender
    through Twilio (takes Meta approval) and use that number instead.
 
+### Cheaper SMS codes in India: 2Factor (optional)
+
+Twilio Verify charges a fee per verification on top of the SMS. For tenant
+sign-in codes in India, 2Factor costs about ₹0.16 per delivered code (failed
+ones are free, no monthly minimum), so ~500 codes a month is roughly ₹80 (A34).
+Links over WhatsApp/SMS stay on Twilio.
+
+1. Sign up at [2factor.in](https://2factor.in), top up the prepaid wallet and
+   copy the **API key** → `TWOFACTOR_API_KEY`.
+2. In the 2Factor dashboard, get your **OTP SMS template** approved on DLT
+   (2Factor files it for you; Indian SMS must use a DLT-registered template).
+   Put its name in `TWOFACTOR_OTP_TEMPLATE`, or leave it empty for 2Factor's
+   default.
+3. Set `OTP_PROVIDER=twofactor` and restart. Run migration
+   `0035_otp_sessions.sql` first: it keeps 2Factor's session id between
+   "send code" and "check code".
+
 ## 3. Configure and run
 
 ```bash

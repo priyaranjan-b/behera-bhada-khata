@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { env, missingTwilioKeys, resetEnvCacheForTests } from "./env";
+import { env, missingTwilioKeys, otpEnabled, resetEnvCacheForTests } from "./env";
 
-const TWILIO = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM"];
+/** What sending links needs; the Verify service SID is only for codes (A34). */
+const TWILIO = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM"];
 
 function production(overrides: Record<string, string>) {
   vi.stubEnv("NODE_ENV", "production");
@@ -11,9 +12,21 @@ function production(overrides: Record<string, string>) {
 
 describe("env in production", () => {
   it("starts without Twilio and reports what is missing", () => {
-    production(Object.fromEntries(TWILIO.map((k) => [k, ""])));
+    production(Object.fromEntries([...TWILIO, "TWILIO_VERIFY_SERVICE_SID"].map((k) => [k, ""])));
     expect(() => env()).not.toThrow();
     expect(missingTwilioKeys()).toEqual(TWILIO);
+    expect(otpEnabled()).toBe(false);
+  });
+
+  it("sends codes through the provider OTP_PROVIDER names, once its keys are set (A34)", () => {
+    production({ OTP_PROVIDER: "twofactor", TWOFACTOR_API_KEY: "" });
+    expect(otpEnabled()).toBe(false);
+    production({ OTP_PROVIDER: "twofactor", TWOFACTOR_API_KEY: "key" });
+    expect(otpEnabled()).toBe(true);
+    production({ OTP_PROVIDER: "twilio" });
+    expect(otpEnabled()).toBe(true);
+    production({ OTP_PROVIDER: "sms-gateway" });
+    expect(() => env()).toThrow();
   });
 
   it("still needs CRON_SECRET", () => {

@@ -14,7 +14,7 @@ which produces a tenant-signed receipt. Payments and corrections are
 append-only — see `supabase/migrations/0001_init.sql`.
 
 Stack: Next.js 16 (App Router) on Vercel, Postgres/Auth/Storage on Supabase,
-Twilio for SMS OTP + WhatsApp/SMS delivery, MUI for UI, `pdf-lib` for
+Twilio (or 2Factor, `OTP_PROVIDER`, A34) for SMS OTP + Twilio for WhatsApp/SMS delivery, MUI for UI, `pdf-lib` for
 receipts, `zod` for validation.
 
 ## Commands
@@ -64,7 +64,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D37), see below.
+- **Database:** `docs/database-design.md` (D1–D38), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -90,7 +90,8 @@ test instead.
   its source data (A28), and the Glass skin (A29), and phone table filters
   in one bottom sheet (A30), and server-streamed pages with JSON only for
   what changes per click (the Overview's month), plus the API's no-store
-  and cross-site write check (A31), and the tenant portal: phone sign-in,
+  and cross-site write check (A31), and SMS codes through Twilio Verify or
+  2Factor (`OTP_PROVIDER`, the `OtpGateway` port; A34), and the tenant portal: phone sign-in,
   `/tenant` with no id, read-only (A32), and phone navigation as a bottom
   bar (A33). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
@@ -299,6 +300,7 @@ Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-or
            src/server/adapters/supabase/* — the ONLY code importing @supabase:
              sign-in (auth.ts, proxy.ts) and file storage (storage.ts)
            src/server/adapters/twilio/*   — the ONLY code importing twilio
+           src/server/adapters/twofactor/* — SMS codes through 2Factor (A34, fetch)
            src/server/adapters/next/*     — ports Next.js itself provides: the
              tenant session cookie (next/headers) and AfterResponse (after())
 ```
@@ -404,8 +406,9 @@ Adapters   src/server/adapters/drizzle/*  — the ONLY code importing drizzle-or
 Optional since 0010: the payment already counts. `/confirm/[token]`
 (tenant-facing, unauthenticated) is served by
 `src/server/services/confirm.ts`: the token is hashed (`src/server/token.ts`)
-and looked up via `systemDb()`; the tenant requests an OTP (the `Messaging`
-port, `src/server/adapters/twilio/messaging.ts`) and posts it with their
+and looked up via `systemDb()`; the tenant requests an OTP (`sendCode` /
+`codeMatches` in `src/server/services/otp.ts` over the `OtpGateway` port,
+Twilio Verify or 2Factor, A34) and posts it with their
 signature to `POST /api/confirm/[token]`, which verifies the OTP, renders the
 PDF (`src/server/pdf/receipt.ts`) **before writing anything**, uploads the
 signature and PDF under a fresh per-attempt folder, then calls

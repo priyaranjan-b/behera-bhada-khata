@@ -31,18 +31,18 @@ async function signIn() {
 describe("sendTenantOtp", () => {
   it("texts a code to a tenant's number, typed any common way", async () => {
     expect(await sendTenantOtp({ phone: "098765-43210" }, meta)).toEqual({});
-    expect(fakes.messaging.sendOtp).toHaveBeenCalledWith(PHONE);
+    expect(fakes.otp.sendOtp).toHaveBeenCalledWith(PHONE);
   });
 
   it("answers the same for a number no tenant has, and sends nothing", async () => {
     expect(await sendTenantOtp({ phone: "+919999999999" }, meta)).toEqual({});
-    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
   });
 
   it("never texts a draft's number", async () => {
     fakes.state.tenants.set(ASHA, tenant({ status: "draft" }));
     await sendTenantOtp({ phone: PHONE }, meta);
-    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
   });
 
   it("refuses a malformed number before anything else", async () => {
@@ -53,7 +53,7 @@ describe("sendTenantOtp", () => {
   it("is rate limited per number (15 minutes, hour, day) and per client, with neither in a key", async () => {
     fakes.state.rateLimitAllows = false;
     await expect(sendTenantOtp({ phone: PHONE }, meta)).rejects.toMatchObject({ status: 429 });
-    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
     const keys = fakes.system.rateLimits.hit.mock.calls.map((c) => (c as unknown[])[0] as string);
     expect(keys.map((k) => k.replace(/:[0-9a-f]{24}$/, ":<hash>"))).toEqual([
       "tenant-otp:phone:<hash>",
@@ -75,7 +75,7 @@ describe("sendTenantOtp", () => {
     await Promise.all(fakes.state.afterTasks);
     expect(fakes.afterResponse.run).toHaveBeenCalledTimes(1);
     expect(hits()).toContain("tenant-otp-day");
-    expect(fakes.messaging.sendOtp).toHaveBeenCalledWith(PHONE);
+    expect(fakes.otp.sendOtp).toHaveBeenCalledWith(PHONE);
   });
 
   it("sends nothing past the cap on all codes, and answers the same", async () => {
@@ -83,13 +83,13 @@ describe("sendTenantOtp", () => {
     fakes.system.rateLimits.hit.mockImplementation((async (key: string) => key !== "tenant-otp-day") as never);
     expect(await sendTenantOtp({ phone: PHONE }, meta)).toEqual({});
     await Promise.all(fakes.state.afterTasks);
-    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
     error.mockRestore();
   });
 
   it("answers the same when Twilio fails: the failure is only logged, without its message", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    fakes.messaging.sendOtp.mockRejectedValueOnce(Object.assign(new Error("Invalid parameter To: +919876543210"), { code: 21211 }));
+    fakes.otp.sendOtp.mockRejectedValueOnce(Object.assign(new Error("Invalid parameter To: +919876543210"), { code: 21211 }));
     expect(await sendTenantOtp({ phone: PHONE }, meta)).toEqual({});
     await Promise.all(fakes.state.afterTasks);
     expect(JSON.stringify(error.mock.calls)).not.toContain("9876543210");
@@ -118,7 +118,7 @@ describe("verifyTenantOtp", () => {
   it("signs in: a hashed session for that tenancy, an HttpOnly cookie, any owner session ended", async () => {
     const { result, session } = await signIn();
     expect(result).toEqual({ next: "/tenant" });
-    expect(fakes.messaging.checkOtp).toHaveBeenCalledWith(PHONE, "123456");
+    expect(fakes.otp.checkOtp).toHaveBeenCalledWith(PHONE, "123456", null);
     expect(session).toMatchObject({ phone: PHONE, tenant_id: ASHA, revoked_at: null });
     // Only the hash is stored; the cookie holds the token.
     expect(fakes.state.tenantCookie).toBeTruthy();
@@ -136,12 +136,12 @@ describe("verifyTenantOtp", () => {
   });
 
   it("refuses a wrong code with the same answer as an unknown number, which never reaches Twilio", async () => {
-    fakes.messaging.checkOtp.mockResolvedValueOnce(false);
+    fakes.otp.checkOtp.mockResolvedValueOnce(false);
     const wrong = await verifyTenantOtp({ phone: PHONE, code: "111111" }, meta).catch((e: unknown) => e);
     const unknown = await verifyTenantOtp({ phone: "+919999999999", code: "111111" }, meta).catch((e: unknown) => e);
     expect(wrong).toMatchObject({ status: 400 });
     expect(unknown).toMatchObject({ status: 400, message: (wrong as Error).message });
-    expect(fakes.messaging.checkOtp).toHaveBeenCalledTimes(1);
+    expect(fakes.otp.checkOtp).toHaveBeenCalledTimes(1);
     expect(fakes.state.tenantSessions.size).toBe(0);
     expect(fakes.state.tenantCookie).toBeNull();
     expect(fakes.state.audit.at(-1)).toMatchObject({ action: "auth.sign_in_failed", actor_kind: "visitor" });
@@ -149,13 +149,13 @@ describe("verifyTenantOtp", () => {
 
   it("refuses a code that isn't 6 digits", async () => {
     await expect(verifyTenantOtp({ phone: PHONE, code: "12345" }, meta)).rejects.toMatchObject({ status: 400 });
-    expect(fakes.messaging.checkOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.checkOtp).not.toHaveBeenCalled();
   });
 
   it("is rate limited before the code is checked", async () => {
     fakes.state.rateLimitAllows = false;
     await expect(verifyTenantOtp({ phone: PHONE, code: "123456" }, meta)).rejects.toMatchObject({ status: 429 });
-    expect(fakes.messaging.checkOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.checkOtp).not.toHaveBeenCalled();
   });
 
   it("lets a moved-out tenant in for a year (their receipts stay theirs), then not", async () => {
@@ -167,7 +167,7 @@ describe("verifyTenantOtp", () => {
 
   it("treats a Twilio failure while checking as a wrong code", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    fakes.messaging.checkOtp.mockRejectedValueOnce(new Error("down"));
+    fakes.otp.checkOtp.mockRejectedValueOnce(new Error("down"));
     await expect(verifyTenantOtp({ phone: PHONE, code: "123456" }, meta)).rejects.toMatchObject({ status: 400 });
     error.mockRestore();
   });

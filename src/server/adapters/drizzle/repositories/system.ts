@@ -15,6 +15,7 @@ import {
 } from "../tables/ledger";
 import { getLocation, getProperty, listOccupancy } from "../tables/places";
 import { checkRateLimit, hitRateLimit, pruneRateLimits } from "../tables/rateLimits";
+import { getOtpSession, pruneOtpSessions, removeOtpSession, saveOtpSession } from "../tables/otpSessions";
 import { getTenant, listTenantsByPhone } from "../tables/tenants";
 import {
   chooseTenantSessionTenancy,
@@ -124,6 +125,13 @@ export function drizzleSystemRepositories(db: Db): SystemRepositories {
       listAllocations: (id) => asSystem(`list allocations of adjustment ${id}`, (tx) => listAdjustmentAllocations(tx, id)),
       acknowledge: (id, patch) =>
         writeAsSystem(`acknowledge adjustment ${id}`, (tx) => acknowledge(tx, "adjustment", id, patch)),
+    },
+    // Keys are keyed hashes of a phone: still never logged.
+    otpSessions: {
+      save: (key, reference, expiresAt) => asSystem("save code reference", (tx) => saveOtpSession(tx, key, reference, expiresAt)),
+      get: (key) => asSystem("get code reference", (tx) => getOtpSession(tx, key)),
+      remove: (key) => asSystem("remove code reference", (tx) => removeOtpSession(tx, key)),
+      prune: () => asSystem("prune code references", pruneOtpSessions),
     },
     rateLimits: {
       // async, so a bad limit is a rejected promise like any other failure.

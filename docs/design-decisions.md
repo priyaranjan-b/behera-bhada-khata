@@ -1283,3 +1283,32 @@ what banking and UPI apps use, so it reads at once and sits under the thumb.
 **Rejected:** a bottom bar per page's sections on owner pages too (it would
 fight the main menu for the same place), and keeping the select (it hides
 that there is anything else).
+
+### A34 — SMS codes through Twilio Verify or 2Factor (`OTP_PROVIDER`)
+
+**Context.** Tenant sign-in (A32) and acknowledging a payment send an SMS
+code. Twilio Verify charges a per-verification fee on top of the SMS to
+India, with no free tier, so even ~500 codes a month cost several thousand
+rupees. No provider sends to India for free at that volume (Firebase Phone
+Auth: ~10 a day free, then ~$0.07 each, and it wants Firebase users and a
+browser reCAPTCHA, which doesn't fit A32's own sessions).
+
+**Decision.** Codes go through their own port, `OtpGateway` (send, check),
+separate from `Messaging` (links over WhatsApp/SMS, still Twilio).
+`OTP_PROVIDER` picks the adapter:
+- `twilio` (default): Twilio Verify, checked by phone number.
+- `twofactor`: 2Factor.in, about ₹0.16 per delivered code, failed ones free,
+  DLT OTP template filed by them (`src/server/adapters/twofactor/otp.ts`,
+  plain `fetch` with a timeout). It answers a send with a session id and
+  checks the code against it, so the id waits in `otp_sessions` (0035, D38)
+  keyed by a keyed hash of the phone; a new code replaces it, a match uses
+  it up, the daily cron drops expired ones. `src/server/services/otp.ts`
+  (`sendCode`, `codeMatches`) does this for both flows.
+- `otpEnabled()` says whether codes can be sent (the chosen provider's
+  keys); `tenantMessagingEnabled()` now only covers links. A provider error
+  is logged by code only (`TwoFactorError`, `loggableError`) and, at a
+  check, counts as a wrong code (A32).
+
+**Rejected:** MSG91 (similar price, a fine second choice behind the same
+port), Firebase Phone Auth (above), a self-run gateway sending our own codes
+(we'd store codes and own DLT registration).

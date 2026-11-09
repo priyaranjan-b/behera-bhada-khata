@@ -421,6 +421,13 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      /** An SMS code's provider reference until it is checked (0035, D38, A34): service role only. */
+      otp_sessions: {
+        Row: { key: string; reference: string; created_at: string; expires_at: string };
+        Insert: { key: string; reference: string; created_at?: string; expires_at: string };
+        Update: { reference?: string; expires_at?: string; created_at?: string };
+        Relationships: [];
+      };
       /** Tenant portal sign-ins (0033, D37, A32): service role only, never read by the browser. */
       tenant_sessions: {
         Row: {

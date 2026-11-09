@@ -81,3 +81,27 @@ describe("tenants.listByPhone", () => {
     expect(await system.tenants.listByPhone("+919999999999")).toEqual([]);
   });
 });
+
+describe("otpSessions", () => {
+  const later = (minutes: number) => new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+  it("saves a reference, replaces it with the next code's, and removes it", async () => {
+    await system.otpSessions.save("k", "session-1", later(15));
+    await system.otpSessions.save("k", "session-2", later(15));
+    expect(await system.otpSessions.get("k")).toBe("session-2");
+    await system.otpSessions.remove("k");
+    expect(await system.otpSessions.get("k")).toBeNull();
+  });
+
+  it("never returns an expired reference, and prunes it", async () => {
+    await l.rows(
+      asService,
+      sql`insert into otp_sessions (key, reference, created_at, expires_at)
+          values ('old', 'session-0', now() - interval '20 minutes', now() - interval '5 minutes')`
+    );
+    await system.otpSessions.save("new", "session-1", later(15));
+    expect(await system.otpSessions.get("old")).toBeNull();
+    expect(await system.otpSessions.prune()).toBe(1);
+    expect(await system.otpSessions.get("new")).toBe("session-1");
+  });
+});

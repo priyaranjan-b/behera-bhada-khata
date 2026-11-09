@@ -10,13 +10,8 @@ const optional = <T extends z.ZodType>(schema: T) =>
 
 const PRODUCTION_REQUIRED = ["CRON_SECRET"] as const;
 
-const TWILIO_KEYS = [
-  "TWILIO_ACCOUNT_SID",
-  "TWILIO_AUTH_TOKEN",
-  "TWILIO_VERIFY_SERVICE_SID",
-  "TWILIO_SMS_FROM",
-  "TWILIO_WHATSAPP_FROM",
-] as const;
+// What sending links needs; the Verify service is only for codes (otpEnabled, A34).
+const TWILIO_KEYS = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_SMS_FROM", "TWILIO_WHATSAPP_FROM"] as const;
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -34,6 +29,13 @@ const schema = z.object({
   TWILIO_VERIFY_SERVICE_SID: optional(z.string()),
   TWILIO_SMS_FROM: optional(z.string()),
   TWILIO_WHATSAPP_FROM: optional(z.string()),
+
+  // Who sends and checks SMS codes (A34): Twilio Verify, or 2Factor (Indian,
+  // about ₹0.16 per delivered code). Links over WhatsApp/SMS stay on Twilio.
+  OTP_PROVIDER: z.enum(["twilio", "twofactor"]).default("twilio"),
+  TWOFACTOR_API_KEY: optional(z.string()),
+  /** The DLT-approved OTP template's name in the 2Factor dashboard; empty = 2Factor's default. */
+  TWOFACTOR_OTP_TEMPLATE: optional(z.string()),
 
   // Optional in development (the cron endpoint then stays locked); required in production - see below.
   CRON_SECRET: optional(z.string().min(16, "CRON_SECRET must be at least 16 characters")),
@@ -61,7 +63,7 @@ export type Env = z.infer<typeof schema>;
  * NEXT_PUBLIC_* variable into the client bundle, so a NEXT_PUBLIC_ copy of
  * one of these is refused at startup instead of being shipped.
  */
-const SERVER_ONLY_SECRETS = ["DATABASE_URL", "SUPABASE_SECRET_KEY", "CRON_SECRET", "TWILIO_AUTH_TOKEN"] as const;
+const SERVER_ONLY_SECRETS = ["DATABASE_URL", "SUPABASE_SECRET_KEY", "CRON_SECRET", "TWILIO_AUTH_TOKEN", "TWOFACTOR_API_KEY"] as const;
 
 /** NEXT_PUBLIC_ copies of the server-only secrets that are set. */
 function leakedSecrets(): string[] {
@@ -126,13 +128,27 @@ export function tenantMessagingEnabled(): boolean {
   return missingTwilioKeys().length === 0;
 }
 
+/**
+ * Whether SMS codes can be sent: the chosen provider (OTP_PROVIDER, A34) has
+ * its keys. Tenant sign-in and acknowledging a payment need it; sending
+ * links needs tenantMessagingEnabled instead.
+ */
+export function otpEnabled(): boolean {
+  const e = env();
+  if (e.OTP_PROVIDER === "twofactor") return Boolean(e.TWOFACTOR_API_KEY);
+  return Boolean(e.TWILIO_ACCOUNT_SID && e.TWILIO_AUTH_TOKEN && e.TWILIO_VERIFY_SERVICE_SID);
+}
+
 /** Called from src/instrumentation.ts. Skipped while `next build` runs, which needs no secrets. */
 export function validateEnvAtStartup(): void {
   if (process.env.NEXT_PHASE === "phase-production-build") return;
   const e = env();
   const missing = missingTwilioKeys();
   if (e.NODE_ENV === "production" && missing.length) {
-    console.warn(`Twilio isn't configured (${missing.join(", ")}): tenants won't get links or OTP codes.`);
+    console.warn(`Twilio isn't configured (${missing.join(", ")}): tenants won't get links.`);
+  }
+  if (e.NODE_ENV === "production" && !otpEnabled()) {
+    console.warn(`SMS codes aren't configured for OTP_PROVIDER=${e.OTP_PROVIDER}: tenants can't sign in or acknowledge.`);
   }
 }
 

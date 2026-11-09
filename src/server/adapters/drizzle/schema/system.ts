@@ -31,3 +31,15 @@ export const tenantSessions = pgTable(
   },
   (t) => [index("tenant_sessions_expires_at_idx").on(t.expires_at)]
 );
+
+// 0035_otp_sessions.sql (D38): an SMS code's provider reference until it is checked.
+export const otpSessions = pgTable(
+  "otp_sessions",
+  {
+    key: text("key").primaryKey(),
+    reference: text("reference").notNull(),
+    created_at: timestamptz("created_at").notNull().default(sql`now()`),
+    expires_at: timestamptz("expires_at").notNull(),
+  },
+  (t) => [index("otp_sessions_expires_at_idx").on(t.expires_at)]
+);

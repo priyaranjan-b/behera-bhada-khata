@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import type { ConfirmView, Confirmed, OtpSent, RecordType } from "@/lib/contracts";
 import { ApiError } from "@/lib/errors";
 import { confirmSchema, otpSendSchema } from "@/lib/validation";
-import { tenantMessagingEnabled } from "@/server/env";
-import { messaging, storage, systemDb } from "@/server/infra";
+import { otpEnabled } from "@/server/env";
+import { storage, systemDb } from "@/server/infra";
 import { hashToken } from "@/server/token";
 import { pngDataUrlToBytes, recordFolder } from "./confirmLinks";
+import { codeMatches, sendCode } from "./otp";
 import { describeRecord, renderReceipt, systemReceiptReads, type RecordDetails } from "./receipts";
 import {
   ACKNOWLEDGED_LINK_SECONDS,
@@ -108,13 +109,14 @@ export async function getConfirmView(token: string): Promise<ConfirmView> {
     unitCodes: ctx.unitCodes,
     maskedPhone: maskPhone(ctx.tenant.phone),
     lineItems: ctx.lineItems,
-    tenantMessaging: tenantMessagingEnabled(),
+    // Acknowledging needs an SMS code (A34).
+    tenantMessaging: otpEnabled(),
   };
 }
 
 export async function sendConfirmOtp(token: string, body: unknown, meta: RequestMeta): Promise<OtpSent> {
   const { recordType } = parseInput(otpSendSchema, withParams(body, { token }));
-  if (!tenantMessagingEnabled()) throw new ApiError(503, "Acknowledging by SMS isn't available yet");
+  if (!otpEnabled()) throw new ApiError(503, "Acknowledging by SMS isn't available yet");
   const ctx = await loadAcknowledgeable(token, recordType);
   // Every send is a paid SMS: cap it per link and per client.
   await enforceRateLimits([
@@ -123,7 +125,7 @@ export async function sendConfirmOtp(token: string, body: unknown, meta: Request
   ]);
 
   try {
-    await messaging.sendOtp(ctx.tenant.phone);
+    await sendCode(ctx.tenant.phone);
   } catch (err) {
     console.error("sendOtp:", loggableError(err));
     throw new ApiError(502, "Could not send the verification code");
@@ -148,7 +150,7 @@ export async function confirmRecord(token: string, body: unknown, meta: RequestM
   ]);
 
   const tenantSignatureBytes = pngDataUrlToBytes(input.tenantSignaturePng);
-  const otpOk = await messaging.checkOtp(ctx.tenant.phone, input.otpCode);
+  const otpOk = await codeMatches(ctx.tenant.phone, input.otpCode);
   if (!otpOk) throw new ApiError(400, "Incorrect or expired code");
 
   const otpVerifiedAt = new Date().toISOString();

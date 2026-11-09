@@ -13,8 +13,8 @@ import {
   tenantOtpSendSchema,
   tenantOtpVerifySchema,
 } from "@/lib/validation";
-import { devLoginEnabled, tenantMessagingEnabled } from "@/server/env";
-import { afterResponse, auth, messaging, systemDb, tenantCookie } from "@/server/infra";
+import { devLoginEnabled, otpEnabled } from "@/server/env";
+import { afterResponse, auth, systemDb, tenantCookie } from "@/server/infra";
 import { hashToken, keyedHash } from "@/server/token";
 import { recordSystemEvent } from "./audit";
 import {
@@ -27,6 +27,7 @@ import {
   type RequestMeta,
   type TenantContext,
 } from "./context";
+import { codeMatches as providerCodeMatches, sendCode } from "./otp";
 import { currentTenancies } from "./placements";
 
 // The tenant portal's sign-in (A32): a tenant proves they hold the phone the
@@ -57,13 +58,13 @@ const IP_LOG_CHARS = 12;
 
 const WRONG_CODE = "That code is wrong or has expired. Check it, or send a new one.";
 
-/** Development's stand-in for Twilio. */
+/** Development's stand-in for the SMS provider. */
 function devOtp(): boolean {
-  return !tenantMessagingEnabled() && devLoginEnabled();
+  return !otpEnabled() && devLoginEnabled();
 }
 
 function requireOtpAvailable(): void {
-  if (!tenantMessagingEnabled() && !devLoginEnabled()) {
+  if (!otpEnabled() && !devLoginEnabled()) {
     throw new ApiError(503, "Signing in with your phone isn't available yet. Ask your landlord for your receipts.");
   }
 }
@@ -111,7 +112,7 @@ export async function sendTenantOtp(body: unknown, meta: RequestMeta): Promise<T
         console.error("tenant sendOtp: the daily cap on sign-in codes is used up; not sent");
         return;
       }
-      await messaging.sendOtp(phone);
+      await sendCode(phone);
     } catch (err) {
       console.error("tenant sendOtp:", loggableError(err));
     }
@@ -119,11 +120,11 @@ export async function sendTenantOtp(body: unknown, meta: RequestMeta): Promise<T
   return {};
 }
 
-/** Whether `code` is the one just sent to `phone`. A Twilio failure counts as a wrong code (logged). */
+/** Whether `code` is the one just sent to `phone`. A provider failure counts as a wrong code (logged). */
 async function codeMatches(phone: string, code: string): Promise<boolean> {
   if (devOtp()) return code === DEV_TENANT_OTP;
   try {
-    return await messaging.checkOtp(phone, code);
+    return await providerCodeMatches(phone, code);
   } catch (err) {
     console.error("tenant checkOtp:", loggableError(err));
     return false;

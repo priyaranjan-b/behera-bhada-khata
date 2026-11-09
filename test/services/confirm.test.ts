@@ -86,7 +86,7 @@ describe("confirmRecord", () => {
   });
 
   it("checks the OTP before storing anything", async () => {
-    fakes.messaging.checkOtp.mockResolvedValueOnce(false);
+    fakes.otp.checkOtp.mockResolvedValueOnce(false);
     expect(await status(confirmRecord("token", body, meta))).toBe(400);
     expect(fakes.storage.upload).not.toHaveBeenCalled();
   });
@@ -94,7 +94,7 @@ describe("confirmRecord", () => {
   it("rejects a signature that isn't really a PNG", async () => {
     const fake = `data:image/png;base64,${Buffer.from("<svg onload=alert(1)>").toString("base64")}`;
     expect(await status(confirmRecord("token", { ...body, tenantSignaturePng: fake }, meta))).toBe(400);
-    expect(fakes.messaging.checkOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.checkOtp).not.toHaveBeenCalled();
   });
 
   it("refuses records that are already acknowledged or whose link expired", async () => {
@@ -110,12 +110,12 @@ describe("sendConfirmOtp", () => {
     await sendConfirmOtp("token", { recordType: "payment" }, meta);
     const keys = (fakes.system.rateLimits.hit.mock.calls as unknown as [string][]).map((c) => c[0]);
     expect(keys).toEqual(["otp:record:00000000-0000-4000-8000-000000000201", "otp:ip:203.0.113.7"]);
-    expect(fakes.messaging.sendOtp).toHaveBeenCalledWith("+919876543210");
+    expect(fakes.otp.sendOtp).toHaveBeenCalledWith("+919876543210");
 
     fakes.state.rateLimitAllows = false;
-    fakes.messaging.sendOtp.mockClear();
+    fakes.otp.sendOtp.mockClear();
     expect(await status(sendConfirmOtp("token", { recordType: "payment" }, meta))).toBe(429);
-    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
   });
 });
 
@@ -126,7 +126,7 @@ describe("without Twilio", () => {
     expect(await getConfirmView("token")).toMatchObject({ isExpired: false, tenantMessaging: false });
     expect(await status(sendConfirmOtp("token", { recordType: "payment" }, meta))).toBe(503);
     expect(fakes.system.rateLimits.hit).not.toHaveBeenCalled();
-    expect(fakes.messaging.sendOtp).not.toHaveBeenCalled();
+    expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
   });
 });
 

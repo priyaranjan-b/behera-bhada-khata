@@ -9,6 +9,7 @@ import type {
   AuthGateway,
   FileStorage,
   Messaging,
+  OtpGateway,
   OwnerRepositories,
   SystemRepositories,
   TenantRepositories,
@@ -17,6 +18,9 @@ import type {
 import { sessionJwtClaims, supabaseAuth } from "@/server/adapters/supabase/auth";
 import { supabaseStorage } from "@/server/adapters/supabase/storage";
 import { twilioMessaging } from "@/server/adapters/twilio/messaging";
+import { twilioOtp } from "@/server/adapters/twilio/otp";
+import { twoFactorOtp } from "@/server/adapters/twofactor/otp";
+import { env } from "@/server/env";
 import {
   drizzleDb,
   drizzleOwnerRepositories,
@@ -63,3 +67,11 @@ export const afterResponse: AfterResponse = nextAfterResponse;
 export const storage: FileStorage = supabaseStorage;
 
 export const messaging: Messaging = twilioMessaging;
+
+/** The SMS-code provider OTP_PROVIDER names (A34), picked per call so the environment is read when needed. */
+const otpProvider = (): OtpGateway => (env().OTP_PROVIDER === "twofactor" ? twoFactorOtp : twilioOtp);
+
+export const otp: OtpGateway = {
+  sendOtp: (phone) => otpProvider().sendOtp(phone),
+  checkOtp: (phone, code, reference) => otpProvider().checkOtp(phone, code, reference),
+};

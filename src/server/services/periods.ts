@@ -66,15 +66,17 @@ export function paidDirectPeriods(
   );
 }
 
-/** Cron: top up periods for every active tenant, drop expired rate-limit counters and old tenant portal sessions (A32). */
+/** Cron: top up periods for every active tenant, drop expired rate-limit counters, old tenant portal sessions (A32) and expired code references (A34). */
 export async function runDailyUpkeep(): Promise<{
   periodsCreated: number;
   rateLimitsPruned: number;
   tenantSessionsPruned: number;
+  otpSessionsPruned: number;
 }> {
   const db = systemDb();
   const periodsCreated = await db.rentPeriods.ensure(null, billedThroughMonth());
   const rateLimitsPruned = await db.rateLimits.prune();
   const tenantSessionsPruned = await db.tenantSessions.prune();
-  return { periodsCreated, rateLimitsPruned, tenantSessionsPruned };
+  const otpSessionsPruned = await db.otpSessions.prune();
+  return { periodsCreated, rateLimitsPruned, tenantSessionsPruned, otpSessionsPruned };
 }

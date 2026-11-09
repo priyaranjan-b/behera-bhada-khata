@@ -11,7 +11,6 @@ function config() {
   return {
     accountSid: e.TWILIO_ACCOUNT_SID!,
     authToken: e.TWILIO_AUTH_TOKEN!,
-    verifyServiceSid: e.TWILIO_VERIFY_SERVICE_SID!,
     smsFrom: e.TWILIO_SMS_FROM!,
     whatsappFrom: e.TWILIO_WHATSAPP_FROM!,
   };
@@ -22,28 +21,8 @@ function client() {
   return twilioClient(accountSid, authToken);
 }
 
-function verifyService() {
-  return client().verify.v2.services(config().verifyServiceSid);
-}
-
-/** Tenant OTP via Twilio Verify; confirm links over WhatsApp and/or SMS. */
+/** Confirm links over WhatsApp and/or SMS (codes are the OtpGateway's: ./otp.ts or 2Factor, A34). */
 export const twilioMessaging: Messaging = {
-  async sendOtp(phoneE164) {
-    await verifyService().verifications.create({ to: phoneE164, channel: "sms" });
-  },
-
-  async checkOtp(phoneE164, code) {
-    try {
-      const check = await verifyService().verificationChecks.create({ to: phoneE164, code });
-      return check.status === "approved";
-    } catch (err) {
-      // Verify answers 404 once a verification is approved, expired or out of
-      // attempts - to the tenant that's just "wrong or expired code".
-      if ((err as { status?: number }).status === 404) return false;
-      throw err;
-    }
-  },
-
   // Best-effort fan-out to whichever channel(s) the tenant prefers. WhatsApp
   // and SMS sends are independent - one failing (e.g. tenant hasn't opted in
   // to the WhatsApp sender yet) shouldn't block the other.
