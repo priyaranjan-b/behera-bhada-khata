@@ -51,6 +51,15 @@ export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: 
   { tab: "addMaintenance", href: routes.maintenance.new(), label: "Record maintenance", icon: <BuildCircleRoundedIcon /> },
 ];
 
+/**
+ * The owner's phone menu (A33, `BottomNavBar` in AppNavbar): the four places
+ * an owner goes most on the go, then "More" for the rest of NAV_ITEMS.
+ */
+export const PHONE_BAR_TABS: readonly AppTab[] = ["summary", "tenants", "payments", "defaulters"];
+
+/** The pages with "Include Govt paid direct": the menus keep it on between them (A24). */
+export const PAID_DIRECT_TABS: ReadonlySet<AppTab> = new Set<AppTab>(["summary", "billing", "earnings"]);
+
 export const SIDEBAR_WIDTH = 240;
 /** Desktop top bar height; the side menu's brand block matches it so their bottom borders line up. */
 export const TOPBAR_HEIGHT = 64;

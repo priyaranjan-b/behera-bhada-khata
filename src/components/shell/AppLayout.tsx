@@ -5,6 +5,7 @@ import Stack from "@mui/material/Stack";
 import { SideMenu } from "@/components/shell/SideMenu";
 import { AppNavbar } from "@/components/shell/AppNavbar";
 import { MOBILE_NAVBAR_HEIGHT } from "@/components/shell/nav";
+import { BOTTOM_NAV_CLEARANCE } from "@/components/ui/BottomNavBar";
 import { Header } from "@/components/shell/Header";
 import { AppBreadcrumbs } from "@/components/shell/AppBreadcrumbs";
 import { appCanvasSx } from "@/components/shell/surface";
@@ -68,7 +69,8 @@ export default function AppLayout({
           spacing={2}
           sx={{
             mx: { xs: 2, sm: 3 },
-            pb: 6,
+            // Phones: the page ends above the bottom menu bar (A33), with the usual gap.
+            pb: { xs: `calc(${BOTTOM_NAV_CLEARANCE} + 24px)`, md: 6 },
             pt: { xs: `${MOBILE_NAVBAR_HEIGHT + 16}px`, md: 3 },
             maxWidth: { sm: "100%", md: 1700 },
           }}

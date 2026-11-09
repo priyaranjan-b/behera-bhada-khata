@@ -483,7 +483,8 @@ one tab per data source:
 
 A Govt tenant paying direct has only Details and Change history.
 
-On phones the tab row is a full-width "Section" select. A table inside a
+On phones the tab row was a full-width "Section" select (replaced in A33 by
+the tab row itself, scrolling sideways, or the bottom bar). A table inside a
 tab drops its own title there (`InTabsContext`): the select already names
 it. The header puts Record payment full width on top, with Edit | Move out
 sharing a row below (`ActionStack phone="primaryOnTop"`).
@@ -1241,6 +1242,11 @@ time and expires.
   never a plain sha256 a 10-digit number can be brute-forced from. Outside
   services' errors are logged by code only (`loggableError`): Twilio's
   messages quote the number.
+- **On phones the sections are the bottom bar (A33)**: `PageTabs
+  phoneNav="bottom"`, Payments, Months, Details, Documents, always in view.
+  Payments comes first and opens by default; Months carries a dot while rent
+  is unpaid and Documents its count; the account cards end "View payments ›"
+  / "View months ›".
 - `/tenant` pages are `noindex` and `private, no-store`; the service worker
   caches no page or API response anyway (A21).
 
@@ -1248,3 +1254,32 @@ time and expires.
 so the sign-in can't be used to text premium numbers abroad. Development
 without Twilio: `ALLOW_DEV_LOGIN=1` makes the code `000000` (never in
 production).
+
+### A33 — Phone navigation is a bar at the bottom of the screen
+
+**Context.** On phones the owner app's pages sat behind a ☰ menu, and a
+page's sections (A16) behind a "Section" select. A tenant on a first visit
+to the portal (A32) took the select for a form field and thought the page
+had nothing more; the ☰ hides the owner's main places the same way.
+
+**Decision.** One phone navigation pattern for the site, `BottomNavBar`
+(`src/components/ui/`): a bar fixed to the bottom of the screen, an icon and
+a short label per item, the current one highlighted, five items at most -
+what banking and UPI apps use, so it reads at once and sits under the thumb.
+- **Owner app** (below `md`, `AppNavbar`): Summary, Tenants, Payments,
+  Defaulters (`PHONE_BAR_TABS`), and More, which slides out the full menu
+  (every page, quick add, Profile, Sign out). More is highlighted on any page
+  not on the bar. The top bar keeps the brand, search and colour mode; the ☰
+  is gone. Links keep "Include Govt paid direct" as the side menu does (A24).
+- **Tenant portal** (below `sm`): its sections are the bar (`PageTabs
+  phoneNav="bottom"`), since it has no other menu.
+- **A page's sections elsewhere** (the owner's tenant page) stay a tab row on
+  phones too, scrolling sideways - the bar is taken by the main menu, and two
+  bars don't stack. The "Section" select is gone everywhere.
+- Pages end above the bar (`BOTTOM_NAV_CLEARANCE`, home-bar inset included),
+  so it never covers a table's last row or pager. Its look is the theme's
+  (`MuiBottomNavigationAction` in `customizations/app.ts`).
+
+**Rejected:** a bottom bar per page's sections on owner pages too (it would
+fight the main menu for the same place), and keeping the select (it hides
+that there is anything else).

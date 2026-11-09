@@ -91,7 +91,8 @@ test instead.
   in one bottom sheet (A30), and server-streamed pages with JSON only for
   what changes per click (the Overview's month), plus the API's no-store
   and cross-site write check (A31), and the tenant portal: phone sign-in,
-  `/tenant` with no id, read-only (A32). Read it before changing any of these, and add
+  `/tenant` with no id, read-only (A32), and phone navigation as a bottom
+  bar (A33). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
@@ -620,8 +621,13 @@ Each of these was found broken somewhere; keep them when adding code.
   `routes.tenants.detail(id, { tab: "ledger" })`. A data component that
   renders several cells exports its own `<Name>Skeleton`
   (`AccountStatsSkeleton`), shared by its fallback and `loading.tsx`.
-- **Phones:** `PageTabs` shows a "Section" select instead of tabs, and
-  `ActionStack phone="primaryOnTop"` puts the primary (last) button on top
+- **Phones (A33):** navigation is a bar at the bottom of the screen,
+  `BottomNavBar` (icon + label per item, five at most): the owner app's menu
+  (`AppNavbar`: Summary, Tenants, Payments, Defaulters, More, which opens the
+  full menu; `PHONE_BAR_TABS` in `nav.tsx`) and the tenant portal's sections
+  (`PageTabs phoneNav="bottom"`). Pages end above it (`BOTTOM_NAV_CLEARANCE`).
+  Elsewhere `PageTabs` stays a tab row that scrolls sideways - never a
+  select. `ActionStack phone="primaryOnTop"` puts the primary (last) button on top
   with the rest two to a row. On phones a `DataTable` toolbar puts the
   title and count on their own line (inside `PageTabs`, where the title is
   hidden, just the count starts the icons' row). Then come search (it

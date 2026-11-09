@@ -11,10 +11,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "@/components/ui/Link";
 import { carryPaidDirect, PAID_DIRECT_PARAM } from "@/lib/preferences";
 import { brand } from "@/theme/themePrimitives";
-import { NAV_ITEMS, QUICK_ADD_ITEMS, type AppTab } from "./nav";
-
-/** The pages with "Include Govt paid direct": the menu keeps it on between them (A24). */
-const PAID_DIRECT_TABS: ReadonlySet<AppTab> = new Set<AppTab>(["summary", "billing", "earnings"]);
+import { NAV_ITEMS, PAID_DIRECT_TABS, QUICK_ADD_ITEMS, type AppTab } from "./nav";
 
 /** CoreUI-style items on the dark desktop side menu (SideMenu); the phone drawer keeps the light look. */
 const contrastItemSx = {

@@ -4,6 +4,7 @@
 import { alpha, type Components, type Theme } from "@mui/material/styles";
 import { alertClasses } from "@mui/material/Alert";
 import { autocompleteClasses } from "@mui/material/Autocomplete";
+import { bottomNavigationActionClasses } from "@mui/material/BottomNavigationAction";
 import { chipClasses } from "@mui/material/Chip";
 import { iconButtonClasses } from "@mui/material/IconButton";
 import { switchClasses } from "@mui/material/Switch";
@@ -377,6 +378,23 @@ export const appCustomizations: Components<Theme> = {
   // An Autocomplete's clear × and dropdown arrow (Tags, Note, Search) sit in
   // its own end slot, not an InputAdornment: the same plain icon, at the
   // 28px its slot is centred for.
+  // The tenant portal's section bar on phones (PageTabs phoneNav="bottom", A32):
+  // grey until chosen, the open section in the brand colour with a bolder
+  // label, every label always shown, and a full-height tap target.
+  MuiBottomNavigationAction: {
+    styleOverrides: {
+      root: ({ theme }) => ({
+        minWidth: 0,
+        minHeight: 56,
+        color: (theme.vars || theme).palette.text.secondary,
+        [`&.${bottomNavigationActionClasses.selected}`]: { color: (theme.vars || theme).palette.primary.main },
+      }),
+      label: {
+        fontSize: "0.75rem",
+        [`&.${bottomNavigationActionClasses.selected}`]: { fontSize: "0.75rem", fontWeight: 600 },
+      },
+    },
+  },
   MuiAutocomplete: {
     variants: [
       {

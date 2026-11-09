@@ -8,7 +8,11 @@ import { PageHeader } from "@/components/ui/DataDisplay";
 import AsyncSection from "@/components/ui/AsyncSection";
 import PageTabs, { type PageTab } from "@/components/ui/PageTabs";
 import { DetailCardSkeleton } from "@/components/ui/Skeletons";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import AccountStats, { AccountStatsSkeleton } from "@/components/domain/AccountStats";
+import DocumentsSectionIcon from "@/components/domain/DocumentsSectionIcon";
+import MonthsSectionIcon from "@/components/domain/MonthsSectionIcon";
 import TenantDetailsCards from "@/components/domain/TenantDetailsCards";
 import TenantDocumentsList from "@/components/domain/TenantDocumentsList";
 import TenantLedgerTable from "@/components/domain/TenantLedgerTable";
@@ -39,19 +43,36 @@ export default async function TenantPortalPage({ searchParams }: PageProps<"/ten
     documents.catch(() => undefined);
   }
 
+  // Payments first: it is what a tenant comes for, so it opens by default on every screen.
   const tabs: (PageTab & { value: TenantPortalTab })[] = [
-    { value: "details", label: "Details", content: <TenantDetailsCards tenant={tenant} audience="tenant" /> },
     ...(account
       ? ([
-          { value: "ledger", label: "Payments", content: <TenantLedgerTable source="tenant" /> },
-          { value: "months", label: "Months", content: <TenantPeriodsGrid source="tenant" /> },
+          {
+            value: "ledger",
+            label: "Payments",
+            icon: <ReceiptLongRoundedIcon />,
+            content: <TenantLedgerTable source="tenant" />,
+          },
+          {
+            value: "months",
+            label: "Months",
+            icon: <MonthsSectionIcon account={account} />,
+            content: <TenantPeriodsGrid source="tenant" />,
+          },
         ] as const)
       : []),
+    {
+      value: "details",
+      label: "Details",
+      icon: <PersonRoundedIcon />,
+      content: <TenantDetailsCards tenant={tenant} audience="tenant" />,
+    },
     ...(documents
       ? ([
           {
             value: "documents",
             label: "Documents",
+            icon: <DocumentsSectionIcon documents={documents} />,
             content: (
               <AsyncSection title="Documents" fallback={<DetailCardSkeleton rows={3} />}>
                 <TenantDocumentsList documents={documents} />
@@ -88,8 +109,8 @@ export default async function TenantPortalPage({ searchParams }: PageProps<"/ten
         </Grid>
       ) : null}
 
-      {/* Phones open Payments: what a tenant comes for is their receipts. */}
-      <PageTabs tabs={tabs} value={tab} version={version} label="Your account" phoneDefault={account ? "ledger" : undefined} />
+      {/* Phones: the sections as a bar at the bottom, always in view, so a first visit can't miss them. */}
+      <PageTabs tabs={tabs} value={tab} version={version} label="Your account" phoneNav="bottom" />
     </Stack>
   );
 }

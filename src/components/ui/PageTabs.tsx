@@ -2,19 +2,20 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Box from "@mui/material/Box";
-import MenuItem from "@mui/material/MenuItem";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
-import TextField from "@mui/material/TextField";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { TAB_PARAM } from "@/lib/routes";
 import { InTabsContext } from "./inTabs";
 import { OPEN_PAGE_TAB_EVENT } from "./openPageTab";
 import { MOBILE_NAVBAR_HEIGHT, TOPBAR_HEIGHT } from "@/components/shell/nav";
+import BottomNavBar, { BOTTOM_NAV_CLEARANCE } from "./BottomNavBar";
 
 export interface PageTab {
   value: string;
   label: string;
+  /** Its icon in the phone bottom bar (`phoneNav="bottom"`); may carry a Badge. */
+  icon?: React.ReactNode;
   /** Rendered the first time the tab is opened, then kept (hidden) while another tab shows. */
   content: React.ReactNode;
 }
@@ -33,9 +34,10 @@ export interface PageTab {
  * reload or a shared link reopens it; a new `value` from the server (e.g. a
  * redirect to `?tab=ledger`) switches to it.
  *
- * On phones the tab row is a full-width "Section" select instead (both are
- * rendered and switched by CSS, so server and browser agree). Panels provide
- * `InTabsContext`, so a table inside drops its own title on phones.
+ * On phones the tab row stays a tab row, scrolling sideways when it doesn't
+ * fit (A33: a "Section" select read as a form field, and readers missed the
+ * other sections). Panels provide `InTabsContext`, so a table inside drops
+ * its own title on phones.
  *
  * Something else on the page opens a tab with `openPageTab` (e.g.
  * `TabStatCard`): in the browser, and the tabs scroll into view, since on a
@@ -44,6 +46,11 @@ export interface PageTab {
  * `phoneDefault` opens another tab on phones when the URL names none (the
  * tenant page opens Ledger there). The server can't know the screen, so it
  * renders the first tab and the phone switches right after hydrating.
+ *
+ * `phoneNav="bottom"` (the tenant portal, A32/A33): on phones the sections
+ * are the `BottomNavBar` instead, each an icon and a label, always in view.
+ * Only for a page with no other bottom bar (the owner app has its menu there)
+ * and at most five tabs, each with an `icon`.
  */
 export default function PageTabs({
   tabs,
@@ -51,6 +58,7 @@ export default function PageTabs({
   version,
   label,
   phoneDefault,
+  phoneNav = "tabs",
 }: {
   tabs: PageTab[];
   /** The tab to open; an unknown value opens the first. */
@@ -61,6 +69,8 @@ export default function PageTabs({
   label: string;
   /** The tab phones open when `value` names none. */
   phoneDefault?: string;
+  /** Phones: the scrollable tab row (default), or the bottom bar (see above). */
+  phoneNav?: "tabs" | "bottom";
 }) {
   const id = useId();
   const valid = (v: string | undefined) => (tabs.some((t) => t.value === v) ? (v as string) : tabs[0].value);
@@ -118,24 +128,27 @@ export default function PageTabs({
 
   return (
     // Scrolled to below the fixed top bar.
-    <Box ref={rootRef} sx={{ minWidth: 0, scrollMarginTop: { xs: MOBILE_NAVBAR_HEIGHT + 8, md: TOPBAR_HEIGHT + 8 } }}>
-      <TextField
-        select
-        fullWidth
-        size="small"
-        label="Section"
-        value={active}
-        onChange={(e) => open(e.target.value)}
-        slotProps={{ htmlInput: { "aria-controls": `${id}-panel-${active}` } }}
-        sx={{ display: { xs: "flex", sm: "none" }, mb: 2 }}
+    <Box
+      ref={rootRef}
+      sx={{
+        minWidth: 0,
+        scrollMarginTop: { xs: MOBILE_NAVBAR_HEIGHT + 8, md: TOPBAR_HEIGHT + 8 },
+        // Room under the last row for the bottom bar, so it never covers the table's pager.
+        pb: phoneNav === "bottom" ? { xs: BOTTOM_NAV_CLEARANCE, sm: 0 } : undefined,
+      }}
+    >
+      {phoneNav === "bottom" ? (
+        <BottomNavBar
+          label={label}
+          hideFrom="sm"
+          value={active}
+          onChange={open}
+          items={tabs.map((t) => ({ value: t.value, label: t.label, icon: t.icon, controls: `${id}-panel-${t.value}` }))}
+        />
+      ) : null}
+      <Box
+        sx={{ display: { xs: phoneNav === "bottom" ? "none" : "block", sm: "block" }, borderBottom: 1, borderColor: "divider", mb: 2 }}
       >
-        {tabs.map((t) => (
-          <MenuItem key={t.value} value={t.value}>
-            {t.label}
-          </MenuItem>
-        ))}
-      </TextField>
-      <Box sx={{ display: { xs: "none", sm: "block" }, borderBottom: 1, borderColor: "divider", mb: 2 }}>
         <Tabs
           value={active}
           onChange={(_, next: string) => open(next)}

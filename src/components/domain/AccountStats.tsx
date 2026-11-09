@@ -70,7 +70,10 @@ export default async function AccountStats({
           variant={balance.totalOutstanding > 0 ? "highlighted" : "default"}
           value={formatMoney(balance.totalOutstanding)}
           tab="ledger"
-          caption={balance.notYetDue > 0 ? `${upTo} · ${formatMoney(balance.notYetDue)} not due yet` : upTo}
+          caption={
+            (balance.notYetDue > 0 ? `${upTo} · ${formatMoney(balance.notYetDue)} not due yet` : upTo) +
+            (audience === "tenant" ? " · View payments ›" : "")
+          }
           badge={balance.totalOutstanding > 0 ? words.owing : words.clear}
         />
       </Grid>
@@ -80,7 +83,10 @@ export default async function AccountStats({
           icon={<EventBusyRoundedIcon />}
           value={String(balance.overdueMonths)}
           tab="months"
-          caption={`${paidEndedMonths} of ${endedMonths} ended month${endedMonths === 1 ? "" : "s"} paid`}
+          caption={
+            `${paidEndedMonths} of ${endedMonths} ended month${endedMonths === 1 ? "" : "s"} paid` +
+            (audience === "tenant" ? " · View months ›" : "")
+          }
           badge={balance.overdueMonths > 0 ? words.behind : words.onTrack}
         />
       </Grid>

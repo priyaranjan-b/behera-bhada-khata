@@ -239,13 +239,16 @@ possible. The kit already does the work below, so use it rather than adding
   phone and desktop through the theme variant in
   `src/theme/customizations/app.ts`. The template's outlined style alone
   greys every colour but secondary, so don't style it ad hoc.
-- **Tabs:** `PageTabs` becomes a full-width "Section" select on phones. Both
-  controls render and CSS switches them, so there is no hydration flash.
-  Don't add a phone variant of your own.
+- **Navigation and tabs (A33):** phones navigate with `BottomNavBar` at the
+  foot of the screen - the owner app's menu (`AppNavbar`, `PHONE_BAR_TABS`)
+  and the tenant portal's sections (`PageTabs phoneNav="bottom"`). On owner
+  pages `PageTabs` stays a tab row that scrolls sideways on phones (the bar
+  is the main menu's). Never a select, and no phone variant of your own. A
+  new top-level page goes in `NAV_ITEMS` (it shows under More on phones).
 - **Tables:** the `DataTable` toolbar is one ~52px row on phones, built in
   `DataTableToolbar.tsx`:
   - the count chip, plus the title unless the table sits in a `PageTabs`
-    panel (`InTabsContext`: the Section select already names it; the title
+    panel (`InTabsContext`: the tab row already names it; the title
     stays for screen readers). The subtitle is hidden on phones;
   - 🔍 opens search across the whole row, and its ✕ clears and closes it;
   - the filter icon opens a bottom sheet (A30, `DataTableFilterSheet`):
