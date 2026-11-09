@@ -1231,8 +1231,10 @@ time and expires.
   ahead", never the owner's "To collect"), and the data shaping is
   `src/server/services/tenantAccount.ts`. The owner's Edit tenant page says
   the tenant can see the documents.
-- **Abuse limits** (`RATE_LIMITS`): codes 3 per 15 min, 5 per hour and 10 a
-  day per number, 20 per hour per IP, and 200 a day in all against SMS
+- **Abuse limits** (`RATE_LIMITS`): codes **4 a day per number**
+  (`otpPerPhonePerDay`, shared by sign-in and acknowledging a payment through
+  `phoneDailyCodeLimit`; "You've asked for 4 codes today", resets 05:30 IST)
+  and 3 per 15 min, 20 per hour per IP, and 200 a day in all against SMS
   pumping - counted only for a code actually sent, so junk requests can't
   use it up for every tenant; checks 5 per hour and 10 a day per number, 30
   per hour per IP; 120 API calls a minute and 30 downloads an hour per

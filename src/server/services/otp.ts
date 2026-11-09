@@ -1,7 +1,22 @@
 import "server-only";
 import { otp, systemDb } from "@/server/infra";
 import { keyedHash } from "@/server/token";
-import { MINUTE } from "./context";
+import { MINUTE, RATE_LIMITS, type RateLimit } from "./context";
+
+/**
+ * The daily budget of codes for one phone number, shared by every flow that
+ * sends one (sign-in, acknowledging a payment): RATE_LIMITS.otpPerPhonePerDay.
+ * Keyed by a keyed hash of the number, never the number.
+ */
+export function phoneDailyCodeLimit(phoneE164: string): RateLimit {
+  const { limit, windowSeconds } = RATE_LIMITS.otpPerPhonePerDay;
+  return {
+    key: `otp-day:phone:${keyedHash(`otp-day:${phoneE164}`).slice(0, 24)}`,
+    limit,
+    windowSeconds,
+    message: `You've asked for ${limit} codes today. Please try again tomorrow.`,
+  };
+}
 
 // Sending and checking an SMS code (A34), whichever provider sends it: the
 // tenant sign-in (./tenantAuth) and acknowledging a payment (./confirm).

@@ -7,7 +7,7 @@ import { otpEnabled } from "@/server/env";
 import { storage, systemDb } from "@/server/infra";
 import { hashToken } from "@/server/token";
 import { pngDataUrlToBytes, recordFolder } from "./confirmLinks";
-import { codeMatches, sendCode } from "./otp";
+import { codeMatches, phoneDailyCodeLimit, sendCode } from "./otp";
 import { describeRecord, renderReceipt, systemReceiptReads, type RecordDetails } from "./receipts";
 import {
   ACKNOWLEDGED_LINK_SECONDS,
@@ -118,10 +118,11 @@ export async function sendConfirmOtp(token: string, body: unknown, meta: Request
   const { recordType } = parseInput(otpSendSchema, withParams(body, { token }));
   if (!otpEnabled()) throw new ApiError(503, "Acknowledging by SMS isn't available yet");
   const ctx = await loadAcknowledgeable(token, recordType);
-  // Every send is a paid SMS: cap it per link and per client.
+  // Every send is a paid SMS: cap it per link, per client, and per phone per day (shared with sign-in).
   await enforceRateLimits([
     { key: `otp:record:${ctx.record.id}`, ...RATE_LIMITS.otpPerRecord },
     { key: `otp:ip:${meta.ip}`, ...RATE_LIMITS.otpPerIp },
+    phoneDailyCodeLimit(ctx.tenant.phone),
   ]);
 
   try {

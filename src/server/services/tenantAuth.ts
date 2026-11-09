@@ -27,7 +27,7 @@ import {
   type RequestMeta,
   type TenantContext,
 } from "./context";
-import { codeMatches as providerCodeMatches, sendCode } from "./otp";
+import { codeMatches as providerCodeMatches, phoneDailyCodeLimit, sendCode } from "./otp";
 import { currentTenancies } from "./placements";
 
 // The tenant portal's sign-in (A32): a tenant proves they hold the phone the
@@ -91,8 +91,8 @@ export async function sendTenantOtp(body: unknown, meta: RequestMeta): Promise<T
   requireOtpAvailable();
   await enforceRateLimits([
     { key: `tenant-otp:phone:${phoneKey(phone)}`, ...RATE_LIMITS.tenantOtpPerPhoneShort },
-    { key: `tenant-otp-hour:phone:${phoneKey(phone)}`, ...RATE_LIMITS.tenantOtpPerPhone },
-    { key: `tenant-otp-day:phone:${phoneKey(phone)}`, ...RATE_LIMITS.tenantOtpPerPhoneDay },
+    // At most RATE_LIMITS.otpPerPhonePerDay codes a day to one number, any flow.
+    phoneDailyCodeLimit(phone),
     { key: `tenant-otp:ip:${ipKey(meta)}`, ...RATE_LIMITS.tenantOtpPerIp },
   ]);
 

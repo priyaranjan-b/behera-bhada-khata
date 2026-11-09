@@ -106,16 +106,33 @@ describe("confirmRecord", () => {
 });
 
 describe("sendConfirmOtp", () => {
-  it("rate-limits per record and per client before sending a paid SMS", async () => {
+  it("rate-limits per record, per client and per phone per day before sending a paid SMS", async () => {
     await sendConfirmOtp("token", { recordType: "payment" }, meta);
     const keys = (fakes.system.rateLimits.hit.mock.calls as unknown as [string][]).map((c) => c[0]);
-    expect(keys).toEqual(["otp:record:00000000-0000-4000-8000-000000000201", "otp:ip:203.0.113.7"]);
+    expect(keys.map((k) => k.replace(/:[0-9a-f]{24}$/, ":<hash>"))).toEqual([
+      "otp:record:00000000-0000-4000-8000-000000000201",
+      "otp:ip:203.0.113.7",
+      "otp-day:phone:<hash>",
+    ]);
     expect(fakes.otp.sendOtp).toHaveBeenCalledWith("+919876543210");
 
     fakes.state.rateLimitAllows = false;
     fakes.otp.sendOtp.mockClear();
     expect(await status(sendConfirmOtp("token", { recordType: "payment" }, meta))).toBe(429);
     expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
+  });
+});
+
+describe("the daily budget of codes per phone", () => {
+  it("is shared with tenant sign-in: the same key for the same number", async () => {
+    const { sendTenantOtp } = await import("@/server/services/tenantAuth");
+    await sendConfirmOtp("token", { recordType: "payment" }, meta);
+    await sendTenantOtp({ phone: "+919876543210" }, meta);
+    const daily = (fakes.system.rateLimits.hit.mock.calls as unknown as [string][])
+      .map((c) => c[0])
+      .filter((k) => k.startsWith("otp-day:phone:"));
+    expect(daily).toHaveLength(2);
+    expect(daily[0]).toBe(daily[1]);
   });
 });
 

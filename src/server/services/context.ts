@@ -58,13 +58,18 @@ export interface RateLimit {
   key: string;
   limit: number;
   windowSeconds: number;
+  /** What the 429 says when this limit is the one exceeded; the generic text otherwise. */
+  message?: string;
 }
 
-/** Counts one hit against each limit; 429 if any of them is exceeded. */
+const TOO_MANY = "Too many attempts. Please wait a while and try again.";
+
+/** Counts one hit against each limit; 429 if any of them is exceeded, with that limit's message if it has one. */
 export async function enforceRateLimits(limits: RateLimit[]): Promise<void> {
   const db = systemDb();
   const allowed = await Promise.all(limits.map((l) => db.rateLimits.hit(l.key, l.limit, l.windowSeconds)));
-  if (allowed.includes(false)) throw new ApiError(429, "Too many attempts. Please wait a while and try again.");
+  const refused = limits.filter((_, i) => !allowed[i]);
+  if (refused.length > 0) throw new ApiError(429, refused.find((l) => l.message)?.message ?? TOO_MANY);
 }
 
 export const MINUTE = 60;
@@ -86,15 +91,18 @@ export const RATE_LIMITS = {
   passwordPerIp: { limit: 30, windowSeconds: HOUR },
   otpPerRecord: { limit: 5, windowSeconds: HOUR },
   otpPerIp: { limit: 20, windowSeconds: HOUR },
+  // Codes one phone number may be sent in a day, sign-in (A32) and
+  // acknowledging a payment together (phoneDailyCodeLimit in ./otp). The day
+  // is the rate-limit window, cut in UTC: it resets at 05:30 IST.
+  otpPerPhonePerDay: { limit: 4, windowSeconds: DAY },
   confirmPerRecord: { limit: 10, windowSeconds: HOUR },
   confirmPerIp: { limit: 30, windowSeconds: HOUR },
   // Guesses at the current password when changing it (S4): a stolen session can't brute-force it.
   passwordChangePerOwner: { limit: 5, windowSeconds: HOUR },
-  // Tenant portal sign-in (A32). Every code is a paid SMS: per number, per
-  // client, and a daily cap on all of them against SMS pumping.
+  // Tenant portal sign-in (A32). Every code is a paid SMS: a burst limit per
+  // number (the daily one is otpPerPhonePerDay), per client, and a daily cap
+  // on all of them against SMS pumping.
   tenantOtpPerPhoneShort: { limit: 3, windowSeconds: 15 * MINUTE },
-  tenantOtpPerPhone: { limit: 5, windowSeconds: HOUR },
-  tenantOtpPerPhoneDay: { limit: 10, windowSeconds: DAY },
   tenantOtpPerIp: { limit: 20, windowSeconds: HOUR },
   // Counted only for codes actually sent to a tenant, so junk requests can't use it up for everyone.
   tenantOtpPerDay: { limit: 200, windowSeconds: DAY },

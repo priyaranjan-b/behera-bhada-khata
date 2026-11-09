@@ -50,20 +50,31 @@ describe("sendTenantOtp", () => {
     expect(fakes.system.rateLimits.hit).not.toHaveBeenCalled();
   });
 
-  it("is rate limited per number (15 minutes, hour, day) and per client, with neither in a key", async () => {
+  it("is rate limited per number (15 minutes, 4 a day) and per client, with neither in a key", async () => {
     fakes.state.rateLimitAllows = false;
     await expect(sendTenantOtp({ phone: PHONE }, meta)).rejects.toMatchObject({ status: 429 });
     expect(fakes.otp.sendOtp).not.toHaveBeenCalled();
     const keys = fakes.system.rateLimits.hit.mock.calls.map((c) => (c as unknown[])[0] as string);
     expect(keys.map((k) => k.replace(/:[0-9a-f]{24}$/, ":<hash>"))).toEqual([
       "tenant-otp:phone:<hash>",
-      "tenant-otp-hour:phone:<hash>",
-      "tenant-otp-day:phone:<hash>",
+      "otp-day:phone:<hash>",
       "tenant-otp:ip:<hash>",
     ]);
     // Never the number or the IP, nor a plain (brute-forceable) sha256 of them.
     expect(keys.join(" ")).not.toMatch(/9876543210|203\.0\.113\.7/);
     expect(keys.join(" ")).not.toContain(hashToken(PHONE).slice(0, 24));
+  });
+
+  it("allows 4 codes a day to one number, then says so", async () => {
+    // Refuse only the daily per-number budget, as the 5th request of the day would be.
+    fakes.system.rateLimits.hit.mockImplementation((async (key: string) => !key.startsWith("otp-day:phone:")) as never);
+    await expect(sendTenantOtp({ phone: PHONE }, meta)).rejects.toMatchObject({
+      status: 429,
+      message: "You've asked for 4 codes today. Please try again tomorrow.",
+    });
+    const daily = fakes.system.rateLimits.hit.mock.calls.find((c) => String((c as unknown[])[0]).startsWith("otp-day:"));
+    expect((daily as unknown[]).slice(1)).toEqual([4, 24 * 3600]);
+    expect(fakes.afterResponse.run).not.toHaveBeenCalled();
   });
 
   it("counts the cap on all codes only for a code actually sent, after the response", async () => {
