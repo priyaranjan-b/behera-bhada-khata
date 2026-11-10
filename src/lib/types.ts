@@ -318,6 +318,8 @@ export interface Database {
           is_active: boolean;
           created_at: string;
           updated_at: string;
+          /** House rent (D39): the last tenant's rent or their share of it; never prices a month. */
+          base_rent: number | null;
         };
         Insert: {
           unit_code: string;
@@ -332,6 +334,7 @@ export interface Database {
           unit_type?: UnitType;
           label?: string | null;
           is_active?: boolean;
+          base_rent?: number | null;
         };
         Relationships: [
           {

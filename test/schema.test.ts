@@ -12,7 +12,8 @@ import { addMonthsToKey, currentMonthKey, formatDateKey, formatDateTime, formatM
 import { monthsIn, paidDirectMonths } from "@/lib/domain/billing";
 import { summarizeBalance } from "@/lib/domain/allocation";
 import { auditActionLabel } from "@/lib/domain/audit";
-import { MAINTENANCE_CATEGORY_LABELS, splitEqually } from "@/lib/domain/maintenance";
+import { splitEqually } from "@/lib/domain/houses";
+import { MAINTENANCE_CATEGORY_LABELS } from "@/lib/domain/maintenance";
 import { PAYMENT_MODE_LABELS } from "@/lib/domain/payments";
 import {
   PREFERRED_CHANNEL_LABELS,
@@ -2860,6 +2861,7 @@ describe("tenant portal hardening (0034)", () => {
       tenant_units: ["recorded_by"],
       tenant_rent_rates: ["recorded_by"],
       tenant_documents: ["recorded_by"],
+      units: ["base_rent"],
     };
     for (const [table, columns] of Object.entries(hidden)) {
       for (const column of columns) {
@@ -2901,5 +2903,46 @@ describe("otp_sessions (0035)", () => {
     expect(
       await errorCode(as(service, `insert into otp_sessions (key, reference, expires_at) values ('k2', 's', now() - interval '1 minute')`))
     ).toBe("23514");
+  });
+});
+
+describe("house rents (0036, D39)", () => {
+  const rentOf = async (code: string) => {
+    const { rows } = await db.query<{ base_rent: string | null }>(`select base_rent from units where unit_code = $1`, [code]);
+    return rows[0].base_rent === null ? null : Number(rows[0].base_rent);
+  };
+  const run0036 = () => db.exec(readFileSync(path.join(MIGRATIONS, "0036_unit_base_rent.sql"), "utf8"));
+
+  it("backfills each house from its current or last tenant, split equally, and runs again cleanly", async () => {
+    // Fixture: Asha holds G01 at 5,000, Bimal G02 at 4,000. Chitra takes G03 + G04 at
+    // 9,000.01 (the odd paisa to G03); Dev had G05 at 7,000 and moved out; G06 was never let.
+    await createTenant(OWNER_A, { name: "Chitra", rent: 9000.01, leaseStart: "2026-01-01", units: ["AC-T1-G04", "AC-T1-G03"] });
+    const dev = await createTenant(OWNER_A, { name: "Dev", rent: 7000, leaseStart: "2025-01-01", units: ["AC-T1-G05"] });
+    await as(owner(OWNER_A), `select move_out_tenant($1, '2025-06-30')`, [dev]);
+    await db.exec(`update units set base_rent = 1234 where unit_code = 'AC-T1-G06'`);
+    await db.exec(`update units set base_rent = null where unit_code <> 'AC-T1-G06'`);
+
+    await run0036();
+    const rents = await Promise.all(["G01", "G02", "G03", "G04", "G05"].map((h) => rentOf(`AC-T1-${h}`)));
+    expect(rents).toEqual([5000, 4000, 4500.01, 4500, 7000]);
+    // A house that already has a rent keeps it (here: one never let, set by hand).
+    expect(await rentOf("AC-T1-G06")).toBe(1234);
+    expect(splitEqually(9000.01, ["AC-T1-G03", "AC-T1-G04"]).map((h) => h.share)).toEqual([4500.01, 4500]);
+  });
+
+  it("is the owner's to set, above zero; another account changes nothing", async () => {
+    await as(owner(OWNER_A), `update units set base_rent = 6500 where unit_code = 'AC-T1-G06'`);
+    expect(await rentOf("AC-T1-G06")).toBe(6500);
+    expect(await errorCode(as(owner(OWNER_A), `update units set base_rent = 0 where unit_code = 'AC-T1-G06'`))).toBe("23514");
+    await as(owner(OWNER_B), `update units set base_rent = 1 where unit_code = 'AC-T1-G06'`);
+    expect(await rentOf("AC-T1-G06")).toBe(6500);
+  });
+
+  it("is written in the house's history as House rent", async () => {
+    await db.exec(`update units set base_rent = 5000 where unit_code = 'AC-T1-G01'`);
+    await db.exec(`truncate audit_log`);
+    await as(owner(OWNER_A), `update units set base_rent = 6000 where unit_code = 'AC-T1-G01'`);
+    const { rows } = await db.query<{ title: string; details: string }>(`select title, details from audit_log`);
+    expect(rows).toEqual([{ title: "House details changed", details: `House rent: ${formatMoney(5000)} → ${formatMoney(6000)}` }]);
   });
 });

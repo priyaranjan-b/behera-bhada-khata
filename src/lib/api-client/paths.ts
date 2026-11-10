@@ -48,6 +48,7 @@ export const apiPaths = {
       list: "/api/dashboard/houses",
       new: "/api/dashboard/houses/new",
       history: (unitCode: string) => `/api/dashboard/houses/${e(unitCode)}/history`,
+      rent: (unitCode: string) => `/api/dashboard/houses/${e(unitCode)}/rent`,
     },
     tenants: {
       list: "/api/dashboard/tenants",

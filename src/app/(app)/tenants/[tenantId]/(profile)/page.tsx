@@ -14,6 +14,7 @@ import MoveOutButton from "@/components/domain/MoveOutButton";
 import AsyncSection from "@/components/ui/AsyncSection";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import CorrectRentButton from "@/components/domain/CorrectRentButton";
+import { rentSplitHouses } from "@/lib/domain/houses";
 import RentTrackingButton from "@/components/domain/RentTrackingButton";
 import TenantDetailsCards from "@/components/domain/TenantDetailsCards";
 import { FLASH, TAB_PARAM, routes, type Flash, type TenantTab } from "@/lib/routes";
@@ -61,7 +62,12 @@ export default async function TenantPage({
       audience="owner"
       rentAction={
         tenant.billingStart && tenant.rentTracked ? (
-          <CorrectRentButton tenantId={tenantId} billingStart={tenant.billingStart} monthlyRent={tenant.monthlyRent} />
+          <CorrectRentButton
+            tenantId={tenantId}
+            billingStart={tenant.billingStart}
+            monthlyRent={tenant.monthlyRent}
+            houses={rentSplitHouses(tenant, tenant.currentUnits)}
+          />
         ) : null
       }
       billingActions={
@@ -153,6 +159,7 @@ export default async function TenantPage({
               tenantId={tenantId}
               leaseStart={tenant.leaseStart}
               agreementRent={tenant.monthlyRent}
+              houses={tenant.currentUnits}
             />
           }
         >

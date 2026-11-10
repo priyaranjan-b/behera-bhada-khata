@@ -13,9 +13,10 @@ import type {
 } from "@/lib/contracts";
 import { currentMonthKey } from "@/lib/dates";
 import { summarizeBalance } from "@/lib/domain/allocation";
+import { rentSplitHouses } from "@/lib/domain/houses";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import { errorMessage } from "@/lib/errors";
-import type { RentPeriod } from "@/lib/types";
+import type { RentPeriod, TenantStatus } from "@/lib/types";
 import {
   correctPaidThroughSchema,
   correctRentSchema,
@@ -28,13 +29,14 @@ import {
 } from "@/lib/validation";
 import { tenantMessagingEnabled } from "@/server/env";
 import { ownerDb } from "@/server/infra";
-import type { NewTenant } from "@/server/ports";
+import type { NewTenant, OwnerRepositories } from "@/server/ports";
 import { parseInput, requireTenant, type OwnerContext } from "./context";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { db, tenantById, tenantPlacements } from "./loaders";
 import { tenantAccountOf, tenantDetailOf, tenantLedgerOf, tenantMonthsOf } from "./tenantAccount";
 import { listTenantDocuments } from "./tenantDocuments";
 import { availableUnits, loadPlacements, placementOf } from "./placements";
+import { houseRentsFor, houseRentsOrEqual } from "./houseRents";
 
 const MAX_BULK_ROWS = 500;
 
@@ -144,8 +146,9 @@ export async function getAnyTowerTenantForm(_ctx: OwnerContext): Promise<AnyTowe
 /** Onboards a tenant onto one or more vacant houses at one combined rent. */
 export async function createTenant(ctx: OwnerContext, body: unknown): Promise<Created> {
   const input = parseInput(createTenantSchema, body);
+  const houseRents = houseRentsFor(input.monthlyRentAmount, input.unitCodes, input.houseRents);
   const db = await ownerDb();
-  const created = await db.tenants.create(toNewTenant(input));
+  const created = await db.tenants.create(toNewTenant(input), houseRents);
   await ensureRentPeriodsFor([created.id]);
   return created;
 }
@@ -171,7 +174,9 @@ export async function bulkCreateTenants(ctx: OwnerContext, rows: unknown): Promi
       continue;
     }
     try {
-      const { id } = await db.tenants.create(toNewTenant(parsed.data));
+      const input = parsed.data;
+      const houseRents = houseRentsOrEqual(input.monthlyRentAmount, input.unitCodes, input.houseRents);
+      const { id } = await db.tenants.create(toNewTenant(input), houseRents);
       createdIds.push(id);
       created += 1;
     } catch (err) {
@@ -224,23 +229,42 @@ export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Pr
 export async function updateTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const input = parseInput(updateTenantSchema, body);
   const db = await ownerDb();
-  await requireTenant(db, tenantId);
-  await db.tenants.update(tenantId, {
-    name: input.name,
-    business_name: input.businessName || null,
-    phone: input.phone ?? null,
-    preferred_channel: input.preferredChannel,
-    unit_codes: input.unitCodes,
-    units_effective: input.unitsEffective ?? null,
-    monthly_rent: input.monthlyRentAmount ?? null,
-    rent_effective_month: input.rentEffectiveMonth ?? null,
-    lease_start: input.leaseStart ?? null,
-    paid_through: input.paidThrough ?? null,
-    deposit_amount: input.depositAmount ?? null,
-    tenant_kind: input.tenantKind ?? null,
-    rent_tracked: input.rentTracked ?? null,
-  });
+  const tenant = await requireTenant(db, tenantId);
+  const placement = placementOf(await loadPlacements(db, [tenantId]), tenantId);
+  // House rents (D39) follow a new rent or house set; editing a phone leaves them.
+  const rent = input.monthlyRentAmount ?? placement.monthlyRent;
+  const changed =
+    rent !== placement.monthlyRent || !sameSet(input.unitCodes, placement.unitCodes) || input.houseRents !== undefined;
+  const houseRents = changed ? houseRentsFor(rent, rentSplitHouses(tenant, input.unitCodes), input.houseRents) : [];
+  await db.tenants.update(
+    tenantId,
+    {
+      name: input.name,
+      business_name: input.businessName || null,
+      phone: input.phone ?? null,
+      preferred_channel: input.preferredChannel,
+      unit_codes: input.unitCodes,
+      units_effective: input.unitsEffective ?? null,
+      monthly_rent: input.monthlyRentAmount ?? null,
+      rent_effective_month: input.rentEffectiveMonth ?? null,
+      lease_start: input.leaseStart ?? null,
+      paid_through: input.paidThrough ?? null,
+      deposit_amount: input.depositAmount ?? null,
+      tenant_kind: input.tenantKind ?? null,
+      rent_tracked: input.rentTracked ?? null,
+    },
+    houseRents
+  );
   await ensureRentPeriodsFor([tenantId]);
+}
+
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((c) => b.includes(c));
+}
+
+/** The houses a rent set on the tenant is split over (rentSplitHouses: none once moved out). */
+async function currentHouses(db: OwnerRepositories, tenantId: string, status: TenantStatus): Promise<string[]> {
+  return rentSplitHouses({ status }, placementOf(await loadPlacements(db, [tenantId]), tenantId).unitCodes);
 }
 
 /** Fixes "rent paid up to" on an active tenant; see correct_paid_through (0014). */
@@ -253,10 +277,12 @@ export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, bo
 
 /** Fixes a rent entered wrongly (correct_rent, 0025); for a real rent change use updateTenant. */
 export async function correctRent(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
-  const { fromMonth, monthlyRent } = parseInput(correctRentSchema, body);
+  const { fromMonth, monthlyRent, houseRents } = parseInput(correctRentSchema, body);
   const db = await ownerDb();
-  await requireTenant(db, tenantId);
-  await db.tenants.correctRent(tenantId, fromMonth, monthlyRent);
+  const tenant = await requireTenant(db, tenantId);
+  // correct_rent replaces every later rate, so this is the rent from now on (D39).
+  const units = await currentHouses(db, tenantId, tenant.status);
+  await db.tenants.correctRent(tenantId, fromMonth, monthlyRent, houseRentsFor(monthlyRent, units, houseRents));
 }
 
 /**
@@ -265,10 +291,17 @@ export async function correctRent(ctx: OwnerContext, tenantId: string, body: unk
  * unpaid ended ones as overdue.
  */
 export async function startRentTracking(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
-  const { monthlyRentAmount, paidThrough } = parseInput(startRentTrackingSchema, body);
+  const { monthlyRentAmount, paidThrough, houseRents } = parseInput(startRentTrackingSchema, body);
   const db = await ownerDb();
-  await requireTenant(db, tenantId);
-  await db.tenants.startRentTracking(tenantId, monthlyRentAmount ?? null, paidThrough ?? null);
+  const tenant = await requireTenant(db, tenantId);
+  // A new rent sets the houses' rents (D39); the agreement rent on file leaves them.
+  const units = monthlyRentAmount ? await currentHouses(db, tenantId, tenant.status) : [];
+  await db.tenants.startRentTracking(
+    tenantId,
+    monthlyRentAmount ?? null,
+    paidThrough ?? null,
+    houseRentsFor(monthlyRentAmount, units, houseRents)
+  );
 }
 
 /** Undoes startRentTracking while nothing is recorded against the months (409 after). */

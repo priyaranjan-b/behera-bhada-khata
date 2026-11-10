@@ -1107,6 +1107,57 @@ Not audited: no vital data, and sign-ins are already `auth.sign_in` events.
 choosable by the client; on the server it can't be swapped for another
 phone's.
 
+### D39 — House rent: what a house goes for, kept while it is vacant
+
+**Decision (0036).** `units.base_rent` (`numeric(12,2)`, null or above
+zero) is what the house goes for: its tenant's rent, or their share of it.
+It is master data and never prices a rent month - `tenant_rent_rates`
+alone does (D9). The owner sees it on /houses and the tower pages, a new
+tenant's rent starts from the chosen houses' rents, and "Set rent" on a
+house changes it by hand.
+
+- **Set with the tenant's rent.** `create_tenant`, `update_tenant` (when
+  the rent or the house set changes), `correct_rent` (active tenants; it
+  replaces every later rate) and `start_rent_tracking` (with a new rent)
+  write the houses' rents in the **same transaction**: the Drizzle
+  repository runs the function, then one `update units … from (values …)`
+  (`withHouseRents`, `setHouseRents`). One house takes the whole rent;
+  several need the owner's split (`houseRents`), one share per house
+  adding up to the rent exactly (`rentSplitProblem` in
+  `src/lib/domain/houses.ts`, checked by the form and the service, 400
+  otherwise); the form starts in proportion to the houses' current rents
+  (`defaultRentSplit`). Bulk upload splits equally. A moved-out tenant's
+  old houses are left alone (`rentSplitHouses`). Moving out changes
+  nothing: that is the point. `setHouseRents` skips houses whose rent is
+  unchanged and throws on a code with no house, rolling the write back.
+- **By hand.** "Set rent" (`PUT …/houses/[unitCode]/rent`: setting one
+  value on a record, like a payment's tags) may disagree with what the
+  tenant pays; the dialog warns ("Save anyway") and the table flags
+  "≠ tenant's rent" under that house (`tenantRentGap`). "What the tenant
+  pays" is their **newest** rate, a rise from next month included, since
+  that is what the houses' rents were set from; a tenant with no rent on
+  file is never flagged. It never changes a tenant's rent.
+- **Backfill.** Each house from its latest tenancy: a current tenant's
+  latest rate, a past one's rate in their last month, split equally over
+  the houses they held then (`maintenance_shares`); never-let houses stay
+  null. Only houses with no rent are filled, so 0036 runs again safely -
+  but a rent the owner cleared on purpose is filled again. **Run 0036
+  before deploying**: the code reads the column on every houses list.
+- **Audited** by the units trigger as "House rent" (`audit_describe`).
+- **Hidden from tenants.** `tenant_reader` gets every `units` column but
+  this one (column grants, as 0034 did for `recorded_by`): a former tenant
+  could otherwise see what their old house goes for now. The tenant
+  repository reads units without it (`withoutRent`).
+
+**Why not inside the SQL functions.** It moves no money and checks nothing
+the ledger relies on, so re-signing four functions (and their Drizzle
+wrappers and grants) for it wasn't worth it; the shared transaction gives
+the same all-or-nothing.
+
+**Why not a dated history table.** Only the latest figure is needed to
+price the next tenant; the audit log already keeps every change with old
+and new values.
+
 ---
 
 ## 3. Checklists

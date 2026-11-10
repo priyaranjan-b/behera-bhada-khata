@@ -33,6 +33,16 @@ export function rentInEffect(rates: TenantRentRate[], monthKey = currentMonthKey
 }
 
 /**
+ * The newest rent on file, even one that starts in a later month: what a
+ * rent rise has made the tenant's rent, and so what their houses' rents
+ * (D39) add up to. 0 with no rate.
+ */
+export function latestRent(rates: TenantRentRate[]): number {
+  const newest = [...rates].sort((a, b) => a.effective_month.localeCompare(b.effective_month)).pop();
+  return newest ? Number(newest.monthly_amount) : 0;
+}
+
+/**
  * Each tower's monthly rent from its current occupants. Rent is per tenant,
  * so a tenant with houses in several towers is split evenly across the
  * houses they live in today; the towers then add up to the true total.
@@ -95,6 +105,8 @@ export interface TenantPlacement {
   /** Tower name(s) of the current houses, e.g. "Tower 1" or "Tower 1, Tower 2". */
   propertyName: string;
   monthlyRent: number;
+  /** The newest rate, a rise from a later month included (latestRent). */
+  latestRent: number;
 }
 
 export function placementOf(p: Placements, tenantId: string): TenantPlacement {
@@ -108,6 +120,7 @@ export function placementOf(p: Placements, tenantId: string): TenantPlacement {
         propertyName: p.propertiesByCode.get(o.property_code)?.name ?? o.property_code,
         unitType: unit?.unit_type ?? "residential",
         label: unit?.label ?? null,
+        baseRent: unit?.base_rent == null ? null : Number(unit.base_rent),
       };
     })
     .sort((a, b) => a.unitCode.localeCompare(b.unitCode));
@@ -117,6 +130,7 @@ export function placementOf(p: Placements, tenantId: string): TenantPlacement {
     unitMix: unitMix(houses.map((h) => h.unitType)),
     propertyName: [...new Set(houses.map((h) => h.propertyName))].join(", ") || NOT_SET,
     monthlyRent: rentInEffect(p.ratesByTenant.get(tenantId) ?? []),
+    latestRent: latestRent(p.ratesByTenant.get(tenantId) ?? []),
   };
 }
 
@@ -145,5 +159,6 @@ export async function availableUnits(db: OwnerRepositories, exceptTenantId?: str
       unitType: u.unit_type,
       label: u.label,
       floor: u.floor,
+      baseRent: u.base_rent == null ? null : Number(u.base_rent),
     }));
 }

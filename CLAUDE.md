@@ -64,7 +64,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D38), see below.
+- **Database:** `docs/database-design.md` (D1–D39), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -122,6 +122,12 @@ both together.
   40 houses), which also claims ownership for the email you put in it. Houses
   are pure master data: who occupies them is a tenant, never a column on
   `units`.
+- **House rent** (`0036_unit_base_rent.sql`, D39): `units.base_rent`, what a
+  house goes for, kept while it is vacant. Written with the tenant's rent in
+  the same transaction (several houses: the owner's split must add up,
+  `rentSplitProblem` / `useRentSplit` + `RentSplitField`), or by hand via
+  "Set rent" on /houses (`HouseRentDialog`, warns when it disagrees with the
+  tenant). Never prices a month; hidden from `tenant_reader`.
 - **Draft tenants** (`0007_draft_tenants.sql`): `tenants.status` is `draft |
   active | inactive`. The register's 26 occupants
   (`supabase/seed/arnapal_tenants.sql`, gitignored: real names stay local)

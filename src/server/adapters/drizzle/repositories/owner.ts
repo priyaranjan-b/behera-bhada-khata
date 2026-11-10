@@ -1,5 +1,5 @@
 import "server-only";
-import type { OwnerRepositories } from "@/server/ports";
+import type { HouseRent, OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must, mustWrite } from "../errors";
 import { createAdjustment, createPayment } from "../procedures/ledger";
@@ -66,7 +66,16 @@ import {
   setRecordTags,
   updatePaymentTag,
 } from "../tables/paymentTags";
-import { createProperty, createUnit, getProperty, listLocations, listOccupancy, listProperties, listUnits } from "../tables/places";
+import {
+  createProperty,
+  createUnit,
+  getProperty,
+  listLocations,
+  listOccupancy,
+  listProperties,
+  listUnits,
+  setHouseRents,
+} from "../tables/places";
 import { getTenant, listRentRates, listTenants } from "../tables/tenants";
 
 /**
@@ -86,6 +95,21 @@ function pageLabel(f: {
 }): string {
   const range = f.from || f.to ? `${f.from ?? ""}..${f.to ?? ""} ` : "";
   return `${range}page ${f.page}x${f.pageSize} by ${f.sort} ${f.dir}, ${f.filters.length} filters${f.search ? ", searched" : ""}`;
+}
+
+/** The houses in a house-rent write, for its error label (codes only, never amounts). */
+function houseCodes(rents: HouseRent[]): string {
+  return rents.length ? rents.map((r) => r.unit_code).join(",") : "none";
+}
+
+/**
+ * A tenant write, then the houses' rents it set (D39), in the same
+ * transaction: if either fails, neither is kept.
+ */
+async function withHouseRents<T>(tx: Tx, rents: HouseRent[], write: () => Promise<T>): Promise<T> {
+  const result = await write();
+  await setHouseRents(tx, rents);
+  return result;
 }
 
 /**
@@ -158,6 +182,7 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
     units: {
       list: (filter) => read("list units", (tx) => listUnits(tx, filter)),
       create: (input) => write(`create unit ${input.unit_code}`, (tx) => createUnit(tx, input)),
+      setRents: (rents) => write(`set rent of houses ${houseCodes(rents)}`, (tx) => setHouseRents(tx, rents)),
     },
     occupancy: {
       list: (filter) =>
@@ -180,15 +205,25 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       accountSummary: (id) => read(`read tenant account ${id}`, (tx) => tenantAccountSummary(tx, id)),
       list: (filter) => read("list tenants", (tx) => listTenants(tx, filter)),
       get: (id) => read(`get tenant ${id}`, (tx) => getTenant(tx, id)),
-      create: (input) => write("create tenant", (tx) => createTenant(tx, input)),
-      update: (id, changes) => write(`update tenant ${id}`, (tx) => updateTenant(tx, id, changes)),
+      create: (input, houseRents = []) =>
+        write(`create tenant, house rents ${houseCodes(houseRents)}`, (tx) =>
+          withHouseRents(tx, houseRents, () => createTenant(tx, input))
+        ),
+      update: (id, changes, houseRents = []) =>
+        write(`update tenant ${id}, house rents ${houseCodes(houseRents)}`, (tx) =>
+          withHouseRents(tx, houseRents, () => updateTenant(tx, id, changes))
+        ),
       moveOut: (id, date) => write(`move out tenant ${id}`, (tx) => moveOutTenant(tx, id, date)),
       correctPaidThrough: (id, paidThrough) =>
         write(`correct paid up to of tenant ${id}`, (tx) => correctPaidThrough(tx, id, paidThrough)),
-      correctRent: (id, fromMonth, monthlyRent) =>
-        write(`correct rent of tenant ${id} from ${fromMonth}`, (tx) => correctRent(tx, id, fromMonth, monthlyRent)),
-      startRentTracking: (id, monthlyRent, paidThrough) =>
-        write(`start rent tracking of tenant ${id}`, (tx) => startRentTracking(tx, id, monthlyRent, paidThrough)),
+      correctRent: (id, fromMonth, monthlyRent, houseRents = []) =>
+        write(`correct rent of tenant ${id} from ${fromMonth}, house rents ${houseCodes(houseRents)}`, (tx) =>
+          withHouseRents(tx, houseRents, () => correctRent(tx, id, fromMonth, monthlyRent))
+        ),
+      startRentTracking: (id, monthlyRent, paidThrough, houseRents = []) =>
+        write(`start rent tracking of tenant ${id}, house rents ${houseCodes(houseRents)}`, (tx) =>
+          withHouseRents(tx, houseRents, () => startRentTracking(tx, id, monthlyRent, paidThrough))
+        ),
       stopRentTracking: (id) => write(`stop rent tracking of tenant ${id}`, (tx) => stopRentTracking(tx, id)),
     },
     billing: {

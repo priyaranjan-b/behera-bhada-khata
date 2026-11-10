@@ -17,15 +17,18 @@ import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf, monthsBetween
 import { billingStartFor } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
+import RentSplitField from "./RentSplitField";
+import { useRentSplit, type RentSplitHouse } from "./useRentSplit";
 
 /**
  * Turns rent tracking on for a government tenant whose rent goes to the
  * owner's bank directly (start_rent_tracking, 0016): billing starts the month
- * after "rent paid up to". `mode="stop"` undoes it while nothing is recorded.
+ * after "rent paid up to". With several `houses`, asks how the rent splits
+ * between them (D39). `mode="stop"` undoes it while nothing is recorded.
  */
 export default function RentTrackingButton(
   props:
-    | { mode: "start"; tenantId: string; leaseStart: string; agreementRent: number }
+    | { mode: "start"; tenantId: string; leaseStart: string; agreementRent: number; houses: RentSplitHouse[] }
     | { mode: "stop"; tenantId: string }
 ) {
   const router = useAppRouter();
@@ -37,6 +40,7 @@ export default function RentTrackingButton(
   const [error, setError] = useState<string | null>(null);
 
   const start = props.mode === "start";
+  const split = useRentSplit(Number(rent) || 0, props.mode === "start" ? props.houses : [], start);
   const billingStart = start && paidThrough ? billingStartFor(props.leaseStart, monthKeyOf(paidThrough)) : null;
   // Months already ended when tracking starts: they fall due at once.
   const endedMonths = billingStart ? monthsBetween(billingStart, currentMonthKey()) : 0;
@@ -49,6 +53,7 @@ export default function RentTrackingButton(
         await api.dashboard.tenants.startRentTracking(props.tenantId, {
           monthlyRentAmount: rent ? Number(rent) : undefined,
           paidThrough: paidThrough || undefined,
+          houseRents: split.houseRents,
         });
       } else {
         await api.dashboard.tenants.stopRentTracking(props.tenantId);
@@ -74,7 +79,7 @@ export default function RentTrackingButton(
       >
         {start ? "Start tracking rent" : "Stop tracking"}
       </Button>
-      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
+      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth={split.needed ? "sm" : "xs"}>
         <DialogTitle>{start ? "Start tracking rent" : "Stop tracking rent"}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
@@ -93,6 +98,7 @@ export default function RentTrackingButton(
                   fullWidth
                   slotProps={{ htmlInput: { step: "0.01", min: 0 } }}
                 />
+                <RentSplitField split={split} disabled={busy} />
                 <MonthField
                   label="Rent paid up to"
                   value={paidThrough}
@@ -126,7 +132,7 @@ export default function RentTrackingButton(
             variant="contained"
             color={start ? "primary" : "error"}
             onClick={save}
-            disabled={start && !rent}
+            disabled={start && (!rent || Boolean(split.problem))}
             loading={busy}
           >
             {busy ? "Saving…" : start ? "Start tracking" : "Stop tracking"}

@@ -10,15 +10,26 @@ import MuiLink from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "@/components/ui/Link";
-import DataTable, { selectColumn, type DataTableColDef } from "@/components/ui/DataTable";
+import DataTable, { moneyColumn, selectColumn, type DataTableColDef } from "@/components/ui/DataTable";
 import { EmptyState, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { DetailList, DetailRow, GridCell } from "@/components/ui";
 import AuditTimeline from "./AuditTimeline";
+import HouseRentDialog from "./HouseRentDialog";
 import { UNIT_TYPE_LABELS, UNIT_TYPE_OPTIONS, formatFloor } from "@/lib/domain/tenant";
 import type { UnitRow } from "@/lib/contracts";
-import { HOUSE_FILTERS, matchesHouseFilter, type HouseFilter } from "@/lib/domain/houses";
+import { HOUSE_FILTERS, matchesHouseFilter, tenantRentGap, type HouseFilter } from "@/lib/domain/houses";
 import { formatDateKey } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
+
+/**
+ * A let house whose tenant's houses' rents (D39) don't add up to what the
+ * tenant pays (a house rent set by hand): flagged briefly under the rent;
+ * the Set rent dialog says it in full.
+ */
+function rentDiffers(row: UnitRow): boolean {
+  return row.currentTenant !== null && row.baseRent !== null && tenantRentGap(row.currentTenant) !== null;
+}
 
 function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
   return (
@@ -85,6 +96,7 @@ export default function UnitsGrid({
   initialFilter?: HouseFilter;
 }) {
   const [historyOf, setHistoryOf] = useState<UnitRow | null>(null);
+  const [rentOf, setRentOf] = useState<UnitRow | null>(null);
   const [filter, setFilter] = useState<HouseFilter>(initialFilter);
   const rows = useMemo(() => (showTower ? units.filter((u) => matchesHouseFilter({ isActive: u.isActive, occupied: Boolean(u.currentTenant) }, filter)) : units), [units, filter, showTower]);
 
@@ -125,6 +137,24 @@ export default function UnitsGrid({
         </GridCell>
       ),
     },
+    // Next to the house: "what did this vacant house go for?" without scrolling sideways on a phone.
+    // No footer total: vacant and retired houses' rents aren't money coming in.
+    moneyColumn<UnitRow>("baseRent", "House rent", {
+      minWidth: 130,
+      exportValue: (row) => row.baseRent,
+      renderCell: ({ row }) => (
+        <GridCell direction="column" spacing={0} align="end">
+          <Typography variant="body2" noWrap>
+            {row.baseRent === null ? "—" : formatMoney(row.baseRent)}
+          </Typography>
+          {rentDiffers(row) ? (
+            <Typography variant="caption" color="warning" noWrap>
+              ≠ tenant&apos;s rent
+            </Typography>
+          ) : null}
+        </GridCell>
+      ),
+    }),
     {
       field: "floor",
       headerName: "Floor",
@@ -167,15 +197,20 @@ export default function UnitsGrid({
       valueFormatter: (value: string) => (value ? formatDateKey(value) : ""),
     },
     {
-      field: "history",
+      field: "actions",
       headerName: "",
-      minWidth: 110,
+      minWidth: 170,
       sortable: false,
       filterable: false,
       disableExport: true,
       renderCell: ({ row }) => (
         <GridCell align="end">
-          <Button size="small" onClick={() => setHistoryOf(row)}>
+          {row.isActive ? (
+            <Button size="small" onClick={() => setRentOf(row)} aria-label={`Set rent of ${row.unitCode}`}>
+              Set rent
+            </Button>
+          ) : null}
+          <Button size="small" onClick={() => setHistoryOf(row)} aria-label={`History of ${row.unitCode}`}>
             History
           </Button>
         </GridCell>
@@ -204,6 +239,8 @@ export default function UnitsGrid({
         emptyState={emptyState}
       />
       <HistoryDialog unit={historyOf} onClose={() => setHistoryOf(null)} />
+      {/* Mounted per house, so the field starts from that house's rent. */}
+      {rentOf ? <HouseRentDialog key={rentOf.unitCode} unit={rentOf} onClose={() => setRentOf(null)} /> : null}
     </>
   );
 }

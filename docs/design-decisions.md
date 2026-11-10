@@ -172,6 +172,12 @@ split is the simplest rule that keeps the site total equal to the sum of the
 tenants' rents when a tenant spans towers. It's an indicator of expected
 rent, not money collected.
 
+Since D39 each house also has its own rent (`units.base_rent`: the owner's
+split of the tenant's rent, kept while vacant). The tower card still uses
+the even split above, because a house rent set by hand may disagree with
+what the tenant pays; house rents are the per-house figure to use for the
+per-house earnings in A23 once that is built.
+
 ---
 
 ## Audit history

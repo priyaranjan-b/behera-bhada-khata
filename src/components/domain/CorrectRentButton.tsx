@@ -15,20 +15,26 @@ import Typography from "@mui/material/Typography";
 import { api, errorMessage } from "@/lib/api-client";
 import { formatMonth, monthKeyOf, yearMonthOf } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import RentSplitField from "./RentSplitField";
+import { useRentSplit, type RentSplitHouse } from "./useRentSplit";
 
 /**
  * Fixes a rent entered wrongly (correct_rent, 0025): every month from the one
  * chosen is re-priced, paid months included. A real rent change goes through
- * Edit tenant, where paid months keep their price.
+ * Edit tenant, where paid months keep their price. With several `houses`,
+ * asks how the corrected rent splits between them (D39); a moved-out
+ * tenant passes none, as their old houses may be let again.
  */
 export default function CorrectRentButton({
   tenantId,
   billingStart,
   monthlyRent,
+  houses,
 }: {
   tenantId: string;
   billingStart: string;
   monthlyRent: number;
+  houses: RentSplitHouse[];
 }) {
   const router = useAppRouter();
   const firstMonth = yearMonthOf(billingStart);
@@ -39,13 +45,14 @@ export default function CorrectRentButton({
   const [error, setError] = useState<string | null>(null);
 
   const rentNumber = Number(rent) || 0;
-  const ready = rentNumber > 0 && Boolean(fromMonth);
+  const split = useRentSplit(rentNumber, houses);
+  const ready = rentNumber > 0 && Boolean(fromMonth) && !split.problem;
 
   async function save() {
     setBusy(true);
     setError(null);
     try {
-      await api.dashboard.tenants.correctRent(tenantId, { fromMonth, monthlyRent: rentNumber });
+      await api.dashboard.tenants.correctRent(tenantId, { fromMonth, monthlyRent: rentNumber, houseRents: split.houseRents });
       setOpen(false);
       router.refresh();
     } catch (err) {
@@ -68,7 +75,7 @@ export default function CorrectRentButton({
       >
         Correct
       </Button>
-      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
+      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth={split.needed ? "sm" : "xs"}>
         <DialogTitle>Correct the rent</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
@@ -94,10 +101,12 @@ export default function CorrectRentButton({
               required
               fullWidth
             />
+            <RentSplitField split={split} disabled={busy} />
             {ready ? (
               <Alert severity="info">
                 Every rent month from {formatMonth(monthKeyOf(fromMonth))} on will be {formatMoney(rentNumber)}. Not
                 possible if more than that is already counted for one of them.
+                {split.needed ? " The houses' rents are set to the amounts above." : ""}
               </Alert>
             ) : null}
             {error ? <Alert severity="error">{error}</Alert> : null}

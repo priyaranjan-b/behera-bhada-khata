@@ -7,6 +7,7 @@ vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => n
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
 const {
   correctPaidThrough,
+  bulkCreateTenants,
   correctRent,
   createTenant,
   getTenantAccount,
@@ -21,7 +22,9 @@ const {
 } = await import(
   "@/server/services/tenants"
 );
-const { getPropertyHeader, listPropertyHouses, listPropertyTenants } = await import("@/server/services/properties");
+const { getPropertyHeader, listPropertyHouses, listPropertyTenants, setHouseRent } = await import(
+  "@/server/services/properties"
+);
 const { confirmRecord } = await import("@/server/services/confirm");
 const { createPayment } = await import("@/server/services/payments");
 
@@ -40,9 +43,18 @@ describe("onboarding and editing", () => {
       monthlyRentAmount: 12000,
       leaseStart: "2026-02-01",
       unitCodes: ["ac-t1-g03", "AC-T1-G04"],
+      houseRents: [
+        { unitCode: "ac-t1-g03", share: 7000 },
+        { unitCode: "AC-T1-G04", share: 5000 },
+      ],
     });
     expect(fakes.owner.tenants.create).toHaveBeenCalledWith(
-      expect.objectContaining({ monthly_rent: 12000, unit_codes: ["AC-T1-G03", "AC-T1-G04"], lease_start: "2026-02-01" })
+      expect.objectContaining({ monthly_rent: 12000, unit_codes: ["AC-T1-G03", "AC-T1-G04"], lease_start: "2026-02-01" }),
+      // Each house's rent, as the owner split it (D39).
+      [
+        { unit_code: "AC-T1-G03", base_rent: 7000 },
+        { unit_code: "AC-T1-G04", base_rent: 5000 },
+      ]
     );
     // Rent months exist straight away.
     expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000199"], expect.any(String));
@@ -56,7 +68,9 @@ describe("onboarding and editing", () => {
       unitCodes: ["AC-T1-G06"],
       paidThrough: "2026-08",
     });
-    expect(fakes.owner.tenants.create).toHaveBeenCalledWith(expect.objectContaining({ paid_through: "2026-08-01" }));
+    expect(fakes.owner.tenants.create).toHaveBeenCalledWith(expect.objectContaining({ paid_through: "2026-08-01" }), [
+      { unit_code: "AC-T1-G06", base_rent: 4000 },
+    ]);
 
     await createTenant(ctx, {
       ...contact,
@@ -65,7 +79,10 @@ describe("onboarding and editing", () => {
       unitCodes: ["AC-T1-G06"],
       depositAmount: "15000.50",
     });
-    expect(fakes.owner.tenants.create).toHaveBeenLastCalledWith(expect.objectContaining({ deposit_amount: 15000.5 }));
+    expect(fakes.owner.tenants.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({ deposit_amount: 15000.5 }),
+      expect.anything()
+    );
 
     await updateTenant(ctx, "00000000-0000-4000-8000-000000000101", {
       ...contact,
@@ -76,7 +93,9 @@ describe("onboarding and editing", () => {
     });
     expect(fakes.owner.tenants.update).toHaveBeenCalledWith(
       "00000000-0000-4000-8000-000000000101",
-      expect.objectContaining({ lease_start: "2019-04-01", paid_through: "2026-09-01" })
+      expect.objectContaining({ lease_start: "2019-04-01", paid_through: "2026-09-01" }),
+      // One house: it takes the whole rent, nothing to ask.
+      [{ unit_code: "AC-T1-G01", base_rent: 12000 }]
     );
   });
 
@@ -94,22 +113,33 @@ describe("onboarding and editing", () => {
       unitsEffective: "2026-03-01",
       monthlyRentAmount: 5500,
       rentEffectiveMonth: "2026-04",
+      houseRents: [
+        { unitCode: "AC-T1-G01", share: 3000 },
+        { unitCode: "AC-T1-G05", share: 2500 },
+      ],
     });
-    expect(fakes.owner.tenants.update).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", {
-      name: "Mohan Das",
-      business_name: null,
-      phone: "+919876543210",
-      preferred_channel: "both",
-      unit_codes: ["AC-T1-G01", "AC-T1-G05"],
-      units_effective: "2026-03-01",
-      monthly_rent: 5500,
-      rent_effective_month: "2026-04-01",
-      lease_start: null,
-      paid_through: null,
-      deposit_amount: null,
-      tenant_kind: null,
-      rent_tracked: null,
-    });
+    expect(fakes.owner.tenants.update).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-000000000101",
+      {
+        name: "Mohan Das",
+        business_name: null,
+        phone: "+919876543210",
+        preferred_channel: "both",
+        unit_codes: ["AC-T1-G01", "AC-T1-G05"],
+        units_effective: "2026-03-01",
+        monthly_rent: 5500,
+        rent_effective_month: "2026-04-01",
+        lease_start: null,
+        paid_through: null,
+        deposit_amount: null,
+        tenant_kind: null,
+        rent_tracked: null,
+      },
+      [
+        { unit_code: "AC-T1-G01", base_rent: 3000 },
+        { unit_code: "AC-T1-G05", base_rent: 2500 },
+      ]
+    );
   });
 
   it("moves a tenant out on a date", async () => {
@@ -189,8 +219,15 @@ describe("correctRent", () => {
   const id = "00000000-0000-4000-8000-000000000101";
 
   it("passes the first of the month and the rent to the database", async () => {
-    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 1000 });
-    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 1000);
+    const houseRents = [
+      { unitCode: "AC-T1-G01", share: 600 },
+      { unitCode: "AC-T1-G02", share: 400 },
+    ];
+    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 1000, houseRents });
+    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 1000, [
+      { unit_code: "AC-T1-G01", base_rent: 600 },
+      { unit_code: "AC-T1-G02", base_rent: 400 },
+    ]);
   });
 
   it("rejects a bad month or rent and an unknown tenant", async () => {
@@ -208,7 +245,8 @@ describe("government tenants (0016)", () => {
   it("onboards a government tenant with no phone, no rent and its rent untracked", async () => {
     await createTenant(ctx, { ...govt, rentTracked: false, leaseStart: "2020-04-01", unitCodes: ["AC-T1-G03"] });
     expect(fakes.owner.tenants.create).toHaveBeenCalledWith(
-      expect.objectContaining({ phone: null, monthly_rent: null, tenant_kind: "government", rent_tracked: false })
+      expect.objectContaining({ phone: null, monthly_rent: null, tenant_kind: "government", rent_tracked: false }),
+      []
     );
   });
 
@@ -230,9 +268,9 @@ describe("government tenants (0016)", () => {
     expect(fakes.system.rentPeriods.ensure).toHaveBeenCalledWith(["00000000-0000-4000-8000-000000000101"], expect.any(String));
 
     await startRentTracking(ctx, GOVT_ID, { monthlyRentAmount: 20000, paidThrough: "2026-02" });
-    expect(fakes.owner.tenants.startRentTracking).toHaveBeenCalledWith(GOVT_ID, 20000, "2026-02-01");
+    expect(fakes.owner.tenants.startRentTracking).toHaveBeenCalledWith(GOVT_ID, 20000, "2026-02-01", []);
     await startRentTracking(ctx, GOVT_ID, {});
-    expect(fakes.owner.tenants.startRentTracking).toHaveBeenLastCalledWith(GOVT_ID, null, null);
+    expect(fakes.owner.tenants.startRentTracking).toHaveBeenLastCalledWith(GOVT_ID, null, null, []);
     await expect(startRentTracking(ctx, GOVT_ID, { paidThrough: "Feb" })).rejects.toMatchObject({ status: 400 });
 
     await stopRentTracking(ctx, GOVT_ID);
@@ -368,5 +406,113 @@ describe("path ids", () => {
     await expect(getTenantLedger(ctx, "not-a-uuid", {})).rejects.toMatchObject({ status: 404 });
     await expect(moveOutTenant(ctx, "1; drop", { moveOutDate: "2026-10-01" })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.get).not.toHaveBeenCalled();
+  });
+});
+
+describe("house rents (D39)", () => {
+  const id = "00000000-0000-4000-8000-000000000101"; // holds AC-T1-G01 and G02 at 5,000
+  const both = ["AC-T1-G01", "AC-T1-G02"];
+
+  it("asks for a split when a rent is set on several houses, and refuses one that is off", async () => {
+    const onboard = { ...contact, monthlyRentAmount: 9000, leaseStart: "2026-02-01", unitCodes: ["AC-T1-G03", "AC-T1-G04"] };
+    await expect(createTenant(ctx, onboard)).rejects.toMatchObject({ status: 400, message: /Split the rent/ });
+    await expect(
+      createTenant(ctx, {
+        ...onboard,
+        houseRents: [
+          { unitCode: "AC-T1-G03", share: 4000 },
+          { unitCode: "AC-T1-G04", share: 4000 },
+        ],
+      })
+    ).rejects.toMatchObject({ status: 400, message: /less than the rent/ });
+    await expect(
+      createTenant(ctx, {
+        ...onboard,
+        houseRents: [
+          { unitCode: "AC-T1-G03", share: 4500 },
+          { unitCode: "AC-T1-G09", share: 4500 },
+        ],
+      })
+    ).rejects.toMatchObject({ status: 400 });
+    expect(fakes.owner.tenants.create).not.toHaveBeenCalled();
+
+    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 6000 })).rejects.toMatchObject({ status: 400 });
+    expect(fakes.owner.tenants.correctRent).not.toHaveBeenCalled();
+  });
+
+  it("leaves the houses' rents alone when an edit changes neither the rent nor the houses", async () => {
+    await updateTenant(ctx, id, { ...contact, name: "Asha R", unitCodes: both, monthlyRentAmount: 5000 });
+    expect(fakes.owner.tenants.update).toHaveBeenCalledWith(id, expect.objectContaining({ name: "Asha R" }), []);
+  });
+
+  it("sets them when only the houses change, splitting the same rent", async () => {
+    await updateTenant(ctx, id, { ...contact, unitCodes: ["AC-T1-G01"], monthlyRentAmount: 5000 });
+    expect(fakes.owner.tenants.update).toHaveBeenLastCalledWith(id, expect.anything(), [
+      { unit_code: "AC-T1-G01", base_rent: 5000 },
+    ]);
+  });
+
+  it("leaves a moved-out tenant's old houses alone: they may be let again", async () => {
+    fakes.state.tenants.set(id, tenant({ id, status: "inactive" }));
+    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 6000 });
+    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 6000, []);
+  });
+
+  it("splits equally on bulk upload, which asks nothing", async () => {
+    await bulkCreateTenants(ctx, [
+      { ...contact, monthlyRentAmount: 1000, leaseStart: "2026-02-01", unitCodes: ["AC-T1-G05", "AC-T1-G03", "AC-T1-G04"] },
+    ]);
+    expect(fakes.owner.tenants.create).toHaveBeenCalledWith(expect.anything(), [
+      { unit_code: "AC-T1-G03", base_rent: 333.34 },
+      { unit_code: "AC-T1-G04", base_rent: 333.33 },
+      { unit_code: "AC-T1-G05", base_rent: 333.33 },
+    ]);
+  });
+
+  it("lists each house's rent, and what its tenant pays against their houses' rents", async () => {
+    const [g01] = await listPropertyHouses(ctx, "AC-T1");
+    expect(g01).toMatchObject({ baseRent: null, currentTenant: { monthlyRent: 5000, housesRent: 0 } });
+
+    fakes.owner.units.list.mockImplementation(async (filter?: { unitCodes?: string[] }) =>
+      both
+        .filter((c) => !filter?.unitCodes || filter.unitCodes.includes(c))
+        .map((unit_code) => ({
+          unit_code,
+          property_code: "AC-T1",
+          house_number: unit_code.slice(-3),
+          floor: "G",
+          unit_type: "commercial" as const,
+          label: null,
+          is_active: true,
+          created_at: "",
+          updated_at: "",
+          base_rent: unit_code === "AC-T1-G01" ? 3000 : 2500,
+        }))
+    );
+    const rows = await listPropertyHouses(ctx, "AC-T1");
+    expect(rows.map((r) => [r.unitCode, r.baseRent, r.currentTenant?.housesRent])).toEqual([
+      ["AC-T1-G01", 3000, 5500],
+      ["AC-T1-G02", 2500, 5500],
+    ]);
+
+    // A rise saved today from a later month: the houses' rents already follow it,
+    // so they are compared with the newest rate, not this month's - no false flag.
+    fakes.owner.rentRates.listForTenants.mockResolvedValue([
+      { id: 1, tenant_id: id, effective_month: "2026-01-01", monthly_amount: 5000, created_at: "", recorded_by: OWNER_ID },
+      { id: 2, tenant_id: id, effective_month: "2099-01-01", monthly_amount: 5500, created_at: "", recorded_by: OWNER_ID },
+    ]);
+    const [risen] = await listPropertyHouses(ctx, "AC-T1");
+    expect(risen.currentTenant).toMatchObject({ monthlyRent: 5500, housesRent: 5500 });
+  });
+
+  it("sets one house's rent by hand; a bad code is a 404, an empty rent clears it", async () => {
+    await setHouseRent(ctx, "ac-t1-g01", { baseRent: 6500 });
+    expect(fakes.owner.units.setRents).toHaveBeenCalledWith([{ unit_code: "AC-T1-G01", base_rent: 6500 }]);
+    await setHouseRent(ctx, "AC-T1-G02", { baseRent: null });
+    expect(fakes.owner.units.setRents).toHaveBeenLastCalledWith([{ unit_code: "AC-T1-G02", base_rent: null }]);
+    await expect(setHouseRent(ctx, "not a code", { baseRent: 6500 })).rejects.toMatchObject({ status: 404 });
+    await expect(setHouseRent(ctx, "AC-T1-G99", { baseRent: 6500 })).rejects.toMatchObject({ status: 404 });
+    await expect(setHouseRent(ctx, "AC-T1-G01", { baseRent: 0 })).rejects.toMatchObject({ status: 400 });
+    expect(fakes.owner.units.setRents).toHaveBeenCalledTimes(2);
   });
 });

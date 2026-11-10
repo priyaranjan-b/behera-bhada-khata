@@ -108,6 +108,7 @@ const units: Unit[] = ["AC-T1-G01", "AC-T1-G02"].map((unit_code) => ({
   is_active: true,
   created_at: "",
   updated_at: "",
+  base_rent: null,
 }));
 /** 00000000-0000-4000-8000-000000000101 holds both houses of AC-T1 at one combined rent. */
 const occupancy: UnitOccupancy[] = units.map((u) => ({
@@ -315,7 +316,13 @@ function build() {
       ]),
     },
     properties: { list: vi.fn(async () => [property]), get: vi.fn(async () => property), create: vi.fn() },
-    units: { list: vi.fn(async () => units), create: vi.fn() },
+    units: {
+      list: vi.fn(async (filter?: { propertyCode?: string; unitCodes?: string[] }) =>
+        filter?.unitCodes ? units.filter((u) => filter.unitCodes?.includes(u.unit_code)) : units
+      ),
+      create: vi.fn(),
+      setRents: vi.fn(async () => undefined),
+    },
     occupancy: { list: vi.fn(async () => occupancy) },
     maintenance: {
       monthly: vi.fn(async () => [] as { month: string; amount: number; cash: number }[]),

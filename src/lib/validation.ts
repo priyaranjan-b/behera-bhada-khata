@@ -165,11 +165,29 @@ export const propertyCodeSchema = upperCode(/^[A-Z]{2,4}-T[A-Z0-9]{1,3}$/, "Towe
 export const houseNumberSchema = upperCode(/^[A-Z0-9]{1,4}$/, "House number: 1-4 letters/digits, e.g. G01 or 101");
 export const unitCodeSchema = upperCode(/^[A-Z]{2,4}-T[A-Z0-9]{1,3}-[A-Z0-9]{1,4}$/, "House code looks like AC-T1-G01");
 
+/** How many houses one tenant may hold; their rent split (houseRents) has one share each. */
+export const MAX_HOUSES_PER_TENANT = 20;
+
 export const unitCodesSchema = z
   .array(unitCodeSchema)
   .min(1, "Choose at least one house")
-  .max(20, "At most 20 houses per tenant")
+  .max(MAX_HOUSES_PER_TENANT, `At most ${MAX_HOUSES_PER_TENANT} houses per tenant`)
   .refine((codes) => new Set(codes).size === codes.length, "Each house can only be chosen once");
+
+/**
+ * How a tenant's rent splits over their houses (D39): each house's rent.
+ * Needed when the rent is set for several houses; the service checks it
+ * against the tenant's houses and rent (rentSplitProblem).
+ */
+const houseRentsSchema = z
+  .array(z.object({ unitCode: unitCodeSchema, share: positiveMoneySchema }))
+  .max(MAX_HOUSES_PER_TENANT, `At most ${MAX_HOUSES_PER_TENANT} houses per tenant`)
+  .optional();
+
+/** The Houses page's "Set rent" (D39): empty clears the house's rent. */
+export const setHouseRentSchema = z.object({
+  baseRent: positiveMoneySchema.nullable(),
+});
 
 const floorSchema = z
   .string()
@@ -246,6 +264,7 @@ export const createTenantSchema = z
     paidThrough: monthKeySchema.optional(),
     /** Security deposit (optional); can't be changed once the tenant is active. */
     depositAmount: positiveMoneySchema.optional(),
+    houseRents: houseRentsSchema,
   })
   .superRefine((input, ctx) => {
     checkGovernmentOnly(input, ctx, { phoneRequired: true });
@@ -278,6 +297,7 @@ export const updateTenantSchema = z
     depositAmount: positiveMoneySchema.optional(),
     /** Drafts only: false completes a government draft without billing it. */
     rentTracked: z.boolean().optional(),
+    houseRents: houseRentsSchema,
   })
   .superRefine((input, ctx) => checkGovernmentOnly(input, ctx, { phoneRequired: false }));
 
@@ -294,6 +314,7 @@ export const correctPaidThroughSchema = z.object({
 export const correctRentSchema = z.object({
   fromMonth: monthKeySchema,
   monthlyRent: positiveMoneySchema,
+  houseRents: houseRentsSchema,
 });
 
 /**
@@ -304,6 +325,7 @@ export const correctRentSchema = z.object({
 export const startRentTrackingSchema = z.object({
   monthlyRentAmount: positiveMoneySchema.optional(),
   paidThrough: monthKeySchema.optional(),
+  houseRents: houseRentsSchema,
 });
 
 // ---- Payments & adjustments -------------------------------------------------

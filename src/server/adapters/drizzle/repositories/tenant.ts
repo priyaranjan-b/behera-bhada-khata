@@ -76,7 +76,7 @@ export function drizzleTenantRepositories(db: Db, tenantId: string): TenantRepos
       list: () => read("list properties", listProperties),
     },
     units: {
-      list: (filter) => read("list units", (tx) => listUnits(tx, filter)),
+      list: (filter) => read("list units", (tx) => listUnits(tx, filter, { withoutRent: true })),
     },
     tenantDocuments: {
       list: (id) => read(`list documents of tenant ${id}`, (tx) => listDocuments(tx, id)),

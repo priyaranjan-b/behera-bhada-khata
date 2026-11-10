@@ -12,10 +12,13 @@ import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
 import { DateField, FormActions, MonthField, SectionCard } from "@/components/ui";
 import HousePicker from "@/components/domain/HousePicker";
+import RentSplitField from "@/components/domain/RentSplitField";
+import { useRentSplit } from "@/components/domain/useRentSplit";
 import TenantDocumentsCard, { type PendingDocument } from "@/components/domain/TenantDocumentsCard";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AvailableUnit, EditTenantForm, TenantDocumentView } from "@/lib/contracts";
 import { addMonthsToKey, currentMonthKey, formatMonth, monthKeyOf, monthsBetween, todayKey, yearMonthOf } from "@/lib/dates";
+import { totalRent } from "@/lib/domain/houses";
 import {
   PREFERRED_CHANNEL_OPTIONS,
   TENANT_KIND_OPTIONS,
@@ -33,9 +36,27 @@ type Mode =
   | { kind: "edit"; tenant: EditTenantForm["tenant"] };
 
 function unitCaption(u: AvailableUnit): string {
-  return [u.unitType === "commercial" ? "Commercial" : "Residential", u.label, formatFloor(u.floor)]
+  return [
+    u.unitType === "commercial" ? "Commercial" : "Residential",
+    u.label,
+    formatFloor(u.floor),
+    u.baseRent ? `Rent ${formatMoney(u.baseRent)}` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
+}
+
+/**
+ * What the chosen houses last went for (D39): their rents added up, and
+ * whether every one has a rent - only then is it a fair starting rent.
+ */
+function lastRentOf(houses: AvailableUnit[]): { total: number; known: number; complete: boolean } {
+  const known = houses.filter((h) => h.baseRent != null && h.baseRent > 0);
+  return {
+    total: totalRent(known.map((h) => h.baseRent)),
+    known: known.length,
+    complete: houses.length > 0 && known.length === houses.length,
+  };
 }
 
 function sameSet(a: string[], b: string[]): boolean {
@@ -83,7 +104,14 @@ export default function TenantForm({
   // Government only (0016): false = rent goes straight to the owner's bank, never billed here.
   const [rentTracked, setRentTracked] = useState(editing?.rentTracked ?? true);
   const [preferredChannel, setPreferredChannel] = useState<PreferredChannel>(editing?.preferredChannel ?? "both");
-  const [monthlyRent, setMonthlyRent] = useState(editing && editing.monthlyRent > 0 ? String(editing.monthlyRent) : "");
+  const [monthlyRent, setMonthlyRent] = useState(() => {
+    if (editing && editing.monthlyRent > 0) return String(editing.monthlyRent);
+    // A draft from the register opens with its houses chosen: start from their rents.
+    const last = lastRentOf(units);
+    return draft && last.complete ? String(last.total) : "";
+  });
+  // A new tenant's rent starts as the chosen houses' rents (D39) until the owner types one.
+  const [rentTyped, setRentTyped] = useState(false);
   const [leaseStart, setLeaseStart] = useState(editing?.leaseStart ?? "");
   // Rent settled outside the app (paper register) up to this month, yyyy-MM.
   // Drafts default to last month so billing starts this month; new tenants to
@@ -113,6 +141,25 @@ export default function TenantForm({
   const draftComplete =
     draft && (untracked ? Boolean(leaseStart) : Boolean((phone.trim() || government) && monthlyRent && leaseStart));
   const settingUpBilling = (mode.kind === "create" || draft) && !untracked;
+  // What the chosen houses went for (D39): the starting point for a new tenant's rent.
+  const lastRent = lastRentOf(units);
+  const prefillsRent = mode.kind === "create" || (draft && !editing?.monthlyRent);
+  // The houses' rents follow a new rent or house set; the server applies the same rule.
+  const rentForSplit = Number(monthlyRent) || (editing?.monthlyRent ?? 0);
+  const split = useRentSplit(
+    rentForSplit,
+    units,
+    !movedOut && (mode.kind === "create" || draft || rentChanged || unitsChanged)
+  );
+
+  function chooseUnits(next: AvailableUnit[]) {
+    setUnits(next);
+    if (prefillsRent && !rentTyped) {
+      // Only a rent every house has is a fair start; with one unknown, leave it to the owner.
+      const last = lastRentOf(next);
+      setMonthlyRent(last.complete ? String(last.total) : "");
+    }
+  }
 
   // billing_start_for() in 0008, shared with the server via src/lib/domain.
   const billingStart =
@@ -137,6 +184,10 @@ export default function TenantForm({
       setError("Choose or type a document type for each new document");
       return;
     }
+    if (split.problem) {
+      setError(split.problem);
+      return;
+    }
     setSubmitting(true);
     if (draft && !untracked && Boolean(monthlyRent) !== Boolean(leaseStart)) {
       setError(
@@ -155,6 +206,7 @@ export default function TenantForm({
       tenantKind,
       unitCodes,
       monthlyRentAmount: monthlyRent ? Number(monthlyRent) : undefined,
+      houseRents: split.houseRents,
     };
     try {
       if (mode.kind === "edit") {
@@ -250,7 +302,7 @@ export default function TenantForm({
             <HousePicker
               options={options}
               value={units}
-              onChange={setUnits}
+              onChange={chooseUnits}
               disabled={movedOut}
               caption={unitCaption}
               helperText={
@@ -275,10 +327,17 @@ export default function TenantForm({
                 label={untracked ? "Agreement rent (optional)" : "Combined monthly rent"}
                 type="number"
                 value={monthlyRent}
-                onChange={(e) => setMonthlyRent(e.target.value)}
+                onChange={(e) => {
+                  setMonthlyRent(e.target.value);
+                  setRentTyped(true);
+                }}
                 disabled={movedOut}
                 helperText={
-                  untracked
+                  prefillsRent && !rentTyped && !untracked && lastRent.known > 0
+                    ? lastRent.complete
+                      ? `Last rent for ${units.length > 1 ? "these houses" : "this house"}: ${formatMoney(lastRent.total)}`
+                      : `Last rent known for ${lastRent.known} of ${units.length} houses: ${formatMoney(lastRent.total)}`
+                    : untracked
                     ? "For reference only - nothing is billed"
                     : draft && !monthlyRent
                     ? "Not set yet"
@@ -312,6 +371,7 @@ export default function TenantForm({
                 />
               )}
             </Stack>
+            <RentSplitField split={split} disabled={submitting} />
             {settingUpBilling ? (
               <MonthField
                 label="Rent paid up to"

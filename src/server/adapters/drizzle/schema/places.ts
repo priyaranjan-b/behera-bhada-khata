@@ -2,7 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { boolean, index, pgTable, text } from "drizzle-orm/pg-core";
 import { UNIT_TYPES } from "@/lib/types";
-import { timestamptz } from "./columns";
+import { money, timestamptz } from "./columns";
 
 // 0006_property_master_data.sql: site -> tower -> house, keyed by permanent codes (D2).
 
@@ -49,6 +49,8 @@ export const units = pgTable(
     is_active: boolean("is_active").notNull().default(true),
     created_at: timestamptz("created_at").notNull().default(sql`now()`),
     updated_at: timestamptz("updated_at").notNull().default(sql`now()`),
+    /** House rent (D39): what it goes for; never prices a month. */
+    base_rent: money("base_rent"),
   },
   (t) => [index("units_property_idx").on(t.property_code)]
 );

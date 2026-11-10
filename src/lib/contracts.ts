@@ -38,6 +38,7 @@ import type {
   createPaymentSchema,
   createPropertySchema,
   createTenantSchema,
+  setHouseRentSchema,
   createUnitSchema,
   moveOutSchema,
   correctPaidThroughSchema,
@@ -566,8 +567,21 @@ export interface UnitRow {
   unitType: UnitType;
   label: string | null;
   isActive: boolean;
-  /** Occupying now (or from a future date already booked); null = vacant. */
-  currentTenant: { id: string; displayName: string; since: string } | null;
+  /** House rent (D39): what it goes for, kept while vacant; null = never set. */
+  baseRent: number | null;
+  /**
+   * Occupying now (or from a future date already booked); null = vacant.
+   * `monthlyRent`: the tenant's combined rent, newest rate (a rise from next
+   * month included); `housesRent`: their houses' rents added up, which
+   * differ when a house rent was set by hand (tenantRentGap).
+   */
+  currentTenant: {
+    id: string;
+    displayName: string;
+    since: string;
+    monthlyRent: number;
+    housesRent: number;
+  } | null;
   /** Every tenancy, oldest first. */
   history: OccupancyEntry[];
 }
@@ -599,6 +613,8 @@ export interface AvailableUnit {
   unitType: UnitType;
   label: string | null;
   floor: string | null;
+  /** House rent (D39): what it last went for; prefills a new tenant's rent. */
+  baseRent: number | null;
 }
 
 /** Data for the "add tenant" form opened from a tower. */
@@ -619,6 +635,7 @@ export interface NewHouseForm {
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
 export type CreateUnitInput = Omit<z.infer<typeof createUnitSchema>, "propertyCode">;
+export type SetHouseRentInput = z.input<typeof setHouseRentSchema>;
 export type CreateTenantInput = z.input<typeof createTenantSchema>;
 
 export interface BulkCreateResult {
@@ -694,6 +711,8 @@ export interface TenantHouse {
   propertyName: string;
   unitType: UnitType;
   label: string | null;
+  /** House rent (D39), for splitting a corrected rent; null in the tenant portal. */
+  baseRent: number | null;
 }
 
 export interface TenantDetail {

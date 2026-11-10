@@ -10,11 +10,13 @@ import type {
 } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
 import { round2 } from "@/lib/money";
+import { totalRent } from "@/lib/domain/houses";
 import { tenantDisplayName } from "@/lib/domain/tenant";
 import type { Location, Property, Unit, UnitOccupancy } from "@/lib/types";
-import { createPropertySchema, createUnitSchema, propertyCodeSchema } from "@/lib/validation";
+import { createPropertySchema, createUnitSchema, propertyCodeSchema, setHouseRentSchema, unitCodeSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
-import { notFound, parseInput, withParams, type OwnerContext } from "./context";
+import type { OwnerRepositories } from "@/server/ports";
+import { notFound, parseInput, requireCode, withParams, type OwnerContext } from "./context";
 import { db as ownerRepos, locationsList, propertyByCode, tenantsList, towerOccupancy } from "./loaders";
 import { billedTenantIds, paidDirectTenants } from "./periods";
 import { availableUnits, holdsUnit, loadPlacements, placementOf, rentByProperty } from "./placements";
@@ -30,9 +32,7 @@ function toHeader(property: Property, locations: Location[]): PropertyHeader {
 
 /** Normalises a code from the URL; anything malformed is simply "not found". */
 function parsePropertyCode(raw: string): string {
-  const parsed = propertyCodeSchema.safeParse(decodeURIComponent(raw));
-  if (!parsed.success) notFound("Property");
-  return parsed.data;
+  return requireCode(raw, propertyCodeSchema, "Property");
 }
 
 /** Every site with its towers, how full each one is and the rent its current occupants pay. */
@@ -88,12 +88,34 @@ export async function getPropertyHeader(_ctx: OwnerContext, rawCode: string): Pr
   return toHeader(property, locations);
 }
 
+interface HolderRent {
+  monthlyRent: number;
+  housesRent: number;
+}
+
+/**
+ * For each tenant holding one of `units` today: their combined rent and
+ * their houses' rents added up (D39), over all their houses, in any tower.
+ */
+async function holderRents(db: OwnerRepositories, occupancy: UnitOccupancy[], today = todayKey()): Promise<Map<string, HolderRent>> {
+  const holders = [...new Set(occupancy.filter((o) => holdsUnit(o, today)).map((o) => o.tenant_id))];
+  const placements = await loadPlacements(db, holders);
+  return new Map(
+    holders.map((id) => {
+      const placement = placementOf(placements, id);
+      // The newest rate: house rents follow a rise as soon as it is saved, even from next month.
+      return [id, { monthlyRent: placement.latestRent, housesRent: totalRent(placement.houses.map((h) => h.baseRent)) }];
+    })
+  );
+}
+
 /** Table rows for houses: who is in each today, and who was. */
 function toUnitRows(
   units: Unit[],
   occupancy: UnitOccupancy[],
   properties: Property[],
   locations: Location[],
+  rents: Map<string, HolderRent>,
   today = todayKey()
 ): UnitRow[] {
   const headers = new Map(properties.map((p) => [p.property_code, toHeader(p, locations)]));
@@ -111,11 +133,14 @@ function toUnitRows(
       unitType: unit.unit_type,
       label: unit.label,
       isActive: unit.is_active,
+      baseRent: unit.base_rent == null ? null : Number(unit.base_rent),
       currentTenant: holder
         ? {
             id: holder.tenant_id,
             displayName: tenantDisplayName({ name: holder.tenant_name, business_name: holder.tenant_business_name }),
             since: holder.start_date,
+            monthlyRent: rents.get(holder.tenant_id)?.monthlyRent ?? 0,
+            housesRent: rents.get(holder.tenant_id)?.housesRent ?? 0,
           }
         : null,
       history: history.map((o) => ({
@@ -137,19 +162,20 @@ export async function listHouses(_ctx: OwnerContext): Promise<UnitRow[]> {
     db.units.list(),
     db.occupancy.list(),
   ]);
-  return toUnitRows(units, occupancy, properties, locations);
+  return toUnitRows(units, occupancy, properties, locations, await holderRents(db, occupancy));
 }
 
 /** A tower's houses, with who is in each today and who was - the same rows as /dashboard/houses. */
 export async function listPropertyHouses(_ctx: OwnerContext, rawCode: string): Promise<UnitRow[]> {
   const code = parsePropertyCode(rawCode);
+  const repos = await ownerRepos();
   const [property, locations, units, occupancy] = await Promise.all([
     propertyByCode(code),
     locationsList(),
-    ownerRepos().then((repos) => repos.units.list({ propertyCode: code })),
+    repos.units.list({ propertyCode: code }),
     towerOccupancy(code),
   ]);
-  return toUnitRows(units, occupancy, [property], locations);
+  return toUnitRows(units, occupancy, [property], locations, await holderRents(repos, occupancy));
 }
 
 /** The tenants holding a house in the tower today. */
@@ -208,6 +234,19 @@ export async function createUnit(ctx: OwnerContext, rawCode: string, body: unkno
     label: input.label || null,
   });
   return { code };
+}
+
+/**
+ * The Houses page's "Set rent" (D39): what the house goes for. It never
+ * changes what a tenant pays; the form warns when it disagrees with that.
+ */
+export async function setHouseRent(_ctx: OwnerContext, rawCode: string, body: unknown): Promise<void> {
+  const code = requireCode(rawCode, unitCodeSchema, "House");
+  const { baseRent } = parseInput(setHouseRentSchema, body);
+  const db = await ownerDb();
+  const [unit] = await db.units.list({ unitCodes: [code] });
+  if (!unit) notFound("House");
+  await db.units.setRents([{ unit_code: unit.unit_code, base_rent: baseRent }]);
 }
 
 /** The "add tenant" form opened from a tower: that tower, plus every vacant house. */

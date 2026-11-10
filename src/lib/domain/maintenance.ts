@@ -45,27 +45,6 @@ export function isCashExpense(expense: { settledBy: unknown }): boolean {
   return expense.settledBy == null;
 }
 
-/** One house's part of an expense. */
-export interface HouseShare {
-  unitCode: string;
-  share: number;
-}
-
-/**
- * The amount split equally over the houses, as maintenance_shares() in 0031
- * does it: everyone gets the same whole paise, and the paise left over go
- * one each to the first houses by code, so the shares add up to the amount.
- * Duplicates count once; the result is in code order.
- */
-export function splitEqually(amount: number, unitCodes: readonly string[]): HouseShare[] {
-  const codes = [...new Set(unitCodes)].sort();
-  if (codes.length === 0 || !Number.isFinite(amount) || amount <= 0) return codes.map((unitCode) => ({ unitCode, share: 0 }));
-  const paise = Math.round(amount * 100);
-  const base = Math.floor(paise / codes.length);
-  const extra = paise - base * codes.length;
-  return codes.map((unitCode, i) => ({ unitCode, share: (base + (i < extra ? 1 : 0)) / 100 }));
-}
-
 // ---- The Maintenance page: expenses by the day spent ----------------------------
 
 /** The Maintenance grid's sortable and filterable columns (queries/maintenancePage.ts). */

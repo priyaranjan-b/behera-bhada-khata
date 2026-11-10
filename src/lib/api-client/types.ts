@@ -26,6 +26,7 @@ import type {
   CreatePropertyInput,
   CreateTenantInput,
   CreateUnitInput,
+  SetHouseRentInput,
   DefaultersReport,
   EditTenantForm,
   HouseCounts,
@@ -225,6 +226,10 @@ export interface ApiCommands {
       create(input: CreatePropertyInput): Promise<{ code: string }>;
       createUnit(propertyCode: string, input: CreateUnitInput): Promise<{ code: string }>;
       bulkCreateTenants(propertyCode: string, tenants: unknown[]): Promise<BulkCreateResult>;
+    };
+    houses: {
+      /** What the house goes for (D39); null clears it. Never changes what a tenant pays. */
+      setRent(unitCode: string, input: SetHouseRentInput): Promise<void>;
     };
     tenants: {
       create(input: CreateTenantInput): Promise<Created>;

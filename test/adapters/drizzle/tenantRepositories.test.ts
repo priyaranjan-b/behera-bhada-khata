@@ -116,4 +116,10 @@ describe("drizzleTenantRepositories", () => {
     expect(await mine.tenantDocuments.list(bimal)).toEqual([]);
     expect(await mine.rentRates.listForTenants([bimal])).toEqual([]);
   });
+
+  it("never reads a house's rent (0036, D39): a former tenant would see what it goes for now", async () => {
+    await drizzleOwnerRepositories(l.db, { sub: OWNER }).units.setRents([{ unit_code: "AC-T1-G01", base_rent: 5000 }]);
+    const [house] = await drizzleTenantRepositories(l.db, asha).units.list();
+    expect(house).toMatchObject({ unit_code: "AC-T1-G01", base_rent: null });
+  });
 });

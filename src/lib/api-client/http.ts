@@ -102,6 +102,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         list: () => get(p.dashboard.houses.list),
         newForm: () => get(p.dashboard.houses.new),
         history: (code, before) => get(withQuery(p.dashboard.houses.history(code), { before })),
+        setRent: (code, input) => put(p.dashboard.houses.rent(code), input),
       },
       tenants: {
         list: () => get(p.dashboard.tenants.list),

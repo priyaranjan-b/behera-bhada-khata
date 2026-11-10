@@ -105,6 +105,12 @@ export interface NewUnit {
   label: string | null;
 }
 
+/** A house's rent (D39); null clears it. Never prices a rent month. */
+export interface HouseRent {
+  unit_code: string;
+  base_rent: number | null;
+}
+
 /** A tenant plus the houses they move into on lease_start, for one combined rent. */
 export interface NewTenant {
   name: string;
@@ -408,6 +414,8 @@ export interface OwnerRepositories {
     /** By code. */
     list(filter?: { propertyCode?: string; unitCodes?: string[] }): Promise<Unit[]>;
     create(input: NewUnit): Promise<void>;
+    /** Sets each house's rent (D39) in one statement. */
+    setRents(rents: HouseRent[]): Promise<void>;
   };
   /** Who occupies (occupied) which house, when - oldest tenancy first. */
   occupancy: {
@@ -433,12 +441,15 @@ export interface OwnerRepositories {
     list(filter?: { status?: TenantStatus }): Promise<Tenant[]>;
     get(id: string): Promise<Tenant | null>;
     /**
+     * The write methods that set a rent take `houseRents` (D39): the houses'
+     * rents, written in the same transaction (none = left as they are).
+     *
      * Tenant, first rent rate and tenancies in one transaction. Rejects
      * (400/409) houses that don't exist, are retired, or are occupied.
      */
-    create(input: NewTenant): Promise<{ id: string }>;
+    create(input: NewTenant, houseRents?: HouseRent[]): Promise<{ id: string }>;
     /** Contact details, house set and combined rent - see TenantChanges. */
-    update(id: string, changes: TenantChanges): Promise<void>;
+    update(id: string, changes: TenantChanges, houseRents?: HouseRent[]): Promise<void>;
     /** Ends every tenancy on `date`, marks the tenant inactive and drops untouched later months. */
     moveOut(id: string, date: string): Promise<void>;
     /**
@@ -452,12 +463,17 @@ export interface OwnerRepositories {
      * `fromMonth` (a month key, not before billing start) on, and those months
      * are re-priced even if paid; 409 if one has more counted than that.
      */
-    correctRent(id: string, fromMonth: string, monthlyRent: number): Promise<void>;
+    correctRent(id: string, fromMonth: string, monthlyRent: number, houseRents?: HouseRent[]): Promise<void>;
     /**
      * Starts billing an untracked government tenant (0016) from the month
      * after `paidThrough` (null = last month). Returns the billing start.
      */
-    startRentTracking(id: string, monthlyRent: number | null, paidThrough: string | null): Promise<string>;
+    startRentTracking(
+      id: string,
+      monthlyRent: number | null,
+      paidThrough: string | null,
+      houseRents?: HouseRent[]
+    ): Promise<string>;
     /** Undoes startRentTracking; 409 once a payment or adjustment is recorded. */
     stopRentTracking(id: string): Promise<void>;
     /** The tenant's balance figures and whether tracking can stop, aggregated in SQL (0022). */

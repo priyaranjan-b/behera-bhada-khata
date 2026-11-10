@@ -195,3 +195,69 @@ describe("payment tags on Drizzle (0030)", () => {
     await expect(stranger.paymentTags.create!("spam")).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe("house rents (D39)", () => {
+  const rentsOf = async (codes: string[]) => {
+    const units = await owner.units.list!({ unitCodes: codes });
+    return Object.fromEntries(units.map((u) => [u.unit_code, u.base_rent === null ? null : Number(u.base_rent)]));
+  };
+  const newTenant = {
+    name: "Chitra",
+    business_name: null,
+    phone: "+919876543212",
+    preferred_channel: "both" as const,
+    monthly_rent: 9000,
+    lease_start: "2026-02-01",
+    unit_codes: ["AC-T1-G03", "AC-T1-G04"],
+    paid_through: null,
+    deposit_amount: null,
+    tenant_kind: "individual" as const,
+    rent_tracked: true,
+  };
+
+  it("sets several houses in one statement; null clears one; an unknown or unseen house is refused", async () => {
+    await owner.units.setRents!([
+      { unit_code: "AC-T1-G05", base_rent: 3000 },
+      { unit_code: "AC-T1-G06", base_rent: 2500.5 },
+    ]);
+    expect(await rentsOf(["AC-T1-G05", "AC-T1-G06"])).toEqual({ "AC-T1-G05": 3000, "AC-T1-G06": 2500.5 });
+    await owner.units.setRents!([]);
+    await owner.units.setRents!([{ unit_code: "AC-T1-G06", base_rent: null }]);
+    expect(await rentsOf(["AC-T1-G06"])).toEqual({ "AC-T1-G06": null });
+    await expect(owner.units.setRents!([{ unit_code: "AC-T1-G05", base_rent: 0 }])).rejects.toMatchObject({ status: 400 });
+    // A house it can't see (another account under RLS, or no such house) is refused, not skipped.
+    await expect(stranger.units.setRents!([{ unit_code: "AC-T1-G05", base_rent: 1 }])).rejects.toThrow(/AC-T1-G05/);
+    await expect(
+      owner.units.setRents!([
+        { unit_code: "AC-T1-G05", base_rent: 1 },
+        { unit_code: "AC-T1-G99", base_rent: 1 },
+      ])
+    ).rejects.toThrow(/AC-T1-G99/);
+    expect(await rentsOf(["AC-T1-G05"])).toEqual({ "AC-T1-G05": 3000 });
+  });
+
+  it("writes them with the tenant, in the same transaction: a refused tenant leaves them as they were", async () => {
+    const split = [
+      { unit_code: "AC-T1-G03", base_rent: 5000 },
+      { unit_code: "AC-T1-G04", base_rent: 4000 },
+    ];
+    // G01 is Asha's: create_tenant refuses, so the rents aren't written either.
+    await expect(owner.tenants.create!({ ...newTenant, unit_codes: ["AC-T1-G01", "AC-T1-G03"] }, split)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(await rentsOf(["AC-T1-G03", "AC-T1-G04"])).toEqual({ "AC-T1-G03": null, "AC-T1-G04": null });
+
+    const { id } = await owner.tenants.create!(newTenant, split);
+    expect(await rentsOf(["AC-T1-G03", "AC-T1-G04"])).toEqual({ "AC-T1-G03": 5000, "AC-T1-G04": 4000 });
+
+    // A bad rent rolls back the tenant write it came with.
+    await expect(
+      owner.tenants.correctRent!(id, "2026-02-01", 9500, [{ unit_code: "AC-T1-G03", base_rent: -1 }])
+    ).rejects.toMatchObject({ status: 400 });
+    const [rate] = await l.rows<{ monthly_amount: string }>(
+      asService,
+      sql`select monthly_amount from tenant_rent_rates where tenant_id = ${id} order by effective_month desc limit 1`
+    );
+    expect(Number(rate.monthly_amount)).toBe(9000);
+  });
+});

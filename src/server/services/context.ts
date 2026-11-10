@@ -53,6 +53,22 @@ export function notFound(what: string): never {
   throw new ApiError(404, `${what} not found`);
 }
 
+/**
+ * A code from the URL (tower, house) parsed with `schema`; anything
+ * malformed, a broken %-escape included, is simply `what` not found.
+ */
+export function requireCode(raw: string, schema: z.ZodType<string>, what: string): string {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    notFound(what);
+  }
+  const parsed = schema.safeParse(decoded);
+  if (!parsed.success) notFound(what);
+  return parsed.data;
+}
+
 export interface RateLimit {
   /** Counter name, e.g. `otp:token:<hash>` - every distinct key is counted separately. */
   key: string;
