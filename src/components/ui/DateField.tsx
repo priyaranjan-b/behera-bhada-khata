@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import Stack from "@mui/material/Stack";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { DATE_FORMAT, formatDateKey } from "@/lib/dates";
+import { DATE_FORMAT } from "@/lib/dates";
 import { boundOf, usePickerValue } from "./pickerValue";
 import QuickPicks from "./QuickPicks";
+import { useDates } from "./DateFormat";
 
 export interface DateFieldProps {
   label: string;
@@ -47,6 +48,7 @@ export default function DateField({
   sx,
   quickPicks,
 }: DateFieldProps) {
+  const { formatDate: formatDateKey } = useDates();
   const picker = usePickerValue(value, onChange, "YYYY-MM-DD");
   const field = (
     <DatePicker

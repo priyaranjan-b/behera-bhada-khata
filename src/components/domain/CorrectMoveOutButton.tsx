@@ -8,9 +8,10 @@ import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import { api } from "@/lib/api-client";
-import { addDaysToKey, addMonthsToKey, currentMonthKey, formatDateKey, formatMonth, formatMonthRange, monthKeyOf, monthsBetween } from "@/lib/dates";
+import { addDaysToKey, addMonthsToKey, currentMonthKey, formatMonth, formatMonthRange, monthKeyOf, monthsBetween } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 import { useCorrectionSubmit } from "./useCorrectionSubmit";
+import { useDates } from "@/components/ui/DateFormat";
 
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
 
@@ -64,6 +65,7 @@ export default function CorrectMoveOutButton({
   /** earliestMoveOutDate: the last house taken, or billing start. */
   earliest: string | null;
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(movedOutOn);

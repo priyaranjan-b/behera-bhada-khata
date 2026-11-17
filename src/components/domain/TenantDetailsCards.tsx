@@ -2,7 +2,7 @@ import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import MuiLink from "@mui/material/Link";
 import type { TenantDetail } from "@/lib/contracts";
-import { addMonthsToKey, formatDateKey, formatMonth, monthKeyOf } from "@/lib/dates";
+import { addMonthsToKey, formatMonth, monthKeyOf } from "@/lib/dates";
 import { unitMixLabel } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
@@ -11,6 +11,7 @@ import { TagPill } from "@/components/ui/DataDisplay";
 import TextLink from "@/components/ui/TextLink";
 import TenantKindTags from "@/components/domain/TenantKindTags";
 import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
+import FormattedDate from "@/components/ui/FormattedDate";
 
 /**
  * A tenant page's Details tab: who they are, their houses and rents, then
@@ -87,7 +88,7 @@ export default function TenantDetailsCards({
             <DetailRow label="Security deposit">
               {tenant.depositAmount ? formatMoney(tenant.depositAmount) : draft ? "Not set" : "None"}
             </DetailRow>
-            <DetailRow label="Moved in">{tenant.leaseStart ? formatDateKey(tenant.leaseStart) : "Not set"}</DetailRow>
+            <DetailRow label="Moved in">{tenant.leaseStart ? <FormattedDate date={tenant.leaseStart} /> : "Not set"}</DetailRow>
             <DetailRow label={owner ? "Billing from" : "Rent tracked from"}>
               {tenant.billingStart
                 ? formatMonth(tenant.billingStart) + paidUpToBefore
@@ -109,7 +110,7 @@ export default function TenantDetailsCards({
             <DetailList dividers>
               {houseHistory.map((h) => (
                 <DetailRow key={`${h.unitCode}-${h.startDate}`} label={h.label ? `${h.unitCode} · ${h.label}` : h.unitCode}>
-                  {formatDateKey(h.startDate)} → {h.endDate ? formatDateKey(h.endDate) : "now"}
+                  <FormattedDate date={h.startDate} /> → {h.endDate ? <FormattedDate date={h.endDate} /> : "now"}
                 </DetailRow>
               ))}
             </DetailList>

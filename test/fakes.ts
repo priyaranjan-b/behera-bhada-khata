@@ -17,6 +17,7 @@ import { ApiError } from "@/lib/errors";
 import type {
   Adjustment,
   AuditLogEntry,
+  DisplayDateFormat,
   OwnerProfile,
   Payment,
   PaymentNotePreset,
@@ -169,6 +170,7 @@ function build() {
   const state = {
     tenants: new Map<string, Tenant>([["00000000-0000-4000-8000-000000000101", tenant()]]),
     payments: new Map<string, Payment>([["00000000-0000-4000-8000-000000000201", payment()]]),
+    dateFormat: "DD/MMM/YYYY" as DisplayDateFormat,
     adjustments: new Map<string, Adjustment>(),
     files: new Map<string, Uint8Array>(),
     proofs: new Map<string, PaymentProof>(),
@@ -252,6 +254,12 @@ function build() {
   }
 
   const owner = {
+    appSettings: {
+      getDateFormat: vi.fn(async () => state.dateFormat),
+      setDateFormat: vi.fn(async (dateFormat: DisplayDateFormat) => {
+        state.dateFormat = dateFormat;
+      }),
+    },
     corrections: {
       status: vi.fn(async () => ({
         pinSet: true,
@@ -695,6 +703,7 @@ function build() {
       },
       rentPeriods: { page: owner.rentPeriods.page },
       ledger: owner.ledger,
+      appSettings: { getDateFormat: owner.appSettings.getDateFormat },
       payments: {
         listProofs: vi.fn(async (ids: string[]) =>
           [...state.proofs.values()].filter((p) => ids.includes(p.payment_id) && ownPayment(p.payment_id))

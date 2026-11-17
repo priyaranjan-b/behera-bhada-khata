@@ -10,9 +10,11 @@
 export const APP_TIME_ZONE = "Asia/Kolkata";
 export const APP_LOCALE = "en-IN";
 /**
- * How every calendar date is written, shown and typed (dayjs tokens: DD, MM,
- * YYYY): formatDateKey, the DateField picker and receipts. The audit log's SQL
- * (audit_date, 0024) writes the same, kept equal by test/schema.test.ts.
+ * How dates are written outside the UI and typed (dayjs tokens: DD, MM,
+ * YYYY): formatDateKey's default, services, receipts, the paged queries'
+ * search text and the DateField picker. The audit log's SQL (audit_date,
+ * 0024) writes the same, kept equal by test/schema.test.ts. What the UI
+ * shows is the owner's display format instead (DISPLAY_DATE_FORMATS, A36).
  */
 export const DATE_FORMAT = "DD/MM/YYYY";
 /** How the MonthField picker writes a month in its input. */
@@ -167,24 +169,32 @@ export function formatMonthRange(from: string, to: string): string {
   return from === to ? formatMonth(from) : `${formatMonth(from, "short")} – ${formatMonth(to, "short")}`;
 }
 
-export function formatDateTime(instant: Date | string): string {
+/** An instant as its date (see formatDateKey) and time, in the app time zone. */
+export function formatDateTime(instant: Date | string, format: string = DATE_FORMAT): string {
   const d = typeof instant === "string" ? new Date(instant) : instant;
-  return `${formatDateKey(dateKeyOf(d))}, ${timeFormatter.format(d)}`;
+  return `${formatDateKey(dateKeyOf(d), format)}, ${timeFormatter.format(d)}`;
 }
 
+/** Fixed English short month names: the same text on the server, in the browser and on any locale. */
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 /**
- * A date key (yyyy-MM-dd) in DATE_FORMAT, e.g. "04/10/2026". Built from the
- * key's own digits, so server, browser and PDF print the same text.
+ * A date key (yyyy-MM-dd) as text, e.g. "04/10/2026". `format` (dayjs tokens
+ * YYYY, MMM, MM, DD) defaults to DATE_FORMAT, which services, SQL text and
+ * receipts keep; the UI passes the owner's display format (A36, useDates).
+ * Built from the key's own digits, so server, browser and PDF agree.
  */
-export function formatDateKey(dateKey: string): string {
+export function formatDateKey(dateKey: string, format: string = DATE_FORMAT): string {
   const [year, month, day] = dateKey.slice(0, 10).split("-");
-  return DATE_FORMAT.replace("YYYY", year).replace("MM", month).replace("DD", day);
+  return format.replace(/YYYY|MMM|MM|DD/g, (token) =>
+    token === "YYYY" ? year : token === "MMM" ? (MONTH_SHORT[Number(month) - 1] ?? month) : token === "MM" ? month : day
+  );
 }
 
 /** A from/to day filter as text: "01/10/2026 – 31/10/2026", "From 01/10/2026", "Until 31/10/2026", or "" when neither is set. */
-export function formatDayRange(from: string, to: string): string {
-  if (from && to) return `${formatDateKey(from)} – ${formatDateKey(to)}`;
-  if (from) return `From ${formatDateKey(from)}`;
-  if (to) return `Until ${formatDateKey(to)}`;
+export function formatDayRange(from: string, to: string, format: string = DATE_FORMAT): string {
+  if (from && to) return `${formatDateKey(from, format)} – ${formatDateKey(to, format)}`;
+  if (from) return `From ${formatDateKey(from, format)}`;
+  if (to) return `Until ${formatDateKey(to, format)}`;
   return "";
 }

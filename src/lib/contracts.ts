@@ -16,6 +16,7 @@ import type { BillingShow, TenantMonthShow } from "@/lib/domain/billing";
 import type {
   AuditAction,
   AuditActorKind,
+  DisplayDateFormat,
   MaintenanceCategory,
   PaidDirectView,
   PaymentMode,
@@ -44,6 +45,7 @@ import type {
   correctMoveOutSchema,
   correctPaidThroughSchema,
   setCorrectionPinSchema,
+  displaySettingsSchema,
   stopRentTrackingSchema,
   correctRentSchema,
   startRentTrackingSchema,
@@ -470,6 +472,15 @@ export interface DefaultersReport {
   /** Most months behind first (compareAging). */
   rows: DefaulterRow[];
 }
+
+// ---- /api/dashboard/settings/display (0040, D42) ---------------------------
+
+/** How the UI shows dates (A36); services, SQL and receipts keep DATE_FORMAT. */
+export interface DisplaySettingsView {
+  dateFormat: DisplayDateFormat;
+}
+
+export type SetDisplaySettingsInput = z.infer<typeof displaySettingsSchema>;
 
 // ---- /api/dashboard/profile/correction-pin (0039, D41) -----------------------
 

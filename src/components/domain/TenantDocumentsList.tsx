@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/DataDisplay";
 import { SectionCard } from "@/components/ui";
 import { apiHref, apiPaths } from "@/lib/api-client";
 import type { TenantDocumentView } from "@/lib/contracts";
-import { formatDateTime } from "@/lib/dates";
+import FormattedDate from "@/components/ui/FormattedDate";
 
 /**
  * The tenant portal's Documents tab (A32): the files the owner keeps on the
@@ -39,7 +39,11 @@ export default async function TenantDocumentsList({ documents }: { documents: Pr
               </ListItemIcon>
               <ListItemText
                 primary={doc.documentType}
-                secondary={`${doc.fileName} · added ${formatDateTime(doc.uploadedAt)}`}
+                secondary={
+                  <>
+                    {doc.fileName} · added <FormattedDate date={doc.uploadedAt} withTime />
+                  </>
+                }
                 slotProps={{ secondary: { noWrap: true } }}
               />
             </ListItemButton>

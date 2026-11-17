@@ -9,7 +9,7 @@ import type { GridSortModel } from "@mui/x-data-grid";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import { LEDGER_SHOW_OPTIONS, LEDGER_STATUS_LABELS, type LedgerRow, type LedgerShow } from "@/lib/domain/tenantLedger";
 import type { TenantLedgerQuery, TenantLedgerView } from "@/lib/contracts";
-import { formatDateKey, formatDayRange, formatMonth, monthDayRange, monthKeyOf } from "@/lib/dates";
+import { formatMonth, monthDayRange, monthKeyOf } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import DataTable, {
   moneyColumn,
@@ -30,6 +30,7 @@ import ShareReceiptButton from "@/components/domain/ShareReceiptButton";
 import { api, apiHref, apiPaths } from "@/lib/api-client";
 import { routes } from "@/lib/routes";
 import LinkButton from "@/components/ui/Loading/LinkButton";
+import { useDates } from "@/components/ui/DateFormat";
 
 type FilterMode = "all" | "range" | "month";
 
@@ -123,6 +124,7 @@ function blankZero(value: number | null | undefined) {
  * downloads, and no owner tags (A32).
  */
 export default function TenantLedgerTable(props: TenantLedgerSource) {
+  const { formatDayRange } = useDates();
   const tenantId = props.source === "owner" ? props.tenantId : null;
   const forTenant = tenantId === null;
   const load = useCallback(
@@ -150,7 +152,7 @@ export default function TenantLedgerTable(props: TenantLedgerSource) {
         headerName: "Date",
         minWidth: 110,
         flex: 0.6,
-        valueFormatter: (value: string) => formatDateKey(value),
+        dateKind: "date",
         filterOperators: SERVER_TEXT_OPERATORS,
       },
       {

@@ -23,11 +23,12 @@ import { SectionCard } from "@/components/ui";
 import FileIcon from "@/components/ui/FileIcon";
 import { api, apiHref, apiPaths, errorMessage } from "@/lib/api-client";
 import type { TenantDocumentView } from "@/lib/contracts";
-import { dateKeyOf, formatDateKey } from "@/lib/dates";
+import { dateKeyOf } from "@/lib/dates";
 import { formatBytes, prepareProofFile } from "@/lib/proofImages";
 import { DOCUMENT_LIMITS, TENANT_DOCUMENT_TYPES } from "@/lib/validation";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 import Loader from "@/components/ui/Loading/Loader";
+import { useDates } from "@/components/ui/DateFormat";
 
 /** A file added on the Edit tenant page with its own type; uploaded when the form is saved. */
 export interface PendingDocument {
@@ -55,6 +56,7 @@ export default function TenantDocumentsCard({
   onPendingChange: (pending: PendingDocument[]) => void;
   disabled?: boolean;
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const router = useAppRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState(saved);

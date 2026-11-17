@@ -1,4 +1,5 @@
 import "server-only";
+import { getDateFormat } from "../tables/owner";
 import { asc, eq, getTableColumns, inArray } from "drizzle-orm";
 import type { TenantDocument, TenantRentRate } from "@/lib/types";
 import type { TenantRepositories } from "@/server/ports";
@@ -52,6 +53,9 @@ export function drizzleTenantRepositories(db: Db, tenantId: string): TenantRepos
     must(inScope(db, { role: "tenant_reader", tenantId }, fn), `tenant portal: ${what}`);
 
   return {
+    appSettings: {
+      getDateFormat: () => read("read date format", (tx) => getDateFormat(tx)),
+    },
     tenants: {
       get: (id) => read(`get tenant ${id}`, (tx) => getTenant(tx, id)),
       accountSummary: (id) => read(`read tenant account ${id}`, (tx) => tenantAccountSummary(tx, id)),

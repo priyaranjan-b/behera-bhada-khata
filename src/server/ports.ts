@@ -22,6 +22,7 @@ import type {
   TenantMonthDbRow,
   AdjustmentAllocation,
   Database,
+  DisplayDateFormat,
   LedgerStatus,
   Location,
   MaintenanceCategory,
@@ -371,6 +372,12 @@ export interface OwnerRepositories {
     log(event: AuditEvent): Promise<void>;
   };
   /** The owner's name (0013): one row. */
+  /** Rent-book-wide preferences (0040, D42): so far how the UI shows dates. */
+  appSettings: {
+    /** The default until the owner picks one. */
+    getDateFormat(): Promise<DisplayDateFormat>;
+    setDateFormat(dateFormat: DisplayDateFormat): Promise<void>;
+  };
   ownerProfile: {
     get(): Promise<OwnerProfile | null>;
     /** Creates or replaces the row. */
@@ -624,6 +631,7 @@ export interface TenantAccountReads {
   properties: Pick<OwnerRepositories["properties"], "list">;
   units: Pick<OwnerRepositories["units"], "list">;
   tenantDocuments: Pick<OwnerRepositories["tenantDocuments"], "list" | "get">;
+  appSettings: Pick<OwnerRepositories["appSettings"], "getDateFormat">;
 }
 
 /**

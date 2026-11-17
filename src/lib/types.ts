@@ -75,6 +75,16 @@ export const CORRECTION_AUDIT_ACTIONS = [
 ] as const;
 
 /**
+ * How the UI shows a date (0040, D42, A36), as dayjs tokens: set on the
+ * Settings page and saved in app_settings. The UI only - services, SQL text,
+ * the audit log and the PDF receipt keep DATE_FORMAT (dd/MM/yyyy). The first
+ * is the default. Same list as the check on app_settings.date_format.
+ */
+export const DISPLAY_DATE_FORMATS = ["DD/MMM/YYYY", "DD/MM/YYYY", "DD MMM YYYY", "YYYY-MM-DD"] as const;
+export type DisplayDateFormat = (typeof DISPLAY_DATE_FORMATS)[number];
+export const DEFAULT_DISPLAY_DATE_FORMAT: DisplayDateFormat = "DD/MMM/YYYY";
+
+/**
  * What a corrections PIN confirms (0039, D41): each gated SQL function uses up
  * a ticket for its action on one record. Same list as correction_action_label().
  */
@@ -131,6 +141,8 @@ export const AUDIT_ACTIONS = [
   "owner.created",
   "owner.updated",
   "owner.deleted",
+  "settings.created",
+  "settings.updated",
   ...APP_AUDIT_ACTIONS,
   ...CORRECTION_AUDIT_ACTIONS,
 ] as const;
@@ -217,6 +229,13 @@ export interface Database {
         Row: { id: string; text: string; created_at: string; updated_at: string };
         Insert: { text: string };
         Update: { text?: string };
+        Relationships: [];
+      };
+      /** Rent-book-wide preferences, one row (0040, D42); the date format is for the UI only. */
+      app_settings: {
+        Row: { singleton: boolean; date_format: DisplayDateFormat; updated_at: string };
+        Insert: { singleton?: boolean; date_format?: DisplayDateFormat };
+        Update: { date_format?: DisplayDateFormat };
         Relationships: [];
       };
       /** Suggested payment tags (0030, D34), managed on the Settings page. */

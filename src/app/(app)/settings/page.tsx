@@ -5,19 +5,22 @@ import SettingsLayout from "./SettingsLayout";
 import { SETTINGS_SKELETONS as SKELETON } from "./settingsSkeletons";
 import NotesSection from "./sections/NotesSection";
 import TagsSection from "./sections/TagsSection";
+import DatesSection from "./sections/DatesSection";
 
-// The rent book's shared lists, offered while you work (A25): not the
-// owner's profile. Each list streams in on its own call (A12).
+// The rent book's shared lists, offered while you work (A25), and how it
+// shows dates (A36): not the owner's profile. Each streams in on its own
+// call (A12).
 export default function SettingsPage() {
   const tags = serverApi.dashboard.paymentTags();
   const notes = serverApi.dashboard.paymentNotes();
+  const display = serverApi.dashboard.displaySettings();
 
   return (
     <SettingsLayout
       header={
         <PageHeader
           title="Settings"
-          subtitle="Lists the rent book offers while you work. Changing them never edits records already saved."
+          subtitle="Lists the rent book offers while you work, and how it shows dates. Changing them never edits records already saved."
         />
       }
       tags={
@@ -28,6 +31,11 @@ export default function SettingsPage() {
       notes={
         <AsyncSection title="Quick payment notes" fallback={SKELETON.list}>
           <NotesSection notes={notes} />
+        </AsyncSection>
+      }
+      dates={
+        <AsyncSection title="Date format" fallback={SKELETON.dates}>
+          <DatesSection settings={display} />
         </AsyncSection>
       }
     />

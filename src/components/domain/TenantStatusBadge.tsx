@@ -1,5 +1,7 @@
+"use client";
+
 import { StatusBadge } from "@/components/ui/DataDisplay";
-import { formatDateKey } from "@/lib/dates";
+import { useDates } from "@/components/ui/DateFormat";
 import { TENANT_STATUS_DISPLAY } from "@/lib/domain/tenant";
 import type { TenantStatus } from "@/lib/types";
 
@@ -11,7 +13,8 @@ export default function TenantStatusBadge({
   status: TenantStatus;
   movedOutOn?: string | null;
 }) {
+  const { formatDate } = useDates();
   const { label, tone } = TENANT_STATUS_DISPLAY[status];
-  const text = status === "inactive" && movedOutOn ? `${label} ${formatDateKey(movedOutOn)}` : label;
+  const text = status === "inactive" && movedOutOn ? `${label} ${formatDate(movedOutOn)}` : label;
   return <StatusBadge tone={tone} label={text} />;
 }

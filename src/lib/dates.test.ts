@@ -57,6 +57,17 @@ describe("dates (Asia/Kolkata)", () => {
     // 2026-10-31 20:00 UTC is 1 Nov 01:30 IST.
     expect(formatDateTime("2026-10-31T20:00:00Z")).toBe("01/11/2026, 1:30 am IST");
   });
+
+  it("writes every display format the UI offers (A36), month names fixed in English", () => {
+    expect(formatDateKey("2026-11-18", "DD/MMM/YYYY")).toBe("18/Nov/2026");
+    expect(formatDateKey("2026-11-18", "DD/MM/YYYY")).toBe("18/11/2026");
+    expect(formatDateKey("2026-11-18", "DD MMM YYYY")).toBe("18 Nov 2026");
+    expect(formatDateKey("2026-11-18", "YYYY-MM-DD")).toBe("2026-11-18");
+    const names = Array.from({ length: 12 }, (_, i) => formatDateKey(`2026-${String(i + 1).padStart(2, "0")}-01`, "MMM"));
+    expect(names).toEqual(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]);
+    expect(formatDateTime("2026-10-31T20:00:00Z", "DD/MMM/YYYY")).toBe("01/Nov/2026, 1:30 am IST");
+    expect(formatDayRange("2026-10-01", "2026-10-31", "DD MMM YYYY")).toBe("01 Oct 2026 – 31 Oct 2026");
+  });
 });
 
 describe("month helpers", () => {

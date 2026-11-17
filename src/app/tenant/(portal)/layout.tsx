@@ -6,6 +6,7 @@ import { PublicLayout } from "@/components/ui";
 import LinkButton from "@/components/ui/Loading/LinkButton";
 import { serverApi } from "@/lib/api-client/server";
 import { routes } from "@/lib/routes";
+import { DateFormatProvider } from "@/components/ui/DateFormat";
 import TenantSignOutButton from "./TenantSignOutButton";
 
 export const metadata: Metadata = { title: "My rent", robots: { index: false, follow: false } };
@@ -14,8 +15,9 @@ export const metadata: Metadata = { title: "My rent", robots: { index: false, fo
 // is signed in and Sign out. The session check here is for the header only;
 // every read on the page checks the tenant session again (serverApi.tenant).
 export default async function TenantPortalLayout({ children }: LayoutProps<"/tenant">) {
-  const session = await serverApi.tenant.session();
+  const [session, display] = await Promise.all([serverApi.tenant.session(), serverApi.tenant.displaySettings()]);
   return (
+    <DateFormatProvider format={display.dateFormat}>
     <PublicLayout width="lg" align="top">
       <Stack spacing={3}>
         <Stack direction="row" spacing={2} sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }} useFlexGap>
@@ -35,5 +37,6 @@ export default async function TenantPortalLayout({ children }: LayoutProps<"/ten
         {children}
       </Stack>
     </PublicLayout>
+    </DateFormatProvider>
   );
 }

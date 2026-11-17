@@ -9,11 +9,11 @@ import type { GridSortModel } from "@mui/x-data-grid";
 import DataTable, { useServerGrid } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/DataDisplay";
 import { api } from "@/lib/api-client";
-import { formatDayRange } from "@/lib/dates";
 import type { AuditEntry, AuditTablePage, AuditTableQuery } from "@/lib/contracts";
 import { AUDIT_CATEGORIES, AUDIT_CATEGORY_LABELS, type AuditCategory } from "@/lib/domain/audit";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { ACTIVITY_COLUMNS, TENANT_HISTORY_COLUMNS } from "./auditColumns";
+import { useDates } from "@/components/ui/DateFormat";
 
 /** Whose history: every change (Activity) or one tenant's (the tenant page). Plain data, so a Server Component can pass it. */
 export type AuditHistorySource = { kind: "all" } | { kind: "tenant"; tenantId: string };
@@ -66,6 +66,7 @@ export default function AuditHistoryTable({
   subtitle: string;
   emptyDescription: string;
 }) {
+  const { formatDayRange } = useDates();
   const tenantId = source.kind === "tenant" ? source.tenantId : null;
   const load = useCallback(
     (query: AuditTableQuery) => (tenantId ? api.dashboard.tenants.history(tenantId, query) : api.dashboard.activity(query)),

@@ -14,7 +14,7 @@ import HousePicker from "@/components/domain/HousePicker";
 import TagsField from "@/components/domain/TagsField";
 import { api, errorMessage } from "@/lib/api-client";
 import type { MaintenanceDetail, MaintenanceHouseOption, MaintenancePrefill } from "@/lib/contracts";
-import { formatDateKey, todayKey } from "@/lib/dates";
+import { todayKey } from "@/lib/dates";
 import { splitEqually } from "@/lib/domain/houses";
 import { MAINTENANCE_CATEGORY_OPTIONS } from "@/lib/domain/maintenance";
 import { recentDayPicks } from "@/lib/domain/payments";
@@ -23,6 +23,7 @@ import { prepareProofFile } from "@/lib/proofImages";
 import { FLASH, routes } from "@/lib/routes";
 import type { MaintenanceCategory } from "@/lib/types";
 import { MAINTENANCE_FILE_LIMITS, MAINTENANCE_LIMITS } from "@/lib/validation";
+import { useDates } from "@/components/ui/DateFormat";
 
 /**
  * Records a maintenance expense (0031, D35) on one or more houses, split
@@ -44,6 +45,7 @@ export default function MaintenanceForm({
   /** A new expense started from a set-off payment (A22). */
   prefill?: MaintenancePrefill;
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const router = useAppRouter();
   // An edited expense may cover a house since retired: keep it choosable.
   const options = useMemo(() => {

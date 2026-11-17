@@ -15,14 +15,15 @@ import { LEDGER_FILTER_FIELDS, LEDGER_SHOWS, LEDGER_SORT_FIELDS } from "@/lib/do
 import { normalizePhone } from "@/lib/domain/phone";
 import { PAYMENTS_FILTER_FIELDS, PAYMENTS_SORT_FIELDS } from "@/lib/domain/payments";
 import {
+  DISPLAY_DATE_FORMATS,
   MAINTENANCE_CATEGORIES,
   PAID_DIRECT_VIEWS,
   PAYMENT_MODES,
   PREFERRED_CHANNELS,
   RECORD_TYPES,
   TENANT_KINDS,
-  UNIT_TYPES,
   type TenantKind,
+  UNIT_TYPES,
 } from "@/lib/types";
 
 // Every request body the API accepts, validated by the service that receives
@@ -300,6 +301,13 @@ export const updateTenantSchema = z
     houseRents: houseRentsSchema,
   })
   .superRefine((input, ctx) => checkGovernmentOnly(input, ctx, { phoneRequired: false }));
+
+// ---- Display settings (0040, D42) -----------------------------------------
+
+/** How the UI shows dates (A36): one of DISPLAY_DATE_FORMATS. */
+export const displaySettingsSchema = z.object({
+  dateFormat: z.enum(DISPLAY_DATE_FORMATS, { error: "Pick one of the date formats" }),
+});
 
 // ---- Corrections PIN (0039, D41) -------------------------------------------
 

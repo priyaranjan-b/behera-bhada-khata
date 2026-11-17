@@ -6,7 +6,7 @@ import { SETTINGS_SKELETONS as SKELETON } from "./settingsSkeletons";
 export default function SettingsLoading() {
   return (
     <PageSkeleton label="Loading settings…">
-      <SettingsLayout header={SKELETON.header} tags={SKELETON.list} notes={SKELETON.list} />
+      <SettingsLayout header={SKELETON.header} tags={SKELETON.list} notes={SKELETON.list} dates={SKELETON.dates} />
     </PageSkeleton>
   );
 }

@@ -1,3 +1,4 @@
+import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { FLASH } from "@/lib/routes";
@@ -42,10 +43,17 @@ export default async function ProfilePage({
       <ProfileSummary profile={profile} />
       {/* Remount on save so the form starts from what was stored. */}
       <ProfileForm key={`${profile.displayName}|${profile.signatureName}|${profile.signatureUrl}`} profile={profile} />
-      <ChangePasswordCard />
-      <AsyncSection title="Corrections PIN" fallback={<DetailCardSkeleton rows={3} action={false} />}>
-        <CorrectionPinSection status={pin} />
-      </AsyncSection>
+      {/* Side by side on wide screens, stacked on phones. */}
+      <Grid container spacing={2} sx={{ alignItems: "stretch" }}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <ChangePasswordCard />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <AsyncSection title="Corrections PIN" fallback={<DetailCardSkeleton rows={3} action={false} />}>
+            <CorrectionPinSection status={pin} />
+          </AsyncSection>
+        </Grid>
+      </Grid>
     </Stack>
   );
 }

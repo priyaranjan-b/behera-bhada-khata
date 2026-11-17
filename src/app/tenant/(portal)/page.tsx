@@ -31,7 +31,7 @@ export default async function TenantPortalPage({ searchParams }: PageProps<"/ten
   // A new version per server render resets the kept tabs (as on the owner's tenant page).
   // eslint-disable-next-line react-hooks/purity -- a per-render token, not data
   const version = Date.now();
-  const { tenant } = await serverApi.tenant.profile();
+  const [{ tenant }, { dateFormat }] = await Promise.all([serverApi.tenant.profile(), serverApi.tenant.displaySettings()]);
   const active = tenant.status === "active";
   // Government rent paid to the owner directly (0016): no months, no dues, no payments here.
   const untracked = active && !tenant.rentTracked;
@@ -83,7 +83,7 @@ export default async function TenantPortalPage({ searchParams }: PageProps<"/ten
       : []),
   ];
 
-  const movedOut = active ? null : tenant.movedOutOn ? `Moved out ${formatDateKey(tenant.movedOutOn)}` : "Moved out";
+  const movedOut = active ? null : tenant.movedOutOn ? `Moved out ${formatDateKey(tenant.movedOutOn, dateFormat)}` : "Moved out";
 
   return (
     <Stack spacing={2}>

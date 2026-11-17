@@ -64,7 +64,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D41), see below.
+- **Database:** `docs/database-design.md` (D1–D42), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -94,7 +94,8 @@ test instead.
   2Factor (`OTP_PROVIDER`, the `OtpGateway` port; A34), and the tenant portal: phone sign-in,
   `/tenant` with no id, read-only (A32), and phone navigation as a bottom
   bar (A33), and changes to past records confirmed with a corrections PIN
-  checked in the database (A35). Read it before changing any of these, and add
+  checked in the database (A35), and the date display format, a UI-only
+  setting saved in `app_settings` (A36). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
@@ -538,10 +539,16 @@ Each of these was found broken somewhere; keep them when adding code.
   `yyyy-MM` of an input/URL/grouping key, `monthKeyOf` back,
   `monthsBetween`, `addMonthsToKey`), never `.slice(0, 7)` or
   `` `${month}-01` ``.
-- **Every date a user sees is formatted** (`formatDateKey`, `formatMonth`,
-  `formatDateTime`); never render a raw `yyyy-MM-dd`. Dates read
-  `DATE_FORMAT` (dd/MM/yyyy, `src/lib/dates.ts`, matched by SQL
-  `audit_date`), and every date/month input is the kit's `DateField` /
+- **Every date a user sees is formatted**; never render a raw `yyyy-MM-dd`.
+  The UI shows dates in the owner's display format (A36: Settings → Date
+  format, `app_settings.date_format`, default dd/MMM/yyyy): client
+  components through `useDates()`, server-safe JSX through `<FormattedDate>`,
+  table columns through `dateColumn` (the table applies the format), and the
+  few server pages that build text pass `serverApi.dashboard.displaySettings()`
+  to `formatDateKey(key, format)` - ESLint keeps the bare formatters out of
+  `src/app` and `src/components` otherwise. Services, SQL text (`dateLabel`,
+  `audit_date`), the stored audit text and the PDF receipt keep `DATE_FORMAT`
+  (dd/MM/yyyy, the formatters' default). Every date/month input is the kit's `DateField` /
   `MonthField` (MUI pickers; ESLint bans native `type="date"`/`"month"`). Every number/date
   formatter passes `APP_LOCALE` (no `"en-IN"` literals, no
   `toLocaleString(undefined, …)`, which differs between server and browser).

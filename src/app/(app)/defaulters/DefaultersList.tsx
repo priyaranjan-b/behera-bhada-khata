@@ -9,7 +9,7 @@ import DataTable, { moneyColumn, type DataTableColDef } from "@/components/ui/Da
 import { EmptyState, IdentityCell, StatusBadge, TagPill } from "@/components/ui/DataDisplay";
 import { GridCell } from "@/components/ui";
 import type { DefaulterRow } from "@/lib/contracts";
-import { formatDateKey, formatMonth } from "@/lib/dates";
+import { formatMonth } from "@/lib/dates";
 import { agingBucketOf, AGING_BUCKETS, isAgingBucketKey, type AgingBucketKey } from "@/lib/domain/reports";
 import { formatUnits } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
@@ -79,7 +79,8 @@ const columns: DataTableColDef<DefaulterRow>[] = [
     field: "lastPaymentDate",
     headerName: "Last payment",
     minWidth: 140,
-    valueFormatter: (value: string | null) => (value ? formatDateKey(value) : "None recorded"),
+    dateKind: "date",
+    emptyText: "None recorded",
   },
   {
     field: "propertyName",

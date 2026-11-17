@@ -13,8 +13,8 @@ import { EmptyState } from "@/components/ui/DataDisplay";
 import { Loader, LoadingButton } from "@/components/ui/Loading";
 import { api, errorMessage } from "@/lib/api-client";
 import type { AuditEntry } from "@/lib/contracts";
-import { formatDateTime } from "@/lib/dates";
 import { routes } from "@/lib/routes";
+import { useDates } from "@/components/ui/DateFormat";
 
 /** Whose history: a house's (its details and tenancies) or a maintenance expense's (0031). */
 export type AuditSubject = { kind: "house"; unitCode: string } | { kind: "maintenance"; expenseId: string };
@@ -42,6 +42,7 @@ function groupByChange(entries: AuditEntry[]): AuditEntry[][] {
  * each change to its tenant.
  */
 export default function AuditTimeline({ subject, showTenant = false }: { subject: AuditSubject; showTenant?: boolean }) {
+  const { formatDateTime } = useDates();
   const key = subject.kind === "house" ? subject.unitCode : subject.expenseId;
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [nextBefore, setNextBefore] = useState<number | null>(null);

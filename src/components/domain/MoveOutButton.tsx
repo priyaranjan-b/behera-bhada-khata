@@ -13,11 +13,12 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { api, errorMessage } from "@/lib/api-client";
-import { addMonthsToKey, currentMonthKey, formatDateKey, formatMonth, formatMonthRange, monthKeyOf, todayKey } from "@/lib/dates";
+import { addMonthsToKey, currentMonthKey, formatMonth, formatMonthRange, monthKeyOf, todayKey } from "@/lib/dates";
 import { moveOutNeedsPin, moveOutPinFrom } from "@/lib/domain/corrections";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import { useCorrectionSubmit } from "./useCorrectionSubmit";
+import { useDates } from "@/components/ui/DateFormat";
 
 /**
  * Ends all of a tenant's houses on a date. Their ledger stays: dues up to the
@@ -42,6 +43,7 @@ export default function MoveOutButton({
   draft?: boolean;
   disabled?: boolean;
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);

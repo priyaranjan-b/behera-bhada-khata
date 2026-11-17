@@ -31,7 +31,6 @@ import StatCardRow from "@/components/ui/StatCardRow";
 import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
 import type { PaymentListRow, PaymentsPage, PaymentsPageQuery, PaymentTotals } from "@/lib/contracts";
-import { formatDateKey } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { isCashMode, PAYMENT_MODE_OPTIONS, paymentModeLabel, type DayRange } from "@/lib/domain/payments";
 import { PAYMENT_MODES, type PaymentMode } from "@/lib/types";
@@ -39,6 +38,7 @@ import { formatMoney, round2 } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
 import { PAYMENT_STAT_COLUMNS } from "./paymentStatColumns";
+import { useDates } from "@/components/ui/DateFormat";
 
 const tagsOf = (row: PaymentListRow) => row.tags;
 /** The database filters on the label the column shows. */
@@ -49,8 +49,7 @@ const baseColumns: DataTableColDef<PaymentListRow>[] = [
     field: "paymentDate",
     headerName: "Date received",
     minWidth: 130,
-    valueFormatter: (value: string) => formatDateKey(value),
-    exportValue: (row) => formatDateKey(row.paymentDate),
+    dateKind: "date",
     filterOperators: SERVER_TEXT_OPERATORS,
   },
   {
@@ -170,6 +169,7 @@ export default function PaymentsView({
   /** Suggested tag names for the tag editor (Settings). */
   tagSuggestions: string[];
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const { from, to } = range;
   const [editing, setEditing] = useState<PaymentListRow | null>(null);
   const [suggestions, setSuggestions] = useState(tagSuggestions);

@@ -1381,3 +1381,41 @@ ticket committed on its own before the write (another session holding the
 owner's token could use it, with its own arguments, until it expired); a
 server-only Postgres role for the corrections (stops REST, but not someone
 using the app itself with the session).
+
+### A36 — The date display format is a UI setting (default dd/MMM/yyyy)
+
+**Context.** Every date was written `dd/MM/yyyy` (18/11/2026). The owner
+wanted dd/MMM/yyyy (18/Nov/2026) by default, changeable, and saved in the
+database - but only for what the UI shows: services, the database and the
+PDF receipt keep `dd/MM/yyyy`.
+
+**Decision.**
+- **Stored once for the rent book:** `app_settings.date_format` (0040, D42),
+  one of `DISPLAY_DATE_FORMATS` (`DD/MMM/YYYY` default, `DD/MM/YYYY`,
+  `DD MMM YYYY`, `YYYY-MM-DD`), set on Settings ("Date format" card). The
+  tenant portal reads it too.
+- **The UI applies it; nothing else does.** `formatDateKey` /
+  `formatDateTime` / `formatDayRange` take an optional format defaulting to
+  `DATE_FORMAT` (dd/MM/yyyy), which services, SQL labels (`dateLabel`), the
+  audit text (`audit_date`, stored when written, D27) and receipts keep. The
+  layouts read the setting (`serverApi.dashboard.displaySettings()`, cached
+  per request) into `DateFormatProvider`, so the first render is already
+  right; client components use `useDates()`, server-safe JSX
+  `<FormattedDate>`, tables `dateColumn` (DataTable formats those columns,
+  so columns stay module constants), and the three server pages that build
+  text pass the format explicitly. An ESLint rule keeps the bare formatters
+  out of `src/app` / `src/components` elsewhere.
+- **Month names are fixed English** (Jan…Dec), so server and browser print
+  the same text whatever the locale.
+
+**Accepted consequences:** typing a date stays `dd/MM/yyyy` (the
+`DateField` input format, quick on a phone keypad); searching a server-paged
+table by date matches the database's `dd/MM/yyyy` text, not month names;
+Change history details written before or after keep `dd/MM/yyyy` (stored
+text); messages a service builds (a lockout time) stay `dd/MM/yyyy`;
+`/tenant/select`, outside the portal layout, shows the default format.
+
+**Rejected:** a per-browser cookie (the owner wanted it saved in the
+database); a module-wide "current format" set per request (shared mutable
+state on the server); changing `DATE_FORMAT` itself (would change receipts,
+SQL text and stored audit text).

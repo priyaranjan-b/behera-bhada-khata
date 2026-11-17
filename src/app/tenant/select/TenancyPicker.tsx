@@ -10,10 +10,11 @@ import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { Loader } from "@/components/ui/Loading";
 import { api, errorMessage } from "@/lib/api-client";
 import type { TenancyOption } from "@/lib/contracts";
-import { formatDateKey } from "@/lib/dates";
+import { useDates } from "@/components/ui/DateFormat";
 
 /** One button per tenancy of the signed-in phone; choosing opens it (A32). */
 export default function TenancyPicker({ tenancies }: { tenancies: TenancyOption[] }) {
+  const { formatDate: formatDateKey } = useDates();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 

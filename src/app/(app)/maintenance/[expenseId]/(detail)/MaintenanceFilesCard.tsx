@@ -18,15 +18,17 @@ import FileIcon from "@/components/ui/FileIcon";
 import { LoadingButton, useAppRouter } from "@/components/ui/Loading";
 import { api, apiHref, apiPaths, errorMessage } from "@/lib/api-client";
 import type { MaintenanceFileView } from "@/lib/contracts";
-import { dateKeyOf, formatDateKey } from "@/lib/dates";
+import { dateKeyOf } from "@/lib/dates";
 import { formatBytes, prepareProofFile } from "@/lib/proofImages";
 import { MAINTENANCE_FILE_LIMITS } from "@/lib/validation";
+import { useDates } from "@/components/ui/DateFormat";
 
 /**
  * An expense's receipts, bills and photos (0031): open, delete (after a
  * confirmation), or add more - photos are compressed in the browser first.
  */
 export default function MaintenanceFilesCard({ expenseId, files: saved }: { expenseId: string; files: MaintenanceFileView[] }) {
+  const { formatDate: formatDateKey } = useDates();
   const router = useAppRouter();
   const [files, setFiles] = useState(saved);
   const [adding, setAdding] = useState<File[]>([]);

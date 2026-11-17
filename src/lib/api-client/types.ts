@@ -19,6 +19,8 @@ import type {
   Created,
   CorrectMoveOutInput,
   CorrectionPinView,
+  DisplaySettingsView,
+  SetDisplaySettingsInput,
   CorrectPaidThroughInput,
   CorrectRentInput,
   StartRentTrackingInput,
@@ -134,6 +136,8 @@ export interface ApiQueries {
     profile(): Promise<OwnerProfileView>;
     /** Whether a corrections PIN is set (Profile, the correction dialogs). */
     correctionPin(): Promise<CorrectionPinView>;
+    /** How the UI shows dates (A36): read by the app's layout. */
+    displaySettings(): Promise<DisplaySettingsView>;
     /** Quick-select notes for Record payment (Settings). */
     paymentNotes(): Promise<PaymentNotePresetView[]>;
     /** Suggested payment tags with usage counts (Settings). */
@@ -204,6 +208,8 @@ export interface ApiQueries {
     months(query?: TenantMonthsQuery): Promise<TenantMonthsPage>;
     ledger(query?: TenantLedgerQuery): Promise<TenantLedgerView>;
     documents(): Promise<TenantDocumentView[]>;
+    /** How the owner chose to show dates (A36). */
+    displaySettings(): Promise<DisplaySettingsView>;
   };
   confirm: {
     detail(token: string): Promise<ConfirmView>;
@@ -223,6 +229,8 @@ export interface ApiCommands {
     changePassword(input: ChangePasswordInput): Promise<void>;
     /** Sets or changes the corrections PIN (0039). */
     setCorrectionPin(input: SetCorrectionPinInput): Promise<CorrectionPinView>;
+    /** The date format on the Settings page (A36). */
+    setDisplaySettings(input: SetDisplaySettingsInput): Promise<DisplaySettingsView>;
     createPaymentNote(input: PaymentNotePresetInput): Promise<void>;
     updatePaymentNote(noteId: string, input: PaymentNotePresetInput): Promise<void>;
     deletePaymentNote(noteId: string): Promise<void>;

@@ -29,7 +29,6 @@ import StatCard from "@/components/ui/StatCard";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
 import { api } from "@/lib/api-client";
 import type { MaintenanceListRow, MaintenancePage, MaintenancePageQuery } from "@/lib/contracts";
-import { formatDateKey } from "@/lib/dates";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import {
   MAINTENANCE_CATEGORY_OPTIONS,
@@ -41,6 +40,7 @@ import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
+import { useDates } from "@/components/ui/DateFormat";
 
 const tagsOf = (row: MaintenanceListRow) => row.tags;
 /** The database filters on the labels the columns show. */
@@ -54,8 +54,7 @@ const baseColumns: DataTableColDef<MaintenanceListRow>[] = [
     field: "expenseDate",
     headerName: "Date",
     minWidth: 120,
-    valueFormatter: (value: string) => formatDateKey(value),
-    exportValue: (row) => formatDateKey(row.expenseDate),
+    dateKind: "date",
     filterOperators: SERVER_TEXT_OPERATORS,
   },
   {
@@ -172,6 +171,7 @@ export default function MaintenanceView({
   rangeLabel: string;
   tagSuggestions: string[];
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const { from, to } = range;
   const [editing, setEditing] = useState<MaintenanceListRow | null>(null);
   const [suggestions, setSuggestions] = useState(tagSuggestions);

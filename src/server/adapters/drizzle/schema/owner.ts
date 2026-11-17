@@ -25,6 +25,13 @@ export const ownerProfile = pgTable("owner_profile", {
   updated_at: timestamptz("updated_at").notNull().default(sql`now()`),
 });
 
+/** 0040 (D42): rent-book-wide preferences, one row; the check on date_format lives in the migration. */
+export const appSettings = pgTable("app_settings", {
+  singleton: boolean("singleton").primaryKey().default(true),
+  date_format: text("date_format").notNull().default("DD/MMM/YYYY"),
+  updated_at: timestamptz("updated_at").notNull().default(sql`now()`),
+});
+
 /** Unique on lower(text): that index lives in the migration. */
 export const paymentNotePresets = pgTable("payment_note_presets", {
   id: uuid("id").primaryKey().defaultRandom(),

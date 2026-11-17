@@ -3,7 +3,6 @@ import Typography from "@mui/material/Typography";
 import Link from "@/components/ui/Link";
 import { SERVER_TEXT_OPERATORS, type DataTableColDef } from "@/components/ui/DataTable";
 import { GridCell } from "@/components/ui";
-import { formatDateTime } from "@/lib/dates";
 import type { AuditEntry } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
 
@@ -16,7 +15,7 @@ const when: DataTableColDef<AuditEntry> = {
   field: "at",
   headerName: "When",
   minWidth: 170,
-  valueFormatter: (value: string) => formatDateTime(value),
+  dateKind: "dateTime",
 };
 
 const who: DataTableColDef<AuditEntry> = {

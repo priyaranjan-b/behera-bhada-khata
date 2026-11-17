@@ -47,9 +47,11 @@ import {
 } from "../tables/documents";
 import {
   createPaymentNotePreset,
+  getDateFormat,
   getOwnerProfile,
   listPaymentNotePresets,
   removePaymentNotePreset,
+  saveDateFormat,
   saveOwnerProfile,
   updatePaymentNotePreset,
 } from "../tables/owner";
@@ -142,6 +144,10 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
           `read history page of ${filter.tenantId !== undefined ? `tenant ${filter.tenantId}` : "all tenants"} ${pageLabel({ ...filter, from: filter.fromDate, to: filter.toDate })}${filter.actions ? `, ${filter.actions.length} actions` : ""}`,
           (tx) => auditHistoryPage(tx, filter)
         ),
+    },
+    appSettings: {
+      getDateFormat: () => read("read date format", (tx) => getDateFormat(tx)),
+      setDateFormat: (dateFormat) => write(`set date format to ${dateFormat}`, (tx) => saveDateFormat(tx, dateFormat)),
     },
     ownerProfile: {
       get: () => read("get owner profile", getOwnerProfile),

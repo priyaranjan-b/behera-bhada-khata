@@ -35,6 +35,7 @@ import { listPaymentNotePresets } from "@/server/services/paymentNotes";
 import { getPaymentTagSuggestions, listPaymentTags } from "@/server/services/paymentTags";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getCorrectionPin } from "@/server/services/corrections";
+import { getDisplaySettings, getMyDisplaySettings } from "@/server/services/displaySettings";
 import { getPaymentsPage, getPaymentsPaidDirect } from "@/server/services/paymentsReport";
 import { getSearchIndex } from "@/server/services/search";
 import {
@@ -90,6 +91,7 @@ const inProcessApi: ApiQueries = {
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),
     correctionPin: async () => getCorrectionPin(await owner()),
+    displaySettings: async () => getDisplaySettings(await owner()),
     paymentNotes: async () => listPaymentNotePresets(await owner()),
     paymentTags: async () => listPaymentTags(await owner()),
     properties: {
@@ -140,6 +142,7 @@ const inProcessApi: ApiQueries = {
     months: async (query) => getMyMonths(await tenant(), query ?? {}),
     ledger: async (query) => getMyLedger(await tenant(), query ?? {}),
     documents: async () => getMyDocuments(await tenant()),
+    displaySettings: async () => getMyDisplaySettings(await tenant()),
   },
   confirm: {
     detail: (token) => getConfirmView(token),

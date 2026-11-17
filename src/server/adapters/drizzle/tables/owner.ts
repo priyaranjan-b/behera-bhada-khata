@@ -1,8 +1,8 @@
 import "server-only";
 import { asc, eq } from "drizzle-orm";
-import type { OwnerProfile, PaymentNotePreset } from "@/lib/types";
+import { DEFAULT_DISPLAY_DATE_FORMAT, type DisplayDateFormat, type OwnerProfile, type PaymentNotePreset } from "@/lib/types";
 import type { Tx } from "../client";
-import { ownerProfile, paymentNotePresets } from "../schema";
+import { appSettings, ownerProfile, paymentNotePresets } from "../schema";
 
 // The owner's own settings (0013, 0024): plain reads and writes under RLS
 // (is_app_owner()). updated_at is set by the tables' trigger; the profile's
@@ -22,6 +22,20 @@ export async function saveOwnerProfile(tx: Tx, profile: ProfileFields): Promise<
     .insert(ownerProfile)
     .values({ singleton: true, ...profile })
     .onConflictDoUpdate({ target: ownerProfile.singleton, set: profile });
+}
+
+/** How the UI shows dates (0040); the default until the owner picks one. */
+export async function getDateFormat(tx: Tx): Promise<DisplayDateFormat> {
+  const [row] = await tx.select({ dateFormat: appSettings.date_format }).from(appSettings);
+  return (row?.dateFormat as DisplayDateFormat | undefined) ?? DEFAULT_DISPLAY_DATE_FORMAT;
+}
+
+/** Creates or replaces the one row (the check refuses an unknown format: 23514, a 400). */
+export async function saveDateFormat(tx: Tx, dateFormat: DisplayDateFormat): Promise<void> {
+  await tx
+    .insert(appSettings)
+    .values({ singleton: true, date_format: dateFormat })
+    .onConflictDoUpdate({ target: appSettings.singleton, set: { date_format: dateFormat } });
 }
 
 /** Alphabetical. */

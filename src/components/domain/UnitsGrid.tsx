@@ -18,9 +18,9 @@ import HouseRentDialog from "./HouseRentDialog";
 import { UNIT_TYPE_LABELS, UNIT_TYPE_OPTIONS, formatFloor } from "@/lib/domain/tenant";
 import type { UnitRow } from "@/lib/contracts";
 import { HOUSE_FILTERS, matchesHouseFilter, tenantRentGap, type HouseFilter } from "@/lib/domain/houses";
-import { formatDateKey } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
+import { useDates } from "@/components/ui/DateFormat";
 
 /**
  * A let house whose tenant's houses' rents (D39) don't add up to what the
@@ -32,6 +32,7 @@ function rentDiffers(row: UnitRow): boolean {
 }
 
 function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
+  const { formatDate: formatDateKey } = useDates();
   return (
     <Dialog open={unit !== null} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{unit ? `History of ${unit.unitCode}` : ""}</DialogTitle>
@@ -194,7 +195,7 @@ export default function UnitsGrid({
       headerName: "Since",
       minWidth: 110,
       valueGetter: (_v, row) => row.currentTenant?.since ?? "",
-      valueFormatter: (value: string) => (value ? formatDateKey(value) : ""),
+      dateKind: "date",
     },
     {
       field: "actions",

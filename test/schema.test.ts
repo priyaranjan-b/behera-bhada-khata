@@ -182,7 +182,7 @@ beforeEach(async () => {
     truncate adjustment_allocations, adjustments, payment_allocations, payments, receipt_counters, rent_periods,
       tenant_units, tenant_rent_rates, tenants, units, properties, locations, rate_limits, app_owner, auth.users,
       audit_log, maintenance_files, maintenance_expense_tags, maintenance_expense_units, maintenance_expenses,
-      correction_guard, correction_tickets cascade;
+      correction_guard, correction_tickets, app_settings cascade;
     insert into correction_guard (pin_hash, pin_salt) values (correction_pin_hash('test-salt', '${TEST_PIN}'), 'test-salt');
     insert into auth.users (id, email) values ('${OWNER_A}', 'a@example.com'), ('${OWNER_B}', 'b@example.com');
     insert into app_owner (user_id) values ('${OWNER_A}');
@@ -3243,6 +3243,7 @@ describe("tenant portal hardening (0034)", () => {
     );
     expect(relations.map((r) => r.rel)).toEqual([
       "adjustments",
+      "app_settings",
       "payment_proofs",
       "payment_record_tags",
       "payments",
@@ -3314,6 +3315,60 @@ describe("otp_sessions (0035)", () => {
     expect(
       await errorCode(as(service, `insert into otp_sessions (key, reference, expires_at) values ('k2', 's', now() - interval '1 minute')`))
     ).toBe("23514");
+  });
+});
+
+describe("app settings: the date format (0040, D42)", () => {
+  const read = (who: Role) => as<{ date_format: string }>(who, `select date_format from app_settings`);
+  const save = (who: Role, format: string) =>
+    as(
+      who,
+      `insert into app_settings (singleton, date_format) values (true, $1)
+       on conflict (singleton) do update set date_format = excluded.date_format`,
+      [format]
+    );
+
+  it("has no row until the owner picks a format; the column's default is dd/MMM/yyyy", async () => {
+    await db.exec(`delete from app_settings`);
+    expect(await read(owner(OWNER_A))).toEqual([]);
+    await as(owner(OWNER_A), `insert into app_settings default values`);
+    expect(await read(owner(OWNER_A))).toEqual([{ date_format: "DD/MMM/YYYY" }]);
+  });
+
+  it("lets the owner save one of the offered formats, and is audited", async () => {
+    await db.exec(`delete from app_settings; truncate audit_log`);
+    await save(owner(OWNER_A), "DD/MM/YYYY");
+    await save(owner(OWNER_A), "YYYY-MM-DD");
+    expect(await read(owner(OWNER_A))).toEqual([{ date_format: "YYYY-MM-DD" }]);
+    expect(await errorCode(save(owner(OWNER_A), "MM/DD/YYYY"))).toBe("23514");
+    const { rows } = await db.query<{ action: string; title: string; details: string }>(
+      `select action, title, details from audit_log order by id`
+    );
+    expect(rows).toEqual([
+      { action: "settings.created", title: "Settings changed", details: "Date format: DD/MM/YYYY" },
+      { action: "settings.updated", title: "Settings changed", details: "Date format: DD/MM/YYYY → YYYY-MM-DD" },
+    ]);
+  });
+
+  it("is read by the tenant portal, written by nobody but the owner", async () => {
+    await db.exec(`delete from app_settings`);
+    await save(owner(OWNER_A), "DD MMM YYYY");
+    // Another account sees and changes nothing.
+    expect(await read(owner(OWNER_B))).toEqual([]);
+    await as(owner(OWNER_B), `update app_settings set date_format = 'DD/MM/YYYY'`);
+    expect(await read(owner(OWNER_A))).toEqual([{ date_format: "DD MMM YYYY" }]);
+    expect(await errorCode(as(anonRole, `select * from app_settings`))).toBe("42501");
+    const asTenant = async (sql: string) => {
+      await db.query(`select set_config('app.tenant_id', $1, false)`, [fx.tenantA]);
+      await db.exec(`set role tenant_reader`);
+      try {
+        return (await db.query(sql)).rows;
+      } finally {
+        await db.exec("reset role");
+      }
+    };
+    expect(await asTenant(`select date_format from app_settings`)).toEqual([{ date_format: "DD MMM YYYY" }]);
+    expect(await errorCode(asTenant(`update app_settings set date_format = 'DD/MM/YYYY'`))).toBe("42501");
   });
 });
 

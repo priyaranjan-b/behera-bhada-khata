@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useAppRouter } from "@/components/ui/Loading";
 import { ApiError, api, errorMessage } from "@/lib/api-client";
 import type { CorrectionPinView } from "@/lib/contracts";
-import { formatDateTime } from "@/lib/dates";
+import { useDates } from "@/components/ui/DateFormat";
 
 /** Why corrections can't be saved right now (no PIN, locked), or null. */
-function blockedBy(status: CorrectionPinView | null): string | null {
+function blockedBy(status: CorrectionPinView | null, formatDateTime: (instant: string) => string): string | null {
   if (!status) return null;
   if (!status.pinSet) return "No corrections PIN is set yet, so this can't be saved.";
   if (status.lockedUntil) return `Too many wrong PINs: corrections are locked until ${formatDateTime(status.lockedUntil)}.`;
@@ -24,6 +24,7 @@ function blockedBy(status: CorrectionPinView | null): string | null {
  */
 export function useCorrectionSubmit(fallbackError: string, open: boolean) {
   const router = useAppRouter();
+  const { formatDateTime } = useDates();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -66,5 +67,5 @@ export function useCorrectionSubmit(fallbackError: string, open: boolean) {
     }
   }
 
-  return { busy, error, pinError, blocked: blockedBy(status), clearErrors, submit };
+  return { busy, error, pinError, blocked: blockedBy(status, formatDateTime), clearErrors, submit };
 }

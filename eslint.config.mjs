@@ -45,6 +45,43 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The UI shows dates in the owner's display format (A36): through useDates /
+    // FormattedDate / dateColumn, or by passing the format explicitly in the few
+    // server components listed here. (Flat config replaces the rule, so the
+    // layering patterns above are repeated.)
+    files: ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
+    ignores: [
+      "src/app/api/**",
+      "src/components/ui/DateFormat.tsx",
+      "src/components/ui/DataTable/columns.ts",
+      "src/app/(app)/maintenance/[[]expenseId]/(detail)/page.tsx",
+      "src/app/(app)/tenants/[[]tenantId]/(profile)/page.tsx",
+      "src/app/tenant/(portal)/page.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/lib/dates",
+              importNames: ["formatDateKey", "formatDateTime", "formatDayRange"],
+              message:
+                "Show dates in the owner's display format (A36): useDates() or <FormattedDate> from the UI kit, or dateColumn in a table.",
+            },
+          ],
+          patterns: [
+            { group: ["@supabase/*", ...DRIZZLE], message: "Database access lives in src/server/adapters - go through the API." },
+            {
+              group: ["@/server/*"],
+              message: "UI code reads data with serverApi (Server Components) or api (Client Components).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/server/services/**/*.ts"],
     rules: {
       "no-restricted-imports": [

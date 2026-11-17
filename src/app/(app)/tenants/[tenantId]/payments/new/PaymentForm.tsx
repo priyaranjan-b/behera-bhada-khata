@@ -23,7 +23,7 @@ import {
 } from "@/components/ui";
 import { OwnerSignatureField, type OwnerSignatureHandle } from "@/components/domain/OwnerSignatureField";
 import { suggestAllocations, summarizeBalance, type PeriodLike } from "@/lib/domain/allocation";
-import { currentMonthKey, formatDateKey, formatMonth, todayKey } from "@/lib/dates";
+import { currentMonthKey, formatMonth, todayKey } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 import TagsField from "@/components/domain/TagsField";
@@ -34,6 +34,7 @@ import type { PaymentMode } from "@/lib/types";
 import { api, errorMessage } from "@/lib/api-client";
 import type { SavedSignature } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
+import { useDates } from "@/components/ui/DateFormat";
 
 export default function PaymentForm({
   tenantId,
@@ -57,6 +58,7 @@ export default function PaymentForm({
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;
 }) {
+  const { formatDate: formatDateKey } = useDates();
   const router = useAppRouter();
   const [amount, setAmount] = useState("");
   // No default: back entries kept getting saved as today. Today/Yesterday are one tap.

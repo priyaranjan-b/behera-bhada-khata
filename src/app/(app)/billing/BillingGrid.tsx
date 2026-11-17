@@ -19,27 +19,28 @@ import { StatusChip } from "@/components/domain/StatusChip";
 import { api } from "@/lib/api-client";
 import { apiHref, apiPaths } from "@/lib/api-client/paths";
 import type { BillingPage, BillingPageQuery, BillingQuery, BillingRow } from "@/lib/contracts";
-import { formatDateKey } from "@/lib/dates";
 import { BILLING_DISPLAY_STATUSES, BILLING_SHOW_OPTIONS, PAID_DIRECT_TEXT, periodDisplayStatus, type BillingShow } from "@/lib/domain/billing";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { paymentModeLabel } from "@/lib/domain/payments";
 import { statusLabel } from "@/lib/domain/status";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
+import { useDates } from "@/components/ui/DateFormat";
 
 const displayStatus = (row: BillingRow) =>
   row.paidDirect
     ? "paid_direct"
     : periodDisplayStatus(row.status, row.notYetDue);
 
-const receiptText = (row: BillingRow) =>
+const receiptText = (row: BillingRow, formatDate: (key: string) => string) =>
   row.paidDirect
     ? PAID_DIRECT_TEXT
     : row.payments
-        .map((p) => `${p.receiptNo ?? "—"} (${formatDateKey(p.paymentDate)})`)
+        .map((p) => `${p.receiptNo ?? "—"} (${formatDate(p.paymentDate)})`)
         .join(", ");
 
-const columns: DataTableColDef<BillingRow>[] = [
+/** The columns, with dates in the owner's display format (A36): built once per format. */
+const columnsFor = (formatDate: (key: string) => string): DataTableColDef<BillingRow>[] => [
   {
     field: "periodMonth",
     headerName: "Month",
@@ -79,8 +80,8 @@ const columns: DataTableColDef<BillingRow>[] = [
     minWidth: 230,
     sortable: false,
     filterOperators: SERVER_TEXT_OPERATORS,
-    valueGetter: (_value, row) => receiptText(row),
-    exportValue: (row) => receiptText(row),
+    valueGetter: (_value, row) => receiptText(row, formatDate),
+    exportValue: (row) => receiptText(row, formatDate),
     renderCell: ({ row }) =>
       row.paidDirect ? (
         <Typography variant="caption" color="textSecondary">
@@ -103,7 +104,7 @@ const columns: DataTableColDef<BillingRow>[] = [
               >
                 {p.receiptNo ?? "Receipt"}
               </MuiLink>
-              {` · ${formatDateKey(p.paymentDate)} · ${paymentModeLabel(p.mode)} · ${formatMoney(p.amount)}`}
+              {` · ${formatDate(p.paymentDate)} · ${paymentModeLabel(p.mode)} · ${formatMoney(p.amount)}`}
             </Typography>
           ))}
         </Stack>
@@ -134,6 +135,8 @@ export default function BillingGrid({
   query: BillingQuery;
   rangeLabel: string;
 }) {
+  const { formatDate } = useDates();
+  const columns = useMemo(() => columnsFor(formatDate), [formatDate]);
   const { from, to, paidDirect } = query;
   const load = useCallback(
     (q: BillingPageQuery) => api.dashboard.billing({ from, to, paidDirect, ...q }),

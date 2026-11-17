@@ -1,4 +1,5 @@
 import type { GridColDef, GridValidRowModel } from "@mui/x-data-grid";
+import { formatDateKey, formatDateTime } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 
 /**
@@ -35,7 +36,42 @@ export type DataTableColDef<R extends GridValidRowModel> = GridColDef<R> & {
   exportValue?: (row: R) => string | number | null;
   /** A money column added up in the footer and the Excel download (`moneyColumn`, A26). */
   total?: boolean;
+  /** A date column (`dateColumn`): shown, searched and exported in the owner's date format (A36). */
+  dateKind?: "date" | "dateTime";
+  /** What an empty date column shows. */
+  emptyText?: string;
 };
+
+/**
+ * A date column: the value is a yyyy-MM-dd key (`dateTime`: an ISO instant),
+ * shown, searched and exported in the owner's display format (A36) - the
+ * table applies it (`withDateFormat`), so the column can stay a module
+ * constant.
+ */
+export function dateColumn<R extends GridValidRowModel>(
+  field: string,
+  headerName: string,
+  extra: Partial<DataTableColDef<R>> = {}
+): DataTableColDef<R> {
+  return { field, headerName, minWidth: 110, flex: 0.6, dateKind: "date", ...extra };
+}
+
+/** The table's columns with each date column formatted in `format` (DataTable calls it). */
+export function withDateFormat<R extends GridValidRowModel>(
+  columns: readonly GridColDef<R>[],
+  format: string
+): GridColDef<R>[] {
+  return columns.map((column) => {
+    const col = column as DataTableColDef<R>;
+    if (!col.dateKind) return column;
+    const kind = col.dateKind;
+    return {
+      ...col,
+      valueFormatter: (value: string | null | undefined) =>
+        value ? (kind === "dateTime" ? formatDateTime(value, format) : formatDateKey(value, format)) : (col.emptyText ?? ""),
+    } as GridColDef<R>;
+  });
+}
 
 /** A dropdown choice: a value with the label it shows, or a value that is its own label. */
 export type SelectOption = string | { value: string; label: string };

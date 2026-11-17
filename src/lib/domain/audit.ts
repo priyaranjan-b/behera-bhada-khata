@@ -63,6 +63,8 @@ const ACTIONS: Record<AuditAction, { label: string; category: AuditCategory }> =
   "owner.created": { label: "Owner account set", category: "access" },
   "owner.updated": { label: "Owner account changed", category: "access" },
   "owner.deleted": { label: "Owner account removed", category: "access" },
+  "settings.created": { label: "Settings changed", category: "access" },
+  "settings.updated": { label: "Settings changed", category: "access" },
   "message.sent": { label: "Link sent to tenant", category: "messages" },
   "receipt.downloaded": { label: "Receipt downloaded", category: "money" },
   "auth.sign_in": { label: "Signed in", category: "access" },

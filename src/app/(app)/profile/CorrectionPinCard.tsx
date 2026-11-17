@@ -10,9 +10,9 @@ import PinRoundedIcon from "@mui/icons-material/PinRounded";
 import { FormActions, PinField, SectionCard } from "@/components/ui";
 import { ApiError, api, errorMessage } from "@/lib/api-client";
 import type { CorrectionPinView } from "@/lib/contracts";
-import { formatDateTime } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 import { CORRECTION_LIMITS } from "@/lib/validation";
+import { useDates } from "@/components/ui/DateFormat";
 
 const SETUP_SCRIPT = "supabase/scripts/open_correction_pin_setup.sql";
 
@@ -24,6 +24,7 @@ const SETUP_SCRIPT = "supabase/scripts/open_correction_pin_setup.sql";
  * nothing can be saved until it unlocks.
  */
 export default function CorrectionPinCard({ status }: { status: CorrectionPinView }) {
+  const { formatDateTime } = useDates();
   const router = useAppRouter();
   const [currentPin, setCurrentPin] = useState("");
   const [pin, setPin] = useState("");

@@ -28,15 +28,21 @@ export default async function MaintenanceExpensePage({
 }) {
   const { expenseId } = await params;
   const suggestions = serverApi.dashboard.payments.tagSuggestions();
-  const [expense, flash] = await Promise.all([serverApi.dashboard.maintenance.detail(expenseId), searchParams]);
+  const [expense, flash, { dateFormat }] = await Promise.all([
+    serverApi.dashboard.maintenance.detail(expenseId),
+    searchParams,
+    serverApi.dashboard.displaySettings(),
+  ]);
+  // Dates in the owner's display format (A36).
+  const date = (key: string) => formatDateKey(key, dateFormat);
   const voided = expense.voidedAt !== null;
-  const summary = `${expense.description} · ${formatMoney(expense.amount)} on ${formatDateKey(expense.expenseDate)}`;
+  const summary = `${expense.description} · ${formatMoney(expense.amount)} on ${date(expense.expenseDate)}`;
 
   return (
     <Stack spacing={2}>
       <PageHeader
         title={expense.description}
-        subtitle={`${maintenanceCategoryLabel(expense.category)} · ${formatMoney(expense.amount)} on ${formatDateKey(expense.expenseDate)}`}
+        subtitle={`${maintenanceCategoryLabel(expense.category)} · ${formatMoney(expense.amount)} on ${date(expense.expenseDate)}`}
         action={
           voided ? undefined : (
             <ActionStack phone="primaryOnTop">
@@ -66,7 +72,7 @@ export default async function MaintenanceExpensePage({
       ) : null}
       {voided ? (
         <Alert severity="info">
-          Voided on {formatDateTime(expense.voidedAt!)}: {expense.voidReason}. It stays on record but counts nowhere.
+          Voided on {formatDateTime(expense.voidedAt!, dateFormat)}: {expense.voidReason}. It stays on record but counts nowhere.
         </Alert>
       ) : null}
 
@@ -76,11 +82,11 @@ export default async function MaintenanceExpensePage({
             <SectionCard title="Details" action={voided ? <StatusBadge tone="neutral" label="Voided" /> : undefined}>
               <DetailList dividers>
                 <DetailRow label="Amount">{formatMoney(expense.amount)}</DetailRow>
-                <DetailRow label="Spent on">{formatDateKey(expense.expenseDate)}</DetailRow>
+                <DetailRow label="Spent on">{date(expense.expenseDate)}</DetailRow>
                 <DetailRow label="Category">{maintenanceCategoryLabel(expense.category)}</DetailRow>
                 <DetailRow label="Paid to">{expense.vendor ?? "—"}</DetailRow>
                 {expense.note ? <DetailRow label="Note">{expense.note}</DetailRow> : null}
-                <DetailRow label="Recorded">{formatDateKey(dateKeyOf(expense.recordedAt))}</DetailRow>
+                <DetailRow label="Recorded">{date(dateKeyOf(expense.recordedAt))}</DetailRow>
               </DetailList>
             </SectionCard>
             <SectionCard

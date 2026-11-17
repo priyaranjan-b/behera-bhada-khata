@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import Box from "@mui/material/Box";
 import AppCard from "@/components/ui/AppCard";
 import Stack from "@mui/material/Stack";
@@ -17,7 +17,8 @@ import DataTableToolbar from "./DataTableToolbar";
 import DataTablePagination from "./DataTablePagination";
 import DataTableNoResults from "./DataTableNoResults";
 import DataTableFilterPanel from "./DataTableFilterPanel";
-import type { DataTableColDef } from "./columns";
+import { withDateFormat, type DataTableColDef } from "./columns";
+import { useDateFormat } from "../DateFormat";
 import { fitsOnePage } from "./pagination";
 import { dataTableSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
 
@@ -110,6 +111,7 @@ export default function DataTable<R extends GridValidRowModel>({
   slotProps,
   sx,
   label,
+  columns: givenColumns,
   ...props
 }: DataTableProps<R>) {
   const titleId = useId();
@@ -143,7 +145,10 @@ export default function DataTable<R extends GridValidRowModel>({
     Boolean(title) || filters.length > 0 || Boolean(toolbarExtra) || Boolean(searchConfig) || columnsButton || filterButton || exportCsv || exportExcel;
   // A money column added up (A26) keeps the footer whenever there are rows; otherwise it hides
   // only while everything fits the smallest page, so a bigger page size can always be undone.
-  const hasTotals = props.columns.some((col) => (col as DataTableColDef<R>).total);
+  const hasTotals = givenColumns.some((col) => (col as DataTableColDef<R>).total);
+  // Date columns in the owner's display format (A36).
+  const dateFormat = useDateFormat();
+  const columns = useMemo(() => withDateFormat(givenColumns, dateFormat), [givenColumns, dateFormat]);
   const hideFooter = rowCount === 0 || (!hasTotals && fitsOnePage(rowCount, pageSize, pageSizeOptions));
 
   const body =
@@ -185,6 +190,7 @@ export default function DataTable<R extends GridValidRowModel>({
           {...(title ? { "aria-labelledby": titleId } : { "aria-label": label })}
           {...(server ? { sortingMode: "server", filterMode: "server" } : {})}
           {...props}
+          columns={columns}
           slots={SLOTS}
           initialState={{ ...initialState, pagination: { paginationModel: { pageSize }, ...initialState?.pagination } }}
           slotProps={{
