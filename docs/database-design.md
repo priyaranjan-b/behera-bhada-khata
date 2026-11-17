@@ -69,6 +69,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0032_set_off_mode.sql` | payment mode `set_off`: rent the tenant settled by keeping back what the owner owed them; counted as paid, never as cash received (A22, D36); `maintenance_expenses.settled_by_payment_id` for an expense a set-off paid for, taken by `create_maintenance_expense(…, p_settled_by_payment_id)` |
 | `0031_maintenance.sql` | `maintenance_expenses`, `maintenance_expense_units` (equal split per house), `maintenance_expense_tags` (who paid), `maintenance_files`; `create_/update_/void_maintenance_expense()`, `maintenance_shares()`; audit actions `maintenance.*`, the `category` audit format, index `audit_log (entity_type, entity_id)` (D35) |
 | `0037_correct_move_out.sql` | `correct_move_out()`: fix a moved-out tenant's move-out date, with their houses and last rent months (D40) |
+| `0038_correct_move_out_fixes.sql` | `correct_move_out()` revised: future dates allowed (as move-out), not before billing start, months and neighbouring tenancies locked before checking (D40) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -1176,8 +1177,13 @@ refuses a tenant who has already moved out, so this is the only way.
 - **Later month:** the months up to the new month are created, priced by
   `rent_for_month` (`ensure_rent_periods`). An untracked tenant (D26) gets
   only the date and houses changed.
-- Not in the future, and payments keep their allocations (D4). The audit
-  triggers record the date, tenancy and dropped-month changes (D25).
+- **Limits (0038):** not before the month billing started (it would drop
+  every month); a future date is fine, as `move_out_tenant` allows one;
+  the same date changes nothing. The rent months and the other tenancies
+  of the houses are locked before the checks, and a tenancy let at the same
+  moment still answers `BBK09`.
+- Payments keep their allocations (D4). The audit triggers record the
+  date, tenancy and dropped-month changes (D25).
 
 **Why.** Billing runs through the move-out month, so a date a few days into
 the next month (the day the keys came back, not the last day paid for)

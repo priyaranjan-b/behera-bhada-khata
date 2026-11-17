@@ -16,6 +16,7 @@ import CorrectMoveOutButton from "@/components/domain/CorrectMoveOutButton";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import CorrectRentButton from "@/components/domain/CorrectRentButton";
 import { rentSplitHouses } from "@/lib/domain/houses";
+import { earliestMoveOutDate } from "@/lib/domain/tenant";
 import RentTrackingButton from "@/components/domain/RentTrackingButton";
 import TenantDetailsCards from "@/components/domain/TenantDetailsCards";
 import { FLASH, TAB_PARAM, routes, type Flash, type TenantTab } from "@/lib/routes";
@@ -63,7 +64,16 @@ export default async function TenantPage({
       audience="owner"
       statusAction={
         tenant.status === "inactive" && tenant.movedOutOn ? (
-          <CorrectMoveOutButton tenantId={tenantId} movedOutOn={tenant.movedOutOn} rentTracked={tenant.rentTracked} />
+          <CorrectMoveOutButton
+            tenantId={tenantId}
+            movedOutOn={tenant.movedOutOn}
+            rentTracked={tenant.rentTracked}
+            earliest={earliestMoveOutDate({
+              rentTracked: tenant.rentTracked,
+              billingStart: tenant.billingStart,
+              houseStarts: tenant.unitHistory.map((h) => h.startDate),
+            })}
+          />
         ) : null
       }
       rentAction={
@@ -181,6 +191,11 @@ export default async function TenantPage({
       {flash.movedOut ? (
         <FlashAlert param={FLASH.movedOut} severity="success">
           Moved out. Their houses are free for a new tenant; any dues stay on this ledger.
+        </FlashAlert>
+      ) : null}
+      {flash.moveOutCorrected ? (
+        <FlashAlert param={FLASH.moveOutCorrected} severity="success">
+          Move-out date corrected. The houses and the months billed now follow it.
         </FlashAlert>
       ) : null}
 

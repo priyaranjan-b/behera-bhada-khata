@@ -121,6 +121,21 @@ export function billingStartFor(leaseStart: string, paidThrough: string | null):
 }
 
 /**
+ * The earliest move-out date correct_move_out (0038) accepts: not before the
+ * last house was taken, nor before billing started for a tracked tenant.
+ * Null when nothing limits it.
+ */
+export function earliestMoveOutDate(tenant: {
+  rentTracked: boolean;
+  billingStart: string | null;
+  houseStarts: string[];
+}): string | null {
+  const limits = [...tenant.houseStarts];
+  if (tenant.rentTracked && tenant.billingStart) limits.push(tenant.billingStart);
+  return limits.length ? limits.reduce((a, b) => (a > b ? a : b)) : null;
+}
+
+/**
  * May this tenant sign in to the tenant portal (A32)? They need a phone, and
  * to be active - or moved out no more than `movedOutAccessMonths` months ago
  * (TENANT_PORTAL_LIMITS in src/lib/validation.ts), counted from the move-out

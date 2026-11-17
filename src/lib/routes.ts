@@ -13,6 +13,8 @@ export const FLASH = {
   saved: "saved",
   passwordChanged: "passwordChanged",
   movedOut: "movedOut",
+  /** A moved-out tenant's move-out date was corrected (D40). */
+  moveOutCorrected: "moveOutCorrected",
   paymentCreated: "paymentCreated",
   notifyFailed: "notifyFailed",
   resent: "resent",

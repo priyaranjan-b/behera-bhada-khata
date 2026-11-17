@@ -66,6 +66,7 @@ export default function CorrectRentButton({
     <>
       <Button
         size="small"
+        aria-label="Correct rent"
         onClick={() => {
           setRent(String(monthlyRent));
           setFromMonth(firstMonth);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MonthField } from "@/components/ui";
-import { useAppRouter } from "@/components/ui/Loading";
+import { LoadingButton, useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -14,7 +14,6 @@ import Typography from "@mui/material/Typography";
 import { api, errorMessage } from "@/lib/api-client";
 import { addMonthsToKey, formatMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
 import { billingStartFor } from "@/lib/domain/tenant";
-import LoadingButton from "@/components/ui/Loading/LoadingButton";
 
 /**
  * Fixes "rent paid up to" for an active tenant (correct_paid_through, 0014):
@@ -59,6 +58,7 @@ export default function CorrectPaidThroughButton({
     <>
       <Button
         size="small"
+        aria-label="Correct rent paid up to"
         onClick={() => {
           setPaidThrough(current);
           setError(null);

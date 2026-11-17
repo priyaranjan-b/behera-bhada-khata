@@ -64,7 +64,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D39), see below.
+- **Database:** `docs/database-design.md` (D1–D40), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -149,7 +149,7 @@ both together.
   "Combined rent" calls `correct_rent`, which re-prices every month from a
   chosen month (paid ones included; refused if a month has more counted
   than the new rent). Edit tenant's rent change is for real increases.
-- **Correcting a move-out date** (`0037_correct_move_out.sql`, D40):
+- **Correcting a move-out date** (`0037_correct_move_out.sql`, `0038`, D40):
   "Correct" by a moved-out tenant's Status calls `correct_move_out`, which
   moves `moved_out_on` and the houses' end date and drops or adds the last
   rent months (refused if a dropped month has a payment, or a house was

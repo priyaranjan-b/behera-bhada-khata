@@ -713,10 +713,49 @@ describe("correct_move_out (0037, D40)", () => {
     await moveOut(fx.tenantA, "2026-03-20");
     expect(await errorCode(correct(owner(OWNER_B), "2026-03-31"))).toBe("BBK04");
     expect(await errorCode(correct(owner(OWNER_A), null))).toBe("BBK00");
-    expect(await errorCode(correct(owner(OWNER_A), "2099-01-01"))).toBe("BBK00");
     expect(await errorCode(correct(owner(OWNER_A), "2026-01-10"))).toBe("BBK00");
     expect(await errorCode(correct(service, "2026-03-31"))).not.toBe("ok");
     expect(await movedOutOn()).toBe("2026-03-20");
+  });
+
+  it("allows a future date, as moving out does, and the same date changes nothing (0038)", async () => {
+    await moveOut(fx.tenantA, "2099-01-31");
+    expect(await errorCode(correct(owner(OWNER_A), "2099-01-31"))).toBe("ok");
+    await correct(owner(OWNER_A), "2099-02-28");
+    expect(await movedOutOn()).toBe("2099-02-28");
+  });
+
+  it("won't go before the month billing started (0038)", async () => {
+    // Paid up to January before the app: billed from February.
+    await as(owner(OWNER_A), `select correct_paid_through($1, '2026-01-01')`, [fx.tenantA]);
+    await moveOut(fx.tenantA, "2026-03-20");
+    expect(await errorCode(correct(owner(OWNER_A), "2026-01-31"))).toBe("BBK00");
+    await correct(owner(OWNER_A), "2026-02-10");
+    expect(await months()).toEqual(["2026-02-01"]);
+  });
+
+  it("changes only the date and houses of a tenant with no rent months (0038)", async () => {
+    const govt = (
+      await as<{ id: string }>(
+        owner(OWNER_A),
+        `select create_tenant('Block Office', null, null, 'both', 20000, '2026-01-01', array['AC-T1-G03'], null, null,
+           'government', false) as id`
+      )
+    )[0].id;
+    await moveOut(govt, "2026-02-15");
+    await correct(owner(OWNER_A), "2026-04-30", govt);
+    expect(await periodsOf(govt)).toEqual([]);
+    expect(await tenancies("AC-T1-G03")).toEqual([{ tenant_id: govt, start_date: "2026-01-01", end_date: "2026-04-30" }]);
+
+    // A draft from the paper register, moved out: never billed either.
+    const [{ id: draft }] = (
+      await db.query<{ id: string }>(`insert into tenants (name, status, preferred_channel) values ('Old Draft', 'draft', 'both') returning id`)
+    ).rows;
+    await db.query(`insert into tenant_units (tenant_id, unit_code, start_date) values ($1, 'AC-T1-G04', '2025-06-01')`, [draft]);
+    await moveOut(draft, "2026-01-31");
+    await correct(owner(OWNER_A), "2025-12-31", draft);
+    expect(await periodsOf(draft)).toEqual([]);
+    expect(await tenancies("AC-T1-G04")).toEqual([{ tenant_id: draft, start_date: "2025-06-01", end_date: "2025-12-31" }]);
   });
 
   it("is written in the tenant's history", async () => {

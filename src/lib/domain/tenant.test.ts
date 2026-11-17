@@ -5,6 +5,7 @@ import {
   formatUnits,
   unitMix,
   billingStartFor,
+  earliestMoveOutDate,
   isGovernment,
   isRentTracked,
   TENANT_KIND_OPTIONS,
@@ -76,5 +77,16 @@ describe("canUseTenantPortal (A32)", () => {
     expect(canUseTenantPortal(t("inactive", "2025-11-30"), 12, "2026-11-01")).toBe(true);
     expect(canUseTenantPortal(t("inactive", "2025-10-31"), 12, "2026-11-01")).toBe(false);
     expect(canUseTenantPortal(t("inactive", null), 12, "2026-11-01")).toBe(false);
+  });
+});
+
+describe("earliestMoveOutDate", () => {
+  it("is the later of the last house taken and, when billed, the billing start", () => {
+    const houseStarts = ["2026-01-15", "2026-03-10"];
+    expect(earliestMoveOutDate({ rentTracked: true, billingStart: "2026-02-01", houseStarts })).toBe("2026-03-10");
+    expect(earliestMoveOutDate({ rentTracked: true, billingStart: "2026-04-01", houseStarts })).toBe("2026-04-01");
+    // Govt paid direct: billing doesn't limit it.
+    expect(earliestMoveOutDate({ rentTracked: false, billingStart: "2026-04-01", houseStarts })).toBe("2026-03-10");
+    expect(earliestMoveOutDate({ rentTracked: true, billingStart: null, houseStarts: [] })).toBeNull();
   });
 });
