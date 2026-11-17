@@ -59,6 +59,11 @@ export async function moveOutTenant(tx: Tx, id: string, date: string): Promise<v
   await executeRows(tx, sql`select move_out_tenant(p_tenant_id => ${id}::uuid, p_move_out_date => ${date}::date)`);
 }
 
+/** A moved-out tenant's move-out date, houses and last months (D40). */
+export async function correctMoveOut(tx: Tx, id: string, date: string): Promise<void> {
+  await executeRows(tx, sql`select correct_move_out(p_tenant_id => ${id}::uuid, p_move_out_date => ${date}::date)`);
+}
+
 /** The new billing start (D24). */
 export async function correctPaidThrough(tx: Tx, id: string, paidThrough: string): Promise<string> {
   const [row] = await executeRows<{ v: string }>(

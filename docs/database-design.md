@@ -68,6 +68,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0030_payment_tags.sql` | `payment_tags` (suggested tags, managed on /settings) and `payment_record_tags` (each payment's own copy of its tag names, editable on /payments) (D34) |
 | `0032_set_off_mode.sql` | payment mode `set_off`: rent the tenant settled by keeping back what the owner owed them; counted as paid, never as cash received (A22, D36); `maintenance_expenses.settled_by_payment_id` for an expense a set-off paid for, taken by `create_maintenance_expense(…, p_settled_by_payment_id)` |
 | `0031_maintenance.sql` | `maintenance_expenses`, `maintenance_expense_units` (equal split per house), `maintenance_expense_tags` (who paid), `maintenance_files`; `create_/update_/void_maintenance_expense()`, `maintenance_shares()`; audit actions `maintenance.*`, the `category` audit format, index `audit_log (entity_type, entity_id)` (D35) |
+| `0037_correct_move_out.sql` | `correct_move_out()`: fix a moved-out tenant's move-out date, with their houses and last rent months (D40) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -1159,6 +1160,29 @@ price the next tenant; the audit log already keeps every change with old
 and new values.
 
 ---
+
+### D40 — A move-out date can be corrected while no payment depends on it
+
+**Decision (0037).** `correct_move_out(tenant, date)` (owner, `SECURITY
+DEFINER`) moves an **inactive** tenant's `moved_out_on`. `move_out_tenant`
+refuses a tenant who has already moved out, so this is the only way.
+- **Houses:** the tenancies that ended on the old date (and any ending
+  after the new one) end on the new date. `BBK00` if the new date is before
+  a house was taken; `BBK09` when moving it later would run into the next
+  tenant of a house.
+- **Earlier month:** the rent months after the new month are deleted;
+  `BBK09` if a payment or adjustment is allocated to one of them
+  (`has_allocations_from`, as move-out does).
+- **Later month:** the months up to the new month are created, priced by
+  `rent_for_month` (`ensure_rent_periods`). An untracked tenant (D26) gets
+  only the date and houses changed.
+- Not in the future, and payments keep their allocations (D4). The audit
+  triggers record the date, tenancy and dropped-month changes (D25).
+
+**Why.** Billing runs through the move-out month, so a date a few days into
+the next month (the day the keys came back, not the last day paid for)
+invented a month of arrears for a tenant who was paid up, and only
+hand-written SQL could remove it.
 
 ## 3. Checklists
 

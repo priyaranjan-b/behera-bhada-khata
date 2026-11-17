@@ -17,6 +17,7 @@ import type {
   ConfirmView,
   Confirmed,
   Created,
+  CorrectMoveOutInput,
   CorrectPaidThroughInput,
   CorrectRentInput,
   StartRentTrackingInput,
@@ -235,6 +236,8 @@ export interface ApiCommands {
       create(input: CreateTenantInput): Promise<Created>;
       update(tenantId: string, input: UpdateTenantInput): Promise<void>;
       moveOut(tenantId: string, input: MoveOutInput): Promise<void>;
+      /** A moved-out tenant's move-out date entered wrongly (0037). */
+      correctMoveOut(tenantId: string, input: CorrectMoveOutInput): Promise<void>;
       correctPaidThrough(tenantId: string, input: CorrectPaidThroughInput): Promise<void>;
       /** A rent entered wrongly: re-prices from a month on, paid months included. */
       correctRent(tenantId: string, input: CorrectRentInput): Promise<void>;

@@ -825,6 +825,8 @@ export type UploadTenantDocumentsInput = z.infer<typeof uploadTenantDocumentsSch
 
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type MoveOutInput = z.infer<typeof moveOutSchema>;
+/** Same shape as moving out: the corrected last day in the house (0037). */
+export type CorrectMoveOutInput = MoveOutInput;
 
 export type CorrectPaidThroughInput = z.input<typeof correctPaidThroughSchema>;
 export type CorrectRentInput = z.input<typeof correctRentSchema>;

@@ -1,5 +1,5 @@
 // The tenant lifecycle on Drizzle calls the SQL functions that stay in
-// Postgres (create_tenant, update_tenant, move_out_tenant,
+// Postgres (create_tenant, update_tenant, move_out_tenant, correct_move_out,
 // correct_paid_through, correct_rent, start/stop_rent_tracking). The rules
 // are theirs and test/schema.test.ts covers them; these tests pin the call:
 // each argument reaches its parameter, the dates they return come back as
@@ -96,6 +96,9 @@ describe("tenant lifecycle on Drizzle calls the SQL functions", () => {
     expect(rate?.monthly_amount).toBe(5500);
     await owner.tenants.moveOut(id, "2026-05-31");
     expect(await owner.tenants.get(id)).toMatchObject({ status: "inactive", moved_out_on: "2026-05-31" });
+    await owner.tenants.correctMoveOut(id, "2026-04-30");
+    expect(await owner.tenants.get(id)).toMatchObject({ status: "inactive", moved_out_on: "2026-04-30" });
+    await expect(owner.tenants.correctMoveOut(id, "2025-01-01")).rejects.toMatchObject({ status: 400 });
   });
 
   it("starts and stops tracking a government tenant's rent", async () => {

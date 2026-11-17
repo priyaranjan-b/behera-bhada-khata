@@ -737,6 +737,11 @@ export interface Database {
         Args: { p_tenant_id: string; p_move_out_date: string };
         Returns: undefined;
       };
+      /** 0037: moves a moved-out tenant's move-out date, with their houses and last months. */
+      correct_move_out: {
+        Args: { p_tenant_id: string; p_move_out_date: string };
+        Returns: undefined;
+      };
       /** 0014: returns the new billing_start. */
       correct_paid_through: {
         Args: { p_tenant_id: string; p_paid_through: string };

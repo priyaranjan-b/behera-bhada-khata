@@ -6,6 +6,7 @@ import { createAdjustment, createPayment } from "../procedures/ledger";
 import { createMaintenanceExpense, updateMaintenanceExpense, voidMaintenanceExpense } from "../procedures/maintenance";
 import { logEvent } from "../procedures/system";
 import {
+  correctMoveOut,
   correctPaidThrough,
   correctRent,
   createTenant,
@@ -214,6 +215,7 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
           withHouseRents(tx, houseRents, () => updateTenant(tx, id, changes))
         ),
       moveOut: (id, date) => write(`move out tenant ${id}`, (tx) => moveOutTenant(tx, id, date)),
+      correctMoveOut: (id, date) => write(`correct move-out date of tenant ${id}`, (tx) => correctMoveOut(tx, id, date)),
       correctPaidThrough: (id, paidThrough) =>
         write(`correct paid up to of tenant ${id}`, (tx) => correctPaidThrough(tx, id, paidThrough)),
       correctRent: (id, fromMonth, monthlyRent, houseRents = []) =>

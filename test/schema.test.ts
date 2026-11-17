@@ -647,6 +647,89 @@ describe("move_out_tenant and re-letting", () => {
   });
 });
 
+describe("correct_move_out (0037, D40)", () => {
+  const moveOut = (tenantId: string, date: string) =>
+    as(owner(OWNER_A), `select move_out_tenant($1, $2)`, [tenantId, date]);
+  const correct = (who: Role, date: string | null, tenant = fx.tenantA) =>
+    as(who, `select correct_move_out($1, $2::date)`, [tenant, date]);
+  const months = async () => (await periodsOf(fx.tenantA)).map((p) => p.period_month);
+  const movedOutOn = async () =>
+    (await db.query<{ d: string }>(`select to_char(moved_out_on, 'YYYY-MM-DD') as d from tenants where id = $1`, [fx.tenantA]))
+      .rows[0].d;
+
+  it("moves it earlier: the houses end then and the months after it go", async () => {
+    // Asha: lease 2026-01-15, house G01, 5,000; billed to April, moved out 10 Apr.
+    await as(service, `select ensure_rent_periods($1::uuid[], '2026-05-01')`, [[fx.tenantA]]);
+    await moveOut(fx.tenantA, "2026-04-10");
+    expect(await months()).toEqual(["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01"]);
+
+    await correct(owner(OWNER_A), "2026-03-31");
+    expect(await movedOutOn()).toBe("2026-03-31");
+    expect(await months()).toEqual(["2026-01-01", "2026-02-01", "2026-03-01"]);
+    expect(await tenancies("AC-T1-G01")).toEqual([{ tenant_id: fx.tenantA, start_date: "2026-01-15", end_date: "2026-03-31" }]);
+    // Upkeep doesn't bring April back.
+    await as(service, `select ensure_rent_periods($1::uuid[], '2026-06-01')`, [[fx.tenantA]]);
+    expect(await months()).toHaveLength(3);
+    // Within the same month only the date moves.
+    await correct(owner(OWNER_A), "2026-03-15");
+    expect(await months()).toHaveLength(3);
+    expect(await tenancies("AC-T1-G01")).toEqual([{ tenant_id: fx.tenantA, start_date: "2026-01-15", end_date: "2026-03-15" }]);
+  });
+
+  it("moves it later: the houses are held longer and the months up to it are owed", async () => {
+    await moveOut(fx.tenantA, "2026-02-20");
+    expect(await months()).toEqual(["2026-01-01", "2026-02-01"]);
+    await correct(owner(OWNER_A), "2026-04-05");
+    expect(await periodsOf(fx.tenantA)).toEqual([
+      { period_month: "2026-01-01", amount_due: 5000 },
+      { period_month: "2026-02-01", amount_due: 5000 },
+      { period_month: "2026-03-01", amount_due: 5000 },
+      { period_month: "2026-04-01", amount_due: 5000 },
+    ]);
+    expect(await tenancies("AC-T1-G01")).toEqual([{ tenant_id: fx.tenantA, start_date: "2026-01-15", end_date: "2026-04-05" }]);
+  });
+
+  it("won't drop a month that has a payment", async () => {
+    await moveOut(fx.tenantA, "2026-03-20");
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[2].id, amount: 5000 }] });
+    expect(await errorCode(correct(owner(OWNER_A), "2026-02-28"))).toBe("BBK09");
+    expect(await movedOutOn()).toBe("2026-03-20");
+    expect(await months()).toHaveLength(3);
+  });
+
+  it("won't keep a house past the day it was let to someone else", async () => {
+    await moveOut(fx.tenantA, "2026-03-20");
+    const next = await createTenant(OWNER_A, { name: "Ramesh Store", rent: 6000, leaseStart: "2026-03-25", units: ["AC-T1-G01"] });
+    expect(await errorCode(correct(owner(OWNER_A), "2026-03-31"))).toBe("BBK09");
+    await correct(owner(OWNER_A), "2026-03-24");
+    expect(await tenancies("AC-T1-G01")).toEqual([
+      { tenant_id: fx.tenantA, start_date: "2026-01-15", end_date: "2026-03-24" },
+      { tenant_id: next, start_date: "2026-03-25", end_date: null },
+    ]);
+  });
+
+  it("refuses non-owners, current tenants, a missing or future date, and a date before moving in", async () => {
+    expect(await errorCode(correct(owner(OWNER_A), "2026-03-31"))).toBe("BBK09");
+    await moveOut(fx.tenantA, "2026-03-20");
+    expect(await errorCode(correct(owner(OWNER_B), "2026-03-31"))).toBe("BBK04");
+    expect(await errorCode(correct(owner(OWNER_A), null))).toBe("BBK00");
+    expect(await errorCode(correct(owner(OWNER_A), "2099-01-01"))).toBe("BBK00");
+    expect(await errorCode(correct(owner(OWNER_A), "2026-01-10"))).toBe("BBK00");
+    expect(await errorCode(correct(service, "2026-03-31"))).not.toBe("ok");
+    expect(await movedOutOn()).toBe("2026-03-20");
+  });
+
+  it("is written in the tenant's history", async () => {
+    await moveOut(fx.tenantA, "2026-03-20");
+    await db.exec(`truncate audit_log`);
+    await correct(owner(OWNER_A), "2026-02-28");
+    const { rows } = await db.query<{ details: string }>(
+      `select details from audit_log where entity_type = 'tenant' and details like '%Moved out on%'`
+    );
+    expect(rows).toHaveLength(1);
+  });
+});
+
 describe("migration 0006 guard", () => {
   it("refuses to run on a database that already has tenants", async () => {
     const sql = readFileSync(path.join(MIGRATIONS, "0006_property_master_data.sql"), "utf8");

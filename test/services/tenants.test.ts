@@ -6,6 +6,7 @@ vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => n
 
 const { generateReceiptPdf } = await import("@/server/pdf/receipt");
 const {
+  correctMoveOut,
   correctPaidThrough,
   bulkCreateTenants,
   correctRent,
@@ -146,6 +147,15 @@ describe("onboarding and editing", () => {
     await moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-03-20" });
     expect(fakes.owner.tenants.moveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-03-20");
     await expect(moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "20-03-2026" })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("corrects a move-out date, after checking the date and the tenant", async () => {
+    await correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30" });
+    expect(fakes.owner.tenants.correctMoveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-09-30");
+    fakes.owner.tenants.correctMoveOut.mockClear();
+    await expect(correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "30-09-2026" })).rejects.toMatchObject({ status: 400 });
+    await expect(correctMoveOut(ctx, "nobody", { moveOutDate: "2026-09-30" })).rejects.toMatchObject({ status: 404 });
+    expect(fakes.owner.tenants.correctMoveOut).not.toHaveBeenCalled();
   });
 });
 

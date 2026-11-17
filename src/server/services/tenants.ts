@@ -267,6 +267,14 @@ async function currentHouses(db: OwnerRepositories, tenantId: string, status: Te
   return rentSplitHouses({ status }, placementOf(await loadPlacements(db, [tenantId]), tenantId).unitCodes);
 }
 
+/** Fixes a moved-out tenant's move-out date; see correct_move_out (0037, D40). */
+export async function correctMoveOut(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const { moveOutDate } = parseInput(moveOutSchema, body);
+  const db = await ownerDb();
+  await requireTenant(db, tenantId);
+  await db.tenants.correctMoveOut(tenantId, moveOutDate);
+}
+
 /** Fixes "rent paid up to" on an active tenant; see correct_paid_through (0014). */
 export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const { paidThrough } = parseInput(correctPaidThroughSchema, body);

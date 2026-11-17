@@ -116,6 +116,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         history: (id, query = {}) => get(withQuery(p.dashboard.tenants.history(id), { ...query })),
         update: (id, input) => put(p.dashboard.tenants.detail(id), input),
         moveOut: (id, input) => post(p.dashboard.tenants.moveOut(id), input),
+        correctMoveOut: (id, input) => post(p.dashboard.tenants.moveOutCorrection(id), input),
         correctPaidThrough: (id, input) => post(p.dashboard.tenants.paidThrough(id), input),
         correctRent: (id, input) => post(p.dashboard.tenants.rentCorrection(id), input),
         startRentTracking: (id, input) => post(p.dashboard.tenants.rentTracking(id), input),

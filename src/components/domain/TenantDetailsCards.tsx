@@ -24,11 +24,14 @@ export default function TenantDetailsCards({
   audience,
   rentAction,
   billingActions,
+  statusAction,
 }: {
   tenant: TenantDetail["tenant"];
   audience: "owner" | "tenant";
   /** Owner only: next to the rent (Correct rent). */
   rentAction?: React.ReactNode;
+  /** Owner only: next to a moved-out tenant's status (Correct move-out date). */
+  statusAction?: React.ReactNode;
   /** Owner only: next to "Billing from" (Correct paid up to, Stop tracking). */
   billingActions?: React.ReactNode;
 }) {
@@ -50,6 +53,7 @@ export default function TenantDetailsCards({
           <DetailList dividers>
             <DetailRow label="Status">
               <TenantStatusBadge status={tenant.status} movedOutOn={tenant.movedOutOn} />
+              {statusAction}
             </DetailRow>
             {owner ? (
               <DetailRow label="Tenant type">

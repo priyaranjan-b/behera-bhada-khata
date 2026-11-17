@@ -453,6 +453,12 @@ export interface OwnerRepositories {
     /** Ends every tenancy on `date`, marks the tenant inactive and drops untouched later months. */
     moveOut(id: string, date: string): Promise<void>;
     /**
+     * Fixes a moved-out tenant's move-out date (0037): their houses end on it
+     * and they're billed up to its month. 409 if a dropped month has a
+     * payment or a house was let to someone else by then.
+     */
+    correctMoveOut(id: string, date: string): Promise<void>;
+    /**
      * Fixes an active tenant's "rent paid up to" (0014): billing starts the
      * month after. Earlier adds the months as owed; later drops months, 409
      * if one has a payment. Returns the new billing start.

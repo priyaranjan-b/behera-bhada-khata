@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
 import AsyncSection from "@/components/ui/AsyncSection";
+import CorrectMoveOutButton from "@/components/domain/CorrectMoveOutButton";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import CorrectRentButton from "@/components/domain/CorrectRentButton";
 import { rentSplitHouses } from "@/lib/domain/houses";
@@ -60,6 +61,11 @@ export default async function TenantPage({
     <TenantDetailsCards
       tenant={tenant}
       audience="owner"
+      statusAction={
+        tenant.status === "inactive" && tenant.movedOutOn ? (
+          <CorrectMoveOutButton tenantId={tenantId} movedOutOn={tenant.movedOutOn} rentTracked={tenant.rentTracked} />
+        ) : null
+      }
       rentAction={
         tenant.billingStart && tenant.rentTracked ? (
           <CorrectRentButton

@@ -149,6 +149,11 @@ both together.
   "Combined rent" calls `correct_rent`, which re-prices every month from a
   chosen month (paid ones included; refused if a month has more counted
   than the new rent). Edit tenant's rent change is for real increases.
+- **Correcting a move-out date** (`0037_correct_move_out.sql`, D40):
+  "Correct" by a moved-out tenant's Status calls `correct_move_out`, which
+  moves `moved_out_on` and the houses' end date and drops or adds the last
+  rent months (refused if a dropped month has a payment, or a house was
+  re-let by the new date).
 - **Government tenants** (`0016_government_tenants.sql`, D26):
   `tenants.tenant_kind` is `individual | business | government`. A
   government tenant may have no phone, and with `rent_tracked = false`

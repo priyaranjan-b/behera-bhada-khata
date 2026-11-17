@@ -60,6 +60,7 @@ export const apiPaths = {
       ledger: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/ledger`,
       history: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/history`,
       moveOut: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out`,
+      moveOutCorrection: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/move-out-correction`,
       paidThrough: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/paid-through`,
       rentCorrection: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/rent-correction`,
       rentTracking: (tenantId: string) => `/api/dashboard/tenants/${e(tenantId)}/rent-tracking`,

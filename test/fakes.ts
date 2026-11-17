@@ -439,6 +439,7 @@ function build() {
       create: vi.fn(async () => ({ id: "00000000-0000-4000-8000-000000000199" })),
       update: vi.fn(async () => undefined),
       moveOut: vi.fn(async () => undefined),
+      correctMoveOut: vi.fn(async () => undefined),
       correctPaidThrough: vi.fn(async (_id: string, paidThrough: string) => paidThrough),
       correctRent: vi.fn(async () => undefined),
       startRentTracking: vi.fn(async () => "2026-03-01"),
