@@ -7,6 +7,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { executeRows, inScope, type Db, type Scope } from "@/server/adapters/drizzle/client";
 import * as schema from "@/server/adapters/drizzle/schema";
+import type { CorrectionAction } from "@/lib/types";
 import { createMigratedDb, loadOracles } from "../../db/pglite";
 
 export const OWNER = "00000000-0000-4000-8000-00000000000a";
@@ -15,6 +16,9 @@ export const STRANGER = "00000000-0000-4000-8000-00000000000b";
 export const asOwner: Scope = { role: "authenticated", claims: { sub: OWNER } };
 export const asStranger: Scope = { role: "authenticated", claims: { sub: STRANGER } };
 export const asService: Scope = { role: "service_role" };
+
+/** The corrections PIN every ledger DB starts with (0039). */
+export const PIN = "246810";
 
 /** A text[] / uuid[] parameter: Drizzle's sql`` spreads a JS array into separate parameters. */
 const textArray = (values: string[]) => sql`array(select jsonb_array_elements_text(${JSON.stringify(values)}::jsonb))`;
@@ -38,6 +42,11 @@ export interface LedgerDb {
   bill(tenantIds: string[], through: string): Promise<void>;
   /** The tenant's months, oldest first. */
   months(tenantId: string): Promise<{ id: string; period_month: string }[]>;
+  /**
+   * Confirms the next correction with the PIN, as the owner (0039): leaves
+   * the one-time ticket the gated SQL function then uses up.
+   */
+  confirmPin(action: CorrectionAction, targetId: string): Promise<void>;
   /** Records a payment through create_payment, as the owner. */
   pay(tenantId: string, allocations: { rent_period_id: string; amount: number }[], date?: string): Promise<void>;
   close(): Promise<void>;
@@ -59,6 +68,7 @@ export async function createLedgerDb(opts: { oracles?: boolean } = {}): Promise<
     insert into properties (property_code, location_code, name) values ('AC-T1', 'AC', 'Tower 1');
     insert into units (unit_code, property_code, floor, unit_type)
       select 'AC-T1-G0' || n, 'AC-T1', 'G', 'commercial' from generate_series(1, 6) as n;
+    insert into correction_guard (pin_hash, pin_salt) values (correction_pin_hash('test-salt', '${PIN}'), 'test-salt');
   `);
   const db = drizzle(pg, { schema }) as unknown as Db;
   const rows = <T>(scope: Scope, query: SQL) => inScope(db, scope, (tx) => executeRows<T>(tx, query));
@@ -86,6 +96,13 @@ export async function createLedgerDb(opts: { oracles?: boolean } = {}): Promise<
         sql`select id, to_char(period_month, 'YYYY-MM-DD') as period_month from rent_periods
             where tenant_id = ${tenantId} order by period_month`
       );
+    },
+    async confirmPin(action, targetId) {
+      const [row] = await rows<{ ok: boolean }>(
+        asOwner,
+        sql`select ok from verify_correction_pin(${PIN}, ${action}, ${targetId}::uuid)`
+      );
+      if (!row.ok) throw new Error(`PIN refused for ${action} on ${targetId}`);
     },
     async pay(tenantId, allocations, date = "2026-03-05") {
       const amount = allocations.reduce((sum, a) => sum + a.amount, 0);

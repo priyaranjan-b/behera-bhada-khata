@@ -70,6 +70,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0031_maintenance.sql` | `maintenance_expenses`, `maintenance_expense_units` (equal split per house), `maintenance_expense_tags` (who paid), `maintenance_files`; `create_/update_/void_maintenance_expense()`, `maintenance_shares()`; audit actions `maintenance.*`, the `category` audit format, index `audit_log (entity_type, entity_id)` (D35) |
 | `0037_correct_move_out.sql` | `correct_move_out()`: fix a moved-out tenant's move-out date, with their houses and last rent months (D40) |
 | `0038_correct_move_out_fixes.sql` | `correct_move_out()` revised: future dates allowed (as move-out), not before billing start, months and neighbouring tenancies locked before checking (D40) |
+| `0039_correction_pin.sql` | the corrections PIN: `correction_guard`, `correction_tickets`, `set_correction_pin()`, `verify_correction_pin()`, `correction_pin_status()`, `log_correction_event()`; `correct_paid_through`, `correct_rent`, `correct_move_out`, `create_adjustment`, `stop_rent_tracking` and a backdated `move_out_tenant` need its ticket in the same transaction, `update_tenant` refuses a past-month rent, the originals moved to `private.*_unchecked` (D41, A35). Undo: `supabase/rollback/0039_correction_pin.sql` |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -249,6 +250,10 @@ with `revoke all on function … from public, anon, authenticated` and a narrow
 - **Service role only:** `acknowledge_*`, `ensure_rent_periods`,
   `rent_for_month` (and the rate-limit functions until 0029 dropped them,
   D33).
+- **Nobody (0039, D41):** the originals of the PIN-gated functions,
+  `private.*_unchecked`, and the PIN helpers (`consume_correction_ticket`,
+  `correction_pin_failed`, `log_correction_event`, ...); only the `SECURITY DEFINER` functions call
+  them.
 
 ### D12 — Rate limits live in Postgres
 
@@ -1189,6 +1194,54 @@ refuses a tenant who has already moved out, so this is the only way.
 the next month (the day the keys came back, not the last day paid for)
 invented a month of arrears for a tenant who was paid up, and only
 hand-written SQL could remove it.
+
+### D41 — Corrections need a ticket from the corrections PIN, in the same transaction
+
+**Decision (0039).** Every function that rewrites the ledger's history
+checks a ticket that only a correct PIN produces, in the database itself.
+- **The PIN:** `correction_guard` (one row): salted sha256 iterated 2,000
+  times (`correction_pin_hash`; PGlite has no pgcrypto), when it was set,
+  the setup window, the failure counts and the lockout. No role may read or
+  write it; RLS on, no policies, no audit trigger (it would copy the hash).
+  Left out of `Tables` in `src/lib/types.ts` on purpose: no app code reads
+  it. Same for `correction_tickets`.
+- **Setting it:** `set_correction_pin(new, old)`. A first PIN only while
+  `setup_until` is in the future, which only
+  `supabase/scripts/open_correction_pin_setup.sql` (SQL editor) sets, for 15
+  minutes; it also clears a forgotten PIN and any lockout. Changing it
+  needs the current PIN; a wrong one counts as a failure.
+- **The check:** `verify_correction_pin(pin, action, target)` never raises
+  on a wrong PIN, so the caller commits the count: it returns `ok = false`,
+  the tries left and, if that one locked, until when. 5 in a row lock for
+  15 minutes, 10 in a day for 24 hours; a right PIN clears both counts. A
+  right PIN writes a row in `correction_tickets`: that `action`
+  (`correction_action_label`, `CORRECTION_ACTIONS` in `types.ts`) on that
+  `target` (tenant, or the payment for an adjustment). **The app calls it
+  and the gated function in one transaction** (`withCorrectionPin` in the
+  Drizzle adapter), so the ticket is never committed and a refused
+  correction takes it back. A row rather than a token passed along keeps
+  every function's signature.
+- **The gate:** each of `correct_paid_through`, `correct_rent`,
+  `correct_move_out`, `create_adjustment` and `stop_rent_tracking` is a
+  `SECURITY DEFINER` wrapper with the same name and arguments: owner check
+  (`BBK04`), then `consume_correction_ticket` (`BBK09` without one), then
+  `private.<fn>_unchecked`, the original, moved unchanged to a schema the
+  REST API doesn't expose, with no grants. `move_out_tenant` asks for a
+  ticket only for an active tenant's date before last month
+  (`correction_backdate_limit()`, mirrored by `moveOutNeedsPin`);
+  `update_tenant` refuses (`BBK00`) a non-draft rent change from before
+  this month (Asia/Kolkata) - that's Correct rent.
+- **Audit:** `log_correction_event` (no grants) writes the PIN events with
+  their detail (which correction, how long locked) and tenant; the owner
+  can't forge them through `log_event`, which doesn't accept them.
+  `audit_action_label` and `audit_describe` name them.
+- **Undo:** `supabase/rollback/0039_correction_pin.sql`, then redeploy the
+  release before 0039. Run 0039 right before deploying the release that
+  sends the PIN, then the setup script, then set the PIN.
+
+**Why.** The owner's session can call these functions over the Supabase
+REST API, so only a check inside them holds; the login password can be
+changed from that session, so it can't be the check (A35).
 
 ## 3. Checklists
 

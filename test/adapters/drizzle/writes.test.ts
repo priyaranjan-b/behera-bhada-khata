@@ -9,7 +9,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzleOwnerRepositories } from "@/server/adapters/drizzle/repositories/owner";
 import type { OwnerRepositories } from "@/server/ports";
-import { asService, createLedgerDb, OWNER, STRANGER, type LedgerDb } from "./fixtures";
+import { asService, createLedgerDb, OWNER, PIN, STRANGER, type LedgerDb } from "./fixtures";
 
 type Owner = Required<{ [K in keyof OwnerRepositories]: Partial<OwnerRepositories[K]> }>;
 
@@ -252,7 +252,9 @@ describe("house rents (D39)", () => {
 
     // A bad rent rolls back the tenant write it came with.
     await expect(
-      owner.tenants.correctRent!(id, "2026-02-01", 9500, [{ unit_code: "AC-T1-G03", base_rent: -1 }])
+      owner.tenants.correctRent!(id, "2026-02-01", 9500, { pin: PIN }, [
+        { unit_code: "AC-T1-G03", base_rent: -1 },
+      ])
     ).rejects.toMatchObject({ status: 400 });
     const [rate] = await l.rows<{ monthly_amount: string }>(
       asService,

@@ -2,21 +2,27 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useAppRouter } from "@/components/ui/Loading";
+import { useCorrectionSubmit } from "@/components/domain/useCorrectionSubmit";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
 import Divider from "@mui/material/Divider";
 import TextField from "@mui/material/TextField";
 import { StatusBadge } from "@/components/ui/DataDisplay";
-import { AmountRow, FormActions, SectionCard, SummaryLine } from "@/components/ui";
+import { AmountRow, CorrectionDialog, DetailList, DetailRow, FormActions, SectionCard, SummaryLine } from "@/components/ui";
 import { OwnerSignatureField, type OwnerSignatureHandle } from "@/components/domain/OwnerSignatureField";
 import { formatMonth } from "@/lib/dates";
 import { formatMoney, round2 } from "@/lib/money";
-import { api, errorMessage } from "@/lib/api-client";
-import type { AdjustablePeriod, SavedSignature } from "@/lib/contracts";
+import { api } from "@/lib/api-client";
+import type { AdjustablePeriod, CreatedAdjustment, SavedSignature } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
 import NotifyTenantField, { recordedFlash } from "@/components/domain/NotifyTenantField";
 
+/**
+ * Corrects a recorded payment with an adjustment (create_adjustment). The
+ * page is the fix; "Save correction" opens the review and the corrections
+ * PIN (0039) before anything is saved.
+ */
 export default function AdjustmentForm({
   paymentId,
   periods,
@@ -38,9 +44,11 @@ export default function AdjustmentForm({
   const [deltas, setDeltas] = useState<Record<string, number>>({});
   const [reason, setReason] = useState("");
   const [notify, setNotify] = useState(tenantMessaging);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set once the form checks out: the signature to send, and the review + PIN dialog is open. */
+  const [ready, setReady] = useState<{ signature: string | undefined } | null>(null);
   const signatureHandle = useRef<OwnerSignatureHandle | null>(null);
+  const correction = useCorrectionSubmit("Couldn't save that adjustment.", ready !== null);
 
   const allocations = useMemo(
     () =>
@@ -51,7 +59,7 @@ export default function AdjustmentForm({
   );
   const total = round2(allocations.reduce((sum, a) => sum + a.amountDelta, 0));
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -69,22 +77,30 @@ export default function AdjustmentForm({
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const created = await api.dashboard.payments.createAdjustment(paymentId, {
-        deltaAmount: total,
-        reason: reason.trim(),
-        allocations,
-        ownerSignaturePng: signature,
-        notifyTenant: notify,
-      });
-      router.push(routes.tenants.detail(created.tenantId, recordedFlash(created.notified)));
-      router.refresh();
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't save that adjustment."));
-      setSubmitting(false);
-    }
+    correction.clearErrors();
+    setReady({ signature });
   }
+
+  const confirm = (pin: string) => {
+    let created: CreatedAdjustment | null = null;
+    return correction.submit(
+      async () => {
+        created = await api.dashboard.payments.createAdjustment(paymentId, {
+          deltaAmount: total,
+          reason: reason.trim(),
+          allocations,
+          ownerSignaturePng: ready?.signature,
+          notifyTenant: notify,
+          pin,
+        });
+      },
+      () => {
+        if (created) router.push(routes.tenants.detail(created.tenantId, recordedFlash(created.notified)));
+      }
+    );
+  };
+
+  const monthLabel = new Map(periods.map((p) => [p.rentPeriodId, p]));
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
@@ -145,7 +161,7 @@ export default function AdjustmentForm({
         </Grid>
 
         <Grid size={12}>
-          <NotifyTenantField checked={notify} onChange={setNotify} disabled={submitting} available={tenantMessaging} />
+          <NotifyTenantField checked={notify} onChange={setNotify} disabled={correction.busy} available={tenantMessaging} />
         </Grid>
 
         <Grid size={12}>
@@ -154,10 +170,42 @@ export default function AdjustmentForm({
             cancelHref={routes.tenants.detail(tenantId)}
             submitLabel="Save correction"
             pendingLabel="Saving…"
-            pending={submitting}
+            pending={correction.busy}
           />
         </Grid>
       </Grid>
+
+      <CorrectionDialog
+        open={ready !== null}
+        title="Correct this payment"
+        canReview
+        confirmLabel="Save correction"
+        maxWidth="sm"
+        busy={correction.busy}
+        error={correction.error}
+        pinError={correction.pinError}
+        blocked={correction.blocked}
+        onStepChange={correction.clearErrors}
+        onClose={() => setReady(null)}
+        onConfirm={confirm}
+        review={
+          <DetailList dividers>
+            {allocations.map((a) => {
+              const p = monthLabel.get(a.rentPeriodId);
+              return (
+                <DetailRow key={a.rentPeriodId} label={p ? formatMonth(p.periodMonth) : "Month"}>
+                  {p ? `${formatMoney(p.originallyAllocated)} → ${formatMoney(round2(p.originallyAllocated + a.amountDelta))}` : formatMoney(a.amountDelta)}
+                </DetailRow>
+              );
+            })}
+            <DetailRow label="Payment counted">
+              {formatMoney(originalAmount)} → {formatMoney(round2(originalAmount + total))}
+            </DetailRow>
+            <DetailRow label="Reason">{reason.trim()}</DetailRow>
+            <DetailRow label="Tenant">{notify && tenantMessaging ? "Will be sent a link to acknowledge it" : "Won't be messaged"}</DetailRow>
+          </DetailList>
+        }
+      />
     </Box>
   );
 }

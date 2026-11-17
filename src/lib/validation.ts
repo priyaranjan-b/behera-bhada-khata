@@ -301,13 +301,46 @@ export const updateTenantSchema = z
   })
   .superRefine((input, ctx) => checkGovernmentOnly(input, ctx, { phoneRequired: false }));
 
+// ---- Corrections PIN (0039, D41) -------------------------------------------
+
+/** The corrections PIN: what confirms every change to the ledger's history. */
+export const CORRECTION_LIMITS = {
+  pinLength: 6,
+  /** Mirrors correction_pin_failed() in 0039: wrong PINs in a row before a lockout, and its length. */
+  attemptsBeforeLock: 5,
+  lockMinutes: 15,
+} as const;
+
+/** Never echoes the value back in an error. */
+export const correctionPinSchema = z
+  .string({ error: "Enter your corrections PIN" })
+  .regex(new RegExp(`^[0-9]{${CORRECTION_LIMITS.pinLength}}$`), `Enter your ${CORRECTION_LIMITS.pinLength}-digit corrections PIN`);
+
+/** Sets the first PIN, or changes it with the current one. */
+export const setCorrectionPinSchema = z.object({
+  pin: correctionPinSchema,
+  currentPin: correctionPinSchema.optional(),
+});
+
+/** A correction's own fields plus the PIN that confirms it. */
+const withPin = { pin: correctionPinSchema };
+
+/** `pin`: needed only for a date before last month (moveOutNeedsPin), which can drop ended months. */
 export const moveOutSchema = z.object({
   moveOutDate: dateKeySchema,
+  pin: correctionPinSchema.optional(),
+});
+
+/** A moved-out tenant's move-out date entered wrongly (0037). */
+export const correctMoveOutSchema = z.object({
+  moveOutDate: dateKeySchema,
+  ...withPin,
 });
 
 /** The last month rent was paid outside the app (yyyy-MM or yyyy-MM-01). */
 export const correctPaidThroughSchema = z.object({
   paidThrough: monthKeySchema,
+  ...withPin,
 });
 
 /** A rent entered wrongly (0025): the right amount, from the first month it was wrong. */
@@ -315,7 +348,11 @@ export const correctRentSchema = z.object({
   fromMonth: monthKeySchema,
   monthlyRent: positiveMoneySchema,
   houseRents: houseRentsSchema,
+  ...withPin,
 });
+
+/** Stop tracking a government tenant's rent (0016). */
+export const stopRentTrackingSchema = z.object({ ...withPin });
 
 /**
  * Starts billing an untracked government tenant (0016): from the month after
@@ -401,6 +438,7 @@ export const createAdjustmentSchema = z.object({
   ownerSignaturePng: signaturePngSchema.optional(),
   /** Message the tenant a link to acknowledge it (sign + OTP). Default: yes. */
   notifyTenant: z.boolean().optional(),
+  ...withPin,
 });
 
 // ---- Owner profile (0013) ----------------------------------------------------

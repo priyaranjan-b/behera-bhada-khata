@@ -2,6 +2,7 @@ import "server-only";
 import type { HouseRent, OwnerRepositories } from "@/server/ports";
 import { inScope, type Db, type JwtClaims, type Tx } from "../client";
 import { must, mustWrite } from "../errors";
+import { correctionPinStatus, setCorrectionPin, withCorrectionPin } from "../procedures/corrections";
 import { createAdjustment, createPayment } from "../procedures/ledger";
 import { createMaintenanceExpense, updateMaintenanceExpense, voidMaintenanceExpense } from "../procedures/maintenance";
 import { logEvent } from "../procedures/system";
@@ -127,6 +128,10 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
     mustWrite(inScope(db, { role: "authenticated", claims }, fn), what);
 
   return {
+    corrections: {
+      status: () => read("read corrections PIN status", (tx) => correctionPinStatus(tx)),
+      setPin: (pin, currentPin) => write(`set corrections PIN`, (tx) => setCorrectionPin(tx, pin, currentPin)),
+    },
     audit: {
       list: (filter) => read(`list audit log${filter.tenantId ? ` of tenant ${filter.tenantId}` : ""}`, (tx) => listAudit(tx, filter)),
       // An app event, by the owner (the session is the actor).
@@ -214,19 +219,34 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
         write(`update tenant ${id}, house rents ${houseCodes(houseRents)}`, (tx) =>
           withHouseRents(tx, houseRents, () => updateTenant(tx, id, changes))
         ),
-      moveOut: (id, date) => write(`move out tenant ${id}`, (tx) => moveOutTenant(tx, id, date)),
-      correctMoveOut: (id, date) => write(`correct move-out date of tenant ${id}`, (tx) => correctMoveOut(tx, id, date)),
-      correctPaidThrough: (id, paidThrough) =>
-        write(`correct paid up to of tenant ${id}`, (tx) => correctPaidThrough(tx, id, paidThrough)),
-      correctRent: (id, fromMonth, monthlyRent, houseRents = []) =>
+      moveOut: (id, date, pin) =>
+        write(`move out tenant ${id} on ${date}${pin ? " (PIN-confirmed)" : ""}`, (tx) =>
+          pin
+            ? withCorrectionPin(tx, pin.pin, "move_out", id, () => moveOutTenant(tx, id, date))
+            : moveOutTenant(tx, id, date).then(() => ({ ok: true as const, value: undefined }))
+        ),
+      correctMoveOut: (id, date, { pin }) =>
+        write(`correct move-out date of tenant ${id} to ${date}`, (tx) =>
+          withCorrectionPin(tx, pin, "move_out_date", id, () => correctMoveOut(tx, id, date))
+        ),
+      correctPaidThrough: (id, paidThrough, { pin }) =>
+        write(`correct paid up to of tenant ${id} to ${paidThrough}`, (tx) =>
+          withCorrectionPin(tx, pin, "paid_through", id, () => correctPaidThrough(tx, id, paidThrough))
+        ),
+      correctRent: (id, fromMonth, monthlyRent, { pin }, houseRents = []) =>
         write(`correct rent of tenant ${id} from ${fromMonth}, house rents ${houseCodes(houseRents)}`, (tx) =>
-          withHouseRents(tx, houseRents, () => correctRent(tx, id, fromMonth, monthlyRent))
+          withCorrectionPin(tx, pin, "rent", id, () =>
+            withHouseRents(tx, houseRents, () => correctRent(tx, id, fromMonth, monthlyRent))
+          )
         ),
       startRentTracking: (id, monthlyRent, paidThrough, houseRents = []) =>
         write(`start rent tracking of tenant ${id}, house rents ${houseCodes(houseRents)}`, (tx) =>
           withHouseRents(tx, houseRents, () => startRentTracking(tx, id, monthlyRent, paidThrough))
         ),
-      stopRentTracking: (id) => write(`stop rent tracking of tenant ${id}`, (tx) => stopRentTracking(tx, id)),
+      stopRentTracking: (id, { pin }) =>
+        write(`stop rent tracking of tenant ${id}`, (tx) =>
+          withCorrectionPin(tx, pin, "stop_tracking", id, () => stopRentTracking(tx, id))
+        ),
     },
     billing: {
       page: (filter) => read(`read billing page ${pageLabel(filter)} show ${filter.show}`, (tx) => billingPage(tx, filter)),
@@ -268,9 +288,11 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       listForTenants: (ids, filter) => read(`list adjustments of ${ids.length} tenants`, (tx) => listAdjustments(tx, ids, filter)),
       get: (id) => read(`get adjustment ${id}`, (tx) => getAdjustment(tx, id)),
       listAllocations: (id) => read(`list allocations of adjustment ${id}`, (tx) => listAdjustmentAllocations(tx, id)),
-      create: (adjustment, allocations) =>
+      create: (adjustment, allocations, { pin }) =>
         write(`create adjustment ${adjustment.id} on payment ${adjustment.original_payment_id}`, (tx) =>
-          createAdjustment(tx, adjustment, allocations)
+          withCorrectionPin(tx, pin, "adjustment", adjustment.original_payment_id, () =>
+            createAdjustment(tx, adjustment, allocations)
+          )
         ),
       rotateToken: (id, tokenHash, expiresAt) =>
         write(`rotate adjustment link ${id}`, (tx) => rotateToken(tx, "adjustment", id, tokenHash, expiresAt)),

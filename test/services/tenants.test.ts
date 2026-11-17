@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OWNER_ID, PNG_DATA_URL, fakes, resetFakes, tenant } from "../fakes";
+import { FAKE_PIN, OWNER_ID, PNG_DATA_URL, fakes, resetFakes, tenant } from "../fakes";
+import { addMonthsToKey, currentMonthKey, yearMonthOf } from "@/lib/dates";
+
+/** A new rent starts this month at the earliest (0039); the tests use next month. */
+const nextMonth = addMonthsToKey(currentMonthKey(), 1);
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 vi.mock("@/server/pdf/receipt", () => ({ generateReceiptPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])) }));
@@ -113,7 +117,7 @@ describe("onboarding and editing", () => {
       unitCodes: ["AC-T1-G01", "AC-T1-G05"],
       unitsEffective: "2026-03-01",
       monthlyRentAmount: 5500,
-      rentEffectiveMonth: "2026-04",
+      rentEffectiveMonth: yearMonthOf(nextMonth),
       houseRents: [
         { unitCode: "AC-T1-G01", share: 3000 },
         { unitCode: "AC-T1-G05", share: 2500 },
@@ -129,7 +133,7 @@ describe("onboarding and editing", () => {
         unit_codes: ["AC-T1-G01", "AC-T1-G05"],
         units_effective: "2026-03-01",
         monthly_rent: 5500,
-        rent_effective_month: "2026-04-01",
+        rent_effective_month: nextMonth,
         lease_start: null,
         paid_through: null,
         deposit_amount: null,
@@ -143,19 +147,74 @@ describe("onboarding and editing", () => {
     );
   });
 
-  it("moves a tenant out on a date", async () => {
-    await moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-03-20" });
-    expect(fakes.owner.tenants.moveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-03-20");
+  it("moves a tenant out on a date; before last month only with the corrections PIN (0039)", async () => {
+    const lastMonth = addMonthsToKey(currentMonthKey(), -1);
+    await moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: lastMonth });
+    expect(fakes.owner.tenants.moveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", lastMonth);
+    expect(fakes.owner.corrections.status).not.toHaveBeenCalled();
+
+    await expect(moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-03-20" })).rejects.toMatchObject({ status: 400 });
+    await expect(moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-03-20", pin: "000000" })).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/Wrong PIN/),
+    });
+    // Recent date, then the wrong-PIN try (refused inside the write, nothing moved).
+    expect(fakes.owner.tenants.moveOut).toHaveBeenCalledTimes(2);
+    await moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-03-20", pin: FAKE_PIN });
+    expect(fakes.owner.tenants.moveOut).toHaveBeenLastCalledWith("00000000-0000-4000-8000-000000000101", "2026-03-20", { pin: FAKE_PIN });
     await expect(moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "20-03-2026" })).rejects.toMatchObject({ status: 400 });
   });
 
+  it("moves a draft out on any date without the PIN: it was never billed", async () => {
+    fakes.state.tenants.set("00000000-0000-4000-8000-000000000101", tenant({ id: "00000000-0000-4000-8000-000000000101", status: "draft" }));
+    await moveOutTenant(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2025-01-31" });
+    expect(fakes.owner.tenants.moveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2025-01-31");
+  });
+
   it("corrects a move-out date, after checking the date and the tenant", async () => {
-    await correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30" });
-    expect(fakes.owner.tenants.correctMoveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-09-30");
+    await correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30", pin: FAKE_PIN });
+    expect(fakes.owner.tenants.correctMoveOut).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-09-30", { pin: FAKE_PIN });
     fakes.owner.tenants.correctMoveOut.mockClear();
     await expect(correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "30-09-2026" })).rejects.toMatchObject({ status: 400 });
-    await expect(correctMoveOut(ctx, "nobody", { moveOutDate: "2026-09-30" })).rejects.toMatchObject({ status: 404 });
+    await expect(correctMoveOut(ctx, "nobody", { moveOutDate: "2026-09-30", pin: FAKE_PIN })).rejects.toMatchObject({ status: 404 });
+    // No PIN, or a wrong one: refused before the database is asked to change anything.
+    await expect(correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30" })).rejects.toMatchObject({ status: 400 });
+    await expect(correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30", pin: "135791" })).rejects.toMatchObject({
+      status: 400,
+      message: "Wrong PIN. 4 tries left before corrections lock.",
+    });
+    // Only the wrong-PIN try reached the database (which refused it); the bad date and missing PIN never did.
+    expect(fakes.owner.tenants.correctMoveOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses before any write when no PIN is set or corrections are locked", async () => {
+    fakes.owner.corrections.status.mockResolvedValueOnce({ pinSet: false, pinSetAt: null, lockedUntil: null, setupUntil: null });
+    await expect(correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30", pin: FAKE_PIN })).rejects.toMatchObject({
+      status: 409,
+      field: "pin",
+      message: "No corrections PIN is set yet. Set one on Profile first.",
+    });
+    fakes.owner.corrections.status.mockResolvedValueOnce({ pinSet: true, pinSetAt: null, lockedUntil: "2026-11-18T10:50:00Z", setupUntil: null });
+    await expect(correctMoveOut(ctx, "00000000-0000-4000-8000-000000000101", { moveOutDate: "2026-09-30", pin: FAKE_PIN })).rejects.toMatchObject({
+      status: 409,
+      field: "pin",
+      message: expect.stringMatching(/^Too many wrong PINs\. Corrections are locked until 18\/11\/2026/),
+    });
     expect(fakes.owner.tenants.correctMoveOut).not.toHaveBeenCalled();
+  });
+
+  it("refuses a new rent from a past month on Edit tenant: that is Correct rent", async () => {
+    await expect(
+      updateTenant(ctx, "00000000-0000-4000-8000-000000000101", {
+        name: "Asha",
+        phone: "+919876543210",
+        preferredChannel: "both",
+        unitCodes: ["AC-T1-G01"],
+        monthlyRentAmount: 9999,
+        rentEffectiveMonth: "2026-01",
+      })
+    ).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Correct rent/) });
+    expect(fakes.owner.tenants.update).not.toHaveBeenCalled();
   });
 });
 
@@ -214,13 +273,14 @@ describe("receipts and storage", () => {
 
 describe("correctPaidThrough", () => {
   it("takes a yyyy-MM month and passes the first of it to the database", async () => {
-    await correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "2026-07" });
-    expect(fakes.owner.tenants.correctPaidThrough).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-07-01");
+    await correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "2026-07", pin: FAKE_PIN });
+    expect(fakes.owner.tenants.correctPaidThrough).toHaveBeenCalledWith("00000000-0000-4000-8000-000000000101", "2026-07-01", { pin: FAKE_PIN });
   });
 
   it("rejects a bad month and an unknown tenant", async () => {
-    await expect(correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "July" })).rejects.toMatchObject({ status: 400 });
-    await expect(correctPaidThrough(ctx, "nobody", { paidThrough: "2026-07" })).rejects.toMatchObject({ status: 404 });
+    await expect(correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "July", pin: FAKE_PIN })).rejects.toMatchObject({ status: 400 });
+    await expect(correctPaidThrough(ctx, "nobody", { paidThrough: "2026-07", pin: FAKE_PIN })).rejects.toMatchObject({ status: 404 });
+    await expect(correctPaidThrough(ctx, "00000000-0000-4000-8000-000000000101", { paidThrough: "2026-07", pin: "12ab56" })).rejects.toMatchObject({ status: 400 });
     expect(fakes.owner.tenants.correctPaidThrough).not.toHaveBeenCalled();
   });
 });
@@ -233,17 +293,18 @@ describe("correctRent", () => {
       { unitCode: "AC-T1-G01", share: 600 },
       { unitCode: "AC-T1-G02", share: 400 },
     ];
-    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 1000, houseRents });
-    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 1000, [
+    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 1000, houseRents, pin: FAKE_PIN });
+    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 1000, { pin: FAKE_PIN }, [
       { unit_code: "AC-T1-G01", base_rent: 600 },
       { unit_code: "AC-T1-G02", base_rent: 400 },
     ]);
   });
 
   it("rejects a bad month or rent and an unknown tenant", async () => {
-    await expect(correctRent(ctx, id, { fromMonth: "April", monthlyRent: 1000 })).rejects.toMatchObject({ status: 400 });
-    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 0 })).rejects.toMatchObject({ status: 400 });
-    await expect(correctRent(ctx, "nobody", { fromMonth: "2026-04", monthlyRent: 1000 })).rejects.toMatchObject({ status: 404 });
+    await expect(correctRent(ctx, id, { fromMonth: "April", monthlyRent: 1000, pin: FAKE_PIN })).rejects.toMatchObject({ status: 400 });
+    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 0, pin: FAKE_PIN })).rejects.toMatchObject({ status: 400 });
+    await expect(correctRent(ctx, "nobody", { fromMonth: "2026-04", monthlyRent: 1000, pin: FAKE_PIN })).rejects.toMatchObject({ status: 404 });
+    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 1000, pin: "999999" })).rejects.toMatchObject({ status: 400 });
     expect(fakes.owner.tenants.correctRent).not.toHaveBeenCalled();
   });
 });
@@ -283,9 +344,10 @@ describe("government tenants (0016)", () => {
     expect(fakes.owner.tenants.startRentTracking).toHaveBeenLastCalledWith(GOVT_ID, null, null, []);
     await expect(startRentTracking(ctx, GOVT_ID, { paidThrough: "Feb" })).rejects.toMatchObject({ status: 400 });
 
-    await stopRentTracking(ctx, GOVT_ID);
-    expect(fakes.owner.tenants.stopRentTracking).toHaveBeenCalledWith(GOVT_ID);
-    await expect(stopRentTracking(ctx, "nobody")).rejects.toMatchObject({ status: 404 });
+    await expect(stopRentTracking(ctx, GOVT_ID, {})).rejects.toMatchObject({ status: 400 });
+    await stopRentTracking(ctx, GOVT_ID, { pin: FAKE_PIN });
+    expect(fakes.owner.tenants.stopRentTracking).toHaveBeenCalledWith(GOVT_ID, { pin: FAKE_PIN });
+    await expect(stopRentTracking(ctx, "nobody", { pin: FAKE_PIN })).rejects.toMatchObject({ status: 404 });
   });
 
   it("reads the account as one SQL aggregate, after topping the months up, never the full history (D29)", async () => {
@@ -414,7 +476,7 @@ describe("path ids", () => {
     await expect(getTenantDetail(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
     await expect(getTenantAccount(ctx, "not-a-uuid")).rejects.toMatchObject({ status: 404 });
     await expect(getTenantLedger(ctx, "not-a-uuid", {})).rejects.toMatchObject({ status: 404 });
-    await expect(moveOutTenant(ctx, "1; drop", { moveOutDate: "2026-10-01" })).rejects.toMatchObject({ status: 404 });
+    await expect(moveOutTenant(ctx, "1; drop", { moveOutDate: "2026-10-01", pin: FAKE_PIN })).rejects.toMatchObject({ status: 404 });
     expect(fakes.owner.tenants.get).not.toHaveBeenCalled();
   });
 });
@@ -446,7 +508,7 @@ describe("house rents (D39)", () => {
     ).rejects.toMatchObject({ status: 400 });
     expect(fakes.owner.tenants.create).not.toHaveBeenCalled();
 
-    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 6000 })).rejects.toMatchObject({ status: 400 });
+    await expect(correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 6000, pin: FAKE_PIN })).rejects.toMatchObject({ status: 400 });
     expect(fakes.owner.tenants.correctRent).not.toHaveBeenCalled();
   });
 
@@ -464,8 +526,8 @@ describe("house rents (D39)", () => {
 
   it("leaves a moved-out tenant's old houses alone: they may be let again", async () => {
     fakes.state.tenants.set(id, tenant({ id, status: "inactive" }));
-    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 6000 });
-    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 6000, []);
+    await correctRent(ctx, id, { fromMonth: "2026-04", monthlyRent: 6000, pin: FAKE_PIN });
+    expect(fakes.owner.tenants.correctRent).toHaveBeenCalledWith(id, "2026-04-01", 6000, { pin: FAKE_PIN }, []);
   });
 
   it("splits equally on bulk upload, which asks nothing", async () => {

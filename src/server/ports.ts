@@ -321,9 +321,49 @@ export interface AuditEvent {
   context?: Record<string, string | number | boolean | null>;
 }
 
+// ---- Corrections PIN (0039, D41) ----
+
+/**
+ * The corrections PIN for one correction: every repository method that
+ * rewrites the ledger's history takes it and checks it in the same
+ * transaction as the write, so no service can skip it and no other session
+ * can use the ticket it leaves.
+ */
+export interface CorrectionPin {
+  pin: string;
+}
+
+/**
+ * A PIN-checked write: done (`value`), or refused for a wrong PIN, with the
+ * tries left and, if that one locked corrections, until when. The failure
+ * count is committed either way.
+ */
+export type CorrectionResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; triesLeft: number | null; lockedUntil: string | null };
+
+export interface CorrectionPinStatusDb {
+  pinSet: boolean;
+  pinSetAt: string | null;
+  /** While locked out after wrong PINs. */
+  lockedUntil: string | null;
+  /** While a first (or new) PIN may be set: opened from the SQL editor. */
+  setupUntil: string | null;
+}
+
 // ---- The owner's data (an implementation must refuse anyone but the single app owner) ----
 
 export interface OwnerRepositories {
+  /** The corrections PIN (0039): checked in the database, never readable. */
+  corrections: {
+    status(): Promise<CorrectionPinStatusDb>;
+    /**
+     * Sets the first PIN while setup is open, or changes it with `currentPin`;
+     * a wrong current PIN counts as a failure (ok false). 409 while setup is
+     * closed or corrections are locked.
+     */
+    setPin(pin: string, currentPin: string | null): Promise<CorrectionResult<void>>;
+  };
   /** History of every change (0015): read-only, plus the owner's own app events. */
   audit: {
     list(filter: AuditFilter): Promise<AuditLogEntry[]>;
@@ -450,26 +490,36 @@ export interface OwnerRepositories {
     create(input: NewTenant, houseRents?: HouseRent[]): Promise<{ id: string }>;
     /** Contact details, house set and combined rent - see TenantChanges. */
     update(id: string, changes: TenantChanges, houseRents?: HouseRent[]): Promise<void>;
-    /** Ends every tenancy on `date`, marks the tenant inactive and drops untouched later months. */
-    moveOut(id: string, date: string): Promise<void>;
+    /**
+     * Ends every tenancy on `date`, marks the tenant inactive and drops
+     * untouched later months. A date before last month is a correction: pass
+     * the PIN (0039); without one the database refuses it (409).
+     */
+    moveOut(id: string, date: string, pin?: CorrectionPin): Promise<CorrectionResult<void>>;
     /**
      * Fixes a moved-out tenant's move-out date (0037): their houses end on it
      * and they're billed up to its month. 409 if a dropped month has a
      * payment or a house was let to someone else by then.
      */
-    correctMoveOut(id: string, date: string): Promise<void>;
+    correctMoveOut(id: string, date: string, pin: CorrectionPin): Promise<CorrectionResult<void>>;
     /**
      * Fixes an active tenant's "rent paid up to" (0014): billing starts the
      * month after. Earlier adds the months as owed; later drops months, 409
      * if one has a payment. Returns the new billing start.
      */
-    correctPaidThrough(id: string, paidThrough: string): Promise<string>;
+    correctPaidThrough(id: string, paidThrough: string, pin: CorrectionPin): Promise<CorrectionResult<string>>;
     /**
      * Fixes a rent entered wrongly (0025): the rent is `monthlyRent` from
      * `fromMonth` (a month key, not before billing start) on, and those months
      * are re-priced even if paid; 409 if one has more counted than that.
      */
-    correctRent(id: string, fromMonth: string, monthlyRent: number, houseRents?: HouseRent[]): Promise<void>;
+    correctRent(
+      id: string,
+      fromMonth: string,
+      monthlyRent: number,
+      pin: CorrectionPin,
+      houseRents?: HouseRent[]
+    ): Promise<CorrectionResult<void>>;
     /**
      * Starts billing an untracked government tenant (0016) from the month
      * after `paidThrough` (null = last month). Returns the billing start.
@@ -481,7 +531,7 @@ export interface OwnerRepositories {
       houseRents?: HouseRent[]
     ): Promise<string>;
     /** Undoes startRentTracking; 409 once a payment or adjustment is recorded. */
-    stopRentTracking(id: string): Promise<void>;
+    stopRentTracking(id: string, pin: CorrectionPin): Promise<CorrectionResult<void>>;
     /** The tenant's balance figures and whether tracking can stop, aggregated in SQL (0022). */
     accountSummary(id: string): Promise<TenantAccountSummaryDb>;
   };
@@ -551,7 +601,7 @@ export interface OwnerRepositories {
      * summing to the delta, or pushing a period outside [0, amount_due].
      * The tenant is taken from the original payment.
      */
-    create(adjustment: NewAdjustment, allocations: NewAllocation[]): Promise<void>;
+    create(adjustment: NewAdjustment, allocations: NewAllocation[], pin: CorrectionPin): Promise<CorrectionResult<void>>;
     listAllocations(adjustmentId: string): Promise<AdjustmentAllocation[]>;
     rotateToken(id: string, tokenHash: string, expiresAt: string): Promise<boolean>;
   };

@@ -49,7 +49,12 @@ export function isCrossSiteWrite(request: Request): boolean {
 }
 
 function toErrorResponse(err: unknown): Response {
-  if (err instanceof ApiError) return NextResponse.json({ error: err.message }, { status: err.status, headers: NO_STORE });
+  if (err instanceof ApiError) {
+    return NextResponse.json(err.field ? { error: err.message, field: err.field } : { error: err.message }, {
+      status: err.status,
+      headers: NO_STORE,
+    });
+  }
   // Unexpected: log the detail, don't leak it.
   console.error(err);
   return NextResponse.json({ error: "Something went wrong" }, { status: 500, headers: NO_STORE });

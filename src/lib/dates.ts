@@ -162,6 +162,11 @@ const timeFormatter = new Intl.DateTimeFormat(APP_LOCALE, {
 });
 
 /** "01/11/2026, 2:30 pm IST": an instant's date and time in the app time zone, e.g. for receipts. */
+/** "October 2026", or "Oct 2026 – Nov 2026" for several months (month keys, from <= to). */
+export function formatMonthRange(from: string, to: string): string {
+  return from === to ? formatMonth(from) : `${formatMonth(from, "short")} – ${formatMonth(to, "short")}`;
+}
+
 export function formatDateTime(instant: Date | string): string {
   const d = typeof instant === "string" ? new Date(instant) : instant;
   return `${formatDateKey(dateKeyOf(d))}, ${timeFormatter.format(d)}`;

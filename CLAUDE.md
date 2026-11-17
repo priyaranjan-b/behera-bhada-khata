@@ -64,7 +64,7 @@ test instead.
 
 ### Design decisions
 
-- **Database:** `docs/database-design.md` (D1–D40), see below.
+- **Database:** `docs/database-design.md` (D1–D41), see below.
 - **Everything else:** `docs/design-decisions.md` (A1…): Vercel `bom1`
   region and hand-migrated production DB (no `db push`), Twilio optional in
   production (`tenantMessaging`), owner password login, MyRentHQ branding,
@@ -93,7 +93,8 @@ test instead.
   and cross-site write check (A31), and SMS codes through Twilio Verify or
   2Factor (`OTP_PROVIDER`, the `OtpGateway` port; A34), and the tenant portal: phone sign-in,
   `/tenant` with no id, read-only (A32), and phone navigation as a bottom
-  bar (A33). Read it before changing any of these, and add
+  bar (A33), and changes to past records confirmed with a corrections PIN
+  checked in the database (A35). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
@@ -154,6 +155,22 @@ both together.
   moves `moved_out_on` and the houses' end date and drops or adds the last
   rent months (refused if a dropped month has a payment, or a house was
   re-let by the new date).
+- **Corrections PIN** (`0039_correction_pin.sql`, D41, A35): the five
+  actions that rewrite past records (Correct paid-up-to / rent / move-out
+  date, Adjust a payment, Stop tracking) and a Move out dated before last
+  month need a ticket that only `verify_correction_pin` gives for the right
+  PIN, in the same transaction as the write (`withCorrectionPin`); the SQL
+  wrappers refuse without it, the originals are `private.*_unchecked`.
+  Edit tenant's rent starts this month at the earliest (older: Correct
+  rent). The first PIN is set on `/profile` (`CorrectionPinCard`) only
+  after `supabase/scripts/open_correction_pin_setup.sql` opens setup from
+  the SQL editor. In the app: `CorrectionDialog` + `PinField` +
+  `useCorrectionSubmit`, `runCorrection` in
+  `src/server/services/corrections.ts`, and PIN errors as `ApiError` field
+  `"pin"`. **A new function that rewrites ledger history goes behind the
+  same gate** (wrapper + `consume_correction_ticket`, a `CORRECTION_ACTIONS`
+  entry and a `correction_action_label` line, its repository method taking
+  the PIN through `withCorrectionPin`).
 - **Government tenants** (`0016_government_tenants.sql`, D26):
   `tenants.tenant_kind` is `individual | business | government`. A
   government tenant may have no phone, and with `rent_tracked = false`

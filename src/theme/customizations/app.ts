@@ -4,6 +4,7 @@
 import { alpha, type Components, type Theme } from "@mui/material/styles";
 import { alertClasses } from "@mui/material/Alert";
 import { autocompleteClasses } from "@mui/material/Autocomplete";
+import { buttonClasses } from "@mui/material/Button";
 import { bottomNavigationActionClasses } from "@mui/material/BottomNavigationAction";
 import { chipClasses } from "@mui/material/Chip";
 import { iconButtonClasses } from "@mui/material/IconButton";
@@ -211,6 +212,33 @@ export const appCustomizations: Components<Theme> = {
   MuiButton: {
     variants: [
       { props: {}, style: coarsePointerTarget },
+      // The template keeps a contained button's dark gradient when it's
+      // disabled while MUI greys its text, so "Save" read as a blank dark
+      // block. Disabled: a flat light fill with readable grey text. Loading
+      // (also disabled): its own colours, with the label kept beside the
+      // spinner (LoadingButton puts the spinner at the start).
+      {
+        props: { variant: "contained" },
+        style: ({ theme }) => ({
+          [`&.${buttonClasses.disabled}:not(.${buttonClasses.loading})`]: {
+            color: (theme.vars || theme).palette.text.disabled,
+            backgroundColor: (theme.vars || theme).palette.action.disabledBackground,
+            backgroundImage: "none",
+            borderColor: "transparent",
+            boxShadow: "none",
+          },
+          [`&.${buttonClasses.loading}`]: { color: (theme.vars || theme).palette.common.white, opacity: 0.85 },
+        }),
+      },
+      {
+        props: { variant: "contained", color: "primary" },
+        style: ({ theme }) => ({
+          [`&.${buttonClasses.loading}`]: {
+            color: (theme.vars || theme).palette.common.white,
+            ...theme.applyStyles("dark", { color: (theme.vars || theme).palette.common.black }),
+          },
+        }),
+      },
       // The template's outlined style greys every colour but secondary; a
       // destructive action (Move out) must read as one before it's tapped.
       {

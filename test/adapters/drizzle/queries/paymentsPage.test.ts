@@ -51,6 +51,7 @@ beforeAll(async () => {
   await pay(tenants.chai, [0, 1, 2], [3000, 3000, 3000], "2026-03-01", "other", "Includes previous dues");
   await pay(tenants.dev, [0], [1000], "2026-02-20", "cash", "");
   // Dev moved out in February: his tower is the one he held last.
+  await l.confirmPin("move_out", tenants.dev);
   await l.rows(asOwner, sql`select move_out_tenant(${tenants.dev}::uuid, '2026-02-28'::date)`);
 });
 

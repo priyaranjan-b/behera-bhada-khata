@@ -1,24 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { DateField } from "@/components/ui";
-import { LoadingButton, useAppRouter } from "@/components/ui/Loading";
+import { CorrectionDialog, DateField, DetailList, DetailRow } from "@/components/ui";
+import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { api, errorMessage } from "@/lib/api-client";
-import { addDaysToKey, addMonthsToKey, currentMonthKey, formatDateKey, formatMonth, monthKeyOf, monthsBetween } from "@/lib/dates";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import { api } from "@/lib/api-client";
+import { addDaysToKey, addMonthsToKey, currentMonthKey, formatDateKey, formatMonth, formatMonthRange, monthKeyOf, monthsBetween } from "@/lib/dates";
 import { routes } from "@/lib/routes";
-
-/** "October 2026", or "Oct 2026 – Nov 2026" for several months. */
-function monthRange(from: string, to: string): string {
-  return from === to ? formatMonth(from) : `${formatMonth(from, "short")} – ${formatMonth(to, "short")}`;
-}
+import { useCorrectionSubmit } from "./useCorrectionSubmit";
 
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
 
@@ -28,7 +20,7 @@ function changeNote(oldMonth: string, newMonth: string, rentTracked: boolean): {
   const earlier = newMonth < oldMonth;
   const [from, to] = earlier ? [addMonthsToKey(newMonth, 1), oldMonth] : [addMonthsToKey(oldMonth, 1), newMonth];
   const n = monthsBetween(from, addMonthsToKey(to, 1));
-  const range = monthRange(from, to);
+  const range = formatMonthRange(from, to);
   if (!rentTracked) {
     // Govt paid direct (A11): their agreement rent counts as paid each month up to the move-out.
     return {
@@ -56,7 +48,8 @@ function changeNote(oldMonth: string, newMonth: string, rentTracked: boolean): {
 /**
  * Fixes a moved-out tenant's move-out date (correct_move_out, 0037/0038):
  * their houses end on it and rent is billed up to its month. Payments
- * already recorded stay on their months.
+ * already recorded stay on their months. Reviewed and confirmed with the
+ * corrections PIN (0039).
  */
 export default function CorrectMoveOutButton({
   tenantId,
@@ -74,8 +67,7 @@ export default function CorrectMoveOutButton({
   const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(movedOutOn);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const correction = useCorrectionSubmit("Couldn't change this.", open);
 
   const oldMonth = monthKeyOf(movedOutOn);
   const changed = Boolean(date) && date !== movedOutOn;
@@ -90,65 +82,68 @@ export default function CorrectMoveOutButton({
       ? [{ label: `End of ${formatMonth(monthKeyOf(endOfMonthBefore), "short")}`, value: endOfMonthBefore }]
       : undefined;
 
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.dashboard.tenants.correctMoveOut(tenantId, { moveOutDate: date });
-      setOpen(false);
-      router.push(routes.tenants.detail(tenantId, { moveOutCorrected: "1" }));
-      router.refresh();
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't change this."));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const confirm = (pin: string) =>
+    correction.submit(
+      () => api.dashboard.tenants.correctMoveOut(tenantId, { moveOutDate: date, pin }),
+      () => {
+        setOpen(false);
+        router.push(routes.tenants.detail(tenantId, { moveOutCorrected: "1" }));
+      }
+    );
 
   return (
     <>
       <Button
         size="small"
         aria-label="Correct move-out date"
+        startIcon={<LockRoundedIcon fontSize="small" />}
         onClick={() => {
           setDate(movedOutOn);
-          setError(null);
+          correction.clearErrors();
           setOpen(true);
         }}
       >
         Correct
       </Button>
-      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Correct the move-out date</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <Typography variant="body2" color="textSecondary">
-              The last day in the house, now {formatDateKey(movedOutOn)}. Rent is billed up to and including its
-              month, and the houses are free from the day after. Payments already recorded stay on the months they
-              were applied to.
-            </Typography>
-            <DateField
-              label="Last day in the house"
-              value={date}
-              onChange={setDate}
-              min={earliest ?? undefined}
-              required
-              fullWidth
-              quickPicks={quickPicks}
-            />
-            {note ? <Alert severity={note.severity}>{note.text}</Alert> : null}
-            {error ? <Alert severity="error">{error}</Alert> : null}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)} disabled={busy}>
-            Cancel
-          </Button>
-          <LoadingButton variant="contained" onClick={save} disabled={!changed} loading={busy}>
-            {busy ? "Saving…" : "Save"}
-          </LoadingButton>
-        </DialogActions>
-      </Dialog>
+      <CorrectionDialog
+        open={open}
+        title="Correct the move-out date"
+        canReview={changed}
+        busy={correction.busy}
+        error={correction.error}
+        pinError={correction.pinError}
+        blocked={correction.blocked}
+        onStepChange={correction.clearErrors}
+        onClose={() => setOpen(false)}
+        onConfirm={confirm}
+        review={
+          note ? (
+            <>
+              <DetailList dividers>
+                <DetailRow label="Last day in the house">
+                  {formatDateKey(movedOutOn)} → {formatDateKey(date)}
+                </DetailRow>
+              </DetailList>
+              <Alert severity={note.severity}>{note.text}</Alert>
+            </>
+          ) : null
+        }
+      >
+        <Typography variant="body2" color="textSecondary">
+          The last day in the house, now {formatDateKey(movedOutOn)}. Rent is billed up to and including its month,
+          and the houses are free from the day after. Payments already recorded stay on the months they were applied
+          to.
+        </Typography>
+        <DateField
+          label="Last day in the house"
+          value={date}
+          onChange={setDate}
+          min={earliest ?? undefined}
+          required
+          fullWidth
+          quickPicks={quickPicks}
+        />
+      </CorrectionDialog>
     </>
   );
 }

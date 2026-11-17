@@ -15,6 +15,10 @@ export const FLASH = {
   movedOut: "movedOut",
   /** A moved-out tenant's move-out date was corrected (D40). */
   moveOutCorrected: "moveOutCorrected",
+  /** A PIN-confirmed correction was saved (0039): rent, "paid up to", stop tracking. */
+  corrected: "corrected",
+  /** The corrections PIN was set or changed (0039). */
+  pinSaved: "pinSaved",
   paymentCreated: "paymentCreated",
   notifyFailed: "notifyFailed",
   resent: "resent",

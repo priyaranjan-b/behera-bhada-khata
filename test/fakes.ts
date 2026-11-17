@@ -45,6 +45,21 @@ const byName = (a: string, b: string) => a.toLowerCase().localeCompare(b.toLower
 
 export const OWNER_ID = "00000000-0000-4000-8000-00000000000a";
 
+/** The corrections PIN the fake repositories accept (0039). */
+export const FAKE_PIN = "246810";
+
+/** What the fake PIN-checked writes answer (0039): done, or a wrong PIN with 4 tries left. */
+function correctionDone<T>(value: T) {
+  return { ok: true as const, value };
+}
+function wrongPin() {
+  return { ok: false as const, triesLeft: 4 as number | null, lockedUntil: null as string | null };
+}
+/** A fake PIN-checked write: runs `write` for the right PIN. */
+function pinChecked<T>(pin: { pin: string } | undefined, write: () => T) {
+  return pin && pin.pin !== FAKE_PIN ? wrongPin() : correctionDone(write());
+}
+
 export function tenant(overrides: Partial<Tenant> = {}): Tenant {
   return {
     id: "00000000-0000-4000-8000-000000000101",
@@ -237,6 +252,17 @@ function build() {
   }
 
   const owner = {
+    corrections: {
+      status: vi.fn(async () => ({
+        pinSet: true,
+        pinSetAt: "2026-11-01T00:00:00Z" as string | null,
+        lockedUntil: null as string | null,
+        setupUntil: null as string | null,
+      })),
+      setPin: vi.fn(async (_pin: string, currentPin: string | null) =>
+        currentPin === null || currentPin === FAKE_PIN ? correctionDone(undefined) : wrongPin()
+      ),
+    },
     audit: {
       list: vi.fn(async (f: AuditFilter) =>
         [...state.audit]
@@ -438,12 +464,12 @@ function build() {
       get: vi.fn(async (id: string) => state.tenants.get(id) ?? null),
       create: vi.fn(async () => ({ id: "00000000-0000-4000-8000-000000000199" })),
       update: vi.fn(async () => undefined),
-      moveOut: vi.fn(async () => undefined),
-      correctMoveOut: vi.fn(async () => undefined),
-      correctPaidThrough: vi.fn(async (_id: string, paidThrough: string) => paidThrough),
-      correctRent: vi.fn(async () => undefined),
+      moveOut: vi.fn(async (_id: string, _date: string, pin?: { pin: string }) => pinChecked(pin, () => undefined)),
+      correctMoveOut: vi.fn(async (_id: string, _date: string, pin: { pin: string }) => pinChecked(pin, () => undefined)),
+      correctPaidThrough: vi.fn(async (_id: string, paidThrough: string, pin: { pin: string }) => pinChecked(pin, () => paidThrough)),
+      correctRent: vi.fn(async (_id: string, _from: string, _rent: number, pin: { pin: string }) => pinChecked(pin, () => undefined)),
       startRentTracking: vi.fn(async () => "2026-03-01"),
-      stopRentTracking: vi.fn(async () => undefined),
+      stopRentTracking: vi.fn(async (_id: string, pin: { pin: string }) => pinChecked(pin, () => undefined)),
       accountSummary: vi.fn(async () => ({
         total_outstanding: 5000,
         overdue_months: 1,
@@ -574,7 +600,7 @@ function build() {
     adjustments: {
       listForTenants: vi.fn(async () => []),
       get: vi.fn(async (id: string) => state.adjustments.get(id) ?? null),
-      create: vi.fn(async () => undefined),
+      create: vi.fn(async (_adjustment: unknown, _allocations: unknown, pin: { pin: string }) => pinChecked(pin, () => undefined)),
       listAllocations: vi.fn(async () => []),
       rotateToken: vi.fn(async (id: string) => !state.adjustments.get(id)?.acknowledged_at),
     },

@@ -6,6 +6,7 @@ import { createAdjustmentSchema } from "@/lib/validation";
 import { ownerDb } from "@/server/infra";
 import { notFound, parseInput, requireId, requireTenant, withParams, type OwnerContext } from "./context";
 import { recordEvent } from "./audit";
+import { assertCorrectionsOpen, correctionValue } from "./corrections";
 import { confirmUrl, generateConfirmToken, notifyTenant, storeOwnerSignature, withUploadedFile } from "./confirmLinks";
 import { ownerSignatureBytes } from "./profile";
 import { describeRecord, ownerReceiptReads, receiptFile } from "./receipts";
@@ -24,6 +25,10 @@ export async function createAdjustment(
   const payment = await db.payments.get(paymentId);
   if (!payment || payment.status !== "confirmed") notFound("Payment");
   const tenant = await requireTenant(db, payment.tenant_id);
+  // Before any upload: no PIN set or locked fails here (0039). The PIN itself
+  // is checked in the write's transaction; a wrong one throws inside
+  // withUploadedFile, which then removes the signature it stored.
+  await assertCorrectionsOpen(ctx, db, "adjustment", paymentId);
 
   const signature = await ownerSignatureBytes(db, input.ownerSignaturePng);
   const { id, ownerSignaturePath } = await storeOwnerSignature("adjustments", tenant, signature);
@@ -31,18 +36,24 @@ export async function createAdjustment(
 
   // The database checks the allocations against the original payment,
   // inserts everything and applies it to the months in one transaction.
-  await withUploadedFile(ownerSignaturePath, () =>
-    db.adjustments.create(
-      {
-        id,
-        original_payment_id: paymentId,
-        delta_amount: input.deltaAmount,
-        reason: input.reason,
-        owner_signature_path: ownerSignaturePath,
-        token_hash: tokenHash,
-        token_expires_at: expiresAt,
-      },
-      input.allocations.map((a) => ({ rent_period_id: a.rentPeriodId, amount: a.amountDelta }))
+  await withUploadedFile(ownerSignaturePath, async () =>
+    correctionValue(
+      ctx,
+      await db.adjustments.create(
+        {
+          id,
+          original_payment_id: paymentId,
+          delta_amount: input.deltaAmount,
+          reason: input.reason,
+          owner_signature_path: ownerSignaturePath,
+          token_hash: tokenHash,
+          token_expires_at: expiresAt,
+        },
+        input.allocations.map((a) => ({ rent_period_id: a.rentPeriodId, amount: a.amountDelta })),
+        { pin: input.pin }
+      ),
+      "adjustment",
+      paymentId
     )
   );
 

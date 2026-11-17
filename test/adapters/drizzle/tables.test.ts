@@ -30,8 +30,8 @@ beforeAll(async () => {
   asha = await l.createTenant({ name: "Asha", rent: 5000, leaseStart: "2026-01-15", units: ["AC-T1-G01", "AC-T1-G03"] });
   bimal = await l.createTenant({ name: "Bimal", rent: 4250.5, leaseStart: "2026-02-01", units: ["AC-T2-101"] });
   // Asha's rent goes up from April: two dated rates.
-  await l.rows(asOwner, sql`select update_tenant(${asha}::uuid, 'Asha', null, '+919876543210', 'both',
-    array['AC-T1-G01','AC-T1-G03'], '2026-04-01', 5500, '2026-04-01', '2026-01-15', null, null, 'individual', true)`);
+  // (Written directly: update_tenant refuses a rent from a past month since 0039; that is Correct rent.)
+  await l.pg.query(`insert into tenant_rent_rates (tenant_id, effective_month, monthly_amount) values ($1, '2026-04-01', 5500)`, [asha]);
   owner = drizzleOwnerRepositories(l.db, { sub: OWNER });
   stranger = drizzleOwnerRepositories(l.db, { sub: STRANGER });
 });

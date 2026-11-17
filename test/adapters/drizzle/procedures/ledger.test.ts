@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { drizzleOwnerRepositories } from "@/server/adapters/drizzle/repositories/owner";
 import type { OwnerRepositories } from "@/server/ports";
-import { asService, createLedgerDb, OWNER, STRANGER, type LedgerDb } from "../fixtures";
+import { asService, createLedgerDb, OWNER, PIN, STRANGER, type LedgerDb } from "../fixtures";
 
 const PAYMENT = "00000000-0000-4000-8000-0000000000f1";
 const ADJUSTMENT = "00000000-0000-4000-8000-0000000000f2";
@@ -88,6 +88,8 @@ describe("ledger writes on Drizzle call the SQL functions", () => {
   });
 
   it("records an adjustment against the payment, the tenant taken from it", async () => {
+    // Confirmed with the corrections PIN in the same transaction (0039).
+    const withPin = { pin: PIN };
     await owner.adjustments.create(
       {
         id: ADJUSTMENT,
@@ -98,7 +100,8 @@ describe("ledger writes on Drizzle call the SQL functions", () => {
         token_hash: `hash-${ADJUSTMENT}`,
         token_expires_at: "2026-12-31T00:00:00.000Z",
       },
-      [{ rent_period_id: months[1].id, amount: -500 }]
+      [{ rent_period_id: months[1].id, amount: -500 }],
+      withPin
     );
     expect(await owner.adjustments.get(ADJUSTMENT)).toMatchObject({
       tenant_id: asha,
@@ -120,7 +123,8 @@ describe("ledger writes on Drizzle call the SQL functions", () => {
           token_hash: "hash-fb",
           token_expires_at: "2026-12-31T00:00:00.000Z",
         },
-        [{ rent_period_id: months[2].id, amount: 100 }]
+        [{ rent_period_id: months[2].id, amount: 100 }],
+        withPin
       )
     ).rejects.toMatchObject({ status: 400 });
   });

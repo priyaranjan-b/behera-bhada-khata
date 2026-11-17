@@ -51,6 +51,7 @@ beforeAll(async () => {
           ${JSON.stringify(proofs)}::jsonb)`
   );
   // Then 500 of February taken back.
+  await l.confirmPin("adjustment", PAYMENT);
   await l.rows(
     asOwner,
     sql`select create_adjustment(${ADJUSTMENT}::uuid, ${PAYMENT}::uuid, -500, 'Counted twice', 'sig.png',

@@ -52,6 +52,7 @@ beforeAll(async () => {
     rentTracked: false,
   });
   await l.pg.query(`update tenant_rent_rates set effective_month = $2 where tenant_id = $1`, [ids.tehsil, month(-5)]);
+  await l.confirmPin("move_out", ids.tehsil);
   await l.rows(asOwner, sql`select move_out_tenant(${ids.tehsil}::uuid, (${month(0)}::date - 1))`);
   // Never paid direct: a draft, and a government tenant whose rent is tracked (stored months instead).
   ids.draftGovt = await l.createTenant({
@@ -96,6 +97,7 @@ beforeAll(async () => {
     sql`select payment_id as id from payment_allocations where rent_period_id = ${ashaSecond.id}::uuid
         order by created_at limit 1`
   );
+  await l.confirmPin("adjustment", ashaPayment.id);
   await l.rows(
     asOwner,
     sql`select create_adjustment(gen_random_uuid(), ${ashaPayment.id}::uuid, -500, 'Counted twice', 'sig.png',
@@ -112,6 +114,7 @@ beforeAll(async () => {
     [ids.chai, chaiMonths[1].period_month, chaiMonths[1].id]
   );
   // Dev moved out at the end of last month: his last tower stays shown.
+  await l.confirmPin("move_out", ids.dev);
   await l.rows(asOwner, sql`select move_out_tenant(${ids.dev}::uuid, (${month(0)}::date - 1))`);
 });
 

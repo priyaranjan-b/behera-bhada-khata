@@ -1,24 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { MonthField } from "@/components/ui";
-import { LoadingButton, useAppRouter } from "@/components/ui/Loading";
+import { CorrectionDialog, DetailList, DetailRow, MonthField } from "@/components/ui";
+import { useAppRouter } from "@/components/ui/Loading";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
-import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { api, errorMessage } from "@/lib/api-client";
-import { addMonthsToKey, formatMonth, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import { api } from "@/lib/api-client";
+import { addMonthsToKey, formatMonth, formatMonthRange, monthKeyOf, monthsBetween, yearMonthOf } from "@/lib/dates";
 import { billingStartFor } from "@/lib/domain/tenant";
+import { routes } from "@/lib/routes";
+import { useCorrectionSubmit } from "./useCorrectionSubmit";
 
 /**
  * Fixes "rent paid up to" for an active tenant (correct_paid_through, 0014):
  * billing then starts the month after. Payments already recorded stay on
- * their months.
+ * their months. Reviewed and confirmed with the corrections PIN (0039).
  */
 export default function CorrectPaidThroughButton({
   tenantId,
@@ -33,84 +31,75 @@ export default function CorrectPaidThroughButton({
   const current = yearMonthOf(addMonthsToKey(billingStart, -1));
   const [open, setOpen] = useState(false);
   const [paidThrough, setPaidThrough] = useState(current);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const correction = useCorrectionSubmit("Couldn't change this.", open);
 
   const newStart = paidThrough ? billingStartFor(leaseStart, monthKeyOf(paidThrough)) : null;
+  const changed = Boolean(newStart) && newStart !== billingStart;
   const added = newStart && newStart < billingStart ? monthsBetween(newStart, billingStart) : 0;
   const removed = newStart && newStart > billingStart ? monthsBetween(billingStart, newStart) : 0;
 
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.dashboard.tenants.correctPaidThrough(tenantId, { paidThrough });
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(errorMessage(err, "Couldn't change this."));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const confirm = (pin: string) =>
+    correction.submit(
+      () => api.dashboard.tenants.correctPaidThrough(tenantId, { paidThrough, pin }),
+      () => {
+        setOpen(false);
+        router.push(routes.tenants.detail(tenantId, { corrected: "1" }));
+      }
+    );
 
   return (
     <>
       <Button
         size="small"
         aria-label="Correct rent paid up to"
+        startIcon={<LockRoundedIcon fontSize="small" />}
         onClick={() => {
           setPaidThrough(current);
-          setError(null);
+          correction.clearErrors();
           setOpen(true);
         }}
       >
         Correct
       </Button>
-      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Correct &quot;rent paid up to&quot;</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <Typography variant="body2" color="textSecondary">
-              The last month this tenant paid before using the app. Billing starts the month after; payments already
-              recorded stay on the months they were applied to.
-            </Typography>
-            <MonthField
-              label="Rent paid up to"
-              value={paidThrough}
-              onChange={setPaidThrough}
-              required
-              fullWidth
-            />
-            {newStart && newStart !== billingStart ? (
+      <CorrectionDialog
+        open={open}
+        title='Correct "rent paid up to"'
+        canReview={changed}
+        busy={correction.busy}
+        error={correction.error}
+        pinError={correction.pinError}
+        blocked={correction.blocked}
+        onStepChange={correction.clearErrors}
+        onClose={() => setOpen(false)}
+        onConfirm={confirm}
+        review={
+          newStart && changed ? (
+            <>
+              <DetailList dividers>
+                <DetailRow label="Billing from">
+                  {formatMonth(billingStart)} → {formatMonth(newStart)}
+                </DetailRow>
+              </DetailList>
               <Alert severity={removed ? "warning" : "info"}>
-                Billing will start from {formatMonth(newStart)}
                 {added
-                  ? `: ${added} more ${added === 1 ? "month" : "months"} (${formatMonth(newStart)}${added > 1 ? ` – ${formatMonth(addMonthsToKey(billingStart, -1))}` : ""}) will be owed.`
-                  : `: ${removed} ${removed === 1 ? "month" : "months"} before it will be removed. Not possible if a payment is recorded for one of them.`}
+                  ? `${formatMonthRange(newStart, addMonthsToKey(billingStart, -1))} (${added} ${added === 1 ? "month" : "months"}) will be added as owed.`
+                  : `${formatMonthRange(billingStart, addMonthsToKey(newStart, -1))} (${removed} ${removed === 1 ? "month" : "months"}) will be removed. Not possible if a payment is recorded for one of them.`}
               </Alert>
-            ) : newStart ? (
-              <Typography variant="body2" color="textSecondary">
-                No change: billing already starts in {formatMonth(billingStart)}.
-              </Typography>
-            ) : null}
-            {error ? <Alert severity="error">{error}</Alert> : null}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)} disabled={busy}>
-            Cancel
-          </Button>
-          <LoadingButton
-            variant="contained"
-            onClick={save}
-            disabled={!newStart || newStart === billingStart}
-            loading={busy}
-          >
-            {busy ? "Saving…" : "Save"}
-          </LoadingButton>
-        </DialogActions>
-      </Dialog>
+            </>
+          ) : null
+        }
+      >
+        <Typography variant="body2" color="textSecondary">
+          The last month this tenant paid before using the app. Billing starts the month after; payments already
+          recorded stay on the months they were applied to.
+        </Typography>
+        <MonthField label="Rent paid up to" value={paidThrough} onChange={setPaidThrough} required fullWidth />
+        {newStart && !changed ? (
+          <Typography variant="body2" color="textSecondary">
+            No change: billing already starts in {formatMonth(billingStart)}.
+          </Typography>
+        ) : null}
+      </CorrectionDialog>
     </>
   );
 }

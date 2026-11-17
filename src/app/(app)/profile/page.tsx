@@ -5,16 +5,21 @@ import { PageHeader } from "@/components/ui/DataDisplay";
 import FlashAlert from "@/components/ui/FlashAlert";
 import ProfileSummary from "@/components/domain/ProfileSummary";
 import ChangePasswordCard from "./ChangePasswordCard";
+import AsyncSection from "@/components/ui/AsyncSection";
+import { DetailCardSkeleton } from "@/components/ui/Skeletons";
+import CorrectionPinSection from "./sections/CorrectionPinSection";
 import ProfileForm from "./ProfileForm";
 
-// The owner as a person: name, signature, password. The rent book's shared
-// lists (tags, quick notes) are on Settings (A25).
+// The owner as a person: name, signature, password and corrections PIN
+// (A35). The rent book's shared lists (tags, quick notes) are on Settings (A25).
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; passwordChanged?: string }>;
+  searchParams: Promise<{ saved?: string; passwordChanged?: string; pinSaved?: string }>;
 }) {
-  const [profile, { saved, passwordChanged }] = await Promise.all([serverApi.dashboard.profile(), searchParams]);
+  // Started first, streamed on its own: a failed PIN read never takes Profile down.
+  const pin = serverApi.dashboard.correctionPin();
+  const [profile, { saved, passwordChanged, pinSaved }] = await Promise.all([serverApi.dashboard.profile(), searchParams]);
 
   return (
     <Stack spacing={2}>
@@ -22,6 +27,11 @@ export default async function ProfilePage({
       {saved ? (
         <FlashAlert param={FLASH.saved} severity="success">
           Profile saved.
+        </FlashAlert>
+      ) : null}
+      {pinSaved ? (
+        <FlashAlert param={FLASH.pinSaved} severity="success">
+          Corrections PIN saved. Use it to confirm every correction.
         </FlashAlert>
       ) : null}
       {passwordChanged ? (
@@ -33,6 +43,9 @@ export default async function ProfilePage({
       {/* Remount on save so the form starts from what was stored. */}
       <ProfileForm key={`${profile.displayName}|${profile.signatureName}|${profile.signatureUrl}`} profile={profile} />
       <ChangePasswordCard />
+      <AsyncSection title="Corrections PIN" fallback={<DetailCardSkeleton rows={3} action={false} />}>
+        <CorrectionPinSection status={pin} />
+      </AsyncSection>
     </Stack>
   );
 }

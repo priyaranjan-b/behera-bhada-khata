@@ -12,3 +12,5 @@ export { GridCell, UnitCell } from "./GridCells";
 export { default as DateField } from "./DateField";
 export { default as MonthField } from "./MonthField";
 export { default as QuickPicks, type QuickPick } from "./QuickPicks";
+export { default as CorrectionDialog } from "./CorrectionDialog";
+export { default as PinField } from "./PinField";

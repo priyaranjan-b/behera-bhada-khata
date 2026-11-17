@@ -18,6 +18,7 @@ import type {
   Confirmed,
   Created,
   CorrectMoveOutInput,
+  CorrectionPinView,
   CorrectPaidThroughInput,
   CorrectRentInput,
   StartRentTrackingInput,
@@ -44,6 +45,8 @@ import type {
   UpdateMaintenanceInput,
   VoidMaintenanceInput,
   MoveOutInput,
+  SetCorrectionPinInput,
+  StopRentTrackingInput,
   NewHouseForm,
   NewPropertyForm,
   NewTenantForm,
@@ -129,6 +132,8 @@ export interface ApiQueries {
     search(): Promise<SearchIndex>;
     /** The owner's name and saved signature (Profile page, app shell). */
     profile(): Promise<OwnerProfileView>;
+    /** Whether a corrections PIN is set (Profile, the correction dialogs). */
+    correctionPin(): Promise<CorrectionPinView>;
     /** Quick-select notes for Record payment (Settings). */
     paymentNotes(): Promise<PaymentNotePresetView[]>;
     /** Suggested payment tags with usage counts (Settings). */
@@ -216,6 +221,8 @@ export interface ApiCommands {
   dashboard: {
     updateProfile(input: UpdateOwnerProfileInput): Promise<void>;
     changePassword(input: ChangePasswordInput): Promise<void>;
+    /** Sets or changes the corrections PIN (0039). */
+    setCorrectionPin(input: SetCorrectionPinInput): Promise<CorrectionPinView>;
     createPaymentNote(input: PaymentNotePresetInput): Promise<void>;
     updatePaymentNote(noteId: string, input: PaymentNotePresetInput): Promise<void>;
     deletePaymentNote(noteId: string): Promise<void>;
@@ -244,7 +251,7 @@ export interface ApiCommands {
       /** Government tenant (0016): bill from the month after `paidThrough`. */
       startRentTracking(tenantId: string, input: StartRentTrackingInput): Promise<void>;
       /** Undo startRentTracking; 409 once a payment is recorded. */
-      stopRentTracking(tenantId: string): Promise<void>;
+      stopRentTracking(tenantId: string, input: StopRentTrackingInput): Promise<void>;
       /** `proofs`: photos/PDFs of the payment, sent as multipart (see PROOF_LIMITS). */
       createPayment(tenantId: string, input: CreatePaymentInput, proofs?: File[]): Promise<RecordCreated>;
       /** ID proof, photo, agreement... as multipart; `documentTypes[i]` is the type of `files[i]`. */

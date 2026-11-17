@@ -10,6 +10,7 @@ export default async function MoveOutAction({
   tenantId: string;
   tenantName: string;
   unitCodes: string[];
+  draft: boolean;
 }) {
   const { balance } = await account;
   return <MoveOutButton {...props} outstanding={balance.totalOutstanding} />;

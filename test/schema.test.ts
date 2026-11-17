@@ -36,7 +36,7 @@ const OWNER_B = "00000000-0000-4000-8000-00000000000b";
 
 let db: PGlite;
 
-type Role = { role: "authenticated"; sub: string } | { role: "service_role" };
+type Role = { role: "authenticated"; sub: string } | { role: "service_role" } | { role: "anon" };
 
 /** Runs `sql` as an app-facing role (RLS and grants apply), returning rows. */
 async function as<T = Record<string, unknown>>(who: Role, sql: string, params: unknown[] = []): Promise<T[]> {
@@ -51,6 +51,7 @@ async function as<T = Record<string, unknown>>(who: Role, sql: string, params: u
 
 const owner = (sub: string): Role => ({ role: "authenticated", sub });
 const service: Role = { role: "service_role" };
+const anonRole: Role = { role: "anon" };
 
 /** The SQLSTATE a statement fails with (or "ok"). */
 async function errorCode(run: Promise<unknown>): Promise<string> {
@@ -111,6 +112,36 @@ function createPayment(as_: Role, args: { tenant?: string; amount: number; alloc
   );
 }
 
+/** The corrections PIN every test starts with (0039). */
+const TEST_PIN = "246810";
+
+/**
+ * Confirms the next correction with the PIN (0039): leaves the one-time
+ * ticket for `action` on `target` that the gated function then uses up.
+ */
+async function confirmPin(action: string, target: string, who: Role = owner(OWNER_A), pin = TEST_PIN) {
+  const [row] = await as<{ ok: boolean; tries_left: number | null; locked_until: string | null }>(
+    who,
+    `select * from verify_correction_pin($1, $2, $3::uuid)`,
+    [pin, action, target]
+  );
+  return row;
+}
+
+/**
+ * As the owner but past the 0039 gate: the original update_tenant, for tests
+ * of a rent changed from a past month (the public one refuses that now).
+ */
+async function asOwnerUnchecked<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+  await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [OWNER_A]);
+  return (await db.query<T>(sql, params)).rows;
+}
+
+/** Confirms with the PIN only for the owner (others are refused before the ticket). */
+async function confirmPinAs(who: Role, action: string, target: string) {
+  if (who.role === "authenticated" && who.sub === OWNER_A) await confirmPin(action, target);
+}
+
 async function latestPaymentId(): Promise<string> {
   const { rows } = await db.query<{ id: string }>(`select id from payments order by created_at desc, id limit 1`);
   return rows[0].id;
@@ -150,7 +181,9 @@ beforeEach(async () => {
   await db.exec(`
     truncate adjustment_allocations, adjustments, payment_allocations, payments, receipt_counters, rent_periods,
       tenant_units, tenant_rent_rates, tenants, units, properties, locations, rate_limits, app_owner, auth.users,
-      audit_log, maintenance_files, maintenance_expense_tags, maintenance_expense_units, maintenance_expenses cascade;
+      audit_log, maintenance_files, maintenance_expense_tags, maintenance_expense_units, maintenance_expenses,
+      correction_guard, correction_tickets cascade;
+    insert into correction_guard (pin_hash, pin_salt) values (correction_pin_hash('test-salt', '${TEST_PIN}'), 'test-salt');
     insert into auth.users (id, email) values ('${OWNER_A}', 'a@example.com'), ('${OWNER_B}', 'b@example.com');
     insert into app_owner (user_id) values ('${OWNER_A}');
 
@@ -379,7 +412,8 @@ describe("adjustments", () => {
     return latestPaymentId();
   }
 
-  function createAdjustment(paymentId: string, delta: number, allocations: unknown[]) {
+  async function createAdjustment(paymentId: string, delta: number, allocations: unknown[]) {
+    await confirmPin("adjustment", paymentId);
     return as(
       owner(OWNER_A),
       `select create_adjustment(gen_random_uuid(), $1, $2, 'Recorded too much', 'sig.png',
@@ -559,11 +593,19 @@ describe("create_tenant", () => {
 });
 
 describe("update_tenant", () => {
-  function update(args: { units?: string[] | null; unitsFrom?: string | null; rent?: number | null; rentFrom?: string | null }) {
+  async function update(args: { units?: string[] | null; unitsFrom?: string | null; rent?: number | null; rentFrom?: string | null }) {
+    // A rent from a past month: the original, past the 0039 gate (its own test is below).
+    const params = [fx.tenantA, args.units ?? null, args.unitsFrom ?? null, args.rent ?? null, args.rentFrom ?? null];
+    if (args.rent != null) {
+      return asOwnerUnchecked(
+        `select private.update_tenant_unchecked($1, 'Asha', null, '+919876543210', 'both', $2::text[], $3, $4, $5, null)`,
+        params
+      );
+    }
     return as(
       owner(OWNER_A),
       `select update_tenant($1, 'Asha', null, '+919876543210', 'both', $2::text[], $3, $4, $5, null)`,
-      [fx.tenantA, args.units ?? null, args.unitsFrom ?? null, args.rent ?? null, args.rentFrom ?? null]
+      params
     );
   }
 
@@ -601,8 +643,10 @@ describe("update_tenant", () => {
 });
 
 describe("move_out_tenant and re-letting", () => {
-  const moveOut = (tenantId: string, date: string) =>
-    as(owner(OWNER_A), `select move_out_tenant($1, $2)`, [tenantId, date]);
+  const moveOut = async (tenantId: string, date: string) => {
+    await confirmPin("move_out", tenantId);
+    return as(owner(OWNER_A), `select move_out_tenant($1, $2)`, [tenantId, date]);
+  };
 
   it("ends the houses, keeps the move-out month and dues, drops untouched later months", async () => {
     await as(service, `select ensure_rent_periods($1::uuid[], '2026-05-01')`, [[fx.tenantA]]);
@@ -648,10 +692,14 @@ describe("move_out_tenant and re-letting", () => {
 });
 
 describe("correct_move_out (0037, D40)", () => {
-  const moveOut = (tenantId: string, date: string) =>
-    as(owner(OWNER_A), `select move_out_tenant($1, $2)`, [tenantId, date]);
-  const correct = (who: Role, date: string | null, tenant = fx.tenantA) =>
-    as(who, `select correct_move_out($1, $2::date)`, [tenant, date]);
+  const moveOut = async (tenantId: string, date: string) => {
+    await confirmPin("move_out", tenantId);
+    return as(owner(OWNER_A), `select move_out_tenant($1, $2)`, [tenantId, date]);
+  };
+  const correct = async (who: Role, date: string | null, tenant = fx.tenantA) => {
+    await confirmPinAs(who, "move_out_date", tenant);
+    return as(who, `select correct_move_out($1, $2::date)`, [tenant, date]);
+  };
   const months = async () => (await periodsOf(fx.tenantA)).map((p) => p.period_month);
   const movedOutOn = async () =>
     (await db.query<{ d: string }>(`select to_char(moved_out_on, 'YYYY-MM-DD') as d from tenants where id = $1`, [fx.tenantA]))
@@ -727,6 +775,7 @@ describe("correct_move_out (0037, D40)", () => {
 
   it("won't go before the month billing started (0038)", async () => {
     // Paid up to January before the app: billed from February.
+    await confirmPin("paid_through", fx.tenantA);
     await as(owner(OWNER_A), `select correct_paid_through($1, '2026-01-01')`, [fx.tenantA]);
     await moveOut(fx.tenantA, "2026-03-20");
     expect(await errorCode(correct(owner(OWNER_A), "2026-01-31"))).toBe("BBK00");
@@ -766,6 +815,222 @@ describe("correct_move_out (0037, D40)", () => {
       `select details from audit_log where entity_type = 'tenant' and details like '%Moved out on%'`
     );
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("corrections PIN (0039, D41)", () => {
+  const correctRent = () => as(owner(OWNER_A), `select correct_rent($1, '2026-02-01', 4500)`, [fx.tenantA]);
+  const guard = async () =>
+    (
+      await db.query<{ failed_attempts: number; failures_today: number; locked: boolean; day: boolean }>(
+        `select failed_attempts, failures_today, locked_until > now() as locked,
+                locked_until > now() + interval '23 hours' as day
+         from correction_guard`
+      )
+    ).rows[0];
+  const pinEvents = async () =>
+    (await db.query<{ action: string }>(`select action from audit_log where action like 'correction%' order by id`)).rows.map(
+      (r) => r.action
+    );
+
+  it("refuses every gated function without a ticket, and runs it once with one", async () => {
+    await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    const paymentId = await latestPaymentId();
+    const gated: [string, string, string, unknown[]][] = [
+      ["paid_through", fx.tenantA, `select correct_paid_through($1, '2025-12-01')`, [fx.tenantA]],
+      ["rent", fx.tenantA, `select correct_rent($1, '2026-02-01', 4500)`, [fx.tenantA]],
+      [
+        "adjustment",
+        paymentId,
+        `select create_adjustment(gen_random_uuid(), $1, -100, 'x', 'sig.png', md5(random()::text), now(), $2::jsonb)`,
+        [paymentId, JSON.stringify([{ rent_period_id: fx.periods[0].id, amount: -100 }])],
+      ],
+      ["move_out", fx.tenantA2, `select move_out_tenant($1, '2026-03-31')`, [fx.tenantA2]],
+    ];
+    for (const [action, target, sql, params] of gated) {
+      expect(await errorCode(as(owner(OWNER_A), sql, params)), action).toBe("BBK09");
+      expect(await confirmPin(action, target)).toEqual({ ok: true, tries_left: null, locked_until: null });
+      expect(await errorCode(as(owner(OWNER_A), sql, params)), action).toBe("ok");
+    }
+    // Once moved out, the date correction is gated the same way.
+    expect(await errorCode(as(owner(OWNER_A), `select correct_move_out($1, '2026-03-20')`, [fx.tenantA2]))).toBe("BBK09");
+    await confirmPin("move_out_date", fx.tenantA2);
+    expect(await errorCode(as(owner(OWNER_A), `select correct_move_out($1, '2026-03-20')`, [fx.tenantA2]))).toBe("ok");
+    // Stop tracking checks the ticket before anything else.
+    expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [fx.tenantA]))).toBe("BBK09");
+    expect(await pinEvents()).toEqual(Array(5).fill("correction.confirmed"));
+  });
+
+  it("uses a ticket once, only for its action and record, and not after 2 minutes", async () => {
+    await confirmPin("rent", fx.tenantA);
+    expect(await errorCode(correctRent())).toBe("ok");
+    expect(await errorCode(correctRent())).toBe("BBK09");
+
+    await confirmPin("paid_through", fx.tenantA);
+    await confirmPin("rent", fx.tenantA2);
+    expect(await errorCode(correctRent())).toBe("BBK09");
+
+    await confirmPin("rent", fx.tenantA);
+    await db.exec(`update correction_tickets set expires_at = now() - interval '1 second'`);
+    expect(await errorCode(correctRent())).toBe("BBK09");
+  });
+
+  it("counts wrong PINs (the count survives), locks for 15 minutes on the 5th, and for 24 hours on the 10th in a day", async () => {
+    expect(await confirmPin("rent", fx.tenantA, owner(OWNER_A), "000000")).toEqual({ ok: false, tries_left: 4, locked_until: null });
+    expect(await guard()).toMatchObject({ failed_attempts: 1, failures_today: 1, locked: null });
+    // A right PIN clears both counts.
+    await confirmPin("rent", fx.tenantA);
+    expect(await guard()).toMatchObject({ failed_attempts: 0, failures_today: 0 });
+
+    for (const left of [4, 3, 2, 1]) {
+      expect(await confirmPin("rent", fx.tenantA, owner(OWNER_A), "111111")).toMatchObject({ ok: false, tries_left: left });
+    }
+    const fifth = await confirmPin("rent", fx.tenantA, owner(OWNER_A), "111111");
+    expect(fifth).toMatchObject({ ok: false, tries_left: 0 });
+    expect(fifth.locked_until).not.toBeNull();
+    expect(await guard()).toMatchObject({ locked: true, day: false });
+    // Locked: even the right PIN is refused, and no ticket is left.
+    expect(await errorCode(confirmPin("rent", fx.tenantA))).toBe("BBK09");
+
+    await db.exec(`update correction_guard set locked_until = now() - interval '1 second'`);
+    // 5 so far today; the 10th locks for a day.
+    for (let i = 0; i < 5; i++) await confirmPin("rent", fx.tenantA, owner(OWNER_A), "222222");
+    expect(await guard()).toMatchObject({ failures_today: 10, locked: true, day: true });
+    expect(await errorCode(confirmPin("rent", fx.tenantA))).toBe("BBK09");
+    const events = await pinEvents();
+    expect(events.filter((e) => e === "correction_pin.failed")).toHaveLength(11);
+    expect(events.filter((e) => e === "correction_pin.locked")).toHaveLength(2);
+    // Each wrong PIN is in the tenant's own history, saying what it was for.
+    const { rows } = await db.query<{ tenant_id: string; details: string }>(
+      `select tenant_id, details from audit_log where action = 'correction_pin.failed' limit 1`
+    );
+    expect(rows).toEqual([{ tenant_id: fx.tenantA, details: "Correct rent" }]);
+  });
+
+  it("sets a first PIN only while setup is open (from the SQL editor), then changes it only with the current one", async () => {
+    await db.exec(`truncate correction_guard`);
+    expect(await errorCode(confirmPin("rent", fx.tenantA))).toBe("BBK09"); // "No corrections PIN is set yet"
+    const status = async () =>
+      (
+        await as<{ pin_set: boolean; locked_until: string | null; setup_until: string | null }>(
+          owner(OWNER_A),
+          `select * from correction_pin_status()`
+        )
+      )[0];
+    expect(await status()).toMatchObject({ pin_set: false, locked_until: null, setup_until: null });
+
+    const set = (next: string, old: string | null = null) =>
+      as<{ ok: boolean; tries_left: number | null }>(owner(OWNER_A), `select ok, tries_left from set_correction_pin($1, $2)`, [next, old]);
+    // Setup closed: the owner's session can't set a first PIN.
+    expect(await errorCode(set("135790"))).toBe("BBK09");
+
+    // The SQL editor has no signed-in user.
+    await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+    await db.exec(readFileSync(path.resolve(__dirname, "../supabase/scripts/open_correction_pin_setup.sql"), "utf8"));
+    expect((await status()).setup_until).not.toBeNull();
+    expect(await errorCode(set("12345"))).toBe("BBK00");
+    expect(await errorCode(set("abcdef"))).toBe("BBK00");
+    expect(await set("135790")).toEqual([{ ok: true, tries_left: null }]);
+    expect(await status()).toMatchObject({ pin_set: true, setup_until: null });
+
+    // Changing needs the current PIN; a wrong one counts as a failure.
+    expect(await set("246802")).toEqual([{ ok: false, tries_left: 4 }]);
+    expect(await set("246802", "000000")).toEqual([{ ok: false, tries_left: 3 }]);
+    expect(await set("246802", "135790")).toEqual([{ ok: true, tries_left: null }]);
+    expect((await confirmPin("rent", fx.tenantA, owner(OWNER_A), "246802")).ok).toBe(true);
+    expect(await pinEvents()).toEqual([
+      "correction_pin.setup_opened",
+      "correction_pin.set",
+      "correction_pin.failed",
+      "correction_pin.failed",
+      "correction_pin.changed",
+    ]);
+    // The setup was opened by the system (the SQL editor), the PIN set by the owner; the hash never reaches the log.
+    const { rows: who } = await db.query<{ action: string; actor_kind: string }>(
+      `select action, actor_kind from audit_log where action in ('correction_pin.setup_opened', 'correction_pin.set') order by id`
+    );
+    expect(who).toEqual([
+      { action: "correction_pin.setup_opened", actor_kind: "system" },
+      { action: "correction_pin.set", actor_kind: "owner" },
+    ]);
+    const { rows } = await db.query(`select 1 from audit_log where changes::text like '%pin_hash%' or context::text like '%hash%'`);
+    expect(rows).toEqual([]);
+  });
+
+  it("keeps the PIN, the tickets and the originals out of reach of the owner's session", async () => {
+    for (const who of [owner(OWNER_A), anonRole]) {
+      expect(await errorCode(as(who, `select * from correction_guard`))).toBe("42501");
+      expect(await errorCode(as(who, `select * from correction_tickets`))).toBe("42501");
+      expect(await errorCode(as(who, `insert into correction_tickets (action, target_id, expires_at) values ('rent', $1, now() + interval '1 hour')`, [fx.tenantA]))).toBe("42501");
+      expect(await errorCode(as(who, `select private.correct_rent_unchecked($1, '2026-02-01', 4500)`, [fx.tenantA]))).toBe("42501");
+    }
+    const { rows } = await db.query<{ fn: string; role: string; can: boolean }>(
+      `select p.oid::regprocedure::text as fn, r.role, has_function_privilege(r.role, p.oid, 'execute') as can
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       cross join (values ('anon'), ('authenticated'), ('service_role')) as r(role)
+       where n.nspname = 'private'`
+    );
+    expect(rows.length).toBe(7 * 3);
+    expect(rows.filter((r) => r.can)).toEqual([]);
+    // Internal helpers aren't callable either.
+    expect(await errorCode(as(owner(OWNER_A), `select consume_correction_ticket('rent', $1)`, [fx.tenantA]))).toBe("42501");
+    expect(await errorCode(as(owner(OWNER_A), `select correction_pin_failed(null, null)`))).toBe("42501");
+    // The PIN events can't be written by the owner's session, through log_event or directly.
+    expect(await errorCode(as(owner(OWNER_A), `select log_correction_event('correction.confirmed', null, 'x')`))).toBe("42501");
+    expect(await errorCode(as(owner(OWNER_A), `select log_event('correction.confirmed')`))).toBe("BBK00");
+  });
+
+  it("refuses another account before anything else", async () => {
+    expect(await errorCode(confirmPin("rent", fx.tenantA, owner(OWNER_B)))).toBe("BBK04");
+    expect(await errorCode(as(owner(OWNER_B), `select correct_rent($1, '2026-02-01', 4500)`, [fx.tenantA]))).toBe("BBK04");
+    expect(await errorCode(as(owner(OWNER_B), `select * from set_correction_pin('123456', null)`))).toBe("BBK04");
+    expect(await errorCode(confirmPin("bogus", fx.tenantA))).toBe("BBK00");
+  });
+
+  it("runs again cleanly, and its rollback script puts the unguarded functions back", async () => {
+    const fresh = await createMigratedDb();
+    const privateFns = async () =>
+      (await fresh.query<{ n: number }>(`select count(*)::int as n from pg_proc p join pg_namespace s on s.oid = p.pronamespace where s.nspname = 'private'`))
+        .rows[0].n;
+    try {
+      await fresh.exec(readFileSync(path.join(MIGRATIONS, "0039_correction_pin.sql"), "utf8"));
+      expect(await privateFns()).toBe(7);
+      await fresh.exec(readFileSync(path.resolve(__dirname, "../supabase/rollback/0039_correction_pin.sql"), "utf8"));
+      const { rows } = await fresh.query<{ ok: boolean; guard: string | null }>(
+        `select has_function_privilege('authenticated', 'public.correct_rent(uuid, date, numeric)', 'execute') as ok,
+                to_regclass('public.correction_guard')::text as guard`
+      );
+      expect(rows).toEqual([{ ok: true, guard: null }]);
+      expect(
+        (await fresh.query(`select 1 from pg_namespace where nspname = 'private'`)).rows
+      ).toEqual([]);
+    } finally {
+      await fresh.close();
+    }
+  });
+
+  it("lets everyday move-outs and rent changes from last month or this month through without a PIN", async () => {
+    const thisMonth = currentMonthKey();
+    const lastMonth = addMonthsToKey(thisMonth, -1);
+    await as(service, `select ensure_rent_periods($1::uuid[], $2::date)`, [[fx.tenantA, fx.tenantA2], thisMonth]);
+    expect(
+      await errorCode(
+        as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, '+919876543210', 'both', null, null, 5200, $2, null)`, [
+          fx.tenantA,
+          thisMonth,
+        ])
+      )
+    ).toBe("ok");
+    // From an earlier month it is refused (Correct rent is the tool); the same rent again changes nothing, so it isn't.
+    const fromJanuary = (rent: number) =>
+      as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, '+919876543210', 'both', null, null, $2, '2026-01-01', null)`, [
+        fx.tenantA,
+        rent,
+      ]);
+    expect(await errorCode(fromJanuary(5300))).toBe("BBK00"); // "use Correct rent"
+
+    expect(await errorCode(fromJanuary(5000))).toBe("ok");
+    expect(await errorCode(as(owner(OWNER_A), `select move_out_tenant($1, $2)`, [fx.tenantA2, lastMonth]))).toBe("ok");
   });
 });
 
@@ -1115,6 +1380,7 @@ describe("receipt numbers (0012)", () => {
 
   it("gives adjustments their own ADJ/ series", async () => {
     await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    await confirmPin("adjustment", await latestPaymentId());
     await as(
       owner(OWNER_A),
       `select create_adjustment(gen_random_uuid(), $1, -100, 'x', 'sig.png', md5(random()::text), now(), $2::jsonb)`,
@@ -1289,12 +1555,14 @@ describe("payment tags (0030)", () => {
 });
 
 describe("correct_paid_through (0014)", () => {
-  const correct = (who: Role, paidThrough: string | null, tenant = fx.tenantA) =>
-    as<{ billing_start: string }>(
+  const correct = async (who: Role, paidThrough: string | null, tenant = fx.tenantA) => {
+    await confirmPinAs(who, "paid_through", tenant);
+    return as<{ billing_start: string }>(
       who,
       `select to_char(correct_paid_through($1, $2::date), 'YYYY-MM-DD') as billing_start`,
       [tenant, paidThrough]
     );
+  };
   const billingStart = async () =>
     (
       await db.query<{ b: string }>(`select to_char(billing_start, 'YYYY-MM-DD') as b from tenants where id = $1`, [
@@ -1339,6 +1607,7 @@ describe("correct_paid_through (0014)", () => {
     expect(await errorCode(correct(owner(OWNER_B), "2026-01-01"))).toBe("BBK04");
     expect(await errorCode(correct(owner(OWNER_A), null))).toBe("BBK00");
     expect(await errorCode(correct(owner(OWNER_A), "2099-01-01"))).toBe("BBK00");
+    await confirmPin("move_out", fx.tenantA);
     await as(owner(OWNER_A), `select move_out_tenant($1, '2026-03-31')`, [fx.tenantA]);
     expect(await errorCode(correct(owner(OWNER_A), "2026-01-01"))).toBe("BBK09");
     expect(await errorCode(as(owner(OWNER_A), `update tenants set billing_start = '2026-02-01'`))).toBe("42501");
@@ -1346,8 +1615,10 @@ describe("correct_paid_through (0014)", () => {
 });
 
 describe("correct_rent (0025)", () => {
-  const correct = (who: Role, from: string | null, amount: number | null, tenant = fx.tenantA) =>
-    as(who, `select correct_rent($1, $2::date, $3)`, [tenant, from, amount]);
+  const correct = async (who: Role, from: string | null, amount: number | null, tenant = fx.tenantA) => {
+    await confirmPinAs(who, "rent", tenant);
+    return as(who, `select correct_rent($1, $2::date, $3)`, [tenant, from, amount]);
+  };
   const dues = async () => (await periodsOf(fx.tenantA)).map((p) => p.amount_due);
   const rates = async () =>
     (
@@ -1368,9 +1639,10 @@ describe("correct_rent (0025)", () => {
   });
 
   it("replaces later rates but keeps earlier ones", async () => {
-    await as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, '+919876543210', 'both', null, null, 6000, '2026-03-01', null)`, [
-      fx.tenantA,
-    ]);
+    await asOwnerUnchecked(
+      `select private.update_tenant_unchecked($1, 'Asha', null, '+919876543210', 'both', null, null, 6000, '2026-03-01', null)`,
+      [fx.tenantA]
+    );
     await correct(owner(OWNER_A), "2026-02-01", 4500);
     expect(await rates()).toEqual([
       { m: "2026-01-01", amount: 5000 },
@@ -1409,13 +1681,14 @@ describe("audit log (0015)", () => {
         params
       )
     ).rows;
-  const updateTenant = (args: { phone?: string; rent?: number; month?: string }) =>
-    as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, $2, 'both', null, null, $3, $4, null)`, [
+  const updateTenant = async (args: { phone?: string; rent?: number; month?: string }) => {
+    return asOwnerUnchecked(`select private.update_tenant_unchecked($1, 'Asha', null, $2, 'both', null, null, $3, $4, null)`, [
       fx.tenantA,
       args.phone ?? "+919876543210",
       args.rent ?? null,
       args.month ?? null,
     ]);
+  };
 
   it("records onboarding: the tenant, the tenancy and the first rent, by the owner", async () => {
     const rows = await log(`tenant_id = $1`, [fx.tenantA]);
@@ -1439,7 +1712,7 @@ describe("audit log (0015)", () => {
     await updateTenant({ rent: 6000, month: "2026-03-01" });
     await updateTenant({ rent: 6500, month: "2026-03-01" });
     const rows = await log();
-    expect(rows.map((r) => [r.action, r.changes.monthly_amount ?? r.changes.amount_due])).toEqual([
+    expect(rows.map((r) => [r.action, r.changes.monthly_amount ?? r.changes.amount_due ?? null])).toEqual([
       ["rent_rate.set", [null, 6000]],
       ["rent_period.repriced", [5000, 6000]],
       ["rent_rate.changed", [6000, 6500]],
@@ -1449,17 +1722,25 @@ describe("audit log (0015)", () => {
 
   it("groups a move-out with the tenancy it ends and the months it drops", async () => {
     await db.exec(`truncate audit_log`);
+    await confirmPin("move_out", fx.tenantA);
     await as(owner(OWNER_A), `select move_out_tenant($1, '2026-02-28')`, [fx.tenantA]);
     const rows = await log();
-    expect(rows.map((r) => r.action).sort()).toEqual(["rent_period.deleted", "tenancy.ended", "tenant.moved_out"]);
+    expect(rows.map((r) => r.action).sort()).toEqual([
+      "correction.confirmed",
+      "rent_period.deleted",
+      "tenancy.ended",
+      "tenant.moved_out",
+    ]);
     expect(new Set(rows.map((r) => r.tx_id)).size).toBe(1);
     expect(rows.find((r) => r.action === "rent_period.deleted")?.changes.period_month).toEqual(["2026-03-01", null]);
   });
 
   it("records a corrected 'paid up to' and the months it drops", async () => {
     await db.exec(`truncate audit_log`);
+    await confirmPin("paid_through", fx.tenantA);
     await as(owner(OWNER_A), `select correct_paid_through($1, '2026-01-01')`, [fx.tenantA]);
     expect((await log()).map((r) => [r.action, Object.keys(r.changes)])).toEqual([
+      ["correction.confirmed", []],
       ["rent_period.deleted", ["amount_due", "period_month"]],
       ["billing_start.corrected", ["billing_start"]],
     ]);
@@ -1610,6 +1891,7 @@ describe("government tenants with untracked rent (0016)", () => {
     const id = await createGovt(null);
     expect(await errorCode(as(owner(OWNER_A), `select start_rent_tracking($1, null, '2026-02-01')`, [id]))).toBe("BBK00");
     expect(await errorCode(as(owner(OWNER_B), `select start_rent_tracking($1, 20000, '2026-02-01')`, [id]))).toBe("BBK04");
+    await confirmPin("paid_through", id);
     expect(await errorCode(as(owner(OWNER_A), `select correct_paid_through($1, '2026-02-01')`, [id]))).toBe("BBK09");
 
     await db.exec(`truncate audit_log`);
@@ -1624,6 +1906,7 @@ describe("government tenants with untracked rent (0016)", () => {
     );
     expect(actions.map((a) => a.action)).toEqual(["rent_tracking.started"]);
 
+    await confirmPin("stop_tracking", id);
     await as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]);
     expect(await tenantRow(id)).toMatchObject({ rent_tracked: false, billing_start: null });
     expect(await periodsOf(id)).toEqual([]);
@@ -1633,7 +1916,9 @@ describe("government tenants with untracked rent (0016)", () => {
       await db.query<{ id: string }>(`select id from rent_periods where tenant_id = $1 and period_month = '2026-03-01'`, [id])
     ).rows;
     await createPayment(owner(OWNER_A), { tenant: id, amount: 20000, allocations: [{ rent_period_id: march.id, amount: 20000 }] });
+    await confirmPin("stop_tracking", id);
     expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]))).toBe("BBK09");
+    await confirmPin("stop_tracking", fx.tenantA);
     expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [fx.tenantA]))).toBe("BBK09");
   });
 });
@@ -1675,14 +1960,16 @@ describe("stored audit text (0017)", () => {
 
   it("writes the text of a table change when it happens", async () => {
     await db.exec(`truncate audit_log`);
-    const rent = (amount: number) =>
-      as(owner(OWNER_A), `select update_tenant($1, 'Asha', null, '+919876543210', 'both', null, null, $2, '2026-03-01', null)`, [
+    const rent = async (amount: number) => {
+      return asOwnerUnchecked(`select private.update_tenant_unchecked($1, 'Asha', null, '+919876543210', 'both', null, null, $2, '2026-03-01', null)`, [
         fx.tenantA,
         amount,
       ]);
+    };
     await rent(6000);
     await rent(6500);
     await createPayment(owner(OWNER_A), { amount: 5000, allocations: [{ rent_period_id: fx.periods[0].id, amount: 5000 }] });
+    await confirmPin("move_out", fx.tenantA);
     await as(owner(OWNER_A), `select move_out_tenant($1, '2026-02-28')`, [fx.tenantA]);
     const rows = await texts();
     expect(rows.find((r) => r.action === "rent_rate.changed")).toMatchObject({
@@ -1967,6 +2254,7 @@ describe("tenant_ledger_page (0020)", () => {
     const [{ id: janPayment }] = (
       await db.query<{ id: string }>(`select id from payments where payment_date = '2026-01-10'`)
     ).rows;
+    await confirmPin("adjustment", janPayment);
     await as(
       owner(OWNER_A),
       `select create_adjustment(gen_random_uuid(), $1, -500, 'Counted twice', 'sig.png',
@@ -2239,6 +2527,7 @@ describe("tenant_account_summary (0022)", () => {
     await createPayment(owner(OWNER_A), { tenant: id, amount: 20000, allocations: [{ rent_period_id: first.id, amount: 20000 }] });
     expect((await summary(id)).can_stop_rent_tracking).toBe(false);
     // The same rule stop_rent_tracking enforces.
+    await confirmPin("stop_tracking", id);
     expect(await errorCode(as(owner(OWNER_A), `select stop_rent_tracking($1)`, [id]))).toBe("BBK09");
   });
 });
@@ -3040,6 +3329,7 @@ describe("house rents (0036, D39)", () => {
     // 9,000.01 (the odd paisa to G03); Dev had G05 at 7,000 and moved out; G06 was never let.
     await createTenant(OWNER_A, { name: "Chitra", rent: 9000.01, leaseStart: "2026-01-01", units: ["AC-T1-G04", "AC-T1-G03"] });
     const dev = await createTenant(OWNER_A, { name: "Dev", rent: 7000, leaseStart: "2025-01-01", units: ["AC-T1-G05"] });
+    await confirmPin("move_out", dev);
     await as(owner(OWNER_A), `select move_out_tenant($1, '2025-06-30')`, [dev]);
     await db.exec(`update units set base_rent = 1234 where unit_code = 'AC-T1-G06'`);
     await db.exec(`update units set base_rent = null where unit_code <> 'AC-T1-G06'`);

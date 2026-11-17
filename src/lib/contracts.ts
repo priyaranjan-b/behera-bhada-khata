@@ -41,7 +41,10 @@ import type {
   setHouseRentSchema,
   createUnitSchema,
   moveOutSchema,
+  correctMoveOutSchema,
   correctPaidThroughSchema,
+  setCorrectionPinSchema,
+  stopRentTrackingSchema,
   correctRentSchema,
   startRentTrackingSchema,
   billingQuerySchema,
@@ -468,6 +471,20 @@ export interface DefaultersReport {
   rows: DefaulterRow[];
 }
 
+// ---- /api/dashboard/profile/correction-pin (0039, D41) -----------------------
+
+/** Whether a corrections PIN is set, and any lockout after wrong PINs. */
+export interface CorrectionPinView {
+  pinSet: boolean;
+  pinSetAt: string | null;
+  /** ISO time corrections unlock after too many wrong PINs, or null. */
+  lockedUntil: string | null;
+  /** ISO time PIN setup (opened from the SQL editor) closes; null when closed. */
+  setupUntil: string | null;
+}
+
+export type SetCorrectionPinInput = z.infer<typeof setCorrectionPinSchema>;
+
 // ---- /api/dashboard/profile (the owner's name and saved signature) -----------
 
 export interface OwnerProfileView {
@@ -825,8 +842,8 @@ export type UploadTenantDocumentsInput = z.infer<typeof uploadTenantDocumentsSch
 
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type MoveOutInput = z.infer<typeof moveOutSchema>;
-/** Same shape as moving out: the corrected last day in the house (0037). */
-export type CorrectMoveOutInput = MoveOutInput;
+export type CorrectMoveOutInput = z.infer<typeof correctMoveOutSchema>;
+export type StopRentTrackingInput = z.infer<typeof stopRentTrackingSchema>;
 
 export type CorrectPaidThroughInput = z.input<typeof correctPaidThroughSchema>;
 export type CorrectRentInput = z.input<typeof correctRentSchema>;

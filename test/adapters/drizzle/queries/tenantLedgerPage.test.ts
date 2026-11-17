@@ -48,6 +48,7 @@ beforeAll(async () => {
     [-500, 1],
     [200, 1],
   ] as const) {
+    await l.confirmPin("adjustment", P1);
     await l.rows(
       asOwner,
       sql`select create_adjustment(gen_random_uuid(), ${P1}::uuid, ${delta}, ${delta < 0 ? "Counted twice" : "Short by 200"},

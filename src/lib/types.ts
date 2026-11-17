@@ -60,6 +60,33 @@ export const APP_AUDIT_ACTIONS = [
   "auth.signed_out",
 ] as const;
 export type AppAuditAction = (typeof APP_AUDIT_ACTIONS)[number];
+
+/**
+ * The corrections PIN's events (0039): written only by the PIN functions
+ * (log_correction_event), never by log_event, so they can't be faked.
+ */
+export const CORRECTION_AUDIT_ACTIONS = [
+  "correction_pin.setup_opened",
+  "correction_pin.set",
+  "correction_pin.changed",
+  "correction_pin.failed",
+  "correction_pin.locked",
+  "correction.confirmed",
+] as const;
+
+/**
+ * What a corrections PIN confirms (0039, D41): each gated SQL function uses up
+ * a ticket for its action on one record. Same list as correction_action_label().
+ */
+export const CORRECTION_ACTIONS = [
+  "paid_through",
+  "rent",
+  "move_out_date",
+  "adjustment",
+  "stop_tracking",
+  "move_out",
+] as const;
+export type CorrectionAction = (typeof CORRECTION_ACTIONS)[number];
 export const AUDIT_ACTIONS = [
   "tenant.created",
   "tenant.updated",
@@ -105,6 +132,7 @@ export const AUDIT_ACTIONS = [
   "owner.updated",
   "owner.deleted",
   ...APP_AUDIT_ACTIONS,
+  ...CORRECTION_AUDIT_ACTIONS,
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -736,6 +764,24 @@ export interface Database {
       move_out_tenant: {
         Args: { p_tenant_id: string; p_move_out_date: string };
         Returns: undefined;
+      };
+      /** 0039: whether a corrections PIN is set, and any lockout. */
+      correction_pin_status: {
+        Args: Record<string, never>;
+        Returns: { pin_set: boolean; pin_set_at: string | null; locked_until: string | null; setup_until: string | null };
+      };
+      /** 0039: sets the first PIN while setup is open, or changes it with the current one (a wrong one counts). */
+      set_correction_pin: {
+        Args: { p_new: string; p_old: string | null };
+        Returns: { ok: boolean; tries_left: number | null; locked_until: string | null };
+      };
+      /**
+       * 0039: in the correction's own transaction, a right PIN leaves a one-time
+       * ticket for the action on the record; never raises on a wrong one.
+       */
+      verify_correction_pin: {
+        Args: { p_pin: string; p_action: CorrectionAction; p_target: string };
+        Returns: { ok: boolean; tries_left: number | null; locked_until: string | null };
       };
       /** 0037: moves a moved-out tenant's move-out date, with their houses and last months. */
       correct_move_out: {

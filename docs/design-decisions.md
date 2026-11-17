@@ -1320,3 +1320,64 @@ separate from `Messaging` (links over WhatsApp/SMS, still Twilio).
 **Rejected:** MSG91 (similar price, a fine second choice behind the same
 port), Firebase Phone Auth (above), a self-run gateway sending our own codes
 (we'd store codes and own DLT registration).
+
+### A35 — Changes to past records are confirmed with a corrections PIN
+
+**Context.** Five actions rewrite what the ledger says about the past:
+Correct "rent paid up to", Correct rent, Correct move-out date, Adjust a
+payment and Stop tracking (Govt rent). Each was one click plus Save, so a
+mis-tap, or anyone holding the owner's phone, could drop months or
+re-price rent. Two everyday actions could do the same: Move out with a date
+months back (drops ended months) and Edit tenant's rent from a past month
+(re-prices ended months).
+
+**Decision.** Every one of them is: enter the fix, review exactly what
+changes (before → after, the months affected), confirm with the
+**corrections PIN** (6 digits), saved. No "correction mode" window and no
+on/off switch.
+- **Checked in the database (0039, D41), in the correction's own
+  transaction.** The owner's Supabase session can call the SQL functions
+  directly over Supabase's REST API, so a check in a service or a hidden
+  button protects nothing. The gated functions refuse unless
+  `verify_correction_pin` left a ticket in the same transaction, so no
+  other session ever sees it; the originals live in the unexposed schema
+  `private`.
+- **Not the login password.** That same session can change the password
+  through Supabase Auth without the old one, then pass a password check.
+  The PIN lives in our database, and changing it needs the current PIN.
+- **The first PIN needs the SQL editor.** A signed-in session can't set a
+  PIN while none exists; `supabase/scripts/open_correction_pin_setup.sql`,
+  run in the Supabase SQL editor (a login a stolen app session doesn't
+  have), opens setup for 15 minutes and the owner sets the PIN on Profile.
+  The same script resets a forgotten PIN. The PIN never goes in the script.
+- **Lockout, in the database:** 5 wrong PINs in a row lock corrections for
+  15 minutes, 10 in a day for 24 hours; a right PIN clears both counts.
+- **One code path:** the kit `CorrectionDialog` (fix, review, PIN; PIN
+  errors under the PIN, refusals above it; no PIN or locked shown before
+  anything is typed) with `PinField` and `useCorrectionSubmit`; services
+  call `runCorrection` (status first, then the write, which takes the PIN);
+  every repository method that rewrites history takes the PIN and checks
+  it in its own transaction (`withCorrectionPin`).
+- **Everyday actions stay quick:** Move out asks for the PIN only for a date
+  before last month (`moveOutNeedsPin`), never for a draft; Edit tenant's
+  rent changes start this month at the earliest, and an earlier month is
+  refused (the service and `update_tenant`): that's Correct rent.
+- **Audited, and not forgeable:** setup opened, PIN set/changed, wrong PIN
+  and locked (with the tenant it was for), and "Correction confirmed with
+  PIN" (which correction) in the same transaction as the change. Written by
+  `log_correction_event`, which the owner's session can't call (it can call
+  `log_event`).
+
+**Remaining risks, accepted:** the PIN hash is salted, iterated sha256
+(PGlite, the tests' Postgres, has no pgcrypto): someone who can read the
+table could brute-force 6 digits, but could read the ledger itself anyway.
+Not gated: recording a payment, editing tags, maintenance, documents, house
+rents - they don't rewrite what a tenant owed.
+
+**Rejected:** a time-limited "correction mode" with a switch on Profile
+(a window is a bypass while it's open, and the switch is settable over
+REST); the login password per correction (resettable from the session); a
+ticket committed on its own before the write (another session holding the
+owner's token could use it, with its own arguments, until it expired); a
+server-only Postgres role for the corrections (stops REST, but not someone
+using the app itself with the session).

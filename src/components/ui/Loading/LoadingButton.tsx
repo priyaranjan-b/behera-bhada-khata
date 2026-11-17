@@ -13,7 +13,9 @@ export type LoadingButtonProps = Omit<ButtonProps, "onClick"> & {
 /**
  * MUI Button with the app's loading state: pass `loading`, or return a
  * promise from `onClick` and it spins until that settles. Disabled while
- * loading, so a second click can't send the request twice.
+ * loading, so a second click can't send the request twice. The spinner sits
+ * at the start, beside the label ("Saving…"): MUI's centred spinner hides
+ * the label, which left a blank button.
  */
 const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(function LoadingButton(
   { onClick, loading, startIcon, loadingPosition, ...props },
@@ -41,7 +43,7 @@ const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(function
       startIcon={startIcon}
       onClick={onClick ? handleClick : undefined}
       loading={Boolean(loading) || running}
-      loadingPosition={loadingPosition ?? (startIcon ? "start" : "center")}
+      loadingPosition={loadingPosition ?? "start"}
       loadingIndicator={<Loader size="sm" />}
     />
   );

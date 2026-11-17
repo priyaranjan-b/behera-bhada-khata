@@ -29,7 +29,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
     const data = res.status === 204 ? null : await res.json().catch(() => null);
     if (!res.ok) {
       const message = data && typeof data.error === "string" ? data.error : `Request failed (${res.status})`;
-      throw new ApiError(res.status, message);
+      throw new ApiError(res.status, message, data?.field === "pin" ? "pin" : undefined);
     }
     return data as T;
   }
@@ -73,6 +73,8 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       profile: () => get(p.dashboard.profile),
       updateProfile: (input) => put(p.dashboard.profile, input),
       changePassword: (input) => post(p.dashboard.profilePassword, input),
+      correctionPin: () => get(p.dashboard.correctionPin),
+      setCorrectionPin: (input) => put(p.dashboard.correctionPin, input),
       paymentNotes: () => get(p.dashboard.paymentNotes),
       createPaymentNote: (input) => post(p.dashboard.paymentNotes, input),
       updatePaymentNote: (noteId, input) => put(p.dashboard.paymentNote(noteId), input),
@@ -120,9 +122,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
         correctPaidThrough: (id, input) => post(p.dashboard.tenants.paidThrough(id), input),
         correctRent: (id, input) => post(p.dashboard.tenants.rentCorrection(id), input),
         startRentTracking: (id, input) => post(p.dashboard.tenants.rentTracking(id), input),
-        stopRentTracking: async (id) => {
-          await request("DELETE", p.dashboard.tenants.rentTracking(id));
-        },
+        stopRentTracking: (id, input) => post(p.dashboard.tenants.stopRentTracking(id), input),
         newPayment: (id) => get(p.dashboard.tenants.newPayment(id)),
         createPayment: (id, input, proofs) => postWithFiles(p.dashboard.tenants.payments(id), input, "proofs", proofs),
         uploadDocuments: (id, input, files) => postWithFiles(p.dashboard.tenants.documents(id), input, "files", files),

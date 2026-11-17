@@ -14,15 +14,18 @@ import type {
 import { currentMonthKey } from "@/lib/dates";
 import { summarizeBalance } from "@/lib/domain/allocation";
 import { rentSplitHouses } from "@/lib/domain/houses";
+import { moveOutNeedsPin } from "@/lib/domain/corrections";
 import { tenantDisplayName } from "@/lib/domain/tenant";
-import { errorMessage } from "@/lib/errors";
+import { ApiError, errorMessage } from "@/lib/errors";
 import type { RentPeriod, TenantStatus } from "@/lib/types";
 import {
   correctPaidThroughSchema,
+  correctMoveOutSchema,
   correctRentSchema,
   createTenantSchema,
   moveOutSchema,
   startRentTrackingSchema,
+  stopRentTrackingSchema,
   tenantLedgerQuerySchema,
   tenantMonthsQuerySchema,
   updateTenantSchema,
@@ -31,6 +34,7 @@ import { tenantMessagingEnabled } from "@/server/env";
 import { ownerDb } from "@/server/infra";
 import type { NewTenant, OwnerRepositories } from "@/server/ports";
 import { parseInput, requireTenant, type OwnerContext } from "./context";
+import { runCorrection } from "./corrections";
 import { billedTenantIds, ensureRentPeriodsFor } from "./periods";
 import { db, tenantById, tenantPlacements } from "./loaders";
 import { tenantAccountOf, tenantDetailOf, tenantLedgerOf, tenantMonthsOf } from "./tenantAccount";
@@ -224,13 +228,25 @@ export async function getEditTenantForm(ctx: OwnerContext, tenantId: string): Pr
 /**
  * Saves the tenant's full new state. The database diffs it: houses added or
  * removed change on `unitsEffective`, a new rent applies from
- * `rentEffectiveMonth`, and already-paid months are never re-priced.
+ * `rentEffectiveMonth`, and already-paid months are never re-priced. A new
+ * rent starts this month at the earliest: re-pricing months that have ended
+ * is a correction (Correct rent, with the PIN; update_tenant refuses it too,
+ * 0039).
  */
 export async function updateTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
   const input = parseInput(updateTenantSchema, body);
   const db = await ownerDb();
   const tenant = await requireTenant(db, tenantId);
   const placement = placementOf(await loadPlacements(db, [tenantId]), tenantId);
+  if (
+    tenant.status !== "draft" &&
+    input.monthlyRentAmount !== undefined &&
+    input.monthlyRentAmount !== placement.monthlyRent &&
+    input.rentEffectiveMonth &&
+    input.rentEffectiveMonth < currentMonthKey()
+  ) {
+    throw new ApiError(400, "A new rent can start this month at the earliest. For an earlier month, use Correct rent.");
+  }
   // House rents (D39) follow a new rent or house set; editing a phone leaves them.
   const rent = input.monthlyRentAmount ?? placement.monthlyRent;
   const changed =
@@ -267,30 +283,35 @@ async function currentHouses(db: OwnerRepositories, tenantId: string, status: Te
   return rentSplitHouses({ status }, placementOf(await loadPlacements(db, [tenantId]), tenantId).unitCodes);
 }
 
+// The corrections below rewrite the ledger's history, so each is confirmed
+// with the corrections PIN, checked in the same transaction (runCorrection,
+// 0039, D41).
+
 /** Fixes a moved-out tenant's move-out date; see correct_move_out (0037, D40). */
 export async function correctMoveOut(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
-  const { moveOutDate } = parseInput(moveOutSchema, body);
+  const { moveOutDate, pin } = parseInput(correctMoveOutSchema, body);
   const db = await ownerDb();
   await requireTenant(db, tenantId);
-  await db.tenants.correctMoveOut(tenantId, moveOutDate);
+  await runCorrection(ctx, db, "move_out_date", tenantId, () => db.tenants.correctMoveOut(tenantId, moveOutDate, { pin }));
 }
 
 /** Fixes "rent paid up to" on an active tenant; see correct_paid_through (0014). */
 export async function correctPaidThrough(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
-  const { paidThrough } = parseInput(correctPaidThroughSchema, body);
+  const { paidThrough, pin } = parseInput(correctPaidThroughSchema, body);
   const db = await ownerDb();
   await requireTenant(db, tenantId);
-  await db.tenants.correctPaidThrough(tenantId, paidThrough);
+  await runCorrection(ctx, db, "paid_through", tenantId, () => db.tenants.correctPaidThrough(tenantId, paidThrough, { pin }));
 }
 
 /** Fixes a rent entered wrongly (correct_rent, 0025); for a real rent change use updateTenant. */
 export async function correctRent(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
-  const { fromMonth, monthlyRent, houseRents } = parseInput(correctRentSchema, body);
+  const { fromMonth, monthlyRent, houseRents, pin } = parseInput(correctRentSchema, body);
   const db = await ownerDb();
   const tenant = await requireTenant(db, tenantId);
   // correct_rent replaces every later rate, so this is the rent from now on (D39).
   const units = await currentHouses(db, tenantId, tenant.status);
-  await db.tenants.correctRent(tenantId, fromMonth, monthlyRent, houseRentsFor(monthlyRent, units, houseRents));
+  const rents = houseRentsFor(monthlyRent, units, houseRents);
+  await runCorrection(ctx, db, "rent", tenantId, () => db.tenants.correctRent(tenantId, fromMonth, monthlyRent, { pin }, rents));
 }
 
 /**
@@ -313,16 +334,26 @@ export async function startRentTracking(ctx: OwnerContext, tenantId: string, bod
 }
 
 /** Undoes startRentTracking while nothing is recorded against the months (409 after). */
-export async function stopRentTracking(ctx: OwnerContext, tenantId: string): Promise<void> {
+export async function stopRentTracking(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
+  const { pin } = parseInput(stopRentTrackingSchema, body);
   const db = await ownerDb();
   await requireTenant(db, tenantId);
-  await db.tenants.stopRentTracking(tenantId);
+  await runCorrection(ctx, db, "stop_tracking", tenantId, () => db.tenants.stopRentTracking(tenantId, { pin }));
 }
 
-/** Ends every tenancy on the move-out date; dues up to then stay on the ledger. */
+/**
+ * Ends every tenancy on the move-out date; dues up to then stay on the
+ * ledger. A date before last month can drop months that have ended, so it
+ * needs the corrections PIN (moveOutNeedsPin, 0039); a draft never does.
+ */
 export async function moveOutTenant(ctx: OwnerContext, tenantId: string, body: unknown): Promise<void> {
-  const { moveOutDate } = parseInput(moveOutSchema, body);
+  const { moveOutDate, pin } = parseInput(moveOutSchema, body);
   const db = await ownerDb();
-  await requireTenant(db, tenantId);
-  await db.tenants.moveOut(tenantId, moveOutDate);
+  const tenant = await requireTenant(db, tenantId);
+  if (tenant.status !== "active" || !moveOutNeedsPin(moveOutDate)) {
+    await db.tenants.moveOut(tenantId, moveOutDate);
+    return;
+  }
+  if (!pin) throw new ApiError(400, "A move-out before last month needs your corrections PIN", "pin");
+  await runCorrection(ctx, db, "move_out", tenantId, () => db.tenants.moveOut(tenantId, moveOutDate, { pin }));
 }

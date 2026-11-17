@@ -34,6 +34,7 @@ import {
 import { listPaymentNotePresets } from "@/server/services/paymentNotes";
 import { getPaymentTagSuggestions, listPaymentTags } from "@/server/services/paymentTags";
 import { getOwnerProfile } from "@/server/services/profile";
+import { getCorrectionPin } from "@/server/services/corrections";
 import { getPaymentsPage, getPaymentsPaidDirect } from "@/server/services/paymentsReport";
 import { getSearchIndex } from "@/server/services/search";
 import {
@@ -88,6 +89,7 @@ const inProcessApi: ApiQueries = {
     activity: async (query) => listActivity(await owner(), query ?? {}),
     search: async () => getSearchIndex(await owner()),
     profile: async () => getOwnerProfile(await owner()),
+    correctionPin: async () => getCorrectionPin(await owner()),
     paymentNotes: async () => listPaymentNotePresets(await owner()),
     paymentTags: async () => listPaymentTags(await owner()),
     properties: {

@@ -8,6 +8,7 @@ import {
   formatDateKey,
   formatDateTime,
   formatMonth,
+  formatMonthRange,
   isDateKey,
   lastMonthKey,
   monthDayRange,
@@ -46,6 +47,8 @@ describe("dates (Asia/Kolkata)", () => {
   it("labels months the same whatever the runtime's own zone", () => {
     expect(formatMonth("2026-03-01")).toBe("March 2026");
     expect(formatMonth("2026-03-01", "short")).toBe("Mar 2026");
+    expect(formatMonthRange("2026-10-01", "2026-10-01")).toBe("October 2026");
+    expect(formatMonthRange("2026-10-01", "2026-11-01")).toBe("Oct 2026 – Nov 2026");
   });
 
   it("writes dates as DATE_FORMAT (dd/MM/yyyy), in IST for instants", () => {

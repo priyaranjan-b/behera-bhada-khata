@@ -41,6 +41,7 @@ beforeAll(async () => {
     [bimal, bimalPayment],
   ]) {
     const period = (await l.months(tenantId))[0].id;
+    await l.confirmPin("adjustment", paymentId);
     await l.rows(
       asOwner,
       sql`select create_adjustment(gen_random_uuid(), ${paymentId}::uuid, -100, 'Recorded too much', 'sig.png',

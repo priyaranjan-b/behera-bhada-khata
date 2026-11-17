@@ -56,7 +56,7 @@ export default async function TenantPage({
   // Government rent paid to the owner directly (0016): no months, no dues, no payments.
   const untracked = active && !tenant.rentTracked;
   const account = untracked ? null : serverApi.dashboard.tenants.account(tenantId);
-  const moveOut = { tenantId, tenantName: tenant.displayName, unitCodes: tenant.currentUnits.map((u) => u.unitCode) };
+  const moveOut = { tenantId, tenantName: tenant.displayName, unitCodes: tenant.currentUnits.map((u) => u.unitCode), draft };
 
   const details = (
     <TenantDetailsCards
@@ -191,6 +191,11 @@ export default async function TenantPage({
       {flash.movedOut ? (
         <FlashAlert param={FLASH.movedOut} severity="success">
           Moved out. Their houses are free for a new tenant; any dues stay on this ledger.
+        </FlashAlert>
+      ) : null}
+      {flash.corrected ? (
+        <FlashAlert param={FLASH.corrected} severity="success">
+          Correction saved. It&apos;s recorded in Change history with the PIN confirmation.
         </FlashAlert>
       ) : null}
       {flash.moveOutCorrected ? (

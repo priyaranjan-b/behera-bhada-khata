@@ -69,6 +69,13 @@ const ACTIONS: Record<AuditAction, { label: string; category: AuditCategory }> =
   "auth.sign_in_failed": { label: "Failed sign-in", category: "access" },
   "auth.password_changed": { label: "Password changed", category: "access" },
   "auth.signed_out": { label: "Signed out", category: "access" },
+  "correction_pin.setup_opened": { label: "Corrections PIN setup opened", category: "access" },
+  "correction_pin.set": { label: "Corrections PIN set", category: "access" },
+  "correction_pin.changed": { label: "Corrections PIN changed", category: "access" },
+  "correction_pin.failed": { label: "Wrong corrections PIN", category: "access" },
+  "correction_pin.locked": { label: "Corrections locked: too many wrong PINs", category: "access" },
+  // Shown next to the change it confirmed (same transaction), in the tenant's history.
+  "correction.confirmed": { label: "Correction confirmed with PIN", category: "money" },
 };
 
 export function auditActionLabel(action: AuditAction): string {

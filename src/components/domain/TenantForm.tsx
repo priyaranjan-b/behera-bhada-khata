@@ -355,7 +355,8 @@ export default function TenantForm({
                     label="New rent from"
                     value={rentEffectiveMonth}
                     onChange={setRentEffectiveMonth}
-                    helperText="Months before keep the old rent. Entered wrongly? Use Correct by the rent on the tenant page."
+                    min={yearMonthOf(currentMonthKey())}
+                    helperText="From this month on; months before keep the old rent. Entered wrongly, or from an earlier month? Use Correct by the rent on the tenant page (needs your corrections PIN)."
                     required
                     fullWidth
                   />
