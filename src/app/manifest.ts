@@ -24,13 +24,12 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
-    // Long-press the app icon (A37). Record payment needs a tenant: it's the
-    // floating button on the main screens instead.
+    // Long-press the app icon (A37); Android shows about four.
     shortcuts: [
+      shortcut("Record payment", routes.payments.new),
       shortcut("Payments", routes.payments.list()),
       shortcut("Defaulters", routes.defaulters),
       shortcut("Add tenant", routes.tenants.new),
-      shortcut("Record maintenance", routes.maintenance.new()),
     ],
   };
 }

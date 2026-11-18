@@ -27,19 +27,11 @@ import { shellSurfaceSx } from "./surface";
 import { usePathname, useSearchParams } from "next/navigation";
 import BottomNavBar, { type BottomNavItem } from "@/components/ui/BottomNavBar";
 import { useHideOnScroll } from "@/components/ui/useHideOnScroll";
-import { RecordPaymentFab } from "@/components/domain/RecordPaymentFab";
 import { chromeSx } from "@/components/ui/chromeSx";
 import { crumbsForPath } from "./AppBreadcrumbs";
 import { useBackTarget } from "./BackTargetProvider";
 import { carryPaidDirect, PAID_DIRECT_PARAM } from "@/lib/preferences";
-import {
-  hasRecordPaymentFab,
-  MOBILE_NAVBAR_HEIGHT,
-  NAV_ITEMS,
-  PAID_DIRECT_TABS,
-  PHONE_BAR_TABS,
-  type AppTab,
-} from "./nav";
+import { MOBILE_NAVBAR_HEIGHT, NAV_ITEMS, PAID_DIRECT_TABS, PHONE_BAR_TABS, type AppTab } from "./nav";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 import { routes } from "@/lib/routes";
 
@@ -55,8 +47,8 @@ const MORE = "more";
  *
  * Android-app feel (A37): a page under another page (a tenant, a form) shows
  * ← and its title instead of the brand, ← going to the parent page (or where
- * the page says with `PhoneBackTarget`); the main screens on the bar get a
- * "Record payment" button; the bar slides away while scrolling down.
+ * the page says with `PhoneBackTarget`); the bar slides away while scrolling
+ * down.
  */
 export function AppNavbar({
   currentTab,
@@ -78,8 +70,6 @@ export function AppNavbar({
   const parent = target ?? (crumbs.length > 2 ? crumbs[crumbs.length - 2] : null);
   const title = crumbs[crumbs.length - 1]?.label;
   const barHidden = useHideOnScroll(!open, pathname);
-  // Not over the search results or the open menu.
-  const showFab = hasRecordPaymentFab(pathname) && !searching && !open;
 
   const barItems: BottomNavItem[] = [
     ...PHONE_BAR_TABS.flatMap((tab) => {
@@ -206,7 +196,6 @@ export function AppNavbar({
           </Stack>
         </Drawer>
       </AppBar>
-      {showFab ? <RecordPaymentFab lowered={barHidden} /> : null}
       <BottomNavBar label="Main menu" hideFrom="md" value={barValue} items={barItems} hidden={barHidden} />
     </>
   );

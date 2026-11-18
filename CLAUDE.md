@@ -671,9 +671,9 @@ Each of these was found broken somewhere; keep them when adding code.
   another shows ← and its title in the top bar (`crumbsForPath`, so a new
   page's `ROUTE_LABELS` entry names it there too; a page opened from
   somewhere other than its URL parent renders `PhoneBackTarget`); the owner bar hides while
-  scrolling down (`useHideOnScroll`, `BottomNavBar hidden`); the main screens
-  get `RecordPaymentFab` (kit `FloatingActionButton`, `hasRecordPaymentFab`,
-  `FAB_PAGE_CLEARANCE`; who's listed is `canRecordPayment`); pages change
+  scrolling down (`useHideOnScroll`, `BottomNavBar hidden`); Quick add →
+  Record payment is `/payments/new`, a tenant list (`canRecordPayment`,
+  `payableTenants`) - no floating buttons (the owner rejected one); pages change
   through `<ViewTransition>` in `AppLayout`, keyed by route segments so a
   `@modal` dialog doesn't rebuild the page (CSS in `globals.css`; a link into a
   record may pass `transitionTypes={["nav-forward"]}`, a back link

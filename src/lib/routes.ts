@@ -112,6 +112,8 @@ export const routes = {
     /** `from`/`to` are days received, yyyy-MM-dd; none = last month. */
     list: (query?: { from?: string; to?: string }) => withQuery("/payments", query),
     adjust: (id: string) => `/payments/${e(id)}/adjust`,
+    /** Quick add → Record payment: pick the tenant (A37). */
+    new: "/payments/new",
   },
   maintenance: {
     /** `from`/`to` are days spent, yyyy-MM-dd; none = this month. */

@@ -14,6 +14,7 @@ describe("crumbsForPath", () => {
 
   it("skips prefixes with no page, and prefers a static segment over :id", () => {
     expect(crumbsForPath("/payments/p-1/adjust").map((c) => c.label)).toEqual(["Overview", "Payments", "Adjust payment"]);
+    expect(crumbsForPath("/payments/new").map((c) => c.label)).toEqual(["Overview", "Payments", "Record payment"]);
     expect(crumbsForPath("/properties/new").map((c) => c.label)).toEqual(["Overview", "Properties", "New property"]);
   });
 });

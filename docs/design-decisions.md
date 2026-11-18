@@ -1450,41 +1450,43 @@ motion, and Record payment buried two screens deep.
   URL parent isn't where it's opened from names its own with
   `PhoneBackTarget` (`BackTargetProvider` in `AppLayout`): Adjust payment
   goes back to the tenant's Ledger, not to the Payments report.
-- **Record payment as a floating button** (`RecordPaymentFab`, kit
-  `FloatingActionButton`, MUI extended `Fab`) on the four bar screens
-  (`hasRecordPaymentFab`), hidden while the search or the menu is open.
-  Those pages end `FAB_PAGE_CLEARANCE` above the foot, so it never covers a
-  pager or footer total. It opens a bottom sheet of the tenants the tenant
-  page offers Record payment to - everyone but drafts and untracked Govt
-  tenants, moved-out ones included (marked "Moved out", listed last) so late
-  dues can be logged: `canRecordPayment` in `src/lib/domain/tenant.ts`, used
-  by that page and `SearchTenant.canRecordPayment`; `payableTenants` in
-  `src/lib/domain/search.ts`. The index is the top bar's, one request per
-  page shared by both (`useSearchIndex`).
+- **Record payment without opening the tenant first**: Quick add →
+  Record payment (menu, phone More, and an icon shortcut) opens
+  `/payments/new`, a searchable list of the tenants the tenant page offers
+  Record payment to - everyone but drafts and untracked Govt tenants,
+  moved-out ones included (marked "Moved out", listed last) so late dues can
+  be logged: `canRecordPayment` in `src/lib/domain/tenant.ts`, used by that
+  page and `SearchTenant.canRecordPayment`; `payableTenants` in
+  `src/lib/domain/search.ts`, over the search index read on the server.
+  Picking one opens their Record payment form. (It started as a floating
+  button on the bar screens; see Rejected.)
 - **The bottom bar slides away scrolling down** and back scrolling up, near
-  the top, at the bottom, or when focused (`useHideOnScroll`,
-  `BottomNavBar hidden`, `inert` while hidden so it leaves the tab order); the
-  FAB follows it. Page clearance doesn't change, so nothing reflows. The
-  tenant portal's bar stays put (it is its sections).
+  the top and at the bottom (`useHideOnScroll`, `BottomNavBar hidden`,
+  `inert` while hidden so it leaves the tab order). Page clearance doesn't
+  change, so nothing reflows. The tenant portal's bar stays put (it is its
+  sections). The top-bar search loads its index through `useSearchIndex`
+  (one request per page, shared by the desktop and phone search).
 - **Page transitions**: one `<ViewTransition>` in `AppLayout`, keyed by the
   page's route (`useSelectedLayoutSegments`, which follows the `children`
   slots and leaves out search params) - not the pathname, which also
   changes when the Record payment dialog opens over the tenant page (an
   intercepted `@modal` route) and would rebuild the page under it, losing
   its tabs and tables. Every page change crossfades; links tagged
-  `nav-forward` (into a record: `IdentityCell`, the search, the FAB's list)
+  `nav-forward` (into a record: `IdentityCell`, the search, the Record payment list)
   / `nav-back` (the ←) also slide on phones. Fixed chrome (`chromeSx`: the
-  top bar, bottom bar, FAB, desktop header) has a `viewTransitionName` and is
+  top bar, bottom bar, desktop header) has a `viewTransitionName` and is
   held still above the page. Off under `prefers-reduced-motion`; browsers without
   View Transitions just swap.
 - **No browser feel**: no tap highlight; app chrome is `user-select: none`
   (never page text: figures stay copyable).
-- **Manifest**: long-press icon shortcuts (Payments, Defaulters, Add
-  tenant, Record maintenance). Orientation stays free: turning the phone
+- **Manifest**: long-press icon shortcuts (Record payment, Payments,
+  Defaulters, Add tenant). Orientation stays free: turning the phone
   sideways is how wide tables show more columns.
 
 **Rejected:** a custom pull-to-refresh (Chrome already gives the installed
 app one, and `overscroll-behavior: none` would have taken it away); ← as
 `history.back()` (leaves the app when the page was opened from a shortcut or
-link); a FAB on every page (forms and records have their own actions); a
-portrait lock (takes away landscape for wide tables).
+link); a floating "Record payment" button on the bar screens (shipped in
+PR #19, then removed: big, and popping up on every main screen - the
+owner's call; the menu entry does the same job quietly); a portrait lock
+(takes away landscape for wide tables).

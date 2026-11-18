@@ -10,6 +10,7 @@ import { routes } from "@/lib/routes";
 function tabForPath(pathname: string): AppTab | undefined {
   if (pathname === routes.home) return "summary";
   // Quick-add pages before their sections, so the shortcut is the one highlighted.
+  if (pathname === routes.payments.new) return "recordPayment";
   if (pathname === routes.tenants.new) return "addTenant";
   if (pathname === routes.houses.new) return "addHouse";
   if (pathname === routes.maintenance.new()) return "addMaintenance";

@@ -1,14 +1,13 @@
 "use client";
 
 import { ViewTransition } from "react";
-import { usePathname, useSelectedLayoutSegments } from "next/navigation";
+import { useSelectedLayoutSegments } from "next/navigation";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import { SideMenu } from "@/components/shell/SideMenu";
 import { AppNavbar } from "@/components/shell/AppNavbar";
-import { hasRecordPaymentFab, MOBILE_NAVBAR_HEIGHT } from "@/components/shell/nav";
+import { MOBILE_NAVBAR_HEIGHT } from "@/components/shell/nav";
 import { BOTTOM_NAV_CLEARANCE } from "@/components/ui/BottomNavBar";
-import { FAB_PAGE_CLEARANCE } from "@/components/ui/FloatingActionButton";
 import { BackTargetProvider } from "@/components/shell/BackTargetProvider";
 import { Header } from "@/components/shell/Header";
 import { AppBreadcrumbs } from "@/components/shell/AppBreadcrumbs";
@@ -36,7 +35,6 @@ export default function AppLayout({
   ownerEmail?: string;
   ownerName?: string;
 }) {
-  const pathname = usePathname();
   // The page's own route, following the `children` slots: a dialog opened in a
   // parallel slot over the page (Record payment over the tenant, an
   // intercepted route) changes the URL but not this, so the page underneath
@@ -85,12 +83,8 @@ export default function AppLayout({
             useFlexGap
             sx={{
               mx: { xs: 2, sm: 3 },
-              // Phones: the page ends above the bottom menu bar (A33), with the usual
-              // gap, and above the Record payment button where there is one (A37).
-              pb: {
-                xs: hasRecordPaymentFab(pathname) ? FAB_PAGE_CLEARANCE : `calc(${BOTTOM_NAV_CLEARANCE} + 24px)`,
-                md: 6,
-              },
+              // Phones: the page ends above the bottom menu bar (A33), with the usual gap.
+              pb: { xs: `calc(${BOTTOM_NAV_CLEARANCE} + 24px)`, md: 6 },
               pt: { xs: `${MOBILE_NAVBAR_HEIGHT + 16}px`, md: 3 },
               maxWidth: { sm: "100%", md: 1700 },
             }}

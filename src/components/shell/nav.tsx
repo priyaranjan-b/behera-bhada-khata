@@ -3,6 +3,7 @@ import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import PendingActionsRoundedIcon from "@mui/icons-material/PendingActionsRounded";
 import HomeWorkRoundedIcon from "@mui/icons-material/HomeWorkRounded";
+import AddCardRoundedIcon from "@mui/icons-material/AddCardRounded";
 import PersonAddAltRoundedIcon from "@mui/icons-material/PersonAddAltRounded";
 import AddHomeWorkRoundedIcon from "@mui/icons-material/AddHomeWorkRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
@@ -26,6 +27,7 @@ export type AppTab =
   | "earnings"
   | "activity"
   | "settings"
+  | "recordPayment"
   | "addTenant"
   | "addHouse"
   | "addMaintenance";
@@ -46,6 +48,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
 
 /** Shortcuts under the main menu: start a form without first opening a tower. */
 export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: React.ReactNode }[] = [
+  { tab: "recordPayment", href: routes.payments.new, label: "Record payment", icon: <AddCardRoundedIcon /> },
   { tab: "addTenant", href: routes.tenants.new, label: "Add tenant", icon: <PersonAddAltRoundedIcon /> },
   { tab: "addHouse", href: routes.houses.new, label: "Add house", icon: <AddHomeWorkRoundedIcon /> },
   { tab: "addMaintenance", href: routes.maintenance.new(), label: "Record maintenance", icon: <BuildCircleRoundedIcon /> },
@@ -56,15 +59,6 @@ export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: 
  * an owner goes most on the go, then "More" for the rest of NAV_ITEMS.
  */
 export const PHONE_BAR_TABS: readonly AppTab[] = ["summary", "tenants", "payments", "defaulters"];
-
-const FAB_PATHS: ReadonlySet<string> = new Set(
-  NAV_ITEMS.filter((item) => PHONE_BAR_TABS.includes(item.tab)).map((item) => item.href)
-);
-
-/** The bar's own screens get the phone "Record payment" button (A37); the page leaves room for it. */
-export function hasRecordPaymentFab(pathname: string): boolean {
-  return FAB_PATHS.has(pathname);
-}
 
 /** The pages with "Include Govt paid direct": the menus keep it on between them (A24). */
 export const PAID_DIRECT_TABS: ReadonlySet<AppTab> = new Set<AppTab>(["summary", "billing", "earnings"]);
