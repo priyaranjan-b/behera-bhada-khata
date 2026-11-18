@@ -8,6 +8,7 @@ import { buttonClasses } from "@mui/material/Button";
 import { bottomNavigationActionClasses } from "@mui/material/BottomNavigationAction";
 import { chipClasses } from "@mui/material/Chip";
 import { iconButtonClasses } from "@mui/material/IconButton";
+import { outlinedInputClasses } from "@mui/material/OutlinedInput";
 import { switchClasses } from "@mui/material/Switch";
 import type {} from "@mui/x-date-pickers/themeAugmentation";
 import { pickersInputBaseClasses } from "@mui/x-date-pickers/PickersTextField";
@@ -431,6 +432,25 @@ export const appCustomizations: Components<Theme> = {
           [`& .${autocompleteClasses.endAdornment} .${iconButtonClasses.root}`]: embeddedIconButton(theme, 28),
         }),
       },
+      // A multi-select (Houses, Tags) holds a chip per value: the template's
+      // fixed field height (inputs.tsx) let the chips spill out over what
+      // comes below on phones. It grows from the usual height instead.
+      {
+        props: { multiple: true },
+        style: {
+          [`& .${outlinedInputClasses.root}`]: { height: "auto", minHeight: "2.5rem", paddingTop: 4, paddingBottom: 4 },
+          [`& .${autocompleteClasses.inputRoot}.${outlinedInputClasses.sizeSmall}`]: { minHeight: "2.25rem" },
+        },
+      },
     ],
+  },
+  // A picker's calendar header: the month/year switch ▾ and the ‹ › arrows
+  // are plain icons, not the 44px bordered standalone buttons, which on
+  // phones drew them as dark tiles overlapping each other.
+  // (`root` only: the template sets `switchViewButton`, which this keeps.)
+  MuiPickersCalendarHeader: {
+    styleOverrides: {
+      root: ({ theme }) => ({ [`& .${iconButtonClasses.root}`]: embeddedIconButton(theme, 32, 40) }),
+    },
   },
 };

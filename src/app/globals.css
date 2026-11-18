@@ -41,9 +41,6 @@ body {
 ::view-transition-new(app-bottom-bar) {
   animation: none;
 }
-::view-transition-group(app-fab) {
-  z-index: 101;
-}
 
 @keyframes app-fade-in {
   from {
