@@ -17,6 +17,7 @@ import {
   updateTenant,
 } from "../procedures/tenants";
 import { listAudit } from "../tables/audit";
+import { getDateFormat, saveDateFormat } from "../tables/settings";
 import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
 import { maintenancePage } from "../queries/maintenancePage";
@@ -47,11 +48,9 @@ import {
 } from "../tables/documents";
 import {
   createPaymentNotePreset,
-  getDateFormat,
   getOwnerProfile,
   listPaymentNotePresets,
   removePaymentNotePreset,
-  saveDateFormat,
   saveOwnerProfile,
   updatePaymentNotePreset,
 } from "../tables/owner";

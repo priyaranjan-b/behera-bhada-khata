@@ -615,6 +615,7 @@ function build() {
   };
 
   const system = {
+    appSettings: { getDateFormat: owner.appSettings.getDateFormat },
     audit: {
       log: vi.fn(async (event: AuditEvent & { actorKind: AuditLogEntry["actor_kind"]; actorId?: string | null }) =>
         logAudit(event, event.actorKind, event.actorId ?? null)

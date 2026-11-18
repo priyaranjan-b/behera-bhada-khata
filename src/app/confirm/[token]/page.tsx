@@ -11,14 +11,7 @@ import { formatMoney } from "@/lib/money";
 import { paymentModeLabel } from "@/lib/domain/payments";
 import { BrandMark } from "@/components/shell/BrandMark";
 import { StatusBadge } from "@/components/ui/DataDisplay";
-import {
-  DetailList,
-  DetailRow,
-  PublicHeading,
-  PublicLayout,
-  SectionCard,
-  SummaryLine,
-} from "@/components/ui";
+import { DetailList, DetailRow, FormattedDate, PublicHeading, PublicLayout, SectionCard, SummaryLine } from "@/components/ui";
 import ConfirmForm from "./ConfirmForm";
 
 export default async function ConfirmPage({ params }: { params: Promise<{ token: string }> }) {
@@ -88,7 +81,9 @@ export default async function ConfirmPage({ params }: { params: Promise<{ token:
           <SummaryLine label="Total" value={formatMoney(record.amount)} emphasis="total" />
 
           <DetailList>
-            <DetailRow label="Date">{record.date}</DetailRow>
+            <DetailRow label="Date">
+              <FormattedDate date={record.date} />
+            </DetailRow>
             {record.mode ? <DetailRow label="Mode">{paymentModeLabel(record.mode)}</DetailRow> : null}
           </DetailList>
 

@@ -1,5 +1,4 @@
 import "server-only";
-import { getDateFormat } from "../tables/owner";
 import { asc, eq, getTableColumns, inArray } from "drizzle-orm";
 import type { TenantDocument, TenantRentRate } from "@/lib/types";
 import type { TenantRepositories } from "@/server/ports";
@@ -12,6 +11,7 @@ import { getPaymentProof, listPaymentProofs, recordExists } from "../tables/ledg
 import { listOccupancy, listProperties, listUnits } from "../tables/places";
 import { getTenant } from "../tables/tenants";
 import { tenantDocuments, tenantRentRates } from "../schema";
+import { getDateFormat } from "../tables/settings";
 
 // tenant_reader may not read `recorded_by` (the owner's account id, 0034), so
 // these two tables are read column by column; the rows say null for it.

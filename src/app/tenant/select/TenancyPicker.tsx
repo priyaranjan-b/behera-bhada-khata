@@ -10,11 +10,11 @@ import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
 import { Loader } from "@/components/ui/Loading";
 import { api, errorMessage } from "@/lib/api-client";
 import type { TenancyOption } from "@/lib/contracts";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /** One button per tenancy of the signed-in phone; choosing opens it (A32). */
 export default function TenancyPicker({ tenancies }: { tenancies: TenancyOption[] }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +38,7 @@ export default function TenancyPicker({ tenancies }: { tenancies: TenancyOption[
           <ListItemButton key={t.id} disabled={busyId !== null} onClick={() => choose(t.id)} divider>
             <ListItemText
               primary={t.displayName}
-              secondary={[t.unitCodes.join(", "), t.leaseStart ? `since ${formatDateKey(t.leaseStart)}` : null]
+              secondary={[t.unitCodes.join(", "), t.leaseStart ? `since ${formatDate(t.leaseStart)}` : null]
                 .filter(Boolean)
                 .join(" · ")}
             />

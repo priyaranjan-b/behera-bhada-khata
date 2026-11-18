@@ -34,7 +34,7 @@ import type { PaymentMode } from "@/lib/types";
 import { api, errorMessage } from "@/lib/api-client";
 import type { SavedSignature } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 export default function PaymentForm({
   tenantId,
@@ -58,7 +58,7 @@ export default function PaymentForm({
   /** Rendered in the tenant page's `RouteModal` rather than as its own page. */
   inDialog?: boolean;
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const router = useAppRouter();
   const [amount, setAmount] = useState("");
   // No default: back entries kept getting saved as today. Today/Yesterday are one tap.
@@ -281,7 +281,7 @@ export default function PaymentForm({
             error={error}
             cancelHref={routes.tenants.detail(tenantId)}
             onCancel={inDialog ? () => router.back() : undefined}
-            submitLabel={paymentDate ? `Save payment · received ${formatDateKey(paymentDate)}` : "Save payment"}
+            submitLabel={paymentDate ? `Save payment · received ${formatDate(paymentDate)}` : "Save payment"}
             pendingLabel="Saving…"
             pending={submitting}
           />

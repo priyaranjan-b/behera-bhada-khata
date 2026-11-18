@@ -119,6 +119,9 @@ export const apiPaths = {
     adjustmentReceipt: (adjustmentId: string) => `/api/tenant/adjustments/${e(adjustmentId)}/receipt`,
     proof: (paymentId: string, proofId: string) => `/api/tenant/payments/${e(paymentId)}/proofs/${e(proofId)}`,
   },
+  public: {
+    displaySettings: "/api/public/display-settings",
+  },
   confirm: {
     detail: (token: string) => `/api/confirm/${e(token)}`,
     otp: (token: string) => `/api/confirm/${e(token)}/otp`,

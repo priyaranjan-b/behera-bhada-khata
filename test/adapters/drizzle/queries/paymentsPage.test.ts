@@ -12,9 +12,10 @@ import { PAYMENT_MODE_LABELS, paymentModeLabel } from "@/lib/domain/payments";
 import { PAYMENT_MODES, type PaymentMode } from "@/lib/types";
 import { inScope, type Scope } from "@/server/adapters/drizzle/client";
 import { paymentsPage } from "@/server/adapters/drizzle/queries/paymentsPage";
-import { dateLabel, labelOf, monthLabel, towersNow } from "@/server/adapters/drizzle/queries/text";
+import { dateLabel, dateSearchText, labelOf, monthLabel, towersNow } from "@/server/adapters/drizzle/queries/text";
 import type { PaymentsFilter } from "@/server/ports";
 import { asOwner, asStranger, createLedgerDb, type LedgerDb } from "../fixtures";
+import { DISPLAY_DATE_FORMATS } from "@/lib/types";
 
 let l: LedgerDb;
 const tenants: Record<string, string> = {};
@@ -127,6 +128,18 @@ describe("paymentsPage on Drizzle matches payments_page()", () => {
     expect((await same({ search: "bimal" })).total).toBe(2);
     expect((await same({ search: "  asha   upi " })).total).toBe(1);
     expect((await same({ search: "15/03/2026" })).total).toBe(2);
+    // Whatever format the table shows (A36): a month name, or the date with one, finds it too.
+    // (Drizzle only: the frozen payments_page() oracle searched dd/MM/yyyy alone.)
+    for (const search of ["15/Mar/2026", "15 Mar 2026", "2026-03-15"]) {
+      expect((await viaDrizzle(asOwner, { ...BASE, search })).total).toBe(2);
+    }
+    // The Date column filter matches the date in any display format, as the column shows one of them.
+    const byDate = (operator: string, value: string) =>
+      viaDrizzle(asOwner, { ...BASE, filters: [{ field: "date", operator, value }] } as PaymentsFilter);
+    expect((await byDate("contains", "Mar")).total).toBe((await byDate("contains", "/03/")).total);
+    expect((await byDate("equals", "15/Mar/2026")).total).toBe(2);
+    expect((await byDate("equals", "15/03/2026")).total).toBe(2);
+    expect((await byDate("not", "15/Mar/2026")).total).toBe((await viaDrizzle(asOwner, BASE)).total - 2);
     expect((await same({ search: "march 2026" })).total).toBe(2);
     expect((await same({ search: "50%" })).total).toBe(1);
     expect((await same({ search: "rest_later" })).total).toBe(1);
@@ -236,6 +249,10 @@ describe("the text the grid searches is the text the UI shows", () => {
   it("dates as formatDateKey, months as formatMonth", async () => {
     for (const key of ["2026-01-05", "2026-10-31", "2027-02-28"]) {
       expect(await text(dateLabel(sql`${key}::date`))).toBe(formatDateKey(key));
+      // The search text holds the date in every display format the owner can pick.
+      expect(await text(dateSearchText(sql`${key}::date`))).toBe(
+        DISPLAY_DATE_FORMATS.map((format) => formatDateKey(key, format)).join(" ")
+      );
     }
     for (const key of ["2026-01-01", "2026-05-01", "2026-09-01", "2026-12-01"]) {
       expect(await text(monthLabel(sql`${key}::date`))).toBe(formatMonth(key));

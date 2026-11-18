@@ -8,7 +8,7 @@ import { MAINTENANCE_LIMITS } from "@/lib/validation";
 import type { DbPage, MaintenanceFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
-import { dateLabel, labelOf, maintenanceTagsOf } from "./text";
+import { dateLabel, dateFilterField, dateSearchText, labelOf, maintenanceTagsOf } from "./text";
 
 // The Maintenance page (0031, D35): every expense spent in the days, voided
 // ones included (so a void is visible), one page, with the totals of every
@@ -49,7 +49,7 @@ const MAINTENANCE_TABLE: GridTable<MaintenanceFilter["sort"], MaintenanceFilter[
     units_text: sql`r.units_text`,
   },
   fields: {
-    date: sql`r.date_label`,
+    date: dateFilterField(sql`r.expense_date`),
     description: sql`r.description`,
     category: sql`r.category_label`,
     units: sql`r.units_text`,
@@ -58,7 +58,7 @@ const MAINTENANCE_TABLE: GridTable<MaintenanceFilter["sort"], MaintenanceFilter[
     tags: { text: sql`r.tags_text`, values: sql`json_array_elements_text(r.tags)` },
     status: sql`r.status_label`,
   },
-  searchText: sql`concat_ws(${NL}, r.date_label, r.description, r.category_label, r.units_text, r.vendor, r.note, r.tags_text)`,
+  searchText: sql`concat_ws(${NL}, ${dateSearchText(sql`r.expense_date`)}, r.description, r.category_label, r.units_text, r.vendor, r.note, r.tags_text)`,
   tieBreak: [sql`r.expense_date desc`, sql`r.id`],
 };
 

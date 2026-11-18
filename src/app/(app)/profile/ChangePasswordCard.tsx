@@ -38,8 +38,9 @@ export default function ChangePasswordCard() {
   }
 
   return (
-    <Box component="form" onSubmit={handleSubmit}>
+    <Box component="form" onSubmit={handleSubmit} sx={{ height: "100%" }}>
       <SectionCard
+        fill
         title="Security"
         caption="Set a password to sign in with your email and password instead of an email link."
         icon={<LockRoundedIcon />}

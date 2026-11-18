@@ -1,6 +1,7 @@
 import type { GridColDef, GridValidRowModel } from "@mui/x-data-grid";
 import { formatDateKey, formatDateTime } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import type { DisplayDateFormat } from "@/lib/types";
 
 /**
  * Right-aligned, tabular, ₹-formatted number column. `total: true` adds it
@@ -56,14 +57,17 @@ export function dateColumn<R extends GridValidRowModel>(
   return { field, headerName, minWidth: 110, flex: 0.6, dateKind: "date", ...extra };
 }
 
-/** The table's columns with each date column formatted in `format` (DataTable calls it). */
+/**
+ * The table's columns with each date column formatted in `format` (DataTable
+ * calls it). A date column that brings its own `valueFormatter` keeps it.
+ */
 export function withDateFormat<R extends GridValidRowModel>(
   columns: readonly GridColDef<R>[],
-  format: string
+  format: DisplayDateFormat
 ): GridColDef<R>[] {
   return columns.map((column) => {
     const col = column as DataTableColDef<R>;
-    if (!col.dateKind) return column;
+    if (!col.dateKind || col.valueFormatter) return column;
     const kind = col.dateKind;
     return {
       ...col,

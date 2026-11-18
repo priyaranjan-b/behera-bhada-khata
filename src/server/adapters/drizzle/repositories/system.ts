@@ -3,6 +3,7 @@ import type { SystemRepositories } from "@/server/ports";
 import { inScope, type Db, type Tx } from "../client";
 import { must, mustWrite } from "../errors";
 import { acknowledge, ensureRentPeriods, logEvent } from "../procedures/system";
+import { getDateFormat } from "../tables/settings";
 import {
   findAdjustmentByTokenHash,
   findPaymentByTokenHash,
@@ -70,6 +71,10 @@ export function drizzleSystemRepositories(db: Db): SystemRepositories {
   const writeAsSystem = <T>(what: string, fn: (tx: Tx) => Promise<T>): Promise<T> => asServiceRole(what, fn, mustWrite);
 
   return {
+    // How the UI shows dates (0040), for the pages without an owner or tenant session (/tenant/select, /confirm).
+    appSettings: {
+      getDateFormat: () => asSystem("read date format", (tx) => getDateFormat(tx)),
+    },
     audit: {
       // For someone without an owner session (the tenant, a failed sign-in) or the system; recordEvent decides if a failure matters.
       log: (event) =>

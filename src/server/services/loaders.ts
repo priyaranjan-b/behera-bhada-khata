@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { addMonthsToKey, currentMonthKey } from "@/lib/dates";
-import type { Property, RentPeriod, Tenant } from "@/lib/types";
+import type { DisplayDateFormat, Property, RentPeriod, Tenant } from "@/lib/types";
 import { ownerDb } from "@/server/infra";
 import type { OwnerRepositories } from "@/server/ports";
 import { notFound, requireId, requireTenant } from "./context";
@@ -26,6 +26,9 @@ export function recentMonthKeys(): string[] {
 
 /** The owner's repositories, once per request. */
 export const db = cache((): Promise<OwnerRepositories> => ownerDb());
+
+/** How the UI shows dates (0040): the layout and the page share one read. */
+export const dateFormatSetting = cache(async (): Promise<DisplayDateFormat> => (await db()).appSettings.getDateFormat());
 
 /** Every tenant (drafts and moved-out ones included). */
 export const tenantsList = cache(async (): Promise<Tenant[]> => (await db()).tenants.list());

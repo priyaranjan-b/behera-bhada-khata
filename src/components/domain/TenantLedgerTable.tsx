@@ -30,7 +30,7 @@ import ShareReceiptButton from "@/components/domain/ShareReceiptButton";
 import { api, apiHref, apiPaths } from "@/lib/api-client";
 import { routes } from "@/lib/routes";
 import LinkButton from "@/components/ui/Loading/LinkButton";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 type FilterMode = "all" | "range" | "month";
 

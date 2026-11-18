@@ -43,12 +43,12 @@ export default async function ProfilePage({
       <ProfileSummary profile={profile} />
       {/* Remount on save so the form starts from what was stored. */}
       <ProfileForm key={`${profile.displayName}|${profile.signatureName}|${profile.signatureUrl}`} profile={profile} />
-      {/* Side by side on wide screens, stacked on phones. */}
+      {/* Side by side from lg (half of md squeezes the password fields), stacked below; the cards fill the row. */}
       <Grid container spacing={2} sx={{ alignItems: "stretch" }}>
-        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <Grid size={{ xs: 12, lg: 6 }} sx={{ minWidth: 0, maxWidth: { md: 760, lg: "none" } }}>
           <ChangePasswordCard />
         </Grid>
-        <Grid size={{ xs: 12, md: 6 }} sx={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <Grid size={{ xs: 12, lg: 6 }} sx={{ minWidth: 0, maxWidth: { md: 760, lg: "none" } }}>
           <AsyncSection title="Corrections PIN" fallback={<DetailCardSkeleton rows={3} action={false} />}>
             <CorrectionPinSection status={pin} />
           </AsyncSection>

@@ -2,6 +2,7 @@ import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { DATE_FORMAT } from "@/lib/dates";
 import { NOT_SET } from "@/lib/domain/tenant";
+import { DISPLAY_DATE_FORMATS } from "@/lib/types";
 
 // What the server-paged tables show, written as SQL so search, filters and
 // sort run on the same text the user sees. Each one is built from the app's
@@ -16,6 +17,33 @@ import { NOT_SET } from "@/lib/domain/tenant";
  * tokens as dayjs (DD/MM/YYYY); a test keeps the two equal.
  */
 export const dateLabel = (date: SQL) => sql`to_char(${date}, ${DATE_FORMAT})`;
+
+/**
+ * What a date column searches and filters on (A36): the date written in
+ * every display format the owner can pick, so "Nov", "18/Nov/2026" and
+ * "18/11/2026" all find it whatever the table shows. dayjs' MMM is to_char's
+ * Mon (English abbreviations without the TM prefix); the rest are the same
+ * tokens. A test checks each against formatDateKey.
+ */
+export const dateSearchText = (date: SQL) =>
+  sql.join(
+    DISPLAY_DATE_FORMATS.map((format) => sql`to_char(${date}, ${format.replace("MMM", "Mon")})`),
+    sql` || ' ' || `
+  );
+
+/**
+ * A date column's filter (A36): the column shows one display format, so a
+ * filter matches if the date written in any of them does - "contains Nov",
+ * "equals 18/Nov/2026" and "equals 18/11/2026" all find it, and "is not"
+ * means none of them does (a GridListField). `date` must be a date value.
+ */
+export const dateFilterField = (date: SQL) => ({
+  text: dateLabel(date),
+  values: sql`unnest(array[${sql.join(
+    DISPLAY_DATE_FORMATS.map((format) => sql`to_char(${date}, ${format.replace("MMM", "Mon")})`),
+    sql`, `
+  )}])`,
+});
 
 /** March 2026, as formatMonth(key) (long). */
 export const monthLabel = (month: SQL) => sql`to_char(${month}, 'FMMonth YYYY')`;

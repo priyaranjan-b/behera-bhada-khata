@@ -79,7 +79,7 @@ export function OwnerCard({ email, name }: { email?: string; name?: string }) {
             <PersonRoundedIcon fontSize="small" />
           </ListItemIcon>
         </MenuItem>
-        <MenuItem component={Link} href={routes.settings} onClick={() => setAnchorEl(null)}>
+        <MenuItem component={Link} href={routes.settings()} onClick={() => setAnchorEl(null)}>
           <ListItemText>Settings</ListItemText>
           <ListItemIcon sx={{ ml: "auto", minWidth: "0 !important" }}>
             <SettingsRoundedIcon fontSize="small" />

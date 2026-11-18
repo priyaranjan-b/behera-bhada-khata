@@ -4,10 +4,9 @@ import type { ReactNode } from "react";
 import Stack from "@mui/material/Stack";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { DATE_FORMAT } from "@/lib/dates";
 import { boundOf, usePickerValue } from "./pickerValue";
 import QuickPicks from "./QuickPicks";
-import { useDates } from "./DateFormat";
+import { useDates } from "./useDates";
 
 export interface DateFieldProps {
   label: string;
@@ -29,7 +28,7 @@ export interface DateFieldProps {
 }
 
 /**
- * Every date input in the app: typed and shown as DATE_FORMAT (dd/MM/yyyy,
+ * Every date input in the app: typed and shown in the owner's display format (A36,
  * src/lib/dates.ts) in every browser, with a calendar to pick from. Never use
  * a native `type="date"` field (ESLint refuses it).
  */
@@ -48,13 +47,13 @@ export default function DateField({
   sx,
   quickPicks,
 }: DateFieldProps) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate, format } = useDates();
   const picker = usePickerValue(value, onChange, "YYYY-MM-DD");
   const field = (
     <DatePicker
       label={label}
       {...picker}
-      format={DATE_FORMAT}
+      format={format}
       minDate={boundOf(min)}
       maxDate={boundOf(max)}
       disabled={disabled}
@@ -70,7 +69,7 @@ export default function DateField({
         disabled={disabled}
         picks={quickPicks.map((pick) => ({
           label: pick.label,
-          ariaLabel: `${label}: ${pick.label}, ${formatDateKey(pick.value)}`,
+          ariaLabel: `${label}: ${pick.label}, ${formatDate(pick.value)}`,
           selected: pick.value === value,
         }))}
         onPick={(index) => onChange(quickPicks[index].value)}

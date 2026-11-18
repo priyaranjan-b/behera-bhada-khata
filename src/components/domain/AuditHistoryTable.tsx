@@ -13,7 +13,7 @@ import type { AuditEntry, AuditTablePage, AuditTableQuery } from "@/lib/contract
 import { AUDIT_CATEGORIES, AUDIT_CATEGORY_LABELS, type AuditCategory } from "@/lib/domain/audit";
 import type { GridQueryParams } from "@/lib/domain/gridQuery";
 import { ACTIVITY_COLUMNS, TENANT_HISTORY_COLUMNS } from "./auditColumns";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /** Whose history: every change (Activity) or one tenant's (the tenant page). Plain data, so a Server Component can pass it. */
 export type AuditHistorySource = { kind: "all" } | { kind: "tenant"; tenantId: string };

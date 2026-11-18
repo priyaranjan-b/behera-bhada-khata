@@ -8,7 +8,7 @@ import { PAYMENTS_LIMITS } from "@/lib/validation";
 import type { DbPage, PaymentsFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
-import { dateLabel, labelOf, monthLabel, paymentTagsOf, tenantDisplayName, towersNow } from "./text";
+import { dateLabel, dateFilterField, dateSearchText, labelOf, monthLabel, paymentTagsOf, tenantDisplayName, towersNow } from "./text";
 
 // Replaces payments_page() (0026, A18), plus each payment's tags (0030, D34,
 // searched and filtered like the rest of the text) and its payments_rows /
@@ -53,7 +53,7 @@ const PAYMENTS_TABLE: GridTable<PaymentsFilter["sort"], PaymentsFilter["filters"
     amount: sql`r.amount`,
   },
   fields: {
-    date: sql`r.date_label`,
+    date: dateFilterField(sql`r.payment_date`),
     receipt: sql`coalesce(r.receipt_no, '')`,
     tenant: sql`r.tenant_name || ${NL} || r.property_name`,
     mode: sql`r.mode_label`,
@@ -63,7 +63,7 @@ const PAYMENTS_TABLE: GridTable<PaymentsFilter["sort"], PaymentsFilter["filters"
     // filter matches across the ", " between two names.
     tags: { text: sql`r.tags_text`, values: sql`json_array_elements_text(r.tags)` },
   },
-  searchText: sql`concat_ws(${NL}, r.date_label, r.receipt_no, r.tenant_name, r.property_name, r.mode_label, r.months_text, r.note, r.tags_text)`,
+  searchText: sql`concat_ws(${NL}, ${dateSearchText(sql`r.payment_date`)}, r.receipt_no, r.tenant_name, r.property_name, r.mode_label, r.months_text, r.note, r.tags_text)`,
   tieBreak: [sql`r.payment_date desc`, sql`r.receipt_no desc`, sql`r.id`],
 };
 

@@ -241,4 +241,21 @@ describe("tags (0030)", () => {
     const found = await viaDrizzle(asOwner, { ...base(), search: "sankarshan" });
     expect(found.rows.map((r) => r.ref_id)).toEqual([P2]);
   });
+
+  it("finds a row by its date in any display format (A36), as search and as the Date filter", async () => {
+    const { rows } = await viaDrizzle(asOwner, base());
+    const row = rows.find((r) => r.ref_id === P2)!;
+    const key = String(row.date).slice(0, 10);
+    const [y, m, d] = key.split("-");
+    const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][Number(m) - 1];
+    for (const search of [`${d}/${month}/${y}`, `${d}/${m}/${y}`, key]) {
+      const found = await viaDrizzle(asOwner, { ...base(), search });
+      expect(found.rows.map((r) => r.ref_id)).toContain(P2);
+    }
+    const filtered = await viaDrizzle(asOwner, {
+      ...base(),
+      filters: [{ field: "date", operator: "equals", value: `${d} ${month} ${y}` }],
+    });
+    expect(filtered.rows.map((r) => r.ref_id)).toContain(P2);
+  });
 });

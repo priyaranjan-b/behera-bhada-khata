@@ -2,7 +2,6 @@ import Stack from "@mui/material/Stack";
 import Grid from "@mui/material/Grid";
 import Alert from "@mui/material/Alert";
 import { serverApi } from "@/lib/api-client/server";
-import { formatDateKey } from "@/lib/dates";
 import { TAB_PARAM, type TenantPortalTab } from "@/lib/routes";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import AsyncSection from "@/components/ui/AsyncSection";
@@ -17,6 +16,7 @@ import TenantDetailsCards from "@/components/domain/TenantDetailsCards";
 import TenantDocumentsList from "@/components/domain/TenantDocumentsList";
 import TenantLedgerTable from "@/components/domain/TenantLedgerTable";
 import TenantPeriodsGrid from "@/components/domain/TenantPeriodsGrid";
+import { FormattedDate, JoinedText } from "@/components/ui";
 
 // The tenant portal (A32): the signed-in tenant's own account, read-only. No
 // id in the URL - the session says whose - and nothing on it changes
@@ -31,7 +31,7 @@ export default async function TenantPortalPage({ searchParams }: PageProps<"/ten
   // A new version per server render resets the kept tabs (as on the owner's tenant page).
   // eslint-disable-next-line react-hooks/purity -- a per-render token, not data
   const version = Date.now();
-  const [{ tenant }, { dateFormat }] = await Promise.all([serverApi.tenant.profile(), serverApi.tenant.displaySettings()]);
+  const { tenant } = await serverApi.tenant.profile();
   const active = tenant.status === "active";
   // Government rent paid to the owner directly (0016): no months, no dues, no payments here.
   const untracked = active && !tenant.rentTracked;
@@ -83,15 +83,20 @@ export default async function TenantPortalPage({ searchParams }: PageProps<"/ten
       : []),
   ];
 
-  const movedOut = active ? null : tenant.movedOutOn ? `Moved out ${formatDateKey(tenant.movedOutOn, dateFormat)}` : "Moved out";
+  const movedOut = active ? null : (
+    <>Moved out {tenant.movedOutOn ? <FormattedDate date={tenant.movedOutOn} /> : null}</>
+  );
 
   return (
     <Stack spacing={2}>
       <PageHeader
         title={tenant.displayName}
         subtitle={
-          [tenant.businessName ? `Contact: ${tenant.name}` : null, movedOut].filter(Boolean).join(" · ") ||
-          "Your rent, payments and receipts"
+          tenant.businessName || movedOut ? (
+            <JoinedText parts={[tenant.businessName ? `Contact: ${tenant.name}` : null, movedOut]} />
+          ) : (
+            "Your rent, payments and receipts"
+          )
         }
       />
 

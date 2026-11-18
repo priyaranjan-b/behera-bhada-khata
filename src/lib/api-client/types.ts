@@ -214,6 +214,11 @@ export interface ApiQueries {
   confirm: {
     detail(token: string): Promise<ConfirmView>;
   };
+  /** Pages without a session (/tenant/select, a confirm link). */
+  public: {
+    /** How the owner chose to show dates (A36). */
+    displaySettings(): Promise<DisplaySettingsView>;
+  };
 }
 
 /** Writes. Called from Client Components (forms, buttons) over HTTP. */

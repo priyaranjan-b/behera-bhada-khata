@@ -14,3 +14,6 @@ export { default as MonthField } from "./MonthField";
 export { default as QuickPicks, type QuickPick } from "./QuickPicks";
 export { default as CorrectionDialog } from "./CorrectionDialog";
 export { default as PinField } from "./PinField";
+export { default as OptionGroup } from "./OptionGroup";
+export { default as FormattedDate } from "./FormattedDate";
+export { default as JoinedText } from "./JoinedText";

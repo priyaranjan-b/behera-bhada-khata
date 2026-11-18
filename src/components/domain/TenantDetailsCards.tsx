@@ -6,12 +6,11 @@ import { addMonthsToKey, formatMonth, monthKeyOf } from "@/lib/dates";
 import { unitMixLabel } from "@/lib/domain/tenant";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
-import { BadgeRow, DetailList, DetailRow, SectionCard } from "@/components/ui";
+import { BadgeRow, DetailList, DetailRow, FormattedDate, SectionCard } from "@/components/ui";
 import { TagPill } from "@/components/ui/DataDisplay";
 import TextLink from "@/components/ui/TextLink";
 import TenantKindTags from "@/components/domain/TenantKindTags";
 import TenantStatusBadge from "@/components/domain/TenantStatusBadge";
-import FormattedDate from "@/components/ui/FormattedDate";
 
 /**
  * A tenant page's Details tab: who they are, their houses and rents, then

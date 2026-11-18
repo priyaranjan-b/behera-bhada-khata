@@ -38,7 +38,7 @@ import { formatMoney, round2 } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import EditTagsDialog from "@/components/domain/EditTagsDialog";
 import { PAYMENT_STAT_COLUMNS } from "./paymentStatColumns";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 const tagsOf = (row: PaymentListRow) => row.tags;
 /** The database filters on the label the column shows. */
@@ -169,7 +169,7 @@ export default function PaymentsView({
   /** Suggested tag names for the tag editor (Settings). */
   tagSuggestions: string[];
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const { from, to } = range;
   const [editing, setEditing] = useState<PaymentListRow | null>(null);
   const [suggestions, setSuggestions] = useState(tagSuggestions);
@@ -262,7 +262,7 @@ export default function PaymentsView({
         <EditTagsDialog
           key={editing.id}
           title="Payment tags"
-          summary={`${editing.tenantName} · ${formatMoney(editing.amount)} on ${formatDateKey(editing.paymentDate)}${
+          summary={`${editing.tenantName} · ${formatMoney(editing.amount)} on ${formatDate(editing.paymentDate)}${
             editing.receiptNo ? ` · #${editing.receiptNo}` : ""
           }`}
           tags={editing.tags}

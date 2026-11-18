@@ -29,7 +29,7 @@ export default function EditTagsDialog({
 }: {
   title: string;
   /** One line naming the record ("Asha · ₹5,000.00 on 03/02/2026"). */
-  summary: string;
+  summary: React.ReactNode;
   tags: string[];
   suggestions: string[];
   label?: string;

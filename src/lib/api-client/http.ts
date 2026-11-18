@@ -1,6 +1,8 @@
 import { ApiError } from "@/lib/errors";
 import { withQuery } from "@/lib/routes";
 import { apiPaths as p } from "./paths";
+import type { DisplaySettingsView } from "@/lib/contracts";
+import { DEFAULT_DISPLAY_DATE_FORMAT } from "@/lib/types";
 import type { Api } from "./types";
 
 export interface HttpApiOptions {
@@ -35,6 +37,12 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
   }
 
   const get = <T>(path: string) => request<T>("GET", path);
+  /** The date format is cosmetic (A36): if it can't be read, show the default rather than fail the page. */
+  const withDefaultFormat = (read: Promise<DisplaySettingsView>): Promise<DisplaySettingsView> =>
+    read.catch((err: unknown) => {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) throw err;
+      return { dateFormat: DEFAULT_DISPLAY_DATE_FORMAT };
+    });
   const post = <T>(path: string, body?: unknown) => request<T>("POST", path, body ?? {});
   const put = <T>(path: string, body: unknown) => request<T>("PUT", path, body);
   /** JSON as-is, or with files: a multipart form of `payload` (the JSON) + each file under `fileField`. */
@@ -75,7 +83,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       changePassword: (input) => post(p.dashboard.profilePassword, input),
       correctionPin: () => get(p.dashboard.correctionPin),
       setCorrectionPin: (input) => put(p.dashboard.correctionPin, input),
-      displaySettings: () => get(p.dashboard.displaySettings),
+      displaySettings: () => withDefaultFormat(get(p.dashboard.displaySettings)),
       setDisplaySettings: (input) => put(p.dashboard.displaySettings, input),
       paymentNotes: () => get(p.dashboard.paymentNotes),
       createPaymentNote: (input) => post(p.dashboard.paymentNotes, input),
@@ -164,7 +172,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       session: () => get(p.tenant.session),
       tenancies: () => get(p.tenant.select),
       profile: () => get(p.tenant.profile),
-      displaySettings: () => get(p.tenant.displaySettings),
+      displaySettings: () => withDefaultFormat(get(p.tenant.displaySettings)),
       account: () => get(p.tenant.account),
       months: (query = {}) => get(withQuery(p.tenant.months, { ...query })),
       ledger: (query = {}) => get(withQuery(p.tenant.ledger, { ...query })),
@@ -173,6 +181,9 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       verifyOtp: (input) => post(p.tenant.verify, input),
       selectTenancy: (input) => post(p.tenant.select, input),
       signOut: () => post(p.tenant.signOut),
+    },
+    public: {
+      displaySettings: () => withDefaultFormat(get(p.public.displaySettings)),
     },
     confirm: {
       detail: (token) => get(p.confirm.detail(token)),

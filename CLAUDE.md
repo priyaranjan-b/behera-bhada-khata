@@ -540,15 +540,16 @@ Each of these was found broken somewhere; keep them when adding code.
   `monthsBetween`, `addMonthsToKey`), never `.slice(0, 7)` or
   `` `${month}-01` ``.
 - **Every date a user sees is formatted**; never render a raw `yyyy-MM-dd`.
-  The UI shows dates in the owner's display format (A36: Settings → Date
-  format, `app_settings.date_format`, default dd/MMM/yyyy): client
-  components through `useDates()`, server-safe JSX through `<FormattedDate>`,
-  table columns through `dateColumn` (the table applies the format), and the
-  few server pages that build text pass `serverApi.dashboard.displaySettings()`
-  to `formatDateKey(key, format)` - ESLint keeps the bare formatters out of
-  `src/app` and `src/components` otherwise. Services, SQL text (`dateLabel`,
-  `audit_date`), the stored audit text and the PDF receipt keep `DATE_FORMAT`
-  (dd/MM/yyyy, the formatters' default). Every date/month input is the kit's `DateField` /
+  The UI shows and takes dates in the owner's display format (A36: Settings
+  → Date format, `app_settings.date_format`, default dd/MMM/yyyy): client
+  components through `useDates()`, JSX in server components through
+  `<FormattedDate>` (and `JoinedText` for " · "-joined text), table columns
+  through `dateColumn` (the table applies the format), and `DateField`
+  follows it. ESLint keeps the bare formatters out of `src/app` and
+  `src/components` (no exemptions). Services, SQL text (`dateLabel`;
+  `dateSearchText` adds every display form for search), the stored audit
+  text and the PDF receipt keep `DATE_FORMAT` (dd/MM/yyyy, the formatters'
+  default). Every date/month input is the kit's `DateField` /
   `MonthField` (MUI pickers; ESLint bans native `type="date"`/`"month"`). Every number/date
   formatter passes `APP_LOCALE` (no `"en-IN"` literals, no
   `toLocaleString(undefined, …)`, which differs between server and browser).

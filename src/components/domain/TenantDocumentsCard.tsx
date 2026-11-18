@@ -28,7 +28,7 @@ import { formatBytes, prepareProofFile } from "@/lib/proofImages";
 import { DOCUMENT_LIMITS, TENANT_DOCUMENT_TYPES } from "@/lib/validation";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 import Loader from "@/components/ui/Loading/Loader";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /** A file added on the Edit tenant page with its own type; uploaded when the form is saved. */
 export interface PendingDocument {
@@ -56,7 +56,7 @@ export default function TenantDocumentsCard({
   onPendingChange: (pending: PendingDocument[]) => void;
   disabled?: boolean;
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const router = useAppRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState(saved);
@@ -223,7 +223,7 @@ export default function TenantDocumentsCard({
                   {doc.documentType}
                 </Typography>
                 <Typography variant="caption" color="textSecondary" noWrap component="p" title={doc.fileName}>
-                  {doc.fileName} · {formatBytes(doc.sizeBytes)} · {formatDateKey(dateKeyOf(doc.uploadedAt))}
+                  {doc.fileName} · {formatBytes(doc.sizeBytes)} · {formatDate(dateKeyOf(doc.uploadedAt))}
                 </Typography>
               </Box>
               <IconButton

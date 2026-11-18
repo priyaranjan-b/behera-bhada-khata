@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAppRouter } from "@/components/ui/Loading";
 import { ApiError, api, errorMessage } from "@/lib/api-client";
 import type { CorrectionPinView } from "@/lib/contracts";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /** Why corrections can't be saved right now (no PIN, locked), or null. */
 function blockedBy(status: CorrectionPinView | null, formatDateTime: (instant: string) => string): string | null {

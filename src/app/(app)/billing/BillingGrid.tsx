@@ -25,7 +25,7 @@ import { paymentModeLabel } from "@/lib/domain/payments";
 import { statusLabel } from "@/lib/domain/status";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 const displayStatus = (row: BillingRow) =>
   row.paidDirect

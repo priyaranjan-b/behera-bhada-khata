@@ -22,8 +22,8 @@ import {
   PREFERRED_CHANNELS,
   RECORD_TYPES,
   TENANT_KINDS,
-  type TenantKind,
   UNIT_TYPES,
+  type TenantKind,
 } from "@/lib/types";
 
 // Every request body the API accepts, validated by the service that receives

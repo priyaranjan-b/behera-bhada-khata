@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { serverApi } from "@/lib/api-client/server";
 import { routes } from "@/lib/routes";
 import DashboardShell from "@/components/shell/DashboardShell";
-import { DateFormatProvider } from "@/components/ui/DateFormat";
+import { DateFormatProvider } from "@/components/ui/DateFormatProvider";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // The proxy already redirects signed-out visitors; this is the authoritative

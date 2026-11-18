@@ -123,6 +123,8 @@ export const RATE_LIMITS = {
   // Counted only for codes actually sent to a tenant, so junk requests can't use it up for everyone.
   tenantOtpPerDay: { limit: 200, windowSeconds: DAY },
   tenantVerifyPerPhone: { limit: 5, windowSeconds: HOUR },
+  // Public reads with nothing to guess (the date format, A36): only a runaway client hits it.
+  publicReadPerIp: { limit: 120, windowSeconds: MINUTE },
   // About 10 guesses a day at one number, and the real tenant locked out at most until tomorrow.
   tenantVerifyPerPhoneDay: { limit: 10, windowSeconds: DAY },
   tenantVerifyPerIp: { limit: 30, windowSeconds: HOUR },

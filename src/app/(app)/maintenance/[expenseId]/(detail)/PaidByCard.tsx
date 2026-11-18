@@ -18,7 +18,7 @@ export default function PaidByCard({
   suggestions,
 }: {
   expenseId: string;
-  summary: string;
+  summary: React.ReactNode;
   tags: string[];
   suggestions: string[];
 }) {

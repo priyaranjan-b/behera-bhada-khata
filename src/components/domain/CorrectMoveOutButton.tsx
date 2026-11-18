@@ -11,7 +11,7 @@ import { api } from "@/lib/api-client";
 import { addDaysToKey, addMonthsToKey, currentMonthKey, formatMonth, formatMonthRange, monthKeyOf, monthsBetween } from "@/lib/dates";
 import { routes } from "@/lib/routes";
 import { useCorrectionSubmit } from "./useCorrectionSubmit";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 const months = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
 
@@ -65,7 +65,7 @@ export default function CorrectMoveOutButton({
   /** earliestMoveOutDate: the last house taken, or billing start. */
   earliest: string | null;
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(movedOutOn);
@@ -123,7 +123,7 @@ export default function CorrectMoveOutButton({
             <>
               <DetailList dividers>
                 <DetailRow label="Last day in the house">
-                  {formatDateKey(movedOutOn)} → {formatDateKey(date)}
+                  {formatDate(movedOutOn)} → {formatDate(date)}
                 </DetailRow>
               </DetailList>
               <Alert severity={note.severity}>{note.text}</Alert>
@@ -132,7 +132,7 @@ export default function CorrectMoveOutButton({
         }
       >
         <Typography variant="body2" color="textSecondary">
-          The last day in the house, now {formatDateKey(movedOutOn)}. Rent is billed up to and including its month,
+          The last day in the house, now {formatDate(movedOutOn)}. Rent is billed up to and including its month,
           and the houses are free from the day after. Payments already recorded stay on the months they were applied
           to.
         </Typography>

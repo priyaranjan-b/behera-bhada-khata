@@ -371,13 +371,13 @@ export interface OwnerRepositories {
     historyPage(filter: AuditHistoryFilter): Promise<AuditHistoryPage>;
     log(event: AuditEvent): Promise<void>;
   };
-  /** The owner's name (0013): one row. */
   /** Rent-book-wide preferences (0040, D42): so far how the UI shows dates. */
   appSettings: {
     /** The default until the owner picks one. */
     getDateFormat(): Promise<DisplayDateFormat>;
     setDateFormat(dateFormat: DisplayDateFormat): Promise<void>;
   };
+  /** The owner's name (0013): one row. */
   ownerProfile: {
     get(): Promise<OwnerProfile | null>;
     /** Creates or replaces the row. */
@@ -670,6 +670,8 @@ export interface AfterResponse {
 // the tenant confirm link (possession of the token), rent-period upkeep, rate limits and cron. ----
 
 export interface SystemRepositories {
+  /** For the pages without a session (/tenant/select, /confirm): the date format only. */
+  appSettings: Pick<OwnerRepositories["appSettings"], "getDateFormat">;
   audit: {
     /** Logs an event for someone without an owner session (the tenant, a failed sign-in) or the system. */
     log(event: AuditEvent & { actorKind: AuditActorKind; actorId?: string | null }): Promise<void>;

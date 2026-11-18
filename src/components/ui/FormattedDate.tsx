@@ -1,6 +1,6 @@
 "use client";
 
-import { useDates } from "./DateFormat";
+import { useDates } from "./useDates";
 
 /**
  * A date in the owner's display format (A36), for JSX in a server-safe

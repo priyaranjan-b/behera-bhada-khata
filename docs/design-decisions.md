@@ -1386,34 +1386,45 @@ using the app itself with the session).
 
 **Context.** Every date was written `dd/MM/yyyy` (18/11/2026). The owner
 wanted dd/MMM/yyyy (18/Nov/2026) by default, changeable, and saved in the
-database - but only for what the UI shows: services, the database and the
-PDF receipt keep `dd/MM/yyyy`.
+database - but only for what the UI shows and takes: services, the database
+and the PDF receipt keep `dd/MM/yyyy`.
 
 **Decision.**
 - **Stored once for the rent book:** `app_settings.date_format` (0040, D42),
   one of `DISPLAY_DATE_FORMATS` (`DD/MMM/YYYY` default, `DD/MM/YYYY`,
-  `DD MMM YYYY`, `YYYY-MM-DD`), set on Settings ("Date format" card). The
-  tenant portal reads it too.
+  `DD MMM YYYY`, `YYYY-MM-DD`), set on Settings ("Date format" card, which
+  confirms with a flash). The tenant portal reads it too (the column only,
+  0041), and the pages without a session (`/tenant/select`, a confirm
+  link) through a public read (`systemDb`; the format isn't sensitive;
+  `GET /api/public/display-settings`, rate limited per client over HTTP).
 - **The UI applies it; nothing else does.** `formatDateKey` /
   `formatDateTime` / `formatDayRange` take an optional format defaulting to
-  `DATE_FORMAT` (dd/MM/yyyy), which services, SQL labels (`dateLabel`), the
-  audit text (`audit_date`, stored when written, D27) and receipts keep. The
-  layouts read the setting (`serverApi.dashboard.displaySettings()`, cached
-  per request) into `DateFormatProvider`, so the first render is already
-  right; client components use `useDates()`, server-safe JSX
-  `<FormattedDate>`, tables `dateColumn` (DataTable formats those columns,
-  so columns stay module constants), and the three server pages that build
-  text pass the format explicitly. An ESLint rule keeps the bare formatters
-  out of `src/app` / `src/components` elsewhere.
+  `DATE_FORMAT` (dd/MM/yyyy), which services, the SQL labels, the audit
+  text (`audit_date`, stored when written, D27) and receipts keep. The
+  layouts read the setting once per request (`cache()` loaders) into
+  `DateFormatProvider`, so the first render is already right. A failed read
+  logs one line and falls back to the default instead of taking the page
+  down (only a sign-in refusal, 401/403, passes on) - in-process and over
+  HTTP alike.
+- **How components show a date:** client components `useDates()`, JSX in
+  server components `<FormattedDate>` (text joined with `JoinedText`),
+  tables `dateColumn` (DataTable formats those columns; a column's own
+  `valueFormatter` wins). An ESLint rule keeps the bare formatters out of
+  `src/app` / `src/components` except `useDates.ts` and the table helper -
+  no page is exempt.
+- **Inputs follow it too:** `DateField` shows and takes the chosen format
+  (with dd/MMM/yyyy the month is typed as letters or picked).
+- **Searching and filtering by date match every form** (Payments, Ledger,
+  Maintenance): the search text holds the date in each display format
+  (`dateSearchText`) and the Date column filter matches any of them
+  (`dateFilterField`), so "Nov", "18/Nov/2026" and "18/11/2026" all find
+  it.
 - **Month names are fixed English** (Jan…Dec), so server and browser print
   the same text whatever the locale.
 
-**Accepted consequences:** typing a date stays `dd/MM/yyyy` (the
-`DateField` input format, quick on a phone keypad); searching a server-paged
-table by date matches the database's `dd/MM/yyyy` text, not month names;
-Change history details written before or after keep `dd/MM/yyyy` (stored
-text); messages a service builds (a lockout time) stay `dd/MM/yyyy`;
-`/tenant/select`, outside the portal layout, shows the default format.
+**Accepted consequences:** Billing's receipt list (a filter field) and the
+Activity / Change history text match `dd/MM/yyyy` (stored text, D27);
+messages a service builds (a lockout time) stay `dd/MM/yyyy`.
 
 **Rejected:** a per-browser cookie (the owner wanted it saved in the
 database); a module-wide "current format" set per request (shared mutable

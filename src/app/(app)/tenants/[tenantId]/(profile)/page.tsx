@@ -6,10 +6,9 @@ import Alert from "@mui/material/Alert";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { serverApi } from "@/lib/api-client/server";
-import { formatDateKey } from "@/lib/dates";
 import FlashAlert from "@/components/ui/FlashAlert";
 import { PageHeader } from "@/components/ui/DataDisplay";
-import { ActionStack } from "@/components/ui";
+import { ActionStack, FormattedDate, JoinedText } from "@/components/ui";
 import MoveOutButton from "@/components/domain/MoveOutButton";
 import AsyncSection from "@/components/ui/AsyncSection";
 import CorrectMoveOutButton from "@/components/domain/CorrectMoveOutButton";
@@ -50,10 +49,7 @@ export default async function TenantPage({
   // A Server Component renders once per request, so this is meant to differ every time.
   // eslint-disable-next-line react-hooks/purity -- a per-render token, not data
   const version = Date.now();
-  const [{ tenant }, { dateFormat }] = await Promise.all([
-    serverApi.dashboard.tenants.detail(tenantId),
-    serverApi.dashboard.displaySettings(),
-  ]);
+  const { tenant } = await serverApi.dashboard.tenants.detail(tenantId);
   const active = tenant.status === "active";
   const draft = tenant.status === "draft";
   // Government rent paid to the owner directly (0016): no months, no dues, no payments.
@@ -130,12 +126,18 @@ export default async function TenantPage({
       <PageHeader
         title={tenant.displayName}
         subtitle={
-          [
-            tenant.businessName ? `Contact: ${tenant.name}` : null,
-            draft ? "Draft - details missing" : active ? null : `Moved out ${tenant.movedOutOn ? formatDateKey(tenant.movedOutOn, dateFormat) : ""}`,
-          ]
-            .filter(Boolean)
-            .join(" · ") || undefined
+          tenant.businessName || !active ? (
+            <JoinedText
+              parts={[
+                tenant.businessName ? `Contact: ${tenant.name}` : null,
+                draft ? (
+                  "Draft - details missing"
+                ) : active ? null : (
+                  <>Moved out {tenant.movedOutOn ? <FormattedDate date={tenant.movedOutOn} /> : null}</>
+                ),
+              ]}
+            />
+          ) : undefined
         }
         action={
           <ActionStack phone="primaryOnTop">

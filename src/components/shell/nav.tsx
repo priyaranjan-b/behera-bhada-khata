@@ -41,7 +41,7 @@ export const NAV_ITEMS: { tab: AppTab; href: string; label: string; icon: React.
   { tab: "earnings", href: routes.earnings(), label: "Earnings", icon: <TrendingUpRoundedIcon /> },
   { tab: "defaulters", href: routes.defaulters, label: "Defaulters", icon: <PendingActionsRoundedIcon /> },
   { tab: "activity", href: routes.activity, label: "Activity", icon: <HistoryRoundedIcon /> },
-  { tab: "settings", href: routes.settings, label: "Settings", icon: <SettingsRoundedIcon /> },
+  { tab: "settings", href: routes.settings(), label: "Settings", icon: <SettingsRoundedIcon /> },
 ];
 
 /** Shortcuts under the main menu: start a form without first opening a tower. */

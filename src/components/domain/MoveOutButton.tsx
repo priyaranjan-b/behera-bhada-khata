@@ -18,7 +18,7 @@ import { moveOutNeedsPin, moveOutPinFrom } from "@/lib/domain/corrections";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import { useCorrectionSubmit } from "./useCorrectionSubmit";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /**
  * Ends all of a tenant's houses on a date. Their ledger stays: dues up to the
@@ -43,7 +43,7 @@ export default function MoveOutButton({
   draft?: boolean;
   disabled?: boolean;
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
@@ -119,7 +119,7 @@ export default function MoveOutButton({
             <DateField label="Last day in the house" value={date} onChange={setDate} required fullWidth />
             {needsPin ? (
               <Alert severity="info">
-                Before {formatDateKey(moveOutPinFrom())}, so months that have ended are removed: you&apos;ll review it and
+                Before {formatDate(moveOutPinFrom())}, so months that have ended are removed: you&apos;ll review it and
                 confirm with your corrections PIN.
               </Alert>
             ) : null}
@@ -152,7 +152,7 @@ export default function MoveOutButton({
           date && firstRemoved ? (
             <>
               <DetailList dividers>
-                <DetailRow label="Last day in the house">{formatDateKey(date)}</DetailRow>
+                <DetailRow label="Last day in the house">{formatDate(date)}</DetailRow>
                 <DetailRow label="Billed up to">{formatMonth(monthKeyOf(date))}</DetailRow>
               </DetailList>
               {firstRemoved <= lastRemoved ? (

@@ -16,7 +16,7 @@ export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
   maintenance: "Maintenance",
   documents: "Documents",
   messages: "Messages",
-  access: "Sign-ins & profile",
+  access: "Sign-ins, profile & settings",
 };
 
 const ACTIONS: Record<AuditAction, { label: string; category: AuditCategory }> = {

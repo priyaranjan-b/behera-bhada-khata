@@ -1,7 +1,7 @@
 "use client";
 
 import { StatusBadge } from "@/components/ui/DataDisplay";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 import { TENANT_STATUS_DISPLAY } from "@/lib/domain/tenant";
 import type { TenantStatus } from "@/lib/types";
 

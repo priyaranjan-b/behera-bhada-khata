@@ -40,7 +40,7 @@ import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
 import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatColumns";
 import StatCardRow from "@/components/ui/StatCardRow";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 const tagsOf = (row: MaintenanceListRow) => row.tags;
 /** The database filters on the labels the columns show. */
@@ -171,7 +171,7 @@ export default function MaintenanceView({
   rangeLabel: string;
   tagSuggestions: string[];
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const { from, to } = range;
   const [editing, setEditing] = useState<MaintenanceListRow | null>(null);
   const [suggestions, setSuggestions] = useState(tagSuggestions);
@@ -287,7 +287,7 @@ export default function MaintenanceView({
         <EditTagsDialog
           key={editing.id}
           title="Paid by"
-          summary={`${editing.description} · ${formatMoney(editing.amount)} on ${formatDateKey(editing.expenseDate)}`}
+          summary={`${editing.description} · ${formatMoney(editing.amount)} on ${formatDate(editing.expenseDate)}`}
           tags={editing.tags}
           suggestions={suggestions}
           label="Paid by"

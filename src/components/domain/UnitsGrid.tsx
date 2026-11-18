@@ -20,7 +20,7 @@ import type { UnitRow } from "@/lib/contracts";
 import { HOUSE_FILTERS, matchesHouseFilter, tenantRentGap, type HouseFilter } from "@/lib/domain/houses";
 import { formatMoney } from "@/lib/money";
 import { routes } from "@/lib/routes";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /**
  * A let house whose tenant's houses' rents (D39) don't add up to what the
@@ -32,7 +32,7 @@ function rentDiffers(row: UnitRow): boolean {
 }
 
 function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () => void }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   return (
     <Dialog open={unit !== null} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{unit ? `History of ${unit.unitCode}` : ""}</DialogTitle>
@@ -48,7 +48,7 @@ function HistoryDialog({ unit, onClose }: { unit: UnitRow | null; onClose: () =>
                   {[...unit.history].reverse().map((h) => (
                     <DetailRow
                       key={`${h.tenantId}-${h.startDate}`}
-                      label={`${formatDateKey(h.startDate)} → ${h.endDate ? formatDateKey(h.endDate) : "now"}`}
+                      label={`${formatDate(h.startDate)} → ${h.endDate ? formatDate(h.endDate) : "now"}`}
                     >
                       <MuiLink component={Link} href={routes.tenants.detail(h.tenantId)}>
                         {h.tenantName}

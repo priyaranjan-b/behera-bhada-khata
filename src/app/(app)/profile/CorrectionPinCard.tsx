@@ -12,7 +12,7 @@ import { ApiError, api, errorMessage } from "@/lib/api-client";
 import type { CorrectionPinView } from "@/lib/contracts";
 import { routes } from "@/lib/routes";
 import { CORRECTION_LIMITS } from "@/lib/validation";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 const SETUP_SCRIPT = "supabase/scripts/open_correction_pin_setup.sql";
 
@@ -72,8 +72,9 @@ export default function CorrectionPinCard({ status }: { status: CorrectionPinVie
         : null;
 
   return (
-    <Box component="form" onSubmit={handleSubmit}>
+    <Box component="form" onSubmit={handleSubmit} sx={{ height: "100%" }}>
       <SectionCard
+        fill
         title="Corrections PIN"
         caption={`A ${CORRECTION_LIMITS.pinLength}-digit PIN that confirms every change to past records: Correct rent, "paid up to" and move-out date, Adjust on a payment, Stop tracking, and a move-out dated before last month.`}
         icon={<PinRoundedIcon />}

@@ -114,6 +114,14 @@ describe("maintenancePage", () => {
     expect(plumber.rows.map((r) => r.id)).toEqual([ids.tap]);
     expect(plumber.totals.amount).toBe(1000);
     expect((await page({ search: "property tax" })).rows.map((r) => r.id)).toEqual([ids.tax]);
+    // A date in any display format the owner can pick (A36), as search or as the Date column's filter.
+    // (Search splits on spaces, so "20 Mar 2026" is three words; the column filter takes it whole.)
+    for (const search of ["20/Mar/2026", "2026-03-20", "20/03/2026"]) {
+      expect((await page({ search })).rows.map((r) => r.id)).toEqual([ids.tax]);
+    }
+    expect((await page({ filters: [{ field: "date", operator: "equals", value: "20/Mar/2026" }] })).rows.map((r) => r.id)).toEqual([
+      ids.tax,
+    ]);
   });
 
   it("filters tags name by name, category and status by label", async () => {

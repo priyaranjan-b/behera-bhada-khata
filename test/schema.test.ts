@@ -3370,6 +3370,37 @@ describe("app settings: the date format (0040, D42)", () => {
     expect(await asTenant(`select date_format from app_settings`)).toEqual([{ date_format: "DD MMM YYYY" }]);
     expect(await errorCode(asTenant(`update app_settings set date_format = 'DD/MM/YYYY'`))).toBe("42501");
   });
+
+  it("lets tenants read the date format column only (0041), and its rollbacks undo it", async () => {
+    await db.exec(`delete from app_settings`);
+    await save(owner(OWNER_A), "DD/MM/YYYY");
+    const asTenant = async (sql: string) => {
+      await db.query(`select set_config('app.tenant_id', $1, false)`, [fx.tenantA]);
+      await db.exec(`set role tenant_reader`);
+      try {
+        return (await db.query(sql)).rows;
+      } finally {
+        await db.exec("reset role");
+      }
+    };
+    expect(await asTenant(`select date_format from app_settings`)).toEqual([{ date_format: "DD/MM/YYYY" }]);
+    expect(await errorCode(asTenant(`select updated_at from app_settings`))).toBe("42501");
+    expect(await errorCode(asTenant(`select * from app_settings`))).toBe("42501");
+
+    const fresh = await createMigratedDb();
+    try {
+      // Safe to run again.
+      await fresh.exec(readFileSync(path.join(MIGRATIONS, "0041_app_settings_hardening.sql"), "utf8"));
+      const rollback = (name: string) => readFileSync(path.resolve(__dirname, "../supabase/rollback", name), "utf8");
+      await fresh.exec(rollback("0041_app_settings_hardening.sql"));
+      const whole = await fresh.query<{ ok: boolean }>(`select has_table_privilege('tenant_reader', 'app_settings', 'select') as ok`);
+      expect(whole.rows).toEqual([{ ok: true }]);
+      await fresh.exec(rollback("0040_app_settings.sql"));
+      expect((await fresh.query<{ t: string | null }>(`select to_regclass('public.app_settings')::text as t`)).rows).toEqual([{ t: null }]);
+    } finally {
+      await fresh.close();
+    }
+  });
 });
 
 describe("house rents (0036, D39)", () => {

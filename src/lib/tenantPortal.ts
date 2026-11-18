@@ -9,7 +9,17 @@
 export const TENANT_COOKIE = { secure: "__Host-bbk_tenant", insecure: "bbk_tenant" } as const;
 
 /** Pages and API paths a browser holding a tenant session (and no owner session) may open. */
-const TENANT_ALLOWED_PREFIXES = ["/tenant", "/api/tenant/", "/confirm/", "/api/confirm/", "/login", "/auth/", "/api/auth/"] as const;
+const TENANT_ALLOWED_PREFIXES = [
+  "/tenant",
+  "/api/tenant/",
+  "/confirm/",
+  "/api/confirm/",
+  "/login",
+  "/auth/",
+  "/api/auth/",
+  // Public reads anyone may make (the date format, A36).
+  "/api/public/",
+] as const;
 
 /** May a tenant-only browser open `pathname`? Anything else is the owner's (the proxy turns it away). */
 export function isTenantAllowedPath(pathname: string): boolean {

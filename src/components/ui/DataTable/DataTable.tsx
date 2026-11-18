@@ -18,7 +18,7 @@ import DataTablePagination from "./DataTablePagination";
 import DataTableNoResults from "./DataTableNoResults";
 import DataTableFilterPanel from "./DataTableFilterPanel";
 import { withDateFormat, type DataTableColDef } from "./columns";
-import { useDateFormat } from "../DateFormat";
+import { useDateFormat } from "../useDates";
 import { fitsOnePage } from "./pagination";
 import { dataTableSx, HEADER_HEIGHT, ROW_HEIGHT } from "./styles";
 

@@ -7,7 +7,7 @@ import type { DbPage, TenantLedgerFilter } from "@/server/ports";
 import { round2 } from "@/lib/money";
 import { executeRows, type Tx } from "../client";
 import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type GridTable } from "../grid";
-import { dateLabel, labelOf, monthLabel, paymentTagsOf } from "./text";
+import { dateLabel, dateFilterField, dateSearchText, labelOf, monthLabel, paymentTagsOf } from "./text";
 
 // Replaces tenant_ledger_page() (0020, A15, D28) and its tenant_ledger_rows
 // / tenant_ledger_matching (all dropped in 0029, D33): a tenant's rent charges, payments and
@@ -94,11 +94,11 @@ const LEDGER_TABLE: GridTable<TenantLedgerFilter["sort"], TenantLedgerFilter["fi
     balance: sql`r.balance`,
   },
   fields: {
-    date: sql`r.date_label`,
+    date: dateFilterField(sql`r.date`),
     description: sql`r.description || ${NL} || r.caption`,
     status: sql`r.status_label`,
   },
-  searchText: sql`concat_ws(${NL}, r.date_label, r.description, r.caption, r.status_label, r.tags_text)`,
+  searchText: sql`concat_ws(${NL}, ${dateSearchText(sql`r.date`)}, r.description, r.caption, r.status_label, r.tags_text)`,
   tieBreak: [sql`r.ord desc`],
 };
 

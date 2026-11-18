@@ -15,6 +15,8 @@ export const FLASH = {
   movedOut: "movedOut",
   /** A moved-out tenant's move-out date was corrected (D40). */
   moveOutCorrected: "moveOutCorrected",
+  /** The date format was saved on Settings (A36). */
+  dateFormatSaved: "dateFormatSaved",
   /** A PIN-confirmed correction was saved (0039): rent, "paid up to", stop tracking. */
   corrected: "corrected",
   /** The corrections PIN was set or changed (0039). */
@@ -75,7 +77,7 @@ export const routes = {
   earnings: (query?: { from?: string; to?: string; paidDirect?: "show" }) => withQuery("/earnings", query),
   profile: (flash?: Flash) => withQuery("/profile", flash),
   /** The rent book's shared lists: payment tags, quick notes (A25). */
-  settings: "/settings",
+  settings: (flash?: Flash) => withQuery("/settings", flash),
   login: (query?: { error?: LoginError; next?: string }) => withQuery("/login", query),
   /** The tenant portal (A32): a tenant's own account, read-only, behind a phone sign-in. No id: the session says whose. */
   tenantPortal: {

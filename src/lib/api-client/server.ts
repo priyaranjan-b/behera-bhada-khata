@@ -35,7 +35,7 @@ import { listPaymentNotePresets } from "@/server/services/paymentNotes";
 import { getPaymentTagSuggestions, listPaymentTags } from "@/server/services/paymentTags";
 import { getOwnerProfile } from "@/server/services/profile";
 import { getCorrectionPin } from "@/server/services/corrections";
-import { getDisplaySettings, getMyDisplaySettings } from "@/server/services/displaySettings";
+import { getDisplaySettings, getMyDisplaySettings, getPublicDisplaySettings } from "@/server/services/displaySettings";
 import { getPaymentsPage, getPaymentsPaidDirect } from "@/server/services/paymentsReport";
 import { getSearchIndex } from "@/server/services/search";
 import {
@@ -146,6 +146,9 @@ const inProcessApi: ApiQueries = {
   },
   confirm: {
     detail: (token) => getConfirmView(token),
+  },
+  public: {
+    displaySettings: () => getPublicDisplaySettings(),
   },
 };
 

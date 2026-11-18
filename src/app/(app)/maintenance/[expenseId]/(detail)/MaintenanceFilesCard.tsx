@@ -21,14 +21,14 @@ import type { MaintenanceFileView } from "@/lib/contracts";
 import { dateKeyOf } from "@/lib/dates";
 import { formatBytes, prepareProofFile } from "@/lib/proofImages";
 import { MAINTENANCE_FILE_LIMITS } from "@/lib/validation";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /**
  * An expense's receipts, bills and photos (0031): open, delete (after a
  * confirmation), or add more - photos are compressed in the browser first.
  */
 export default function MaintenanceFilesCard({ expenseId, files: saved }: { expenseId: string; files: MaintenanceFileView[] }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const router = useAppRouter();
   const [files, setFiles] = useState(saved);
   const [adding, setAdding] = useState<File[]>([]);
@@ -85,7 +85,7 @@ export default function MaintenanceFilesCard({ expenseId, files: saved }: { expe
                     {f.fileName}
                   </Typography>
                   <Typography variant="caption" color="textSecondary" component="p">
-                    {formatBytes(f.sizeBytes)} · {formatDateKey(dateKeyOf(f.uploadedAt))}
+                    {formatBytes(f.sizeBytes)} · {formatDate(dateKeyOf(f.uploadedAt))}
                   </Typography>
                 </Box>
                 <IconButton

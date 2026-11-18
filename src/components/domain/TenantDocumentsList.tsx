@@ -6,10 +6,9 @@ import FolderOpenRoundedIcon from "@mui/icons-material/FolderOpenRounded";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import { EmptyState } from "@/components/ui/DataDisplay";
-import { SectionCard } from "@/components/ui";
+import { FormattedDate, SectionCard } from "@/components/ui";
 import { apiHref, apiPaths } from "@/lib/api-client";
 import type { TenantDocumentView } from "@/lib/contracts";
-import FormattedDate from "@/components/ui/FormattedDate";
 
 /**
  * The tenant portal's Documents tab (A32): the files the owner keeps on the

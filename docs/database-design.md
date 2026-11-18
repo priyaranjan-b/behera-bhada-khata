@@ -72,6 +72,7 @@ audit_log            every change to the tables above + app events (D25; append-
 | `0038_correct_move_out_fixes.sql` | `correct_move_out()` revised: future dates allowed (as move-out), not before billing start, months and neighbouring tenancies locked before checking (D40) |
 | `0039_correction_pin.sql` | the corrections PIN: `correction_guard`, `correction_tickets`, `set_correction_pin()`, `verify_correction_pin()`, `correction_pin_status()`, `log_correction_event()`; `correct_paid_through`, `correct_rent`, `correct_move_out`, `create_adjustment`, `stop_rent_tracking` and a backdated `move_out_tenant` need its ticket in the same transaction, `update_tenant` refuses a past-month rent, the originals moved to `private.*_unchecked` (D41, A35). Undo: `supabase/rollback/0039_correction_pin.sql` |
 | `0040_app_settings.sql` | `app_settings` (one row): `date_format`, how the UI shows dates (A36); owner reads and writes, `tenant_reader` reads; audited as `settings.*` (D42) |
+| `0041_app_settings_hardening.sql` | `tenant_reader` reads `app_settings.date_format` only (a column grant), so a column added later stays hidden from tenants (D42) |
 
 Seeds, in order:
 - `supabase/seed/arnapal_master_data.sql`: claims ownership and loads 2 sites, 7 towers and 40 houses. This is master data only.
@@ -1251,8 +1252,13 @@ changed from that session, so it can't be the check (A35).
   (`src/lib/types.ts`), enforced by a `check`; default `DD/MMM/YYYY`. No row
   means the default (`getDateFormat`); the Settings card upserts it.
 - RLS: the owner selects, inserts and updates (`is_app_owner()`);
-  `tenant_reader` selects (the portal shows dates the same way); no delete.
-  Explicit grants (D11).
+  `tenant_reader` selects the `date_format` column only (0041: a column
+  grant, so a new column stays hidden from tenants unless granted); the
+  service role selects (the public pages); no delete. Explicit grants (D11).
+- Undo: `supabase/rollback/0041_app_settings_hardening.sql`, then
+  `supabase/rollback/0040_app_settings.sql` (drops the table;
+  `audit_action_label` / `audit_describe` keep their harmless settings
+  lines). 0040 is otherwise additive.
 - Audited (`audit_row_change('settings')`): `settings.created` /
   `settings.updated`, "Date format: … → …".
 - **Only the UI uses it** (A36): no SQL function, service text, stored audit

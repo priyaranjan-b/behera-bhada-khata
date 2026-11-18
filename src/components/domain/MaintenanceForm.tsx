@@ -23,7 +23,7 @@ import { prepareProofFile } from "@/lib/proofImages";
 import { FLASH, routes } from "@/lib/routes";
 import type { MaintenanceCategory } from "@/lib/types";
 import { MAINTENANCE_FILE_LIMITS, MAINTENANCE_LIMITS } from "@/lib/validation";
-import { useDates } from "@/components/ui/DateFormat";
+import { useDates } from "@/components/ui/useDates";
 
 /**
  * Records a maintenance expense (0031, D35) on one or more houses, split
@@ -45,7 +45,7 @@ export default function MaintenanceForm({
   /** A new expense started from a set-off payment (A22). */
   prefill?: MaintenancePrefill;
 }) {
-  const { formatDate: formatDateKey } = useDates();
+  const { formatDate } = useDates();
   const router = useAppRouter();
   // An edited expense may cover a house since retired: keep it choosable.
   const options = useMemo(() => {
@@ -242,7 +242,7 @@ export default function MaintenanceForm({
             error={error}
             cancelHref={expense ? routes.maintenance.detail(expense.id) : routes.maintenance.list()}
             submitLabel={
-              expense ? "Save changes" : expenseDate ? `Save expense · ${formatDateKey(expenseDate)}` : "Save expense"
+              expense ? "Save changes" : expenseDate ? `Save expense · ${formatDate(expenseDate)}` : "Save expense"
             }
             pendingLabel="Saving…"
             pending={submitting}
