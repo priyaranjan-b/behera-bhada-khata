@@ -8,16 +8,22 @@ import type { Theme } from "@mui/material/styles";
  * phones. `touchSize` is its size on touch screens, if larger.
  */
 export function embeddedIconButton(theme: Theme, size: number, touchSize?: number) {
+  const plain = {
+    border: 0,
+    backgroundColor: "transparent",
+    "&:hover, &:active": { backgroundColor: (theme.vars || theme).palette.action.hover },
+  };
   return {
     width: size,
     height: size,
     minWidth: 0,
     minHeight: 0,
     padding: 4,
-    border: 0,
-    backgroundColor: "transparent",
     color: (theme.vars || theme).palette.text.secondary,
-    "&:hover, &:active": { backgroundColor: (theme.vars || theme).palette.action.hover },
+    ...plain,
+    // The template's dark fill sits under the colour-scheme selector, which
+    // outranks a plain rule, so the plain look is repeated under it too.
+    ...theme.applyStyles("dark", plain),
     ...(touchSize ? { "@media (pointer: coarse)": { width: touchSize, height: touchSize } } : {}),
   };
 }
