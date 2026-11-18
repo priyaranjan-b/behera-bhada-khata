@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRecordPayment,
   canUseTenantPortal,
   formatFloor,
   formatUnits,
@@ -46,6 +47,13 @@ describe("government tenants (0016)", () => {
     expect(isRentTracked({ status: "active", rentTracked: false })).toBe(false);
     expect(isRentTracked({ status: "draft", rentTracked: true })).toBe(false);
     expect(isRentTracked({ status: "inactive", rentTracked: true })).toBe(false);
+  });
+
+  it("offers Record payment to all but drafts and untracked Govt tenants, moved-out ones included", () => {
+    expect(canRecordPayment({ status: "active", rentTracked: true })).toBe(true);
+    expect(canRecordPayment({ status: "inactive", rentTracked: true })).toBe(true);
+    expect(canRecordPayment({ status: "draft", rentTracked: true })).toBe(false);
+    expect(canRecordPayment({ status: "active", rentTracked: false })).toBe(false);
   });
 
   it("tags every tenant with its type, and says when the rent is paid direct", () => {

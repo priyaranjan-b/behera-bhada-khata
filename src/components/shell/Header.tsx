@@ -3,6 +3,7 @@
 import Box from "@mui/material/Box";
 import useScrollTrigger from "@mui/material/useScrollTrigger";
 import ColorModeIconDropdown from "@/theme/ColorModeIconDropdown";
+import { chromeSx } from "@/components/ui/chromeSx";
 import { Search } from "./Search";
 import { TOPBAR_HEIGHT } from "./nav";
 import { topBarGlassSx } from "./surface";
@@ -26,6 +27,7 @@ export function Header() {
           alignItems: "center",
           position: "sticky",
           top: 0,
+          ...chromeSx("app-header"),
           zIndex: (theme) => theme.zIndex.appBar,
           height: TOPBAR_HEIGHT + 1,
           px: 3,

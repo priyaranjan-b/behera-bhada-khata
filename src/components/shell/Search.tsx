@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
 import { Loader, useAppRouter } from "@/components/ui/Loading";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
@@ -14,8 +13,7 @@ import type { Theme } from "@mui/material/styles";
 import HomeWorkOutlinedIcon from "@mui/icons-material/HomeWorkOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutlineOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { api } from "@/lib/api-client";
-import type { SearchIndex } from "@/lib/contracts";
+import { useSearchIndex } from "@/components/domain/useSearchIndex";
 import { searchSuggestions, type SearchSuggestion } from "@/lib/domain/search";
 import { brand, gray } from "@/theme/themePrimitives";
 import { slate } from "@/theme/appTokens";
@@ -137,33 +135,18 @@ export function Search({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [showShortcut]);
-  const pathname = usePathname();
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
-  const [index, setIndex] = useState<{ data: SearchIndex; path: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const { index, loading, failed, load } = useSearchIndex();
 
-  async function load() {
-    if (loading || index?.path === pathname) return;
-    setLoading(true);
-    setFailed(false);
-    try {
-      setIndex({ data: await api.dashboard.search(), path: pathname });
-    } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const options = useMemo(() => (index ? searchSuggestions(index.data, query) : []), [index, query]);
+  const options = useMemo(() => (index ? searchSuggestions(index, query) : []), [index, query]);
 
   function choose(option: SearchSuggestion | null) {
     if (!option) return;
     setQuery("");
     (document.activeElement as HTMLElement | null)?.blur();
-    router.push(option.href);
+    // Into a record: slides in on phones (A37).
+    router.push(option.href, { transitionTypes: ["nav-forward"] });
     onNavigate?.();
   }
 

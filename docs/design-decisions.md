@@ -1287,6 +1287,9 @@ what banking and UPI apps use, so it reads at once and sits under the thumb.
 - Pages end above the bar (`BOTTOM_NAV_CLEARANCE`, home-bar inset included),
   so it never covers a table's last row or pager. Its look is the theme's
   (`MuiBottomNavigationAction` in `customizations/app.ts`).
+- **Breadcrumbs are desktop only** (`md` and up, hidden in CSS by
+  `AppBreadcrumbs`): on phones the bar, the top bar's ← (A37) and the
+  system Back are the navigation, and the page starts right under the top bar.
 
 **Rejected:** a bottom bar per page's sections on owner pages too (it would
 fight the main menu for the same place), and keeping the select (it hides
@@ -1430,3 +1433,58 @@ messages a service builds (a lockout time) stay `dd/MM/yyyy`.
 database); a module-wide "current format" set per request (shared mutable
 state on the server); changing `DATE_FORMAT` itself (would change receipts,
 SQL text and stored audit text).
+
+### A37 — The phone app feels like an Android app
+
+**Context.** The owner uses the installed app (A21) on an Android phone.
+It already had a bottom bar (A33), but still read as a website: breadcrumbs,
+a brand logo on every screen, a blue flash on tap, pages swapping with no
+motion, and Record payment buried two screens deep.
+
+**Decision.** On phones (below `md`):
+- **Top bar like an app bar.** A page under another page (three or more
+  crumbs from `crumbsForPath`: a tenant, a form, an expense) shows ← and its
+  title instead of the brand. ← links to the parent page (not
+  `history.back()`, so it is the same wherever you came from); the system
+  Back gesture still walks history. Menu pages keep the brand. A page whose
+  URL parent isn't where it's opened from names its own with
+  `PhoneBackTarget` (`BackTargetProvider` in `AppLayout`): Adjust payment
+  goes back to the tenant's Ledger, not to the Payments report.
+- **Record payment as a floating button** (`RecordPaymentFab`, kit
+  `FloatingActionButton`, MUI extended `Fab`) on the four bar screens
+  (`hasRecordPaymentFab`), hidden while the search or the menu is open.
+  Those pages end `FAB_PAGE_CLEARANCE` above the foot, so it never covers a
+  pager or footer total. It opens a bottom sheet of the tenants the tenant
+  page offers Record payment to - everyone but drafts and untracked Govt
+  tenants, moved-out ones included (marked "Moved out", listed last) so late
+  dues can be logged: `canRecordPayment` in `src/lib/domain/tenant.ts`, used
+  by that page and `SearchTenant.canRecordPayment`; `payableTenants` in
+  `src/lib/domain/search.ts`. The index is the top bar's, one request per
+  page shared by both (`useSearchIndex`).
+- **The bottom bar slides away scrolling down** and back scrolling up, near
+  the top, at the bottom, or when focused (`useHideOnScroll`,
+  `BottomNavBar hidden`, `inert` while hidden so it leaves the tab order); the
+  FAB follows it. Page clearance doesn't change, so nothing reflows. The
+  tenant portal's bar stays put (it is its sections).
+- **Page transitions**: one `<ViewTransition>` in `AppLayout`, keyed by the
+  page's route (`useSelectedLayoutSegments`, which follows the `children`
+  slots and leaves out search params) - not the pathname, which also
+  changes when the Record payment dialog opens over the tenant page (an
+  intercepted `@modal` route) and would rebuild the page under it, losing
+  its tabs and tables. Every page change crossfades; links tagged
+  `nav-forward` (into a record: `IdentityCell`, the search, the FAB's list)
+  / `nav-back` (the ←) also slide on phones. Fixed chrome (`chromeSx`: the
+  top bar, bottom bar, FAB, desktop header) has a `viewTransitionName` and is
+  held still above the page. Off under `prefers-reduced-motion`; browsers without
+  View Transitions just swap.
+- **No browser feel**: no tap highlight; app chrome is `user-select: none`
+  (never page text: figures stay copyable).
+- **Manifest**: long-press icon shortcuts (Payments, Defaulters, Add
+  tenant, Record maintenance). Orientation stays free: turning the phone
+  sideways is how wide tables show more columns.
+
+**Rejected:** a custom pull-to-refresh (Chrome already gives the installed
+app one, and `overscroll-behavior: none` would have taken it away); ← as
+`history.back()` (leaves the app when the page was opened from a shortcut or
+link); a FAB on every page (forms and records have their own actions); a
+portrait lock (takes away landscape for wide tables).

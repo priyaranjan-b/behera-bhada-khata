@@ -9,6 +9,7 @@ import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -23,10 +24,22 @@ import { OwnerAvatar } from "./OwnerMenu";
 import { Search } from "./Search";
 import { useSignOut } from "./useSignOut";
 import { shellSurfaceSx } from "./surface";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import BottomNavBar, { type BottomNavItem } from "@/components/ui/BottomNavBar";
+import { useHideOnScroll } from "@/components/ui/useHideOnScroll";
+import { RecordPaymentFab } from "@/components/domain/RecordPaymentFab";
+import { chromeSx } from "@/components/ui/chromeSx";
+import { crumbsForPath } from "./AppBreadcrumbs";
+import { useBackTarget } from "./BackTargetProvider";
 import { carryPaidDirect, PAID_DIRECT_PARAM } from "@/lib/preferences";
-import { MOBILE_NAVBAR_HEIGHT, NAV_ITEMS, PAID_DIRECT_TABS, PHONE_BAR_TABS, type AppTab } from "./nav";
+import {
+  hasRecordPaymentFab,
+  MOBILE_NAVBAR_HEIGHT,
+  NAV_ITEMS,
+  PAID_DIRECT_TABS,
+  PHONE_BAR_TABS,
+  type AppTab,
+} from "./nav";
 import LoadingButton from "@/components/ui/Loading/LoadingButton";
 import { routes } from "@/lib/routes";
 
@@ -39,6 +52,11 @@ const MORE = "more";
  * Payments, Defaulters, and More, which slides out the full menu with
  * Profile and Sign out (template SideMenuMobile). The search icon swaps the
  * top bar for the top-bar search.
+ *
+ * Android-app feel (A37): a page under another page (a tenant, a form) shows
+ * ← and its title instead of the brand, ← going to the parent page (or where
+ * the page says with `PhoneBackTarget`); the main screens on the bar get a
+ * "Record payment" button; the bar slides away while scrolling down.
  */
 export function AppNavbar({
   currentTab,
@@ -53,6 +71,15 @@ export function AppNavbar({
   const [searching, setSearching] = useState(false);
   const { signOut, signingOut } = useSignOut();
   const paidDirect = useSearchParams().get(PAID_DIRECT_PARAM);
+  const pathname = usePathname();
+  const crumbs = crumbsForPath(pathname);
+  const { target } = useBackTarget();
+  // "/" is one crumb, a menu page ("/tenants") two; deeper is a page under another.
+  const parent = target ?? (crumbs.length > 2 ? crumbs[crumbs.length - 2] : null);
+  const title = crumbs[crumbs.length - 1]?.label;
+  const barHidden = useHideOnScroll(!open, pathname);
+  // Not over the search results or the open menu.
+  const showFab = hasRecordPaymentFab(pathname) && !searching && !open;
 
   const barItems: BottomNavItem[] = [
     ...PHONE_BAR_TABS.flatMap((tab) => {
@@ -79,7 +106,13 @@ export function AppNavbar({
       <AppBar
         position="fixed"
         sx={[
-          { display: { xs: "flex", md: "none" }, boxShadow: 0, borderBottom: "1px solid", borderColor: "divider" },
+          {
+            display: { xs: "flex", md: "none" },
+            boxShadow: 0,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+            ...chromeSx("app-top-bar"),
+          },
           shellSurfaceSx,
         ]}
       >
@@ -95,9 +128,26 @@ export function AppNavbar({
             </>
           ) : (
             <>
-              <Stack direction="row" sx={{ mr: "auto", minWidth: 0 }}>
-                <BrandMark showOdia={false} iconSize={28} />
-              </Stack>
+              {parent?.href ? (
+                <Stack direction="row" sx={{ mr: "auto", minWidth: 0, alignItems: "center", gap: 0.5 }}>
+                  <IconButton
+                    component={Link}
+                    href={parent.href}
+                    transitionTypes={["nav-back"]}
+                    aria-label={`Back to ${parent.label}`}
+                    sx={{ ml: -0.5 }}
+                  >
+                    <ArrowBackRoundedIcon />
+                  </IconButton>
+                  <Typography variant="h6" component="p" noWrap>
+                    {title}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Stack direction="row" sx={{ mr: "auto", minWidth: 0 }}>
+                  <BrandMark showOdia={false} iconSize={28} />
+                </Stack>
+              )}
               <IconButton size="small" aria-label="Search" onClick={() => setSearching(true)}>
                 <SearchRoundedIcon />
               </IconButton>
@@ -156,7 +206,8 @@ export function AppNavbar({
           </Stack>
         </Drawer>
       </AppBar>
-      <BottomNavBar label="Main menu" hideFrom="md" value={barValue} items={barItems} />
+      {showFab ? <RecordPaymentFab lowered={barHidden} /> : null}
+      <BottomNavBar label="Main menu" hideFrom="md" value={barValue} items={barItems} hidden={barHidden} />
     </>
   );
 }

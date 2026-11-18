@@ -3,8 +3,112 @@ body {
   height: 100%;
 }
 
+html {
+  /* App feel (A37): no grey/blue flash on tap; the MUI ripple is the feedback. */
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   display: flex;
   flex-direction: column;
   min-height: 100%;
+}
+
+/*
+ * Page transitions (A37, React <ViewTransition> in AppLayout). Every page
+ * change crossfades; on phones "nav-forward" (into a record) and "nav-back"
+ * (the top bar's back arrow) also slide, as Android screens do. The bars are
+ * named in their own components and held still above the moving page.
+ */
+::view-transition {
+  /* Taps during the short animation reach the new page. */
+  pointer-events: none;
+}
+
+::view-transition-group(app-header),
+::view-transition-group(app-top-bar),
+::view-transition-group(app-bottom-bar) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-header),
+::view-transition-old(app-top-bar),
+::view-transition-old(app-bottom-bar) {
+  display: none;
+}
+::view-transition-new(app-header),
+::view-transition-new(app-top-bar),
+::view-transition-new(app-bottom-bar) {
+  animation: none;
+}
+::view-transition-group(app-fab) {
+  z-index: 101;
+}
+
+@keyframes app-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes app-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes app-slide-from {
+  from {
+    transform: translateX(var(--app-slide, 0));
+  }
+}
+@keyframes app-slide-to {
+  to {
+    transform: translateX(var(--app-slide, 0));
+  }
+}
+
+::view-transition-old(.page-fade),
+::view-transition-old(.nav-forward),
+::view-transition-old(.nav-back) {
+  animation: 90ms ease-in both app-fade-out;
+}
+::view-transition-new(.page-fade),
+::view-transition-new(.nav-forward),
+::view-transition-new(.nav-back) {
+  animation: 150ms ease-out 60ms both app-fade-in;
+}
+
+@media (max-width: 899.95px) {
+  ::view-transition-old(.nav-forward) {
+    --app-slide: -24px;
+    animation:
+      90ms ease-in both app-fade-out,
+      200ms ease-in both app-slide-to;
+  }
+  ::view-transition-new(.nav-forward) {
+    --app-slide: 32px;
+    animation:
+      150ms ease-out 60ms both app-fade-in,
+      220ms cubic-bezier(0.2, 0, 0, 1) both app-slide-from;
+  }
+  ::view-transition-old(.nav-back) {
+    --app-slide: 24px;
+    animation:
+      90ms ease-in both app-fade-out,
+      200ms ease-in both app-slide-to;
+  }
+  ::view-transition-new(.nav-back) {
+    --app-slide: -32px;
+    animation:
+      150ms ease-out 60ms both app-fade-in,
+      220ms cubic-bezier(0.2, 0, 0, 1) both app-slide-from;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }

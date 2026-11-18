@@ -2,6 +2,8 @@ import Stack from "@mui/material/Stack";
 import { serverApi } from "@/lib/api-client/server";
 import { formatMoney } from "@/lib/money";
 import { PageHeader } from "@/components/ui/DataDisplay";
+import { PhoneBackTarget } from "@/components/shell/PhoneBackTarget";
+import { routes } from "@/lib/routes";
 import AdjustmentForm from "./AdjustmentForm";
 
 export default async function AdjustPaymentPage({
@@ -15,6 +17,11 @@ export default async function AdjustPaymentPage({
 
   return (
     <Stack spacing={2}>
+      {/* Opened from the tenant's Ledger, not from Payments: ← goes back there (A37). */}
+      <PhoneBackTarget
+        href={routes.tenants.detail(payment.tenantId, { tab: "ledger" })}
+        label={payment.tenantName ?? "Tenant"}
+      />
       <PageHeader
         title="Adjust payment"
         subtitle={`${payment.tenantName ? `${payment.tenantName} · ` : ""}${formatMoney(payment.amount)} on ${payment.paymentDate}`}

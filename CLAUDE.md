@@ -95,7 +95,9 @@ test instead.
   `/tenant` with no id, read-only (A32), and phone navigation as a bottom
   bar (A33), and changes to past records confirmed with a corrections PIN
   checked in the database (A35), and the date display format, a UI-only
-  setting saved in `app_settings` (A36). Read it before changing any of these, and add
+  setting saved in `app_settings` (A36), and the phone app's Android feel:
+  back arrow + title, Record payment FAB, bar hiding on scroll, page
+  transitions, icon shortcuts (A37). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
@@ -665,6 +667,18 @@ Each of these was found broken somewhere; keep them when adding code.
   (`AppNavbar`: Summary, Tenants, Payments, Defaulters, More, which opens the
   full menu; `PHONE_BAR_TABS` in `nav.tsx`) and the tenant portal's sections
   (`PageTabs phoneNav="bottom"`). Pages end above it (`BOTTOM_NAV_CLEARANCE`).
+  Android feel (A37): breadcrumbs show from `md` up only; a page under
+  another shows ← and its title in the top bar (`crumbsForPath`, so a new
+  page's `ROUTE_LABELS` entry names it there too; a page opened from
+  somewhere other than its URL parent renders `PhoneBackTarget`); the owner bar hides while
+  scrolling down (`useHideOnScroll`, `BottomNavBar hidden`); the main screens
+  get `RecordPaymentFab` (kit `FloatingActionButton`, `hasRecordPaymentFab`,
+  `FAB_PAGE_CLEARANCE`; who's listed is `canRecordPayment`); pages change
+  through `<ViewTransition>` in `AppLayout`, keyed by route segments so a
+  `@modal` dialog doesn't rebuild the page (CSS in `globals.css`; a link into a
+  record may pass `transitionTypes={["nav-forward"]}`, a back link
+  `["nav-back"]`). Fixed chrome uses `chromeSx(name)` so it holds still. The
+  search index is loaded through `useSearchIndex` (one request per page). Keep the browser's own pull-to-refresh: no `overscroll-behavior`.
   Elsewhere `PageTabs` stays a tab row that scrolls sideways - never a
   select. `ActionStack phone="primaryOnTop"` puts the primary (last) button on top
   with the rest two to a row. On phones a `DataTable` toolbar puts the

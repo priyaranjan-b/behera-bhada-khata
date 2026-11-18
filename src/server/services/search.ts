@@ -1,7 +1,7 @@
 import "server-only";
 import type { SearchIndex } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
-import { tenantDisplayName } from "@/lib/domain/tenant";
+import { canRecordPayment, tenantDisplayName } from "@/lib/domain/tenant";
 import { ownerDb } from "@/server/infra";
 import type { OwnerContext } from "./context";
 import { holdsUnit, loadPlacements, placementOf } from "./placements";
@@ -38,6 +38,7 @@ export async function getSearchIndex(_ctx: OwnerContext): Promise<SearchIndex> {
       businessName: t.business_name,
       status: t.status,
       unitCodes: placementOf(placements, t.id).unitCodes,
+      canRecordPayment: canRecordPayment({ status: t.status, rentTracked: t.rent_tracked }),
     })),
     units: units
       .filter((u) => u.is_active)
