@@ -33,6 +33,48 @@ function bestRank(texts: (string | null | undefined)[], query: string): number |
   return ranks.length ? Math.min(...ranks) : null;
 }
 
+interface PayableTenant {
+  tenantId: string;
+  primary: string;
+  secondary: string;
+}
+
+/**
+ * The phone "Record payment" picker: tenants who can record one
+ * (`canRecordPayment`), every one when the query is empty (alphabetical),
+ * otherwise matched by name, business or house like the top-bar search, best
+ * match first; moved-out tenants after current ones, marked "Moved out".
+ */
+export function payableTenants(index: SearchIndex, rawQuery: string): PayableTenant[] {
+  const query = normalize(rawQuery);
+  const scored: { rank: number; tenant: PayableTenant }[] = [];
+  for (const t of index.tenants) {
+    if (!t.canRecordPayment) continue;
+    const rank = query
+      ? bestRank([t.name, t.businessName, ...t.unitCodes, ...t.unitCodes.map((c) => c.split("-").pop())], query)
+      : 0;
+    if (rank === null) continue;
+    const movedOut = t.status === "inactive";
+    scored.push({
+      rank: rank * 2 + (movedOut ? 1 : 0),
+      tenant: {
+        tenantId: t.tenantId,
+        primary: t.displayName,
+        secondary: [
+          t.businessName ? t.name : null,
+          t.unitCodes.length ? formatUnits(t.unitCodes) : null,
+          movedOut ? TENANT_STATUS_DISPLAY.inactive.label : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      },
+    });
+  }
+  return scored
+    .sort((a, b) => a.rank - b.rank || a.tenant.primary.localeCompare(b.tenant.primary))
+    .map((s) => s.tenant);
+}
+
 export function searchSuggestions(index: SearchIndex, rawQuery: string, limit = 8): SearchSuggestion[] {
   const query = normalize(rawQuery);
   if (!query) return [];

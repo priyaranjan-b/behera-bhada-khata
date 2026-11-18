@@ -15,7 +15,7 @@ import CorrectMoveOutButton from "@/components/domain/CorrectMoveOutButton";
 import CorrectPaidThroughButton from "@/components/domain/CorrectPaidThroughButton";
 import CorrectRentButton from "@/components/domain/CorrectRentButton";
 import { rentSplitHouses } from "@/lib/domain/houses";
-import { earliestMoveOutDate } from "@/lib/domain/tenant";
+import { canRecordPayment, earliestMoveOutDate } from "@/lib/domain/tenant";
 import RentTrackingButton from "@/components/domain/RentTrackingButton";
 import TenantDetailsCards from "@/components/domain/TenantDetailsCards";
 import { FLASH, TAB_PARAM, routes, type Flash, type TenantTab } from "@/lib/routes";
@@ -152,7 +152,7 @@ export default async function TenantPage({
               // Untracked: nothing is ever owed.
               <MoveOutButton {...moveOut} outstanding={0} />
             )}
-            {draft || untracked ? null : (
+            {!canRecordPayment(tenant) ? null : (
               <LinkButton
                 href={routes.tenants.newPayment(tenantId)}
                 variant="contained"

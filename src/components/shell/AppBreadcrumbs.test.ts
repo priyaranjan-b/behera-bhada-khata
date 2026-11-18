@@ -8,7 +8,7 @@ describe("crumbsForPath", () => {
       { label: "Overview", href: "/" },
       { label: "Tenants", href: "/tenants" },
       { label: "Tenant", href: "/tenants/t-1" },
-      { label: "Edit" },
+      { label: "Edit tenant" },
     ]);
   });
 

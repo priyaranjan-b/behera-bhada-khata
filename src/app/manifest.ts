@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/brand";
+import { routes } from "@/lib/routes";
 import { appChrome } from "@/theme/appTokens";
 
 // Makes the app installable ("Add to Home screen" / "Install app"): it then
@@ -23,5 +24,17 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Long-press the app icon (A37). Record payment needs a tenant: it's the
+    // floating button on the main screens instead.
+    shortcuts: [
+      shortcut("Payments", routes.payments.list()),
+      shortcut("Defaulters", routes.defaulters),
+      shortcut("Add tenant", routes.tenants.new),
+      shortcut("Record maintenance", routes.maintenance.new()),
+    ],
   };
+}
+
+function shortcut(name: string, url: string) {
+  return { name, url, icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] };
 }

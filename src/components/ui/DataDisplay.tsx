@@ -150,6 +150,8 @@ export function IdentityCell({ name, caption, href }: { name: string; caption?: 
     <Box
       component={Link}
       href={href}
+      // Into a record: slides in on phones (A37).
+      transitionTypes={["nav-forward"]}
       sx={{
         ...layout,
         color: "inherit",

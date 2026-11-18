@@ -4,6 +4,7 @@ import BottomNavigation from "@mui/material/BottomNavigation";
 import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import Paper from "@mui/material/Paper";
 import Link from "@/components/ui/Link";
+import { chromeSx } from "./chromeSx";
 
 /** The bar's height (MUI's BottomNavigation default), without the phone's home-bar inset. */
 export const BOTTOM_NAV_HEIGHT = 56;
@@ -37,6 +38,7 @@ export default function BottomNavBar({
   onChange,
   label,
   hideFrom,
+  hidden = false,
 }: {
   items: BottomNavItem[];
   /** The highlighted item; none when the current page isn't on the bar. */
@@ -45,12 +47,16 @@ export default function BottomNavBar({
   /** Accessible name of the bar. */
   label: string;
   hideFrom: "sm" | "md";
+  /** Slid off the bottom while the page scrolls down (A37), and inert meanwhile. */
+  hidden?: boolean;
 }) {
   return (
     <Paper
       component="nav"
       aria-label={label}
       elevation={8}
+      // Off screen: out of the tab order and the accessibility tree until it slides back.
+      inert={hidden}
       sx={{
         display: { xs: "block", [hideFrom]: "none" },
         position: "fixed",
@@ -60,6 +66,10 @@ export default function BottomNavBar({
         zIndex: (theme) => theme.zIndex.appBar,
         pb: "env(safe-area-inset-bottom)",
         borderRadius: 0,
+        ...chromeSx("app-bottom-bar"),
+        transform: hidden ? "translateY(100%)" : "none",
+        transition: (theme) => theme.transitions.create("transform", { duration: theme.transitions.duration.short }),
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
       }}
     >
       <BottomNavigation

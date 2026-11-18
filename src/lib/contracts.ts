@@ -712,6 +712,8 @@ export interface SearchTenant {
   status: TenantStatus;
   /** Current houses (last houses, for a tenant who moved out). */
   unitCodes: string[];
+  /** Record payment applies (`canRecordPayment`): the phone FAB lists only these. */
+  canRecordPayment: boolean;
 }
 
 export interface SearchUnit {

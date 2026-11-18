@@ -40,6 +40,14 @@ export function isRentTracked(tenant: { status: TenantStatus; rentTracked: boole
   return tenant.status === "active" && tenant.rentTracked;
 }
 
+/**
+ * Whether Record payment applies: not a draft, and not a Govt tenant whose
+ * rent is paid direct (0016). Moved-out tenants can still pay off dues.
+ */
+export function canRecordPayment(tenant: { status: TenantStatus; rentTracked: boolean }): boolean {
+  return tenant.status !== "draft" && !(tenant.status === "active" && !tenant.rentTracked);
+}
+
 /** A tenant's type as tags: "Business", or "Government" plus "Rent paid direct" while its rent isn't tracked (0016). */
 export function tenantTypeTags(tenant: { tenantKind: TenantKind; rentTracked: boolean }): string[] {
   const label = TENANT_KIND_LABELS[tenant.tenantKind];

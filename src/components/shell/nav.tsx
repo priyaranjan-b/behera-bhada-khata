@@ -57,6 +57,15 @@ export const QUICK_ADD_ITEMS: { tab: AppTab; href: string; label: string; icon: 
  */
 export const PHONE_BAR_TABS: readonly AppTab[] = ["summary", "tenants", "payments", "defaulters"];
 
+const FAB_PATHS: ReadonlySet<string> = new Set(
+  NAV_ITEMS.filter((item) => PHONE_BAR_TABS.includes(item.tab)).map((item) => item.href)
+);
+
+/** The bar's own screens get the phone "Record payment" button (A37); the page leaves room for it. */
+export function hasRecordPaymentFab(pathname: string): boolean {
+  return FAB_PATHS.has(pathname);
+}
+
 /** The pages with "Include Govt paid direct": the menus keep it on between them (A24). */
 export const PAID_DIRECT_TABS: ReadonlySet<AppTab> = new Set<AppTab>(["summary", "billing", "earnings"]);
 

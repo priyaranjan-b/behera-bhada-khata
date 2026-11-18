@@ -28,7 +28,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/tenants": "Tenants",
   "/tenants/new": "Add tenant",
   "/tenants/:id": "Tenant",
-  "/tenants/:id/edit": "Edit",
+  "/tenants/:id/edit": "Edit tenant",
   "/houses": "Houses",
   "/houses/new": "Add house",
   "/tenants/:id/payments/new": "Record payment",
@@ -42,7 +42,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/earnings": "Earnings",
   "/maintenance/new": "Record maintenance",
   "/maintenance/:id": "Expense",
-  "/maintenance/:id/edit": "Edit",
+  "/maintenance/:id/edit": "Edit expense",
   "/activity": "Activity",
 };
 
@@ -92,6 +92,9 @@ export function AppBreadcrumbs() {
       aria-label="Breadcrumb"
       separator={<NavigateNextRoundedIcon fontSize="small" />}
       sx={(theme) => ({
+        // Desktop only (A37): on phones the bottom bar and the system Back are the
+        // navigation, as in a native app. Hidden in CSS so nothing jumps on load.
+        display: { xs: "none", md: "flex" },
         [`& .${breadcrumbsClasses.separator}`]: { color: (theme.vars || theme).palette.action.disabled, m: "1px" },
         [`& .${breadcrumbsClasses.ol}`]: { alignItems: "center" },
       })}

@@ -13,12 +13,24 @@ describe("getSearchIndex", () => {
   it("lists tenants with their houses and puts the occupant on held houses", async () => {
     const index = await getSearchIndex(ctx);
     expect(index.tenants).toEqual([
-      { tenantId: "00000000-0000-4000-8000-000000000101", displayName: "Asha", name: "Asha", businessName: null, status: "active", unitCodes: ["AC-T1-G01", "AC-T1-G02"] },
+      { tenantId: "00000000-0000-4000-8000-000000000101", displayName: "Asha", name: "Asha", businessName: null, status: "active", unitCodes: ["AC-T1-G01", "AC-T1-G02"], canRecordPayment: true },
     ]);
     expect(index.units.map((u) => [u.unitCode, u.occupant?.tenantId ?? null])).toEqual([
       ["AC-T1-G01", "00000000-0000-4000-8000-000000000101"],
       ["AC-T1-G02", "00000000-0000-4000-8000-000000000101"],
     ]);
+  });
+
+  it("lets every tenant but drafts and untracked Govt tenants record a payment", async () => {
+    const [asha] = await fakes.owner.tenants.list();
+    fakes.owner.tenants.list.mockResolvedValue([
+      asha,
+      { ...asha, id: "00000000-0000-4000-8000-000000000102", status: "draft" },
+      { ...asha, id: "00000000-0000-4000-8000-000000000103", status: "inactive" },
+      { ...asha, id: "00000000-0000-4000-8000-000000000104", rent_tracked: false },
+    ]);
+    const index = await getSearchIndex(ctx);
+    expect(index.tenants.map((t) => t.canRecordPayment)).toEqual([true, false, true, false]);
   });
 
   it("leaves out retired houses and shows vacant ones with no occupant", async () => {
