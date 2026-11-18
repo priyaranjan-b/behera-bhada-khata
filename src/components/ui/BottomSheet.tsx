@@ -60,7 +60,8 @@ export default function BottomSheet({
           <CloseRoundedIcon />
         </IconButton>
       </Stack>
-      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", mx: -2, px: 2 }}>{children}</Box>
+      {/* pt: an outlined field's label floats above its border, and the scroll box would clip it. */}
+      <Box sx={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", mx: -2, px: 2, pt: 1 }}>{children}</Box>
       {footer ? (
         <Stack direction="row" spacing={1} sx={{ borderTop: 1, borderColor: "divider", pt: 1.5, mx: -2, px: 2 }}>
           {footer}

@@ -62,6 +62,7 @@ export const datePickersCustomizations: PickerComponents<Theme> = {
           backgroundColor: (theme.vars || theme).palette.action.hover,
         },
         [`&.${yearCalendarClasses.selected}`]: {
+          color: (theme.vars || theme).palette.common.white,
           backgroundColor: gray[700],
           fontWeight: theme.typography.fontWeightMedium,
         },
@@ -103,6 +104,7 @@ export const datePickersCustomizations: PickerComponents<Theme> = {
           backgroundColor: (theme.vars || theme).palette.action.hover,
         },
         [`&.${yearCalendarClasses.selected}`]: {
+          color: (theme.vars || theme).palette.common.white,
           backgroundColor: gray[700],
           fontWeight: theme.typography.fontWeightMedium,
         },
@@ -143,6 +145,8 @@ export const datePickersCustomizations: PickerComponents<Theme> = {
           backgroundColor: (theme.vars || theme).palette.action.hover,
         },
         [`&.${pickerDayClasses.selected}`]: {
+          // App fix: the grey day text was unreadable on the dark fill.
+          color: (theme.vars || theme).palette.common.white,
           backgroundColor: gray[700],
           fontWeight: theme.typography.fontWeightMedium,
         },
