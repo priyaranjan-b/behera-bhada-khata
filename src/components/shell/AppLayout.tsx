@@ -1,6 +1,6 @@
 "use client";
 
-import { ViewTransition } from "react";
+import { useEffect, ViewTransition } from "react";
 import { useSelectedLayoutSegments } from "next/navigation";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
@@ -10,7 +10,8 @@ import { MOBILE_NAVBAR_HEIGHT } from "@/components/shell/nav";
 import { BOTTOM_NAV_CLEARANCE } from "@/components/ui/BottomNavBar";
 import { BackTargetProvider } from "@/components/shell/BackTargetProvider";
 import { Header } from "@/components/shell/Header";
-import { AppBreadcrumbs } from "@/components/shell/AppBreadcrumbs";
+import { AppBreadcrumbs, pageTitleFor } from "@/components/shell/AppBreadcrumbs";
+import { registerPageTitle } from "@/components/ui/Loading";
 import { appCanvasSx } from "@/components/shell/surface";
 import type { AppTab } from "@/components/shell/nav";
 
@@ -40,6 +41,8 @@ export default function AppLayout({
   // intercepted route) changes the URL but not this, so the page underneath
   // keeps its tabs and tables. Search params aren't in it either.
   const pageKey = useSelectedLayoutSegments().join("/");
+  // The page-change spinner names the page being opened with the breadcrumb labels (A38).
+  useEffect(() => registerPageTitle(pageTitleFor), []);
   return (
     <BackTargetProvider>
       {/* flexShrink 0: <body> is a full-height flex column (globals.css), and with an explicit

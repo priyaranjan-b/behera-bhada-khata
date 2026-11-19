@@ -10,19 +10,19 @@ import { finishNavigation, startNavigation, useIsLoading } from "./store";
 // routes, loading.tsx skeletons).
 const SHOW_DELAY_MS = 120;
 
-/** True for a plain left click on a same-origin link that leads somewhere else. */
-function isInternalNavigation(event: MouseEvent): boolean {
-  if (event.button !== 0) return false;
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+/** The pathname a plain left click on a same-origin link leads to, or null when it isn't a page change. */
+function internalNavigationTarget(event: MouseEvent): string | null {
+  if (event.button !== 0) return null;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
   const anchor = (event.target as Element | null)?.closest?.("a[href]");
-  if (!(anchor instanceof HTMLAnchorElement)) return false;
-  if (anchor.target && anchor.target !== "_self") return false;
-  if (anchor.hasAttribute("download")) return false;
+  if (!(anchor instanceof HTMLAnchorElement)) return null;
+  if (anchor.target && anchor.target !== "_self") return null;
+  if (anchor.hasAttribute("download")) return null;
   const url = new URL(anchor.href, window.location.href);
-  if (url.origin !== window.location.origin) return false;
+  if (url.origin !== window.location.origin) return null;
   // API links (receipt downloads…) aren't page navigations.
-  if (url.pathname.startsWith("/api/")) return false;
-  return url.pathname + url.search !== window.location.pathname + window.location.search;
+  if (url.pathname.startsWith("/api/")) return null;
+  return url.pathname + url.search !== window.location.pathname + window.location.search ? url.pathname : null;
 }
 
 /**
@@ -38,15 +38,18 @@ export default function NavigationProgress() {
   // A link click or Back/Forward starts a navigation…
   useEffect(() => {
     function onClick(event: MouseEvent) {
-      if (isInternalNavigation(event)) startNavigation();
+      const target = internalNavigationTarget(event);
+      if (target !== null) startNavigation(target);
     }
+    // By the time popstate fires the URL is already the page being opened.
+    const onPopState = () => startNavigation(window.location.pathname);
     // Capture phase: next/link calls preventDefault() on the way up, which
     // would make every client-side navigation look cancelled.
     document.addEventListener("click", onClick, true);
-    window.addEventListener("popstate", startNavigation);
+    window.addEventListener("popstate", onPopState);
     return () => {
       document.removeEventListener("click", onClick, true);
-      window.removeEventListener("popstate", startNavigation);
+      window.removeEventListener("popstate", onPopState);
     };
   }, []);
 

@@ -1519,3 +1519,43 @@ link); a floating "Record payment" button on the bar screens (shipped in
 PR #19, then removed: big, and popping up on every main screen - the
 owner's call; the menu entry does the same job quietly); a portrait lock
 (takes away landscape for wide tables).
+
+### A38 — A full-screen spinner while a page change takes a while
+
+**Decision.** `NavigationOverlay` (`src/components/ui/Loading/`, mounted once
+in `app/layout.tsx`) covers the screen with a light scrim and a centred card
+holding the circular spinner and the page being opened ("Opening
+Tenants…", `Loader variant="screen"`) while a page change is in flight: any internal link (the menu, the
+phone's bottom bar, a breadcrumb, a stat card, a record link), a button that
+navigates (`LinkButton`, or `useAppRouter`'s push / replace / back: Search,
+the date forms, a form's redirect after saving, closing a route dialog), a
+dialog opened as a route (`@modal`), and Back/Forward.
+- **It names the page.** The store remembers each navigation's target
+  pathname (the link's, the router call's, or the URL Back lands on), and
+  the owner shell registers `pageTitleFor` (`AppBreadcrumbs`, the same
+  `ROUTE_LABELS` as the breadcrumbs and the phone top bar) with
+  `registerPageTitle`, so the kit needn't import the shell. Unknown (a
+  router `back()`, the tenant portal): "Loading…".
+- **It covers the server's rendering time only.** Once the next page
+  starts streaming, its `loading.tsx` skeleton replaces it.
+- **Only after 300 ms.** A prefetched page or one with a `loading.tsx`
+  skeleton is ready sooner and never shows it; the thin top bar
+  (`NavigationProgress`, 120 ms) covers that moment. Once shown it blocks
+  taps, so a second tap can't start another navigation.
+- **Page changes only.** The store's navigation token (`beginNavigation`,
+  `useIsNavigating`) is separate from its loading token: a button's request
+  (a save) keeps its own button spinner and the top bar, and
+  `router.refresh()` never covers the page.
+- **It leaves when the new page renders** (the path or query changes, or
+  the router transition ends), or after the store's 15-second safety
+  timeout. It sits out page transitions (`viewTransitionName: app-loading`,
+  hidden in `globals.css`), so it doesn't slide with the old page.
+- A full page load (`window.location.assign` after signing in or out) shows
+  the browser's own loading instead.
+
+**Why.** On a slow connection a tap could leave the screen unchanged for
+seconds with only the 3 px top bar to say anything was happening, which is
+easy to miss on a phone; the owner asked for a full-screen spinner. A plain
+spinner in a disc, then CSS Loaders' bubble01, were tried and rejected; the
+owner chose the card naming the page over a non-blocking pull-to-refresh
+style disc.

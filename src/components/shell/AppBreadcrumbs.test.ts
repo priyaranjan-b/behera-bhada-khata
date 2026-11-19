@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crumbsForPath } from "./AppBreadcrumbs";
+import { crumbsForPath, pageTitleFor } from "./AppBreadcrumbs";
 
 describe("crumbsForPath", () => {
   it("starts every trail at the Overview and links all but the last crumb", () => {
@@ -16,5 +16,15 @@ describe("crumbsForPath", () => {
     expect(crumbsForPath("/payments/p-1/adjust").map((c) => c.label)).toEqual(["Overview", "Payments", "Adjust payment"]);
     expect(crumbsForPath("/payments/new").map((c) => c.label)).toEqual(["Overview", "Payments", "Record payment"]);
     expect(crumbsForPath("/properties/new").map((c) => c.label)).toEqual(["Overview", "Properties", "New property"]);
+  });
+});
+
+describe("pageTitleFor", () => {
+  it("names the page a navigation goes to, as its last crumb", () => {
+    expect(pageTitleFor("/")).toBe("Overview");
+    expect(pageTitleFor("/tenants")).toBe("Tenants");
+    expect(pageTitleFor("/tenants/00000000-0000-4000-8000-000000000001")).toBe("Tenant");
+    expect(pageTitleFor("/payments/new")).toBe("Record payment");
+    expect(pageTitleFor("/no-such-page")).toBeNull();
   });
 });

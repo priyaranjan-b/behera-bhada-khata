@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 import ThemeRegistry from "@/components/ThemeRegistry";
 import NavigationProgress from "@/components/ui/Loading/NavigationProgress";
+import { NavigationOverlay } from "@/components/ui/Loading";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/brand";
 import { appChrome } from "@/theme/appTokens";
 import "./globals.css";
@@ -54,6 +55,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Suspense fallback={null}>
             <NavigationProgress />
           </Suspense>
+          {/* The full-screen spinner while a page change takes a while (A38). */}
+          <NavigationOverlay />
           {children}
         </ThemeRegistry>
         <ServiceWorkerRegistration />

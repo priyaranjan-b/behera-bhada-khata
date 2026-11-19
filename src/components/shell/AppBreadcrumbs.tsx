@@ -70,6 +70,11 @@ function labelFor(segments: string[]): string | undefined {
   return fallback;
 }
 
+/** The name of the page at a pathname, as its last crumb and the phone top bar call it; null when it isn't one. */
+export function pageTitleFor(pathname: string): string | null {
+  return labelFor(pathname.split("/").filter(Boolean)) ?? null;
+}
+
 /** Breadcrumb trail for a pathname: one crumb per URL prefix that is a page. The last one has no link. */
 export function crumbsForPath(pathname: string): Crumb[] {
   const parts = pathname.split("/").filter(Boolean);

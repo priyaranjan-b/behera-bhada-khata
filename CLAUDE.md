@@ -97,7 +97,8 @@ test instead.
   checked in the database (A35), and the date display format, a UI-only
   setting saved in `app_settings` (A36), and the phone app's Android feel:
   back arrow + title, Record payment FAB, bar hiding on scroll, page
-  transitions, icon shortcuts (A37). Read it before changing any of these, and add
+  transitions, icon shortcuts (A37), and the full-screen spinner while a page
+  change takes a while (`NavigationOverlay`, A38). Read it before changing any of these, and add
   a new A-number when you make a decision a future session should know.
 
 ### Ledger design (the core domain model)
@@ -765,9 +766,13 @@ Each of these was found broken somewhere; keep them when adding code.
   drawn by its `Loader`, so loading can be restyled in one place; never
   render `CircularProgress`/`LinearProgress` directly. `NavigationProgress`
   (mounted once in `app/layout.tsx`) shows a top bar for every internal link
-  click, Back/Forward and router transition. Use `useAppRouter()` instead of
+  click, Back/Forward and router transition, and `NavigationOverlay` (mounted
+  beside it) a full-screen card naming the page being opened ("Opening
+  Tenants…", via `registerPageTitle`) when a page change takes over 300 ms
+  (A38: links, breadcrumbs, stat cards, `LinkButton`, route dialogs, Back;
+  never a save or a refresh). Use `useAppRouter()` instead of
   `next/navigation`'s `useRouter` (its push/replace/refresh/back run in a
-  transition that feeds that bar). A button that does async work is a
+  transition that feeds that bar; push/replace/back also the spinner). A button that does async work is a
   `LoadingButton` (pass `loading`, or return a promise from `onClick`); a
   button that navigates is a `LinkButton` (spins until the route loads);
   form footers get both through `FormActions`.
