@@ -156,6 +156,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       earnings: (query = {}) => get(withQuery(p.dashboard.earnings, { ...query })),
       maintenance: {
         list: (query = {}) => get(withQuery(p.dashboard.maintenance.list, { ...query })),
+        totals: (query = {}) => get(withQuery(p.dashboard.maintenance.totals, { ...query })),
         newForm: (query = {}) => get(withQuery(p.dashboard.maintenance.new, { ...query })),
         detail: (id) => get(p.dashboard.maintenance.detail(id)),
         history: (id, before) => get(withQuery(p.dashboard.maintenance.history(id), { before })),

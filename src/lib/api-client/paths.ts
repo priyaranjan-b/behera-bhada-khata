@@ -88,6 +88,7 @@ export const apiPaths = {
     earnings: "/api/dashboard/earnings",
     maintenance: {
       list: "/api/dashboard/maintenance",
+      totals: "/api/dashboard/maintenance/totals",
       new: "/api/dashboard/maintenance/new",
       detail: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}`,
       void: (expenseId: string) => `/api/dashboard/maintenance/${e(expenseId)}/void`,

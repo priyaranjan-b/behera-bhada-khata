@@ -319,7 +319,14 @@ export interface MaintenanceListRow {
 }
 
 /** Every matching expense that isn't voided, whatever the page. */
+/**
+ * GET /api/dashboard/maintenance/totals: the stat cards. Every expense spent in
+ * the days that isn't voided; the table's search and filters don't apply (A18).
+ */
 export interface MaintenanceTotals {
+  /** The days counted (yyyy-MM-dd, both included). */
+  from: string;
+  to: string;
   amount: number;
   /** Of it, paid in cash; the rest a set-off against rent paid (A22). Net cash subtracts only this. */
   cash: number;
@@ -335,7 +342,10 @@ export interface MaintenancePage extends TablePage<MaintenanceListRow> {
   /** The days shown (yyyy-MM-dd, both included). */
   from: string;
   to: string;
-  totals: MaintenanceTotals;
+  /** The Amount footer: spent over every row matching the search and filters, voided ones not counted; keyed by grid field (A26). */
+  totals: Pick<MaintenanceListRow, "amount">;
+  /** Matching expenses that are voided: the footer's note. */
+  voided: number;
 }
 
 /** A house the maintenance form offers: every house in use. */

@@ -1,10 +1,11 @@
 // The Maintenance page query (0031, D35) and the maintenance writes, on a
 // migrated PGlite: paging, search, filters (tags name by name), sort, the
-// totals (voided expenses listed but never counted) and RLS.
+// Amount footer and the stat cards' totals by the days only (voided expenses
+// listed but never counted; A18) and RLS.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { inScope, type Scope } from "@/server/adapters/drizzle/client";
 import { createMaintenanceExpense, voidMaintenanceExpense } from "@/server/adapters/drizzle/procedures/maintenance";
-import { maintenancePage } from "@/server/adapters/drizzle/queries/maintenancePage";
+import { maintenancePage, maintenanceTotals } from "@/server/adapters/drizzle/queries/maintenancePage";
 import { getMaintenanceExpense, maintenanceMonthly } from "@/server/adapters/drizzle/tables/maintenance";
 import { setRecordTags } from "@/server/adapters/drizzle/tables/paymentTags";
 import type { MaintenanceExpenseFields, MaintenanceFilter } from "@/server/ports";
@@ -80,9 +81,11 @@ const BASE: MaintenanceFilter = {
 
 const page = (f: Partial<MaintenanceFilter> = {}, scope: Scope = asOwner) =>
   inScope(l.db, scope, (tx) => maintenancePage(tx, { ...BASE, ...f }));
+const totals = (range: { from: string; to: string } = { from: BASE.from, to: BASE.to }, scope: Scope = asOwner) =>
+  inScope(l.db, scope, (tx) => maintenanceTotals(tx, range));
 
 describe("maintenancePage", () => {
-  it("lists the days' expenses newest first, voided ones too, and totals only what counts", async () => {
+  it("lists the days' expenses newest first, voided ones too, and the footer counts only what counts", async () => {
     const result = await page();
     expect(result.rows.map((r) => r.id)).toEqual([ids.wrong, ids.tax, ids.paint, ids.tap]);
     expect(result).toMatchObject({ total: 4, all: 4, page: 0 });
@@ -93,26 +96,16 @@ describe("maintenancePage", () => {
       file_count: 0,
     });
     expect(result.rows.find((r) => r.id === ids.tap)).toMatchObject({ file_count: 1, vendor: "Ramesh plumber", expense_date: "2026-03-05" });
-    expect(result.totals).toEqual({
-      amount: 12400,
-      cash: 12400,
-      count: 3,
-      by_category: { plumbing: 1000, painting: 9000, property_tax: 2400 },
-      by_tag: [
-        { name: "Padma", amount: 10000 },
-        { name: "Malati", amount: 9000 },
-      ],
-      untagged: 2400,
-    });
+    expect(result.sums).toEqual({ amount: 12400, voided: 1 });
   });
 
-  it("searches every shown text, with % literal, and the totals follow", async () => {
+  it("searches every shown text, with % literal, and the footer follows", async () => {
     expect((await page({ search: "g04" })).rows.map((r) => r.id)).toEqual([ids.tax]);
     expect((await page({ search: "50%" })).rows.map((r) => r.id)).toEqual([ids.paint]);
     expect((await page({ search: "%" })).rows.map((r) => r.id)).toEqual([ids.paint]);
     const plumber = await page({ search: "ramesh" });
     expect(plumber.rows.map((r) => r.id)).toEqual([ids.tap]);
-    expect(plumber.totals.amount).toBe(1000);
+    expect(plumber.sums).toEqual({ amount: 1000, voided: 0 });
     expect((await page({ search: "property tax" })).rows.map((r) => r.id)).toEqual([ids.tax]);
     // A date in any display format the owner can pick (A36), as search or as the Date column's filter.
     // (Search splits on spaces, so "20 Mar 2026" is three words; the column filter takes it whole.)
@@ -131,7 +124,7 @@ describe("maintenancePage", () => {
     expect(category.rows.map((r) => r.id)).toEqual([ids.wrong, ids.tax, ids.tap]);
     const voided = await page({ filters: [{ field: "status", operator: "is", value: "Voided" }] });
     expect(voided.rows.map((r) => r.id)).toEqual([ids.wrong]);
-    expect(voided.totals.amount).toBe(0);
+    expect(voided.sums).toEqual({ amount: 0, voided: 1 });
   });
 
   it("sorts either way and pages, clamping past the end", async () => {
@@ -145,7 +138,30 @@ describe("maintenancePage", () => {
   it("refuses a bad range or sort, and shows anyone but the owner nothing", async () => {
     await expect(page({ from: "2026-04-01", to: "2026-03-01" })).rejects.toMatchObject({ status: 400 });
     await expect(page({ sort: "nope" as MaintenanceFilter["sort"] })).rejects.toMatchObject({ status: 400 });
-    expect(await page({}, asStranger)).toMatchObject({ rows: [], total: 0, all: 0, totals: { amount: 0, count: 0 } });
+    expect(await page({}, asStranger)).toMatchObject({ rows: [], total: 0, all: 0, sums: { amount: 0, voided: 0 } });
+  });
+});
+
+describe("maintenanceTotals: the stat cards, by the days only (A18)", () => {
+  it("totals the days' expenses that count, voided ones never", async () => {
+    expect(await totals()).toEqual({
+      amount: 12400,
+      cash: 12400,
+      count: 3,
+      by_category: { plumbing: 1000, painting: 9000, property_tax: 2400 },
+      by_tag: [
+        { name: "Padma", amount: 10000 },
+        { name: "Malati", amount: 9000 },
+      ],
+      untagged: 2400,
+    });
+    expect(await totals({ from: "2026-01-01", to: "2026-01-31" })).toMatchObject({ amount: 1000, count: 1, untagged: 1000 });
+  });
+
+  it("refuses a bad range, and shows anyone but the owner nothing", async () => {
+    await expect(totals({ from: "2026-04-01", to: "2026-03-01" })).rejects.toMatchObject({ status: 400 });
+    await expect(totals({ from: "2024-01-01", to: "2026-03-31" })).rejects.toMatchObject({ status: 400 });
+    expect(await totals(undefined, asStranger)).toEqual({ amount: 0, cash: 0, count: 0, by_category: {}, by_tag: [], untagged: 0 });
   });
 });
 

@@ -987,6 +987,15 @@ export interface MaintenanceDbRow {
 }
 
 /** The Maintenance page totals: every matching expense that isn't voided, whatever the page. */
+/** The Maintenance page's Amount footer: every row matching the search and filters, whatever the page. */
+export interface MaintenanceSumsDb {
+  /** Spent: a voided expense is listed but counted nowhere (D35). */
+  amount: number;
+  /** Matching expenses that are voided, for the footer's note. */
+  voided: number;
+}
+
+/** The Maintenance page's stat cards (maintenanceTotals): the days' expenses that aren't voided, whatever the table shows (A18). */
 export interface MaintenanceTotalsDb {
   amount: number;
   /** Of it, paid in cash: every expense but those a set-off paid for (A22). */

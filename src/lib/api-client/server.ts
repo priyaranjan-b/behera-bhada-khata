@@ -8,7 +8,7 @@ import { apiBaseUrl } from "@/server/env";
 import { getLoginOptions, getOwnerContext, getSession } from "@/server/services/auth";
 import { listActivity, maintenanceHistory, tenantHistory, unitHistory } from "@/server/services/audit";
 import { getEarnings } from "@/server/services/earnings";
-import { getMaintenanceExpense, getMaintenanceForm, getMaintenancePage } from "@/server/services/maintenance";
+import { getMaintenanceExpense, getMaintenanceForm, getMaintenancePage, getMaintenanceTotals } from "@/server/services/maintenance";
 import { getConfirmView } from "@/server/services/confirm";
 import { getBillingPage, getBillingReceived, getBillingTotals } from "@/server/services/billing";
 import { getDefaultersReport } from "@/server/services/dashboard";
@@ -130,6 +130,7 @@ const inProcessApi: ApiQueries = {
     earnings: async (query) => getEarnings(await owner(), query ?? {}),
     maintenance: {
       list: async (query) => getMaintenancePage(await owner(), query),
+      totals: async (query) => getMaintenanceTotals(await owner(), query),
       newForm: async (query) => getMaintenanceForm(await owner(), query ?? {}),
       detail: async (id) => getMaintenanceExpense(await owner(), id),
       history: async (id, before) => maintenanceHistory(await owner(), id, { before }),

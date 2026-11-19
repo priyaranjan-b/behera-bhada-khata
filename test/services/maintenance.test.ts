@@ -11,6 +11,7 @@ const {
   getMaintenanceExpense,
   getMaintenanceForm,
   getMaintenancePage,
+  getMaintenanceTotals,
   maintenanceFileUrl,
   setMaintenanceTags,
   updateMaintenanceExpense,
@@ -161,6 +162,39 @@ describe("getMaintenancePage", () => {
     );
     await getMaintenancePage(ctx, { from: "2026-01-01", to: "2026-03-31" });
     expect(fakes.owner.maintenance.page).toHaveBeenLastCalledWith(expect.objectContaining({ from: "2026-01-01", to: "2026-03-31" }));
+  });
+
+  it("passes the Amount footer through", async () => {
+    fakes.owner.maintenance.page.mockResolvedValueOnce({ rows: [], total: 2, all: 2, page: 0, sums: { amount: 1500, voided: 1 } });
+    expect(await getMaintenancePage(ctx)).toMatchObject({ totals: { amount: 1500 }, voided: 1 });
+  });
+});
+
+describe("getMaintenanceTotals", () => {
+  it("totals the cards by the days only: no search or filter reaches them", async () => {
+    fakes.owner.maintenance.totals.mockResolvedValueOnce({
+      amount: 12400,
+      cash: 10000,
+      count: 3,
+      by_category: { plumbing: 1000 },
+      by_tag: [{ name: "Padma", amount: 10000 }],
+      untagged: 2400,
+    });
+    expect(await getMaintenanceTotals(ctx, { from: "2026-03-01", to: "2026-03-31", q: "tap", filters: "[]" })).toEqual({
+      from: "2026-03-01",
+      to: "2026-03-31",
+      amount: 12400,
+      cash: 10000,
+      count: 3,
+      byCategory: { plumbing: 1000 },
+      byPaidBy: [{ name: "Padma", amount: 10000 }],
+      untagged: 2400,
+    });
+    expect(fakes.owner.maintenance.totals).toHaveBeenLastCalledWith({ from: "2026-03-01", to: "2026-03-31" });
+    // Defaults to this month, like the table.
+    await getMaintenanceTotals(ctx);
+    expect(fakes.owner.maintenance.totals).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" });
+    await expect(getMaintenanceTotals(ctx, { from: "2026-02-30" })).rejects.toMatchObject({ status: 400 });
   });
 });
 

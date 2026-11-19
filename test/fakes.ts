@@ -365,7 +365,15 @@ function build() {
         total: 0,
         all: 0,
         page: 0,
-        totals: { amount: 0, cash: 0, count: 0, by_category: {}, by_tag: [], untagged: 0 },
+        sums: { amount: 0, voided: 0 },
+      })),
+      totals: vi.fn(async () => ({
+        amount: 0,
+        cash: 0,
+        count: 0,
+        by_category: {},
+        by_tag: [] as { name: string; amount: number }[],
+        untagged: 0,
       })),
       get: vi.fn(async (id: string) => state.maintenance.get(id) ?? null),
       create: vi.fn(

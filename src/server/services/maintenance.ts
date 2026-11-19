@@ -9,6 +9,7 @@ import type {
   MaintenanceListRow,
   MaintenancePage,
   MaintenancePrefill,
+  MaintenanceTotals,
 } from "@/lib/contracts";
 import { todayKey } from "@/lib/dates";
 import { maintenanceRange } from "@/lib/domain/maintenance";
@@ -22,6 +23,7 @@ import {
   createMaintenanceSchema,
   maintenanceFormQuerySchema,
   maintenancePageQuerySchema,
+  maintenanceQuerySchema,
   setPaymentTagsSchema,
   updateMaintenanceSchema,
   voidMaintenanceSchema,
@@ -74,7 +76,6 @@ export async function getMaintenancePage(_ctx: OwnerContext, query: unknown = {}
     page: input.page,
     pageSize: input.pageSize,
   });
-  const t = result.totals;
   return {
     ...range,
     rows: result.rows.map(
@@ -95,14 +96,23 @@ export async function getMaintenancePage(_ctx: OwnerContext, query: unknown = {}
     total: result.total,
     all: result.all,
     page: result.page,
-    totals: {
-      amount: t.amount,
-      cash: t.cash,
-      count: t.count,
-      byCategory: t.by_category,
-      byPaidBy: t.by_tag,
-      untagged: t.untagged,
-    },
+    totals: { amount: result.sums.amount },
+    voided: result.sums.voided,
+  };
+}
+
+/** The stat cards: the days' expenses that aren't voided, whatever the table shows (A18). */
+export async function getMaintenanceTotals(_ctx: OwnerContext, query: unknown = {}): Promise<MaintenanceTotals> {
+  const range = maintenanceRange(parseInput(maintenanceQuerySchema, query ?? {}), MAINTENANCE_LIMITS.maxDays);
+  const t = await (await cachedDb()).maintenance.totals(range);
+  return {
+    ...range,
+    amount: t.amount,
+    cash: t.cash,
+    count: t.count,
+    byCategory: t.by_category,
+    byPaidBy: t.by_tag,
+    untagged: t.untagged,
   };
 }
 

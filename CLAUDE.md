@@ -260,7 +260,8 @@ both together.
   suggestions) and receipts under `maintenance/<id>/files/`. Edited
   (`update_maintenance_expense`) or voided (kept, counted nowhere), never
   deleted; every change audited under the expense. `/maintenance` (paged in
-  the database, cards follow the table), `/maintenance/new`,
+  the database and loaded by the browser; the cards are their own call,
+  `/maintenance/totals`, by the days only, A18), `/maintenance/new`,
   `/maintenance/[id]`; services in `src/server/services/maintenance.ts`.
 - **Tenant documents** (`0011_tenant_documents.sql`, D21): ID proof, photo,
   agreement... uploaded from the Edit tenant page (`TenantDocumentsCard`,

@@ -614,6 +614,14 @@ move whole months by months, other ranges by their length
 - **Govt rent paid direct (A11) is its own card and call.** It is never
   recorded, so it has no date received: it counts by the rent months the
   days touch, up to this month, and the table's search doesn't apply.
+- **Maintenance works the same way** (Nov 2026): its cards are
+  `GET /api/dashboard/maintenance/totals` (`getMaintenanceTotals`,
+  `maintenanceTotals`, the days' expenses that aren't voided) in their own
+  `AsyncSection`, and its table loads in the browser
+  (`GET /api/dashboard/maintenance`, footer: spent over the matching rows
+  plus how many are voided). "Most on …" and "Paid by …" name the biggest
+  category and payer of the period; they no longer re-label to whichever
+  one the table is filtered to, since that one need not be the biggest.
 - **Payments only.** Adjustments stay on the tenant's Ledger.
 - **Server-paged (A15).** Payments grow every month; search and filters
   match the text shown (date as dd/MM/yyyy, mode label, "For months"),
@@ -1057,11 +1065,11 @@ page holding the records behind it, for the same period:
   cards are server-rendered, so there the band is the URL's `?band=`
   (`routes.defaultersBand`), which the table's "Show" reads and writes too;
   its "Show" options are now the cards' four bands, not "2+ / 4+ / 7+".
-  Maintenance's cards follow the table's filters, so with one category on
-  the others read ₹0 until it's cleared. Payments' cards don't: they are the
-  days' totals (A18), and a tapped card only filters the table.
+  Payments' and Maintenance's cards don't follow the table: they are the
+  days' totals (A18), and a tapped card only filters the table, so the other
+  cards keep their figures.
 - **No link:** a total of the table already on screen (Billing's Billed,
-  Collected and Balance; Maintenance's Spent), figures that are computed
+  Collected and Balance; Maintenance's Spent, the whole period's), figures that are computed
   rather than recorded (Earnings' nets, Spent of collected), and two with no
   matching filter yet: "Payer not tagged" (the Paid by column has no "is
   empty") and Tenant types (the Tenants list can't filter by type).

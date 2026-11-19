@@ -5,23 +5,22 @@ import { maintenanceRange } from "@/lib/domain/maintenance";
 import { dayRangeLabel, dayRangeUnit, shiftDayRange } from "@/lib/domain/payments";
 import { routes } from "@/lib/routes";
 import { MAINTENANCE_LIMITS } from "@/lib/validation";
-import AsyncSection from "@/components/ui/AsyncSection";
 import ContextBar from "@/components/shell/ContextBar";
 import DayRangeForm from "@/components/ui/DayRangeForm";
 import { PageHeader } from "@/components/ui/DataDisplay";
 import { ActionStack } from "@/components/ui";
 import { LinkButton } from "@/components/ui/Loading";
 import PeriodSwitcher from "@/components/ui/PeriodSwitcher";
-import { MAINTENANCE_SKELETONS as SKELETON } from "./maintenanceSkeletons";
-import MaintenanceSection from "./sections/MaintenanceSection";
+import MaintenanceView from "./MaintenanceView";
 
 // Every maintenance expense (0031, D35) by the day it was spent, this month
 // by default. The days come from the URL, so the header and the date form
-// render at once; the table with its cards (one call, the cards follow the
-// table's search and filters, as on Payments, A18) streams in.
+// render at once. The cards (the days' totals, never the table's filters, as
+// on Payments, A18) and the who-paid suggestions are started here and each
+// load on their own; the table loads its pages in the browser over the API.
 export default async function MaintenancePage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   const range = maintenanceRange(await searchParams, MAINTENANCE_LIMITS.maxDays);
-  const grid = serverApi.dashboard.maintenance.list(range);
+  const totals = serverApi.dashboard.maintenance.totals(range);
   const tagSuggestions = serverApi.dashboard.payments.tagSuggestions();
   const rangeLabel = dayRangeLabel(range);
   const view = `${range.from}-${range.to}`;
@@ -54,9 +53,13 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
         }
         resetHref={routes.maintenance.list()}
       />
-      <AsyncSection key={`grid-${view}`} title="Maintenance" fallback={SKELETON.view}>
-        <MaintenanceSection grid={grid} tagSuggestions={tagSuggestions} range={range} rangeLabel={rangeLabel} />
-      </AsyncSection>
+      <MaintenanceView
+        key={`view-${view}`}
+        totals={totals}
+        tagSuggestions={tagSuggestions}
+        range={range}
+        rangeLabel={rangeLabel}
+      />
     </Stack>
   );
 }

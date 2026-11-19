@@ -44,6 +44,8 @@ import type {
   EarningsView,
   MaintenancePage,
   MaintenancePageQuery,
+  MaintenanceQuery,
+  MaintenanceTotals,
   UpdateMaintenanceInput,
   VoidMaintenanceInput,
   MoveOutInput,
@@ -192,8 +194,10 @@ export interface ApiQueries {
     /** Effective earning per month: collected / received less maintenance (A23). */
     earnings(query?: EarningsQuery): Promise<EarningsView>;
     maintenance: {
-      /** Every expense spent in the days, one page, with totals (0031). */
+      /** Every expense spent in the days, one page, with the Amount footer of all that match (0031). */
       list(query?: MaintenancePageQuery): Promise<MaintenancePage>;
+      /** The stat cards: the days' expenses that aren't voided, whatever the table's search and filters (A18). */
+      totals(query?: MaintenanceQuery): Promise<MaintenanceTotals>;
       /** The Record / Edit maintenance form's houses and who-paid suggestions. */
       newForm(query?: MaintenanceFormQuery): Promise<MaintenanceForm>;
       detail(expenseId: string): Promise<MaintenanceDetail>;

@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { daysBetween, isDateKey } from "@/lib/dates";
 import { MAINTENANCE_CATEGORY_LABELS, MAINTENANCE_STATUS_LABELS, isMaintenanceCategory } from "@/lib/domain/maintenance";
 import { round2 } from "@/lib/money";
-import type { MaintenanceDbRow, MaintenanceTotalsDb } from "@/lib/types";
+import type { MaintenanceDbRow, MaintenanceSumsDb, MaintenanceTotalsDb } from "@/lib/types";
 import { MAINTENANCE_LIMITS } from "@/lib/validation";
 import type { DbPage, MaintenanceFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
@@ -11,9 +11,10 @@ import { checkGrid, gridOrderBy, gridPageNumber, gridWhere, invalidQuery, type G
 import { dateLabel, dateFilterField, dateSearchText, labelOf, maintenanceTagsOf } from "./text";
 
 // The Maintenance page (0031, D35): every expense spent in the days, voided
-// ones included (so a void is visible), one page, with the totals of every
-// matching expense that isn't voided (the stat cards follow the table, as on
-// the Payments page, A18). One statement under RLS.
+// ones included (so a void is visible), one page, with the Amount footer's
+// sums over every matching row (one statement). The stat cards are
+// maintenanceTotals below: the days' expenses that aren't voided, whatever
+// the table shows (as on the Payments page, A18). Both run under RLS.
 
 /** One row per expense spent in the days, with the text the table shows. */
 function expenseRows(from: string, to: string): SQL {
@@ -68,24 +69,24 @@ interface PageResult {
   total: number;
   page: number;
   amount: string | null;
-  cash_amount: string | null;
-  count: number;
-  by_category: { category: string; amount: string }[];
-  by_tag: { name: string; amount: string }[];
-  untagged: string | null;
+  voided: number;
   rows: (Omit<MaintenanceDbRow, "amount"> & { amount: string })[];
+}
+
+/** maxDays counts both ends (731 = two years), daysBetween doesn't. */
+function checkRange(from: string, to: string) {
+  if (!isDateKey(from) || !isDateKey(to) || from > to || daysBetween(from, to) >= MAINTENANCE_LIMITS.maxDays) {
+    throw invalidQuery("date range");
+  }
 }
 
 export async function maintenancePage(
   tx: Tx,
   filter: MaintenanceFilter
-): Promise<DbPage<MaintenanceDbRow> & { totals: MaintenanceTotalsDb }> {
+): Promise<DbPage<MaintenanceDbRow> & { sums: MaintenanceSumsDb }> {
   checkGrid(MAINTENANCE_TABLE, filter);
   const { from, to } = filter;
-  // maxDays counts both ends (731 = two years), daysBetween doesn't.
-  if (!isDateKey(from) || !isDateKey(to) || from > to || daysBetween(from, to) >= MAINTENANCE_LIMITS.maxDays) {
-    throw invalidQuery("date range");
-  }
+  checkRange(from, to);
 
   const [result] = await executeRows<PageResult>(
     tx,
@@ -97,22 +98,14 @@ export async function maintenancePage(
       shown as (select ${gridPageNumber(sql`counted.total`, filter)} as page from counted),
       ordered as (
         select r.*, row_number() over (order by ${gridOrderBy(MAINTENANCE_TABLE, filter)}) as n from matching r
-      ),
-      spent as (select * from matching where not voided)
+      )
       select
         (select count(*)::int from maintenance_expenses e where e.expense_date between ${from}::date and ${to}::date) as all_count,
         counted.total,
         shown.page,
-        (select sum(amount)::text from spent) as amount,
-        -- Cash out: a set-off paid the rest, and no money left for it (A22, isCashExpense).
-        (select sum(amount)::text from spent where not settled_by_set_off) as cash_amount,
-        (select count(*)::int from spent) as count,
-        (select coalesce(json_agg(json_build_object('category', c.category, 'amount', c.amount::text)), '[]'::json)
-          from (select category, sum(amount) as amount from spent group by category) c) as by_category,
-        (select coalesce(json_agg(json_build_object('name', t.name, 'amount', t.amount::text) order by t.amount desc, t.name), '[]'::json)
-          from (select n.name, sum(s.amount) as amount from spent s cross join lateral json_array_elements_text(s.tags) as n(name) group by n.name) t
-        ) as by_tag,
-        (select sum(amount)::text from spent where json_array_length(tags) = 0) as untagged,
+        -- A voided expense is listed but counted nowhere (D35).
+        (select sum(amount)::text from matching where not voided) as amount,
+        (select count(*)::int from matching where voided) as voided,
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'expense_date', to_char(o.expense_date, 'YYYY-MM-DD'), 'amount', o.amount::text,
             'category', o.category, 'description', o.description, 'vendor', o.vendor, 'note', o.note,
@@ -123,25 +116,66 @@ export async function maintenancePage(
       from counted, shown`
   );
 
+  return {
+    rows: result.rows.map((r) => ({ ...r, amount: Number(r.amount) })),
+    total: result.total,
+    all: result.all_count,
+    page: result.page,
+    sums: { amount: round2(Number(result.amount ?? 0)), voided: result.voided },
+  };
+}
+
+/** What maintenanceTotals returns; money as text so no float rounding happens before round2. */
+interface TotalsResult {
+  amount: string | null;
+  cash_amount: string | null;
+  count: number;
+  by_category: { category: string; amount: string }[];
+  by_tag: { name: string; amount: string }[];
+  untagged: string | null;
+}
+
+/**
+ * The stat cards: every expense spent in the days that isn't voided, whatever
+ * the table's search, filters or page (A18).
+ */
+export async function maintenanceTotals(tx: Tx, range: { from: string; to: string }): Promise<MaintenanceTotalsDb> {
+  const { from, to } = range;
+  checkRange(from, to);
+  const [result] = await executeRows<TotalsResult>(
+    tx,
+    sql`
+      with spent as materialized (
+        select e.amount, e.category, e.settled_by_payment_id is not null as settled_by_set_off, tags.names as tags
+        from maintenance_expenses e
+        left join lateral (${maintenanceTagsOf(sql`e.id`)}) as tags on true
+        where e.voided_at is null and e.expense_date between ${from}::date and ${to}::date
+      )
+      select
+        (select sum(amount)::text from spent) as amount,
+        -- Cash out: a set-off paid the rest, and no money left for it (A22, isCashExpense).
+        (select sum(amount)::text from spent where not settled_by_set_off) as cash_amount,
+        (select count(*)::int from spent) as count,
+        (select coalesce(json_agg(json_build_object('category', c.category, 'amount', c.amount::text)), '[]'::json)
+          from (select category, sum(amount) as amount from spent group by category) c) as by_category,
+        (select coalesce(json_agg(json_build_object('name', t.name, 'amount', t.amount::text) order by t.amount desc, t.name), '[]'::json)
+          from (select n.name, sum(s.amount) as amount from spent s cross join lateral json_array_elements_text(s.tags) as n(name) group by n.name) t
+        ) as by_tag,
+        (select sum(amount)::text from spent where json_array_length(tags) = 0) as untagged`
+  );
+
   const byCategory: MaintenanceTotalsDb["by_category"] = {};
   for (const c of result.by_category) {
     // The table's CHECK allows only the app's categories; Other, just in case.
     const category = isMaintenanceCategory(c.category) ? c.category : "other";
     byCategory[category] = round2((byCategory[category] ?? 0) + Number(c.amount));
   }
-
   return {
-    rows: result.rows.map((r) => ({ ...r, amount: Number(r.amount) })),
-    total: result.total,
-    all: result.all_count,
-    page: result.page,
-    totals: {
-      amount: round2(Number(result.amount ?? 0)),
-      cash: round2(Number(result.cash_amount ?? 0)),
-      count: result.count,
-      by_category: byCategory,
-      by_tag: result.by_tag.map((t) => ({ name: t.name, amount: round2(Number(t.amount)) })),
-      untagged: round2(Number(result.untagged ?? 0)),
-    },
+    amount: round2(Number(result.amount ?? 0)),
+    cash: round2(Number(result.cash_amount ?? 0)),
+    count: result.count,
+    by_category: byCategory,
+    by_tag: result.by_tag.map((t) => ({ name: t.name, amount: round2(Number(t.amount)) })),
+    untagged: round2(Number(result.untagged ?? 0)),
   };
 }

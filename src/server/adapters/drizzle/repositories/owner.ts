@@ -20,7 +20,7 @@ import { listAudit } from "../tables/audit";
 import { getDateFormat, saveDateFormat } from "../tables/settings";
 import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
-import { maintenancePage } from "../queries/maintenancePage";
+import { maintenancePage, maintenanceTotals } from "../queries/maintenancePage";
 import { paymentsPage, paymentsTotals } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
 import { tenantLedgerPage } from "../queries/tenantLedgerPage";
@@ -168,6 +168,7 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       monthly: (fromMonth, toMonth) =>
         read(`read maintenance per month ${fromMonth}..${toMonth}`, (tx) => maintenanceMonthly(tx, fromMonth, toMonth)),
       page: (filter) => read(`read maintenance page ${pageLabel(filter)}`, (tx) => maintenancePage(tx, filter)),
+      totals: (range) => read(`read maintenance totals ${range.from}..${range.to}`, (tx) => maintenanceTotals(tx, range)),
       get: (id) => read(`get maintenance expense ${id}`, (tx) => getMaintenanceExpense(tx, id)),
       create: (id, fields, unitCodes, tags, files, settledByPaymentId) =>
         write(

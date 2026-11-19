@@ -31,6 +31,7 @@ import type {
   MaintenanceFile,
   MaintenanceFilterColumn,
   MaintenanceSortColumn,
+  MaintenanceSumsDb,
   MaintenanceTotalsDb,
   OwnerProfile,
   PaymentNotePreset,
@@ -422,7 +423,9 @@ export interface OwnerRepositories {
      */
     monthly(fromMonth: string, toMonth: string): Promise<{ month: string; amount: number; cash: number }[]>;
     /** The expenses spent in the days, one page, with totals of every matching expense that isn't voided. */
-    page(filter: MaintenanceFilter): Promise<DbPage<MaintenanceDbRow> & { totals: MaintenanceTotalsDb }>;
+    page(filter: MaintenanceFilter): Promise<DbPage<MaintenanceDbRow> & { sums: MaintenanceSumsDb }>;
+    /** The stat cards: the days' expenses that aren't voided, whatever the table's search and filters (A18). */
+    totals(range: { from: string; to: string }): Promise<MaintenanceTotalsDb>;
     get(id: string): Promise<MaintenanceExpenseRecord | null>;
     /**
      * The expense, its houses split equally, who paid and its files, in one
