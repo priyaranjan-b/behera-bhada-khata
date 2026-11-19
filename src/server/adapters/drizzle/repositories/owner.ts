@@ -21,7 +21,7 @@ import { getDateFormat, saveDateFormat } from "../tables/settings";
 import { auditHistoryPage } from "../queries/auditHistoryPage";
 import { billingPage, billingTotals } from "../queries/billingPage";
 import { maintenancePage } from "../queries/maintenancePage";
-import { paymentsPage } from "../queries/paymentsPage";
+import { paymentsPage, paymentsTotals } from "../queries/paymentsPage";
 import { tenantAccountSummary } from "../queries/tenantAccountSummary";
 import { tenantLedgerPage } from "../queries/tenantLedgerPage";
 import { tenantMonthsPage } from "../queries/tenantMonthsPage";
@@ -281,6 +281,7 @@ export function drizzleOwnerRepositories(db: Db, claims: JwtClaims): OwnerReposi
       listProofs: (ids) => read(`list proofs of ${ids.length} payments`, (tx) => listPaymentProofs(tx, ids)),
       getProof: (id) => read(`get payment proof ${id}`, (tx) => getPaymentProof(tx, id)),
       page: (filter) => read(`read payments page ${pageLabel(filter)}`, (tx) => paymentsPage(tx, filter)),
+      totals: (range) => read(`read payments totals ${range.from}..${range.to}`, (tx) => paymentsTotals(tx, range)),
       create: (payment, allocations, proofs, tags) =>
         write(`create payment ${payment.id} for tenant ${payment.tenant_id}`, (tx) =>
           createPayment(tx, payment, allocations, proofs, tags)

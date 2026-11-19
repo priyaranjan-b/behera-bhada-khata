@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { daysBetween, isDateKey, todayKey } from "@/lib/dates";
 import { PAYMENT_MODE_LABELS, isCashMode, isPaymentMode } from "@/lib/domain/payments";
 import { round2 } from "@/lib/money";
-import { PAYMENT_MODES, type PaymentMode, type PaymentsDbRow, type PaymentsTotalsDb } from "@/lib/types";
+import { PAYMENT_MODES, type PaymentMode, type PaymentsDbRow, type PaymentsSumsDb, type PaymentsTotalsDb } from "@/lib/types";
 import { PAYMENTS_LIMITS } from "@/lib/validation";
 import type { DbPage, PaymentsFilter } from "@/server/ports";
 import { executeRows, type Tx } from "../client";
@@ -13,11 +13,12 @@ import { dateLabel, dateFilterField, dateSearchText, labelOf, monthLabel, paymen
 // Replaces payments_page() (0026, A18), plus each payment's tags (0030, D34,
 // searched and filtered like the rest of the text) and its payments_rows /
 // payments_matching / payment_mode_label (all dropped in 0029, D33): every tenant's confirmed payments
-// by the day received, one page, with the money per mode of every row that
-// passes the search and filters (the stat cards follow the table). Runs
-// under RLS, so anyone but the owner gets nothing.
+// by the day received, one page, with the Amount footer's sums over every row
+// that passes the search and filters. The stat cards are paymentsTotals below:
+// the range's money per mode, whatever the table shows (A18). Both run under
+// RLS, so anyone but the owner gets nothing.
 //
-// One statement, as the SQL function was: the count, the cards and the page
+// One statement, as the SQL function was: the count, the sums and the page
 // all read one snapshot under one statement_timeout, in one round trip.
 
 /** One row per confirmed payment received in the days, with the text the table shows. */
@@ -72,20 +73,25 @@ interface PageResult {
   all_count: number;
   total: number;
   page: number;
-  by_mode: { mode: string; amount: string; count: number }[];
+  amount: string;
+  set_off: string;
   rows: (Omit<PaymentsDbRow, "amount"> & { amount: string })[];
+}
+
+/** maxDays counts both ends (731 = two years), daysBetween doesn't. */
+function checkRange(from: string, to: string) {
+  if (!isDateKey(from) || !isDateKey(to) || from > to || daysBetween(from, to) >= PAYMENTS_LIMITS.maxDays) {
+    throw invalidQuery("date range");
+  }
 }
 
 export async function paymentsPage(
   tx: Tx,
   filter: PaymentsFilter
-): Promise<DbPage<PaymentsDbRow> & { totals: PaymentsTotalsDb }> {
+): Promise<DbPage<PaymentsDbRow> & { sums: PaymentsSumsDb }> {
   checkGrid(PAYMENTS_TABLE, filter);
   const { from, to } = filter;
-  // maxDays counts both ends (731 = two years), daysBetween doesn't.
-  if (!isDateKey(from) || !isDateKey(to) || from > to || daysBetween(from, to) >= PAYMENTS_LIMITS.maxDays) {
-    throw invalidQuery("date range");
-  }
+  checkRange(from, to);
 
   const [result] = await executeRows<PageResult>(
     tx,
@@ -103,8 +109,8 @@ export async function paymentsPage(
           where p.status = 'confirmed' and p.payment_date between ${from}::date and ${to}::date) as all_count,
         counted.total,
         shown.page,
-        (select coalesce(json_agg(json_build_object('mode', m.mode, 'amount', m.amount::text, 'count', m.count)), '[]'::json)
-          from (select mode, sum(amount) as amount, count(*)::int as count from matching group by mode) m) as by_mode,
+        (select coalesce(sum(amount), 0)::text from matching) as amount,
+        (select coalesce(sum(amount) filter (where mode = 'set_off'), 0)::text from matching) as set_off,
         (select coalesce(json_agg(json_build_object(
             'id', o.id, 'receipt_no', o.receipt_no, 'payment_date', to_char(o.payment_date, 'YYYY-MM-DD'),
             'tenant_id', o.tenant_id, 'tenant_name', o.tenant_name, 'property_name', o.property_name,
@@ -116,25 +122,45 @@ export async function paymentsPage(
       from counted, shown`
   );
 
-  const totals: PaymentsTotalsDb = {
-    amount: 0,
-    count: 0,
-    by_mode: Object.fromEntries(PAYMENT_MODES.map((mode) => [mode, 0])) as Record<PaymentMode, number>,
-  };
-  for (const m of result.by_mode) {
-    // The table's CHECK allows only the app's modes; Other, as payment_mode_label, just in case.
-    const mode: PaymentMode = isPaymentMode(m.mode) ? m.mode : "other";
-    totals.by_mode[mode] = round2(totals.by_mode[mode] + Number(m.amount));
-    // "Received" is money that came in; a set-off pays rent but is its own figure (A22).
-    if (isCashMode(mode)) totals.amount = round2(totals.amount + Number(m.amount));
-    totals.count += m.count;
-  }
-
   return {
     rows: result.rows.map((r) => ({ ...r, amount: Number(r.amount) })),
     total: result.total,
     all: result.all_count,
     page: result.page,
-    totals,
+    sums: { amount: round2(Number(result.amount)), set_off: round2(Number(result.set_off)) },
   };
+}
+
+/**
+ * The stat cards: money per mode of every confirmed payment received in the
+ * days, whatever the table's search, filters or page (A18).
+ */
+export async function paymentsTotals(tx: Tx, range: { from: string; to: string }): Promise<PaymentsTotalsDb> {
+  const { from, to } = range;
+  checkRange(from, to);
+  const byMode = await executeRows<{ mode: string; amount: string; count: number }>(
+    tx,
+    sql`
+      select p.mode, sum(p.amount)::text as amount, count(*)::int as count
+      from payments p
+      where p.status = 'confirmed' and p.payment_date between ${from}::date and ${to}::date
+      group by p.mode`
+  );
+
+  const totals: PaymentsTotalsDb = {
+    amount: 0,
+    count: 0,
+    by_mode: Object.fromEntries(PAYMENT_MODES.map((mode) => [mode, 0])) as Record<PaymentMode, number>,
+  };
+  for (const m of byMode) {
+    // The table's CHECK allows only the app's modes; Other, as payment_mode_label, just in case.
+    const mode: PaymentMode = isPaymentMode(m.mode) ? m.mode : "other";
+    totals.by_mode[mode] = round2(totals.by_mode[mode] + Number(m.amount));
+    // "Received" is money that came in, and its count the payments in it; a set-off pays rent but is its own figure (A22).
+    if (isCashMode(mode)) {
+      totals.amount = round2(totals.amount + Number(m.amount));
+      totals.count += m.count;
+    }
+  }
+  return totals;
 }

@@ -1,7 +1,9 @@
 // Parity: the Drizzle paymentsPage must answer exactly what payments_page()
-// (0026) answers - rows, order, counts, page and the totals per mode - for a
-// matrix of searches, filters, sorts and pages, as the owner and as anyone
-// else. Also pins the text it searches (dates, months, modes, towers) to the
+// (0026) answers - rows, order, counts, page, and as the Amount footer the
+// sum of its totals - for a matrix of searches, filters, sorts and pages, as
+// the owner and as anyone else. The stat cards moved to paymentsTotals (by
+// the days only, A18), checked against the frozen function's unfiltered
+// totals. Also pins the text it searches (dates, months, modes, towers) to the
 // TS functions the UI uses. The frozen function predates tags (0030), so
 // the comparison leaves each row's `tags` out (none are set while it runs);
 // the tags' own tests come last.
@@ -11,7 +13,7 @@ import { formatDateKey, formatMonth, todayKey } from "@/lib/dates";
 import { PAYMENT_MODE_LABELS, paymentModeLabel } from "@/lib/domain/payments";
 import { PAYMENT_MODES, type PaymentMode } from "@/lib/types";
 import { inScope, type Scope } from "@/server/adapters/drizzle/client";
-import { paymentsPage } from "@/server/adapters/drizzle/queries/paymentsPage";
+import { paymentsPage, paymentsTotals } from "@/server/adapters/drizzle/queries/paymentsPage";
 import { dateLabel, dateSearchText, labelOf, monthLabel, towersNow } from "@/server/adapters/drizzle/queries/text";
 import type { PaymentsFilter } from "@/server/ports";
 import { asOwner, asStranger, createLedgerDb, type LedgerDb } from "../fixtures";
@@ -80,36 +82,44 @@ const viaSql = async (scope: Scope, f: PaymentsFilter) =>
     )
   )[0].v;
 const viaDrizzle = (scope: Scope, f: PaymentsFilter) => inScope(l.db, scope, (tx) => paymentsPage(tx, f));
+const totalsOf = (scope: Scope, range: { from: string; to: string }) => inScope(l.db, scope, (tx) => paymentsTotals(tx, range));
+
+interface FrozenPage {
+  rows: unknown[];
+  total: number;
+  all: number;
+  page: number;
+  totals: { amount: number; count: number; by_mode: Record<string, number> };
+}
 
 /**
  * Same answer both ways, and the Drizzle one returned. payments_page() never
  * had the rows' tags (0030) or the set-off mode (0032), so the comparison
- * leaves out the tags and a zero set_off total; no set-off is in its data.
+ * leaves out the tags; no set-off is in its data, so its money received is
+ * the whole Amount footer.
  */
 async function same(f: Partial<PaymentsFilter>, scope: Scope = asOwner) {
   const filter = { ...BASE, ...f };
   const drizzle = await viaDrizzle(scope, filter);
   expect(drizzle.rows.every((r) => Array.isArray(r.tags))).toBe(true);
-  const { set_off: setOff, ...byMode } = drizzle.totals.by_mode;
-  expect(setOff).toBe(0);
-  expect({
-    ...drizzle,
-    rows: drizzle.rows.map(({ tags: _tags, ...r }) => r),
-    totals: { ...drizzle.totals, by_mode: byMode },
-  }).toEqual(await viaSql(scope, filter));
+  const frozen = (await viaSql(scope, filter)) as FrozenPage;
+  const { sums, ...page } = drizzle;
+  expect({ ...page, rows: drizzle.rows.map(({ tags: _tags, ...r }) => r) }).toEqual({
+    rows: frozen.rows,
+    total: frozen.total,
+    all: frozen.all,
+    page: frozen.page,
+  });
+  expect(sums).toEqual({ amount: frozen.totals.amount, set_off: 0 });
   return drizzle;
 }
 
 describe("paymentsPage on Drizzle matches payments_page()", () => {
-  it("the whole range, newest first, with the totals per mode", async () => {
+  it("the whole range, newest first, with the Amount footer", async () => {
     const page = await same({});
     expect(page.all).toBe(6);
     expect(page.total).toBe(6);
-    expect(page.totals).toEqual({
-      amount: 34500,
-      count: 6,
-      by_mode: { cash: 3500, bank_transfer: 8000, upi: 10000, cheque: 4000, other: 9000, set_off: 0 },
-    });
+    expect(page.sums).toEqual({ amount: 34500, set_off: 0 });
     const bimal = page.rows.find((r) => r.tenant_id === tenants.bimal && r.mode === "cheque");
     expect(bimal).toMatchObject({ property_name: "Tower 1, Tower 2", months_text: "February 2026", amount: 4000 });
     expect(page.rows.find((r) => r.tenant_id === tenants.chai)?.tenant_name).toBe("Chai Point Pvt Ltd");
@@ -186,11 +196,11 @@ describe("paymentsPage on Drizzle matches payments_page()", () => {
     expect((await same({ pageSize: 3, page: 2 })).page).toBe(1);
   });
 
-  it("a shorter range, and the cards follow the search", async () => {
+  it("a shorter range, and the footer follows the search", async () => {
     const march = await same({ from: "2026-03-01", to: "2026-03-31" });
     expect(march.all).toBe(3);
     const cash = await same({ search: "cash" });
-    expect(cash.totals.by_mode).toMatchObject({ cash: 3500, upi: 0 });
+    expect(cash.sums.amount).toBe(3500);
   });
 
   it("refuses what the table doesn't offer, as the SQL did", async () => {
@@ -238,7 +248,42 @@ describe("paymentsPage on Drizzle matches payments_page()", () => {
 
   it("shows another signed-in account nothing", async () => {
     const page = await same({}, asStranger);
-    expect(page).toMatchObject({ rows: [], total: 0, all: 0, page: 0, totals: { amount: 0, count: 0 } });
+    expect(page).toMatchObject({ rows: [], total: 0, all: 0, page: 0, sums: { amount: 0, set_off: 0 } });
+  });
+});
+
+describe("paymentsTotals: the stat cards, by the days only (A18)", () => {
+  it("matches payments_page()'s totals with no search or filter", async () => {
+    for (const range of [
+      { from: BASE.from, to: BASE.to },
+      { from: "2026-03-01", to: "2026-03-31" },
+      { from: "2026-02-01", to: "2026-02-28" },
+    ]) {
+      const frozen = (await viaSql(asOwner, { ...BASE, ...range })) as FrozenPage;
+      const totals = await totalsOf(asOwner, range);
+      const { set_off: setOff, ...byMode } = totals.by_mode;
+      expect(setOff).toBe(0);
+      expect({ ...totals, by_mode: byMode }).toEqual(frozen.totals);
+    }
+    expect(await totalsOf(asOwner, { from: BASE.from, to: BASE.to })).toEqual({
+      amount: 34500,
+      count: 6,
+      by_mode: { cash: 3500, bank_transfer: 8000, upi: 10000, cheque: 4000, other: 9000, set_off: 0 },
+    });
+  });
+
+  it("refuses a bad range, as the table does", async () => {
+    for (const range of [
+      { from: "2026-03-01", to: "2026-02-01" },
+      { from: "2024-01-01", to: "2026-03-31" },
+      { from: "2026-02-30", to: "2026-03-31" },
+    ]) {
+      await expect(totalsOf(asOwner, range)).rejects.toMatchObject({ status: 400 });
+    }
+  });
+
+  it("shows another signed-in account nothing", async () => {
+    expect(await totalsOf(asStranger, { from: BASE.from, to: BASE.to })).toMatchObject({ amount: 0, count: 0 });
   });
 });
 
@@ -294,10 +339,10 @@ describe("tags (0030): on the rows, searched and filtered", () => {
     expect(rows.find((r) => r.tenant_id === tenants.chai)?.tags).toEqual([]);
   });
 
-  it("search and the Tags filter match a tag's name, and the cards follow", async () => {
+  it("search and the Tags filter match a tag's name, and the footer follows", async () => {
     const padma = await viaDrizzle(asOwner, { ...BASE, search: "padma" });
     expect(padma.total).toBe(2);
-    expect(padma.totals).toMatchObject({ amount: 14000, by_mode: { upi: 10000, cheque: 4000, cash: 0 } });
+    expect(padma.sums).toEqual({ amount: 14000, set_off: 0 });
     expect((await viaDrizzle(asOwner, { ...BASE, search: "padma malati" })).total).toBe(1);
     const filtered = await viaDrizzle(asOwner, { ...BASE, filters: [{ field: "tags", operator: "contains", value: "MALATI" }] });
     expect(filtered.rows.map((r) => r.mode)).toEqual(["upi"]);
@@ -350,7 +395,14 @@ describe("set-off payments (0032, A22)", () => {
     }
     const may = await viaDrizzle(asOwner, { ...BASE, from: "2026-05-01", to: "2026-05-31" });
     expect(may.total).toBe(2);
-    expect(may.totals).toMatchObject({ amount: 3800, count: 2, by_mode: { cash: 3800, set_off: 1200 } });
+    // The footer adds up the Amount column, set-offs included; the cards' Received doesn't.
+    expect(may.sums).toEqual({ amount: 5000, set_off: 1200 });
+    // Received counts the cash payment only: its card's filter shows one row.
+    expect(await totalsOf(asOwner, { from: "2026-05-01", to: "2026-05-31" })).toMatchObject({
+      amount: 3800,
+      count: 1,
+      by_mode: { cash: 3800, set_off: 1200 },
+    });
     const setOffOnly = await viaDrizzle(asOwner, {
       ...BASE,
       from: "2026-05-01",
@@ -358,6 +410,6 @@ describe("set-off payments (0032, A22)", () => {
       filters: [{ field: "mode", operator: "is", value: "Set-off (deducted by tenant)" }],
     });
     expect(setOffOnly.rows.map((r) => [r.mode, r.amount])).toEqual([["set_off", 1200]]);
-    expect(setOffOnly.totals.amount).toBe(0);
+    expect(setOffOnly.sums).toEqual({ amount: 1200, set_off: 1200 });
   });
 });

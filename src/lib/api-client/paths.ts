@@ -75,6 +75,7 @@ export const apiPaths = {
     },
     payments: {
       list: "/api/dashboard/payments",
+      totals: "/api/dashboard/payments/totals",
       paidDirect: "/api/dashboard/payments/paid-direct",
       tagSuggestions: "/api/dashboard/payments/tags",
       tags: (paymentId: string) => `/api/dashboard/payments/${e(paymentId)}/tags`,

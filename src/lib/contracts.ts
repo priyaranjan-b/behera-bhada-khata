@@ -264,10 +264,17 @@ export interface PaymentListRow {
   tags: string[];
 }
 
-/** Money per mode for every payment that matches the search and filters, whatever the page. */
+/**
+ * GET /api/dashboard/payments/totals: the stat cards. Money per mode of every
+ * payment received in the days; the table's search and filters don't apply (A18).
+ */
 export interface PaymentTotals {
+  /** The days counted (yyyy-MM-dd, both included). */
+  from: string;
+  to: string;
   /** Money that came in; set-offs are in byMode.set_off only (A22). */
   amount: number;
+  /** The payments in amount (no set-offs), so the Received card's filter shows that many rows. */
   count: number;
   byMode: Record<PaymentMode, number>;
 }
@@ -276,7 +283,10 @@ export interface PaymentsPage extends TablePage<PaymentListRow> {
   /** The days shown (yyyy-MM-dd, both included). */
   from: string;
   to: string;
-  totals: PaymentTotals;
+  /** The Amount footer over every row matching the search and filters, set-offs included; keyed by grid field (A26). */
+  totals: Pick<PaymentListRow, "amount">;
+  /** Of totals.amount, set off (A22): the footer's note. */
+  setOff: number;
 }
 
 // ---- /api/dashboard/maintenance (money spent on the houses, 0031, D35) --------

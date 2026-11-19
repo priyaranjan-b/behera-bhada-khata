@@ -142,6 +142,7 @@ export function createHttpApi({ baseUrl, headers }: HttpApiOptions): Api {
       },
       payments: {
         list: (query = {}) => get(withQuery(p.dashboard.payments.list, { ...query })),
+        totals: (query = {}) => get(withQuery(p.dashboard.payments.totals, { ...query })),
         paidDirect: (query = {}) => get(withQuery(p.dashboard.payments.paidDirect, { ...query })),
         adjust: (id) => get(p.dashboard.payments.adjust(id)),
         createAdjustment: (id, input) => post(p.dashboard.payments.adjustments(id), input),

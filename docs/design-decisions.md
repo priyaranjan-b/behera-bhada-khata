@@ -578,7 +578,7 @@ parameters, whitelisted sort/filter columns, `like_escape`, RLS on every
 table, explicit grants), but nothing limited authenticated calls or query
 time, and the IP used for public limits could be spoofed.
 
-### A18 — The Payments page: payments by day received, cards that follow the table
+### A18 — The Payments page: payments by day received, cards by the days only
 
 **Decision.** `/payments` lists every tenant's recorded payments by the day
 they were received (`payment_date`), not the rent month they paid. It opens
@@ -586,11 +586,31 @@ on last month (whole calendar month, like Billing and the Overview); the
 date form picks any days up to `PAYMENTS_LIMITS.maxDays` and the ‹ › arrows
 move whole months by months, other ranges by their length
 (`src/lib/domain/payments.ts`).
-- **One call for the table and the per-mode cards.** The cards (Received,
-  Cash, UPI, Bank transfer, Cheque & other) must add up exactly what the
-  table finds under its search and column filters, so `payments_page()`
-  (0026) returns the totals of every matching row with the page. A separate
-  totals endpoint would have to repeat the grid's whole query.
+- **The cards are the days' totals, on their own call.** The cards
+  (Received, Cash, UPI, Bank transfer, Cheque & other, Set-off) add up every
+  payment received in the days: `GET /api/dashboard/payments/totals`
+  (`getPaymentsTotals`, `paymentsTotals` in `queries/paymentsPage.ts`).
+  The page starts the call and passes the promise down unawaited;
+  `PaymentStatCards` (a client component, since a tap sets the table's
+  filter) reads it with `use()` inside its own `AsyncSection`, so the cards
+  wait for nothing else and a failure takes only those six cards (Govt paid
+  direct sits outside that boundary). The table's search, column filters
+  and a tapped card (A28) never change them; only a new date range does.
+  Received's count is the payments in its amount (no set-offs), so tapping
+  it shows that many rows. Its caption names the period ("All 38 payments
+  in October 2026"), so it isn't read as the filtered rows' total.
+- **The table loads in the browser.** `GET /api/dashboard/payments`, made
+  for the first page and every page, sort, search and filter
+  (`useServerGrid` with `empty`, as the tenant tabs do, A16); no
+  server-rendered first page, at the owner's request, at the cost of one
+  more round trip after the page loads. A failed first load shows its
+  error with Try again in place of "No payments". Its Amount footer (A26)
+  follows the filters, set-offs included. The cards and the table are two
+  reads, so a payment recorded between them can make the Received card and
+  the footer differ for a moment; that is expected, not a bug.
+  *Changed Nov 2026, at the owner's request.* The cards used to come with
+  the table in one call and follow its filters, so tapping "Cash" made
+  every other card read ₹0.
 - **Govt rent paid direct (A11) is its own card and call.** It is never
   recorded, so it has no date received: it counts by the rent months the
   days touch, up to this month, and the table's search doesn't apply.
@@ -1037,8 +1057,9 @@ page holding the records behind it, for the same period:
   cards are server-rendered, so there the band is the URL's `?band=`
   (`routes.defaultersBand`), which the table's "Show" reads and writes too;
   its "Show" options are now the cards' four bands, not "2+ / 4+ / 7+".
-  Payments' and Maintenance's cards follow the table's filters (A18), so with
-  "Cash" on, the other mode cards read ₹0 until it's cleared.
+  Maintenance's cards follow the table's filters, so with one category on
+  the others read ₹0 until it's cleared. Payments' cards don't: they are the
+  days' totals (A18), and a tapped card only filters the table.
 - **No link:** a total of the table already on screen (Billing's Billed,
   Collected and Balance; Maintenance's Spent), figures that are computed
   rather than recorded (Earnings' nets, Spent of collected), and two with no

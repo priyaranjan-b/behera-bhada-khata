@@ -38,6 +38,7 @@ import type {
   PaymentsDbRow,
   PaymentsFilterColumn,
   PaymentsSortColumn,
+  PaymentsSumsDb,
   PaymentsTotalsDb,
   Payment,
   PaymentAllocation,
@@ -595,8 +596,10 @@ export interface OwnerRepositories {
      * acknowledged yet; never touches ledger facts. False otherwise.
      */
     rotateToken(id: string, tokenHash: string, expiresAt: string): Promise<boolean>;
-    /** Every tenant's payments received in the days, one page, with totals per mode of all that match. */
-    page(filter: PaymentsFilter): Promise<DbPage<PaymentsDbRow> & { totals: PaymentsTotalsDb }>;
+    /** Every tenant's payments received in the days, one page, with the Amount sums of all that match. */
+    page(filter: PaymentsFilter): Promise<DbPage<PaymentsDbRow> & { sums: PaymentsSumsDb }>;
+    /** Money per mode of every payment received in the days, whatever the table's search and filters (A18). */
+    totals(range: { from: string; to: string }): Promise<PaymentsTotalsDb>;
   };
   adjustments: {
     /** `fromDate` (yyyy-MM-dd): only adjustments confirmed on or after it. */

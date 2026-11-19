@@ -3,7 +3,7 @@ import { OWNER_ID, fakes, resetFakes, tenant } from "../fakes";
 
 vi.mock("@/server/infra", async () => (await import("../fakes")).infraMock());
 
-const { getPaymentsPage, getPaymentsPaidDirect } = await import("@/server/services/paymentsReport");
+const { getPaymentsPage, getPaymentsPaidDirect, getPaymentsTotals } = await import("@/server/services/paymentsReport");
 
 const ctx = { ownerId: OWNER_ID };
 
@@ -21,7 +21,7 @@ describe("Payments", () => {
   it("defaults to last month and asks the database for one page, as database columns", async () => {
     const page = await getPaymentsPage(ctx);
     expect(page).toMatchObject({ from: "2026-10-01", to: "2026-10-31", total: 0, page: 0 });
-    expect(page.totals).toEqual({ amount: 0, count: 0, byMode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 0 } });
+    expect(page).toMatchObject({ totals: { amount: 0 }, setOff: 0 });
     expect(fakes.owner.payments.page).toHaveBeenLastCalledWith({
       from: "2026-10-01",
       to: "2026-10-31",
@@ -72,10 +72,37 @@ describe("Payments", () => {
     }
   });
 
+  it("passes the Amount footer through, set-offs included", async () => {
+    fakes.owner.payments.page.mockResolvedValueOnce({ rows: [], total: 0, all: 0, page: 0, sums: { amount: 5000, set_off: 1200 } });
+    expect(await getPaymentsPage(ctx)).toMatchObject({ totals: { amount: 5000 }, setOff: 1200 });
+  });
+
+  it("totals the cards by the days only: no search or filter reaches them", async () => {
+    fakes.owner.payments.totals.mockResolvedValueOnce({
+      amount: 3800,
+      count: 2,
+      by_mode: { cash: 3800, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 1200 },
+    });
+    expect(
+      await getPaymentsTotals(ctx, { from: "2026-10-20", to: "2026-10-05", q: "upi", filters: "[]" })
+    ).toEqual({
+      from: "2026-10-05",
+      to: "2026-10-20",
+      amount: 3800,
+      count: 2,
+      byMode: { cash: 3800, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 1200 },
+    });
+    expect(fakes.owner.payments.totals).toHaveBeenLastCalledWith({ from: "2026-10-05", to: "2026-10-20" });
+    // Defaults to last month, like the table.
+    await getPaymentsTotals(ctx);
+    expect(fakes.owner.payments.totals).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" });
+  });
+
   it("rejects a malformed date or sort", async () => {
     await expect(getPaymentsPage(ctx, { from: "10/10/2026" })).rejects.toMatchObject({ status: 400 });
     await expect(getPaymentsPage(ctx, { sort: "note" })).rejects.toMatchObject({ status: 400 });
     await expect(getPaymentsPaidDirect(ctx, { to: "2026-13-01" })).rejects.toMatchObject({ status: 400 });
+    await expect(getPaymentsTotals(ctx, { from: "2026-02-30" })).rejects.toMatchObject({ status: 400 });
   });
 
   it("counts Govt rent paid direct for the rent months the days touch, up to this month", async () => {

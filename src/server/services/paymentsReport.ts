@@ -1,5 +1,5 @@
 import "server-only";
-import type { PaymentListRow, PaymentsPage, PaymentsPaidDirect } from "@/lib/contracts";
+import type { PaymentListRow, PaymentsPage, PaymentsPaidDirect, PaymentTotals } from "@/lib/contracts";
 import { currentMonthKey } from "@/lib/dates";
 import { monthsIn } from "@/lib/domain/billing";
 import { monthsOfDayRange, resolveDayRange } from "@/lib/domain/payments";
@@ -10,9 +10,10 @@ import { db, placements, tenantsList } from "./loaders";
 import { paidDirectPeriods } from "./periods";
 
 // The Payments page (A18): every tenant's recorded payments by the day they
-// were received, paged, searched and totalled per mode in the database
-// (A15, A19), plus government rent paid direct (A11) on its own
-// call - it has no date received, so it counts by rent month.
+// were received, paged and searched in the database (A15, A19); the stat
+// cards' money per mode for the days on their own call, so the table's search
+// and filters never change them; and government rent paid direct (A11) on
+// another - it has no date received, so it counts by rent month.
 
 // The grid's fields → the columns the Payments query reads.
 const SORT_COLUMNS = {
@@ -32,7 +33,7 @@ const FILTER_COLUMNS = {
   tags: "tags",
 } as const;
 
-/** One page of the Payments grid, with the totals per mode of every payment that matches. */
+/** One page of the Payments grid, with the Amount footer of every payment that matches. */
 export async function getPaymentsPage(_ctx: OwnerContext, query: unknown = {}): Promise<PaymentsPage> {
   const input = parseInput(paymentsPageQuerySchema, query ?? {});
   const range = resolveDayRange(input, PAYMENTS_LIMITS.maxDays);
@@ -46,7 +47,6 @@ export async function getPaymentsPage(_ctx: OwnerContext, query: unknown = {}): 
     page: input.page,
     pageSize: input.pageSize,
   });
-  const t = result.totals;
   return {
     ...range,
     rows: result.rows.map(
@@ -68,17 +68,26 @@ export async function getPaymentsPage(_ctx: OwnerContext, query: unknown = {}): 
     total: result.total,
     all: result.all,
     page: result.page,
-    totals: {
-      amount: Number(t.amount),
-      count: t.count,
-      byMode: {
-        cash: Number(t.by_mode.cash),
-        bank_transfer: Number(t.by_mode.bank_transfer),
-        upi: Number(t.by_mode.upi),
-        cheque: Number(t.by_mode.cheque),
-        other: Number(t.by_mode.other),
-        set_off: Number(t.by_mode.set_off),
-      },
+    totals: { amount: Number(result.sums.amount) },
+    setOff: Number(result.sums.set_off),
+  };
+}
+
+/** The stat cards: money per mode of every payment received in the days, whatever the table shows. */
+export async function getPaymentsTotals(_ctx: OwnerContext, query: unknown = {}): Promise<PaymentTotals> {
+  const range = resolveDayRange(parseInput(paymentsQuerySchema, query ?? {}), PAYMENTS_LIMITS.maxDays);
+  const t = await (await db()).payments.totals(range);
+  return {
+    ...range,
+    amount: Number(t.amount),
+    count: t.count,
+    byMode: {
+      cash: Number(t.by_mode.cash),
+      bank_transfer: Number(t.by_mode.bank_transfer),
+      upi: Number(t.by_mode.upi),
+      cheque: Number(t.by_mode.cheque),
+      other: Number(t.by_mode.other),
+      set_off: Number(t.by_mode.set_off),
     },
   };
 }

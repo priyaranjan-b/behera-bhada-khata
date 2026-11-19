@@ -76,8 +76,8 @@ test instead.
   tables page in the database vs the browser (A15), record pages in
   lazy tabs by data source (A16), and the abuse limits: owner API rate
   limit, client IP from the last `x-forwarded-for` hop, statement timeouts
-  (A17), the Payments page: payments by day received, cards that
-  follow the table (A18), and the Drizzle adapter: which SQL functions
+  (A17), the Payments page: payments by day received, cards by the
+  days only and a table loaded in the browser (A18), and the Drizzle adapter: which SQL functions
   move to TS and which stay in Postgres (A19), and the Overview's
   "Collected" (per rent month) vs the chart's "Received" (cash, A20), and the
   phone app as a PWA whose service worker caches no owner data (A21), and
@@ -711,9 +711,11 @@ Each of these was found broken somewhere; keep them when adding code.
   the template's outlined style alone greys it).
 - Payments (`/payments`, A18, `src/server/services/paymentsReport.ts`):
   every tenant's payments by day received (default last month), paged in
-  the database (`paymentsPage`, A19) with the per-mode cards in the same call so
-  they follow the table's search and filters; Govt paid direct is its own
-  card, counted by rent month.
+  the database (`paymentsPage`, A19) and loaded by the browser
+  (`GET /api/dashboard/payments`). The per-mode cards are their own call
+  (`/payments/totals`, `paymentsTotals`), by the days only: search, filters
+  and a tapped card never change them. Govt paid direct is its own card,
+  counted by rent month.
 - Defaulters (`/defaulters`, `getDefaultersReport` in
   `src/server/services/dashboard.ts`): every tenant, moved-out ones too,
   with rent unpaid for an ended month, most months behind first. Aging

@@ -948,10 +948,19 @@ export interface PaymentsDbRow {
   tags: string[];
 }
 
-/** The Payments page totals (was payments_page, 0026): every matching row, whatever the page. */
+/** The Payments page's Amount footer: every row matching the search and filters, whatever the page. */
+export interface PaymentsSumsDb {
+  /** Set-offs included (A26). */
+  amount: number;
+  /** Of amount, set off (A22). */
+  set_off: number;
+}
+
+/** The Payments page's stat cards (paymentsTotals): every confirmed payment in the days, whatever the table shows (A18). */
 export interface PaymentsTotalsDb {
   /** Money that came in: every mode but set_off (A22). */
   amount: number;
+  /** The payments in amount (no set-offs). */
   count: number;
   by_mode: Record<PaymentMode, number>;
 }

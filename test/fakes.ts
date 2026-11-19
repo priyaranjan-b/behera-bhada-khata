@@ -602,7 +602,12 @@ function build() {
         total: 0,
         all: 0,
         page: 0,
-        totals: { amount: 0, count: 0, by_mode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 0 } },
+        sums: { amount: 0, set_off: 0 },
+      })),
+      totals: vi.fn(async () => ({
+        amount: 0,
+        count: 0,
+        by_mode: { cash: 0, bank_transfer: 0, upi: 0, cheque: 0, other: 0, set_off: 0 },
       })),
     },
     adjustments: {

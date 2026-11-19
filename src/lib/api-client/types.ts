@@ -65,6 +65,7 @@ import type {
   PaymentsPageQuery,
   PaymentsPaidDirect,
   PaymentsQuery,
+  PaymentTotals,
   PaidDirectState,
   PortfolioFacts,
   UpdateOwnerProfileInput,
@@ -178,8 +179,10 @@ export interface ApiQueries {
       newPayment(tenantId: string): Promise<NewPaymentForm>;
     };
     payments: {
-      /** Every tenant's payments by day received, one page, with totals per mode (A18). */
+      /** Every tenant's payments by day received, one page, with the Amount footer of all that match (A18). */
       list(query?: PaymentsPageQuery): Promise<PaymentsPage>;
+      /** The stat cards: money per mode for the days, whatever the table's search and filters (A18). */
+      totals(query?: PaymentsQuery): Promise<PaymentTotals>;
       /** Govt rent paid direct for the rent months the days touch (A11). */
       paidDirect(query?: PaymentsQuery): Promise<PaymentsPaidDirect>;
       adjust(paymentId: string): Promise<AdjustPaymentForm>;

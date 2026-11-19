@@ -11,15 +11,16 @@ import { PageHeader } from "@/components/ui/DataDisplay";
 import DayRangeForm from "@/components/ui/DayRangeForm";
 import { PAYMENTS_SKELETONS as SKELETON } from "./paymentsSkeletons";
 import PaidDirectStat from "./sections/PaidDirectStat";
-import PaymentsSection from "./sections/PaymentsSection";
+import PaymentsView from "./PaymentsView";
 
 // Every tenant's payments by the day they were received (A18). The days come
-// straight from the URL, so the header and the date form render at once; the
-// table with its per-mode cards (one call: the cards follow the table's search
-// and filters) and Govt paid direct (by rent month) stream in on their own.
+// straight from the URL, so the header and the date form render at once. The
+// per-mode cards (the days' totals, never the table's filters), Govt paid
+// direct (by rent month) and the tag suggestions are started here and each
+// load on their own; the table loads its pages in the browser over the API.
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   const range = dayRangeFromParams(await searchParams, PAYMENTS_LIMITS.maxDays);
-  const grid = serverApi.dashboard.payments.list(range);
+  const totals = serverApi.dashboard.payments.totals(range);
   const paidDirect = serverApi.dashboard.payments.paidDirect(range);
   const tagSuggestions = serverApi.dashboard.payments.tagSuggestions();
   const rangeLabel = dayRangeLabel(range);
@@ -45,19 +46,18 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         }
         resetHref={routes.payments.list()}
       />
-      <AsyncSection key={`grid-${view}`} title="Payments" fallback={SKELETON.view}>
-        <PaymentsSection
-          grid={grid}
-          range={range}
-          rangeLabel={rangeLabel}
-          tagSuggestions={tagSuggestions}
-          paidDirectCard={
-            <AsyncSection key={view} title="Govt paid direct" fallback={SKELETON.stat}>
-              <PaidDirectStat paidDirect={paidDirect} href={paidDirectHref} />
-            </AsyncSection>
-          }
-        />
-      </AsyncSection>
+      <PaymentsView
+        key={`view-${view}`}
+        totals={totals}
+        range={range}
+        rangeLabel={rangeLabel}
+        tagSuggestions={tagSuggestions}
+        paidDirectCard={
+          <AsyncSection title="Govt paid direct" fallback={SKELETON.stat}>
+            <PaidDirectStat paidDirect={paidDirect} href={paidDirectHref} />
+          </AsyncSection>
+        }
+      />
     </Stack>
   );
 }

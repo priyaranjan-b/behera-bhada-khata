@@ -36,7 +36,7 @@ import { getPaymentTagSuggestions, listPaymentTags } from "@/server/services/pay
 import { getOwnerProfile } from "@/server/services/profile";
 import { getCorrectionPin } from "@/server/services/corrections";
 import { getDisplaySettings, getMyDisplaySettings, getPublicDisplaySettings } from "@/server/services/displaySettings";
-import { getPaymentsPage, getPaymentsPaidDirect } from "@/server/services/paymentsReport";
+import { getPaymentsPage, getPaymentsPaidDirect, getPaymentsTotals } from "@/server/services/paymentsReport";
 import { getSearchIndex } from "@/server/services/search";
 import {
   getAnyTowerTenantForm,
@@ -122,6 +122,7 @@ const inProcessApi: ApiQueries = {
     },
     payments: {
       list: async (query) => getPaymentsPage(await owner(), query),
+      totals: async (query) => getPaymentsTotals(await owner(), query),
       paidDirect: async (query) => getPaymentsPaidDirect(await owner(), query),
       adjust: async (id) => getAdjustPaymentForm(await owner(), id),
       tagSuggestions: async () => getPaymentTagSuggestions(await owner()),
