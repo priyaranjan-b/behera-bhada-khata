@@ -50,10 +50,19 @@ let endNavigation: (() => void) | null = null;
 let navigationTimer: ReturnType<typeof setTimeout> | undefined;
 const NAVIGATION_TIMEOUT_MS = 15_000;
 
-export function startNavigation(path: string | null = null) {
+/**
+ * A link click or Back/Forward started. `changesPage` false: only the query of
+ * the same page changes (‹ ›, a date form, a filter), which shows the top bar
+ * but not the full-screen card (A38).
+ */
+export function startNavigation(path: string | null = null, changesPage = true) {
   if (endNavigation) return;
-  endNavigation = beginNavigation(path);
-  navigationTimer = setTimeout(finishNavigation, NAVIGATION_TIMEOUT_MS);
+  endNavigation = changesPage ? beginNavigation(path) : beginLoading();
+  navigationTimer = setTimeout(() => {
+    // The card blocked the app all this time: leave a trace of which page never came.
+    console.warn(`navigation to ${path ?? "an unknown page"} didn't finish within ${NAVIGATION_TIMEOUT_MS / 1000} s; stopped waiting`);
+    finishNavigation();
+  }, NAVIGATION_TIMEOUT_MS);
 }
 
 export function finishNavigation() {

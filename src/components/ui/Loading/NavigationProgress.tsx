@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Box from "@mui/material/Box";
 import Loader from "./Loader";
@@ -10,8 +10,8 @@ import { finishNavigation, startNavigation, useIsLoading } from "./store";
 // routes, loading.tsx skeletons).
 const SHOW_DELAY_MS = 120;
 
-/** The pathname a plain left click on a same-origin link leads to, or null when it isn't a page change. */
-function internalNavigationTarget(event: MouseEvent): string | null {
+/** The URL a plain left click on a same-origin link leads to, or null when it isn't a navigation. */
+function internalNavigationTarget(event: MouseEvent): URL | null {
   if (event.button !== 0) return null;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
   const anchor = (event.target as Element | null)?.closest?.("a[href]");
@@ -22,7 +22,7 @@ function internalNavigationTarget(event: MouseEvent): string | null {
   if (url.origin !== window.location.origin) return null;
   // API links (receipt downloads…) aren't page navigations.
   if (url.pathname.startsWith("/api/")) return null;
-  return url.pathname + url.search !== window.location.pathname + window.location.search ? url.pathname : null;
+  return url.pathname + url.search !== window.location.pathname + window.location.search ? url : null;
 }
 
 /**
@@ -34,15 +34,20 @@ export default function NavigationProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const loading = useIsLoading();
+  // The page on screen, for Back/Forward: popstate fires with the URL already changed.
+  const shownPath = useRef(pathname);
 
   // A link click or Back/Forward starts a navigation…
   useEffect(() => {
+    // Another path is a page change (the card names it); the same path with another query only reloads it.
     function onClick(event: MouseEvent) {
       const target = internalNavigationTarget(event);
-      if (target !== null) startNavigation(target);
+      if (target !== null) startNavigation(target.pathname, target.pathname !== window.location.pathname);
     }
-    // By the time popstate fires the URL is already the page being opened.
-    const onPopState = () => startNavigation(window.location.pathname);
+    function onPopState() {
+      const path = window.location.pathname;
+      startNavigation(path, path !== shownPath.current);
+    }
     // Capture phase: next/link calls preventDefault() on the way up, which
     // would make every client-side navigation look cancelled.
     document.addEventListener("click", onClick, true);
@@ -55,6 +60,7 @@ export default function NavigationProgress() {
 
   // …which ends once the new route has rendered.
   useEffect(() => {
+    shownPath.current = pathname;
     finishNavigation();
   }, [pathname, searchParams]);
 

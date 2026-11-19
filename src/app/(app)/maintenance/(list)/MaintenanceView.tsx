@@ -1,8 +1,10 @@
 "use client";
 
+import { useCallback, useState, useTransition } from "react";
 import Stack from "@mui/material/Stack";
 import AsyncSection from "@/components/ui/AsyncSection";
 import StatCardRow from "@/components/ui/StatCardRow";
+import { api } from "@/lib/api-client";
 import type { MaintenanceTotals } from "@/lib/contracts";
 import type { DayRange } from "@/lib/domain/payments";
 import MaintenanceStatCards from "./MaintenanceStatCards";
@@ -18,10 +20,12 @@ import { MAINTENANCE_STAT_COLUMNS } from "./maintenanceStatColumns";
  *   filters and a tapped card never change them; a card only filters the
  *   table (A28).
  * - The table loads each page in the browser over `GET /api/dashboard/maintenance`.
+ * - A "Paid by" edit changes the payer cards, so it fetches the totals again
+ *   (in a transition: the old cards stay until the new ones arrive).
  * Key it by the days: a new range starts again from page 1.
  */
 export default function MaintenanceView({
-  totals,
+  totals: initialTotals,
   range,
   rangeLabel,
   tagSuggestions,
@@ -34,6 +38,13 @@ export default function MaintenanceView({
   tagSuggestions: Promise<string[]>;
 }) {
   const grid = useMaintenanceGrid(range);
+  const [totals, setTotals] = useState(initialTotals);
+  const [, startTransition] = useTransition();
+  const { from, to } = range;
+  const refreshTotals = useCallback(
+    () => startTransition(() => setTotals(api.dashboard.maintenance.totals({ from, to }))),
+    [from, to]
+  );
   return (
     <Stack spacing={2}>
       <StatCardRow columns={MAINTENANCE_STAT_COLUMNS} label="Maintenance totals">
@@ -42,7 +53,7 @@ export default function MaintenanceView({
         </AsyncSection>
       </StatCardRow>
       <AsyncSection title="Maintenance" fallback={SKELETON.table}>
-        <MaintenanceTable grid={grid} rangeLabel={rangeLabel} tagSuggestions={tagSuggestions} />
+        <MaintenanceTable grid={grid} rangeLabel={rangeLabel} tagSuggestions={tagSuggestions} onPayersChanged={refreshTotals} />
       </AsyncSection>
     </Stack>
   );

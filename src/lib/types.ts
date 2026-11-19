@@ -986,7 +986,6 @@ export interface MaintenanceDbRow {
   file_count: number;
 }
 
-/** The Maintenance page totals: every matching expense that isn't voided, whatever the page. */
 /** The Maintenance page's Amount footer: every row matching the search and filters, whatever the page. */
 export interface MaintenanceSumsDb {
   /** Spent: a voided expense is listed but counted nowhere (D35). */

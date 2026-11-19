@@ -177,8 +177,11 @@ export default function MaintenanceTable({
   grid,
   rangeLabel,
   tagSuggestions,
+  onPayersChanged,
 }: {
   grid: MaintenanceGrid;
+  /** After a "Paid by" edit: the payer cards above count by payer, so they need the totals again. */
+  onPayersChanged: () => void;
   rangeLabel: string;
   /** Who-paid names for the Paid by column and the tag editor. */
   tagSuggestions: Promise<string[]>;
@@ -245,6 +248,7 @@ export default function MaintenanceTable({
               return added.length > 0 ? [...known, ...added].sort((a, b) => a.localeCompare(b)) : known;
             });
             void reload();
+            onPayersChanged();
           }}
         />
       ) : null}

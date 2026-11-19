@@ -422,7 +422,7 @@ export interface OwnerRepositories {
      * nothing are left out.
      */
     monthly(fromMonth: string, toMonth: string): Promise<{ month: string; amount: number; cash: number }[]>;
-    /** The expenses spent in the days, one page, with totals of every matching expense that isn't voided. */
+    /** Every expense spent in the days, one page, with the Amount footer's sums over every matching row (voided ones counted apart). */
     page(filter: MaintenanceFilter): Promise<DbPage<MaintenanceDbRow> & { sums: MaintenanceSumsDb }>;
     /** The stat cards: the days' expenses that aren't voided, whatever the table's search and filters (A18). */
     totals(range: { from: string; to: string }): Promise<MaintenanceTotalsDb>;

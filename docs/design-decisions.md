@@ -622,6 +622,9 @@ move whole months by months, other ranges by their length
   plus how many are voided). "Most on …" and "Paid by …" name the biggest
   category and payer of the period; they no longer re-label to whichever
   one the table is filtered to, since that one need not be the biggest.
+  A "Paid by" edit changes those cards, so it fetches the totals again (in
+  a transition, keeping the old cards until the new ones arrive); on
+  Payments a tag edit can't change a mode, so its cards stay.
 - **Payments only.** Adjustments stay on the tenant's Ledger.
 - **Server-paged (A15).** Payments grow every month; search and filters
   match the text shown (date as dd/MM/yyyy, mode label, "For months"),
@@ -1536,6 +1539,19 @@ dialog opened as a route (`@modal`), and Back/Forward.
   `ROUTE_LABELS` as the breadcrumbs and the phone top bar) with
   `registerPageTitle`, so the kit needn't import the shell. Unknown (a
   router `back()`, the tenant portal): "Loading…".
+- **Another page only.** A link, Back or router call that keeps the path
+  and changes only the query (‹ ›, the date forms, Defaulters' bands and
+  "Show", "Include Govt paid direct", a flash param after a save) is not a
+  page change: the top bar only. `useAppRouter`'s refresh never clears a
+  pending push's page change, so `router.push(…); router.refresh()` after a
+  save shows the card too.
+- **Accessible.** While the card shows, every other child of `<body>` is
+  `inert` (no taps, no keyboard; the card is portalled to `<body>`). One
+  status line stays mounted, empty, and gets "Opening …" only when the card
+  appears, so a quick page change is never announced.
+- **A stuck navigation is logged.** After the 15-second safety timeout the
+  store warns in the console with the page that never came, then stops
+  waiting.
 - **It covers the server's rendering time only.** Once the next page
   starts streaming, its `loading.tsx` skeleton replaces it.
 - **Only after 300 ms.** A prefetched page or one with a `loading.tsx`

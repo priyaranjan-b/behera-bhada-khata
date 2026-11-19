@@ -12,39 +12,49 @@ function pathOf(href: string): string {
 /**
  * `useRouter()` whose push / replace / refresh / back run in a transition, so
  * the navigation progress bar shows until the new route has rendered, and for
- * push / replace / back (a page change, not a refresh) the full-screen
- * spinner too (A38). Use it instead of `next/navigation`'s `useRouter` for
- * anything the user triggered.
+ * a push / replace to another path, or a back, the full-screen spinner too
+ * (A38). A refresh, or a push / replace that keeps the path (a flash param,
+ * a filter), never shows it. Use it instead of `next/navigation`'s
+ * `useRouter` for anything the user triggered.
  */
 export function useAppRouter() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  // Whether the pending transition changes the page (push / replace / back) or only refreshes it,
-  // and the pathname it goes to when known (the spinner names it, A38).
+  // Whether the pending transition opens another page, and its pathname when known (the spinner names it,
+  // A38). Set by push / replace / back, never cleared by a refresh in the same transition (the usual
+  // `router.push(…); router.refresh()` after a save); reset when the transition ends.
   const changesPage = useRef(false);
   const target = useRef<string | null>(null);
 
-  useEffect(
-    () => (isPending ? (changesPage.current ? beginNavigation(target.current) : beginLoading()) : undefined),
-    [isPending]
-  );
+  useEffect(() => {
+    if (!isPending) {
+      changesPage.current = false;
+      target.current = null;
+      return;
+    }
+    return changesPage.current ? beginNavigation(target.current) : beginLoading();
+  }, [isPending]);
+
+  const opens = (href: string) => {
+    const path = pathOf(href);
+    if (path === window.location.pathname) return;
+    changesPage.current = true;
+    target.current = path;
+  };
 
   return useMemo(
     () => ({
       ...router,
       isPending,
       push: (...args: Parameters<typeof router.push>) => {
-        changesPage.current = true;
-        target.current = pathOf(args[0]);
+        opens(args[0]);
         startTransition(() => router.push(...args));
       },
       replace: (...args: Parameters<typeof router.replace>) => {
-        changesPage.current = true;
-        target.current = pathOf(args[0]);
+        opens(args[0]);
         startTransition(() => router.replace(...args));
       },
       refresh: () => {
-        changesPage.current = false;
         startTransition(() => router.refresh());
       },
       back: () => {

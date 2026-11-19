@@ -14,13 +14,14 @@ export interface LoaderProps {
    * `overlay`: dims its positioned parent and centres a spinner over it.
    * `screen`: fills its parent with a light scrim and centres a card with a
    * spinner and `text` ("Opening Tenants…"; the page-change spinner,
-   * `NavigationOverlay`, A38).
+   * `NavigationOverlay`, A38, which announces it in its own status line, so
+   * pass no `label` there).
    */
   variant?: "spinner" | "bar" | "overlay" | "screen";
   size?: keyof typeof SPINNER_SIZE;
   /** Announced to screen readers; omit when a parent already says what's loading. */
   label?: string;
-  /** `screen` only: the card's text, also announced (default "Loading…"). */
+  /** `screen` only: the card's text (default "Loading…"). */
   text?: string;
 }
 
@@ -42,9 +43,7 @@ export default function Loader({ variant = "spinner", size = "md", label, text }
     const message = text ?? "Loading…";
     return (
       <Box
-        role="status"
-        aria-live="polite"
-        aria-label={label ?? message}
+        {...a11y}
         sx={{
           position: "absolute",
           inset: 0,

@@ -318,7 +318,6 @@ export interface MaintenanceListRow {
   fileCount: number;
 }
 
-/** Every matching expense that isn't voided, whatever the page. */
 /**
  * GET /api/dashboard/maintenance/totals: the stat cards. Every expense spent in
  * the days that isn't voided; the table's search and filters don't apply (A18).
